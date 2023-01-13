@@ -23,6 +23,10 @@ export function activate(context: vscode.ExtensionContext) {
   // Diagnostics will be updated when a file is opened or when it is changed.
   // When that happens, we also want to update the CodeLenses.
   const runAndUpdateCodeLenses = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection) => {
+    // Only run on Clojure files (find a better way to do this)
+    if (document.languageId !== 'clojure') {
+      return;
+    }
     check(document, diagnosticCollection).then(() => {
       codeLensProvider.update();
     });
