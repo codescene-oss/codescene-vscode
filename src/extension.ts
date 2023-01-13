@@ -4,7 +4,7 @@ import { CsCodeLensProvider } from './codelens';
 import { check } from './codescene-interop';
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('The CodeScene extension is now active!');
+  console.log('CodeScene: the extension is now active!');
 
   // Diagnostics provides the squigglies and also form the basis for the CodeLenses.
   const diagnosticCollection = vscode.languages.createDiagnosticCollection('codescene');
@@ -24,17 +24,18 @@ export function activate(context: vscode.ExtensionContext) {
   // When that happens, we also want to update the CodeLenses.
   const runAndUpdateCodeLenses = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection) => {
     // Only run on Clojure files (find a better way to do this)
-    if (document.languageId !== 'clojure') {
+    if (document.uri.scheme !== 'file' || document.languageId !== 'clojure') {
       return;
     }
-    check(document, diagnosticCollection).then(() => {
+    check(document).then((diagnostics) => {
+      diagnosticCollection.set(document.uri, diagnostics);
       codeLensProvider.update();
     });
   };
 
   // This provides the initial diagnostics and CodeLenses when a file is opened.
   context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((document) => {
+    vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
       runAndUpdateCodeLenses(document, diagnosticCollection);
     })
   );
@@ -42,8 +43,15 @@ export function activate(context: vscode.ExtensionContext) {
   // For live updates, we debounce the runs to avoid consuming too many resources.
   const debouncedRun = debounce(runAndUpdateCodeLenses, 1000);
   context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument(({ document }) => debouncedRun(document, diagnosticCollection))
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) =>
+      debouncedRun(e.document, diagnosticCollection)
+    )
   );
+
+  // This provides the initial diagnostics and CodeLenses when the extension is first activated.
+  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+    runAndUpdateCodeLenses(document, diagnosticCollection);
+  });
 }
 
 // This method is called when your extension is deactivated

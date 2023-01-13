@@ -2,13 +2,11 @@ import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { getFileExtension, getFunctionNameRange } from './utils';
 
-export function check(document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection) {
-  const completedPromise = new Promise((resolve, reject) => {
+export function check(document: vscode.TextDocument) {
+  const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
     console.log('Running "cs check" on ' + document.fileName);
 
     const fileExtension = getFileExtension(document.fileName);
-
-    diagnosticCollection.set(document.uri, []);
 
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
@@ -41,9 +39,7 @@ export function check(document: vscode.TextDocument, diagnosticCollection: vscod
         }
       }
 
-      diagnosticCollection.set(document.uri, diagnostics);
-
-      resolve(diagnosticCollection);
+      resolve(diagnostics);
     });
 
     if (childProcess.stdin) {

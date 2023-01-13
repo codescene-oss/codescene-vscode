@@ -14,9 +14,10 @@ export class CsCodeLens extends vscode.CodeLens {
 
 export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
+  private lenses: CsCodeLens[] = [];
 
   constructor(private readonly diagnosticCollection: vscode.DiagnosticCollection) {
-    console.log('Creating CodeLens provider');
+    console.log('CodeScene: creating CodeLens provider');
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
@@ -27,8 +28,11 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
     document: vscode.TextDocument,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsCodeLens[]> {
+    console.log('CodeScene: providing CodeLenses for ' + document.fileName);
+
     const diagnostics = this.diagnosticCollection.get(document.uri);
     if (!diagnostics || diagnostics.length === 0) {
+      console.log('CodeScene: no diagnostics for ' + document.fileName);
       return [];
     }
 
