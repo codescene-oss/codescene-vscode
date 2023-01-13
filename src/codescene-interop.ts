@@ -8,7 +8,7 @@ export function check(document: vscode.TextDocument, diagnosticCollection: vscod
 
     const fileExtension = getFileExtension(document.fileName);
 
-    diagnosticCollection.clear();
+    diagnosticCollection.set(document.uri, []);
 
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
@@ -74,5 +74,6 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
   }
 
   const diagnostic = new vscode.Diagnostic(range, message, diagnosticSeverity);
+  diagnostic.source = 'CodeScene';
   return diagnostic;
 }
