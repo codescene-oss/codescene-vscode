@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { check } from './codescene-interop';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -14,7 +15,6 @@ export class CsCodeLens extends vscode.CodeLens {
 
 export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
-  private lenses: CsCodeLens[] = [];
 
   constructor(private readonly diagnosticCollection: vscode.DiagnosticCollection) {
     console.log('CodeScene: creating CodeLens provider');
@@ -24,13 +24,11 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
     return this.onDidChangeCodeLensesEmitter.event;
   }
 
-  provideCodeLenses(
-    document: vscode.TextDocument,
-    token: vscode.CancellationToken
-  ): vscode.ProviderResult<CsCodeLens[]> {
-    console.log('CodeScene: providing CodeLenses for ' + document.fileName);
+  async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
+    console.log('pCodeScene: providing CodeLenses for ' + document.fileName);
 
-    const diagnostics = this.diagnosticCollection.get(document.uri);
+    const diagnostics = await check(document);
+
     if (!diagnostics || diagnostics.length === 0) {
       console.log('CodeScene: no diagnostics for ' + document.fileName);
       return [];

@@ -2,7 +2,17 @@ import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { getFileExtension, getFunctionNameRange } from './utils';
 
+const checkCache = {
+  documentVersion: -1,
+  diagnostics: [] as vscode.Diagnostic[],
+};
+
 export function check(document: vscode.TextDocument) {
+  if (document.version === checkCache.documentVersion) {
+    console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
+    return Promise.resolve(checkCache.diagnostics);
+  }
+
   const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
     console.log('Running "cs check" on ' + document.fileName);
 
@@ -38,6 +48,10 @@ export function check(document: vscode.TextDocument) {
           diagnostics.push(diagnostic);
         }
       }
+
+      // Store result in cache.
+      checkCache.documentVersion = document.version;
+      checkCache.diagnostics = diagnostics;
 
       resolve(diagnostics);
     });

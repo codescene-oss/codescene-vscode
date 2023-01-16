@@ -29,7 +29,6 @@ export function activate(context: vscode.ExtensionContext) {
     }
     check(document).then((diagnostics) => {
       diagnosticCollection.set(document.uri, diagnostics);
-      codeLensProvider.update();
     });
   };
 
@@ -41,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(runAndUpdateCodeLenses, 1000);
+  const debouncedRun = debounce(runAndUpdateCodeLenses, 2000);
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) =>
       debouncedRun(e.document, diagnosticCollection)
