@@ -11,7 +11,6 @@ This extension enables you to run CodeScene code health analysis in VSCode.
 
 This extension contributes the following settings:
 
-- `codescene.enable`: Enable/disable this extension.
 - `codescene.enableCodeLenses`: Show code issues as code lenses.
 
 ## Release Notes

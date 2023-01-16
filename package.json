@@ -41,7 +41,17 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": []
+    "commands": [],
+    "configuration": {
+      "title": "CodeScene",
+      "properties": {
+        "codescene.enableCodeLenses": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeScene code lenses"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
