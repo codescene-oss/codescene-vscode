@@ -30,11 +30,11 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(codeLensProviderDisposable);
 
   // Diagnostics will be updated when a file is opened or when it is changed.
-  const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection) => {
+  const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {
     if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
       return;
     }
-    check(document).then((diagnostics) => {
+    check(document, skipCache).then((diagnostics) => {
       diagnosticCollection.set(document.uri, diagnostics);
     });
   };
@@ -58,6 +58,17 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
     run(document, diagnosticCollection);
   });
+
+  // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
+  const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
+  fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
+    console.log('CodeScene: code-health-rules.json changed, updating diagnostics');
+    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+      run(document, diagnosticCollection, true);
+    });
+    codeLensProvider.update();
+  });
+  context.subscriptions.push(fileSystemWatcher);
 }
 
 // This method is called when your extension is deactivated

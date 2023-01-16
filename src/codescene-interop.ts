@@ -1,16 +1,20 @@
 import { exec } from 'child_process';
+import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { getFileExtension, getFunctionNameRange } from './utils';
 
+// Cache the results of the 'cs check' command so that we don't have to run it again
+// We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
+// That way there is only one 'cs check' command running at a time.
 const checkCache = {
   documentVersion: -1,
-  diagnostics: [] as vscode.Diagnostic[],
+  diagnostics: Promise.resolve([] as vscode.Diagnostic[]),
 };
 
-export function check(document: vscode.TextDocument) {
-  if (document.version === checkCache.documentVersion) {
+export function check(document: vscode.TextDocument, skipCache = false) {
+  if (!skipCache && document.version === checkCache.documentVersion) {
     console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
-    return Promise.resolve(checkCache.diagnostics);
+    return checkCache.diagnostics;
   }
 
   const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
@@ -18,9 +22,14 @@ export function check(document: vscode.TextDocument) {
 
     const fileExtension = getFileExtension(document.fileName);
 
+    // Get the fsPath of the current document because we want to execute the 'cs check' command
+    // in the same directory as the current document (to pick up on any .codescene/code-health-config.json file)
+    const documentPath = document.uri.fsPath;
+    const documentDirectory = dirname(documentPath);
+
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
-    const childProcess = exec(`cs check -f ${fileExtension}`, (error, stdout, stderr) => {
+    const childProcess = exec(`cs check -f ${fileExtension}`, { cwd: documentDirectory }, (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         reject(error);
@@ -49,10 +58,6 @@ export function check(document: vscode.TextDocument) {
         }
       }
 
-      // Store result in cache.
-      checkCache.documentVersion = document.version;
-      checkCache.diagnostics = diagnostics;
-
       resolve(diagnostics);
     });
 
@@ -63,6 +68,10 @@ export function check(document: vscode.TextDocument) {
       reject('Error: cannot write to stdin of the CodeScene process');
     }
   });
+
+  // Store result in cache.
+  checkCache.documentVersion = document.version;
+  checkCache.diagnostics = completedPromise;
 
   return completedPromise;
 }
