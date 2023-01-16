@@ -9,18 +9,39 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:apex",
+    "onLanguage:c",
+    "onLanguage:clojure",
+    "onLanguage:cpp",
+    "onLanguage:csharp",
+    "onLanguage:dart",
+    "onLanguage:erlang",
+    "onLanguage:elixir",
+    "onLanguage:go",
+    "onLanguage:groovy",
+    "onLanguage:java",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:kotlin",
+    "onLanguage:objectivec",
+    "onLanguage:perl",
+    "onLanguage:php",
+    "onLanguage:powershell",
+    "onLanguage:python",
+    "onLanguage:ruby",
+    "onLanguage:rust",
+    "onLanguage:scala",
+    "onLanguage:swift",
+    "onLanguage:tcl",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:vb",
+    "onLanguage:vue"
+  ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [],
-    "languages": [
-      {
-        "id": "clojure",
-        "extensions": [
-          ".clj"
-        ]
-      }
-    ]
+    "commands": []
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

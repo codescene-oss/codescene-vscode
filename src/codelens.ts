@@ -25,7 +25,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
-    console.log('pCodeScene: providing CodeLenses for ' + document.fileName);
+    console.log('CodeScene: providing CodeLenses for ' + document.fileName);
 
     const diagnostics = await check(document);
 

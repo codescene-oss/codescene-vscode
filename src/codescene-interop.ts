@@ -14,7 +14,7 @@ export function check(document: vscode.TextDocument) {
   }
 
   const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
-    console.log('Running "cs check" on ' + document.fileName);
+    console.log('CodeScene: running "cs check" on ' + document.fileName);
 
     const fileExtension = getFileExtension(document.fileName);
 
