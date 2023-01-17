@@ -6,15 +6,20 @@ import { getFileExtension, getFunctionNameRange } from './utils';
 // Cache the results of the 'cs check' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
 // That way there is only one 'cs check' command running at a time for the same document version.
-const checkCache = {
-  documentVersion: -1,
-  diagnostics: Promise.resolve([] as vscode.Diagnostic[]),
-};
+interface CheckCacheItem {
+  documentVersion: number;
+  diagnostics: Promise<vscode.Diagnostic[]>;
+}
+
+const checkCache = new Map<string, CheckCacheItem>();
 
 export function check(document: vscode.TextDocument, skipCache = false) {
-  if (!skipCache && document.version === checkCache.documentVersion) {
-    console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
-    return checkCache.diagnostics;
+  if (!skipCache) {
+    const cachedResults = checkCache.get(document.fileName);
+    if (cachedResults && cachedResults.documentVersion === document.version) {
+      console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
+      return cachedResults.diagnostics;
+    }
   }
 
   const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
@@ -62,16 +67,18 @@ export function check(document: vscode.TextDocument, skipCache = false) {
     });
 
     if (childProcess.stdin) {
-      childProcess.stdin.write(document.getText());
-      childProcess.stdin.end();
+      childProcess.stdin.write(document.getText(), () => {
+        if (childProcess.stdin) {
+          childProcess.stdin.end();
+        }
+      });
     } else {
       reject('Error: cannot write to stdin of the CodeScene process');
     }
   });
 
   // Store result in cache.
-  checkCache.documentVersion = document.version;
-  checkCache.diagnostics = completedPromise;
+  checkCache.set(document.fileName, { documentVersion: document.version, diagnostics: completedPromise });
 
   return completedPromise;
 }
