@@ -5,7 +5,7 @@ import { getFileExtension, getFunctionNameRange } from './utils';
 
 // Cache the results of the 'cs check' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
-// That way there is only one 'cs check' command running at a time.
+// That way there is only one 'cs check' command running at a time for the same document version.
 const checkCache = {
   documentVersion: -1,
   diagnostics: Promise.resolve([] as vscode.Diagnostic[]),

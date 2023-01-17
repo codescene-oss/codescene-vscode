@@ -1,13 +1,21 @@
 {
   "name": "codescene-vscode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/empear-analytics/codescene-vscode.git"
+  },
   "displayName": "codescene-vscode",
-  "description": "",
-  "version": "0.0.1",
+  "author": "CodeScene AB",
+  "publisher": "codescene",
+  "description": "Integrates CodeScene analysis into Visual Studio Code",
+  "version": "0.0.4",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Linters"
   ],
   "activationEvents": [
     "onLanguage:apex",
