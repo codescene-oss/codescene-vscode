@@ -16,7 +16,7 @@ export class CsCodeLens extends vscode.CodeLens {
 export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
 
-  constructor(private readonly diagnosticCollection: vscode.DiagnosticCollection) {
+  constructor() {
     console.log('CodeScene: creating CodeLens provider');
   }
 

@@ -45,6 +45,17 @@ export function check(document: vscode.TextDocument, skipCache = false) {
 
       const lines = stdout.split('\n');
       for (const line of lines) {
+        // The first line has the following format:
+        // info: src/extension:1: Code health score: 9,75
+        const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
+        if (codeHealthMatch) {
+          const [_, _filename, score] = codeHealthMatch;
+          const range = new vscode.Range(0, 0, 0, 0);
+          const diagnostic = produceDiagnostic('info', range, `Code health score: ${score}`);
+          diagnostics.push(diagnostic);
+          continue;
+        }
+
         // Each line contains severity, filename, line, function name and message
         // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
         const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);

@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Add CodeLens support
   const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
 
-  const codeLensProvider = new CsCodeLensProvider(diagnosticCollection);
+  const codeLensProvider = new CsCodeLensProvider();
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
@@ -35,7 +35,8 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
     check(document, skipCache).then((diagnostics) => {
-      diagnosticCollection.set(document.uri, diagnostics);
+      // Remove the first diagnostic, which is an info level message about the overall code health.
+      diagnosticCollection.set(document.uri, diagnostics.slice(1));
     });
   };
 
