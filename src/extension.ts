@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { CsCodeLensProvider } from './codelens';
 import { check } from './codescene-interop';
+import { ensureLatestCompatibleCliExists } from './download';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -13,8 +14,15 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
   return supportedLanguages.map((language) => ({ language, scheme: 'file' }));
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+  const log = vscode.window.createOutputChannel('CodeScene');
+  log.appendLine('testing log channel');
+
   console.log('CodeScene: the extension is now active!');
+
+  console.log('CodeScene: checking for latest compatible CLI version...');
+  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+  console.log('CodeScene: latest compatible CLI version is installed.');
 
   const supportedLanguages = getSupportedLanguages(context.extension);
 
@@ -25,7 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Add CodeLens support
   const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
 
-  const codeLensProvider = new CsCodeLensProvider();
+  const codeLensProvider = new CsCodeLensProvider(cliPath);
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
@@ -34,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
       return;
     }
-    check(document, skipCache).then((diagnostics) => {
+    check(cliPath, document, skipCache).then((diagnostics) => {
       // Remove the first diagnostic, which is an info level message about the overall code health.
       diagnosticCollection.set(document.uri, diagnostics.slice(1));
     });

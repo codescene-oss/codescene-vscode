@@ -7,3 +7,7 @@ export function getFunctionNameRange(line: string, functionName: string) {
   const functionNameIndex = line.indexOf(functionName);
   return [functionNameIndex, functionNameIndex + functionName.length];
 }
+
+export function getFileNameWithoutExtension(filename: string) {
+  return filename.slice(0, filename.lastIndexOf('.'));
+}

@@ -16,7 +16,7 @@ export class CsCodeLens extends vscode.CodeLens {
 export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
 
-  constructor() {
+  constructor(private cliPath: string) {
     console.log('CodeScene: creating CodeLens provider');
   }
 
@@ -32,7 +32,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
       return [];
     }
 
-    const diagnostics = await check(document);
+    const diagnostics = await check(this.cliPath, document);
 
     if (!diagnostics || diagnostics.length === 0) {
       console.log('CodeScene: no diagnostics for ' + document.fileName);

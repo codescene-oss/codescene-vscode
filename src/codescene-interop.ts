@@ -13,7 +13,7 @@ interface CheckCacheItem {
 
 const checkCache = new Map<string, CheckCacheItem>();
 
-export function check(document: vscode.TextDocument, skipCache = false) {
+export function check(cliPath: string, document: vscode.TextDocument, skipCache = false) {
   if (!skipCache) {
     const cachedResults = checkCache.get(document.fileName);
     if (cachedResults && cachedResults.documentVersion === document.version) {
@@ -34,48 +34,52 @@ export function check(document: vscode.TextDocument, skipCache = false) {
 
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
-    const childProcess = exec(`cs check -f ${fileExtension}`, { cwd: documentDirectory }, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-        return;
-      }
-
-      const diagnostics: vscode.Diagnostic[] = [];
-
-      const lines = stdout.split('\n');
-      for (const line of lines) {
-        // The first line has the following format:
-        // info: src/extension:1: Code health score: 9,75
-        const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
-        if (codeHealthMatch) {
-          const [_, _filename, score] = codeHealthMatch;
-          const range = new vscode.Range(0, 0, 0, 0);
-          const diagnostic = produceDiagnostic('info', range, `Code health score: ${score}`);
-          diagnostics.push(diagnostic);
-          continue;
+    const childProcess = exec(
+      `"${cliPath}" check -f ${fileExtension}`,
+      { cwd: documentDirectory },
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error(`exec error: ${error}`);
+          reject(error);
+          return;
         }
 
-        // Each line contains severity, filename, line, function name and message
-        // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
-        const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);
+        const diagnostics: vscode.Diagnostic[] = [];
 
-        if (match) {
-          const [_, severity, _filename, line, functionName, message] = match;
-          const lineNumber = Number(line) - 1;
+        const lines = stdout.split('\n');
+        for (const line of lines) {
+          // The first line has the following format:
+          // info: src/extension:1: Code health score: 9,75
+          const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
+          if (codeHealthMatch) {
+            const [_, _filename, score] = codeHealthMatch;
+            const range = new vscode.Range(0, 0, 0, 0);
+            const diagnostic = produceDiagnostic('info', range, `Code health score: ${score}`);
+            diagnostics.push(diagnostic);
+            continue;
+          }
 
-          const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
+          // Each line contains severity, filename, line, function name and message
+          // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
+          const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);
 
-          // Produce the diagnostic
-          const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
-          const diagnostic = produceDiagnostic(severity, range, message);
+          if (match) {
+            const [_, severity, _filename, line, functionName, message] = match;
+            const lineNumber = Number(line) - 1;
 
-          diagnostics.push(diagnostic);
+            const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
+
+            // Produce the diagnostic
+            const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
+            const diagnostic = produceDiagnostic(severity, range, message);
+
+            diagnostics.push(diagnostic);
+          }
         }
-      }
 
-      resolve(diagnostics);
-    });
+        resolve(diagnostics);
+      }
+    );
 
     if (childProcess.stdin) {
       childProcess.stdin.write(document.getText(), () => {
