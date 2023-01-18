@@ -15,8 +15,6 @@ const artifacts: { [platform: string]: { [arch: string]: string } } = {
   },
 };
 
-function getCliPath() {}
-
 function getArtifactDownloadName(platform: string, arch: string): string | undefined {
   return artifacts[platform]?.[arch];
 }
@@ -64,7 +62,7 @@ function download(url: string, filePath: string): Promise<void> {
 export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
   // For now, always do the download to make sure we have the latest version.
   // We will handle real versioning later.
-  const cliPath = path.join(extensionPath, 'cs');
+  const cliPath = path.join(extensionPath, process.platform === 'win32' ? 'cs.exe' : 'cs');
 
   // We only support x64 for now. Once we have arm64 support, we can start
   // using process.arch to determine the architecture.
