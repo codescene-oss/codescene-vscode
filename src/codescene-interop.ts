@@ -116,5 +116,13 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
 
   const diagnostic = new vscode.Diagnostic(range, message, diagnosticSeverity);
   diagnostic.source = 'CodeScene';
+
+  if (diagnostic.severity !== vscode.DiagnosticSeverity.Information) {
+    diagnostic.code = {
+      value: 'generic-function-level-code-issue',
+      target: vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'),
+    };
+  }
+
   return diagnostic;
 }

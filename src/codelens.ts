@@ -1,6 +1,28 @@
 import * as vscode from 'vscode';
 import { check } from './codescene-interop';
 
+export async function codeLensClickedHandler(diagnostic: vscode.Diagnostic) {
+  const diagnosticDocs = `What does "${diagnostic.message}" mean?`;
+  const codeHealthDocs = 'Open general code health documentation';
+
+  let options = [];
+  if (diagnostic.code) {
+    options.push(diagnosticDocs);
+  }
+  options.push(codeHealthDocs);
+
+  const action = await vscode.window.showQuickPick(options);
+
+  // We need to get separate docs for each diagnostic!
+  if (action === diagnosticDocs) {
+    vscode.commands.executeCommand('codescene.openDocsForDiagnostic', diagnostic);
+  }
+
+  if (action === codeHealthDocs) {
+    vscode.commands.executeCommand('codescene.openCodeHealthDocs');
+  }
+}
+
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
  */
@@ -52,7 +74,8 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   resolveCodeLens?(codeLens: CsCodeLens, token: vscode.CancellationToken): vscode.ProviderResult<CsCodeLens> {
     codeLens.command = {
       title: codeLens.diagnostic.message,
-      command: 'helloworld.helloWorld',
+      command: 'codescene.actionPicker',
+      arguments: [codeLens.diagnostic],
     };
 
     return codeLens;

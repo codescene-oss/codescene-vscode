@@ -5,7 +5,7 @@
     "url": "https://github.com/empear-analytics/codescene-vscode.git"
   },
   "icon": "assets/cs-logo.png",
-  "displayName": "codescene-vscode",
+  "displayName": "CodeScene",
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into Visual Studio Code",
@@ -50,7 +50,12 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [],
+    "commands": [
+      {
+        "command": "codescene.openCodeHealthDocs",
+        "title": "CodeScene: open code health documentation"
+      }
+    ],
     "configuration": {
       "title": "CodeScene",
       "properties": {

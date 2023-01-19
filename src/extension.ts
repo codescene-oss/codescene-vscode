@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
-import { CsCodeLensProvider } from './codelens';
+import { codeLensClickedHandler, CsCodeLensProvider } from './codelens';
 import { check } from './codescene-interop';
 import { ensureLatestCompatibleCliExists } from './download';
 
@@ -14,8 +14,30 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
   return supportedLanguages.map((language) => ({ language, scheme: 'file' }));
 }
 
+function registerCommands(context: vscode.ExtensionContext) {
+  const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
+    vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
+  });
+  context.subscriptions.push(openCodeHealthDocsCmd);
+
+  const openDocsForDiagnostic = vscode.commands.registerCommand(
+    'codescene.openDocsForDiagnostic',
+    (diag: vscode.Diagnostic) => {
+      if (diag.code instanceof Object) {
+        vscode.env.openExternal(diag.code.target);
+      }
+    }
+  );
+  context.subscriptions.push(openDocsForDiagnostic);
+
+  const actionPickerCommand = vscode.commands.registerCommand('codescene.actionPicker', codeLensClickedHandler);
+  context.subscriptions.push(actionPickerCommand);
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
+
+  registerCommands(context);
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
