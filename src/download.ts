@@ -2,6 +2,7 @@ import { https } from 'follow-redirects';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as extractZip from 'extract-zip';
+import { outputChannel } from './log';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -34,7 +35,8 @@ function ensureExecutable(filePath: string) {
 }
 
 function download(url: string, filePath: string): Promise<void> {
-  console.log(`Downloading codescene cli from ${url} to ${filePath}`);
+  outputChannel.appendLine(`Downloading ${url}`);
+
   return new Promise((resolve, reject) => {
     https
       .get(url, (response) => {
@@ -60,6 +62,8 @@ function download(url: string, filePath: string): Promise<void> {
  * Download the CodeScene CLI artifact for the current platform and architecture.
  */
 export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
+  outputChannel.appendLine('Ensuring latest compatible CodeScene CLI exists');
+
   // For now, always do the download to make sure we have the latest version.
   // We will handle real versioning later.
   const cliPath = path.join(extensionPath, process.platform === 'win32' ? 'cs.exe' : 'cs');
@@ -81,6 +85,7 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   ensureExecutable(cliPath);
 
   if (fs.existsSync(cliPath)) {
+    outputChannel.appendLine('CodeScene CLI is in place, we are ready to go!');
     return cliPath;
   } else {
     throw new Error('Failed to download codescene cli');

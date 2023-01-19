@@ -15,14 +15,9 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  const log = vscode.window.createOutputChannel('CodeScene');
-  log.appendLine('testing log channel');
-
   console.log('CodeScene: the extension is now active!');
 
-  console.log('CodeScene: checking for latest compatible CLI version...');
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
-  console.log('CodeScene: latest compatible CLI version is installed.');
 
   const supportedLanguages = getSupportedLanguages(context.extension);
 
