@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { dirname } from 'path';
 import * as vscode from 'vscode';
-import { getFileExtension, getFunctionNameRange } from './utils';
+import { getFileExtension, getFunctionNameRange, isDefined } from './utils';
 
 // Cache the results of the 'cs check' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
@@ -12,6 +12,37 @@ interface CheckCacheItem {
 }
 
 const checkCache = new Map<string, CheckCacheItem>();
+
+/**
+ * Parse one line of output from the 'cs check' command and return a diagnostic.
+ */
+function parseLine(line: string, document: vscode.TextDocument) {
+  // The first line has the following format:
+  // info: src/extension:1: Code health score: 9,75
+  const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
+  if (codeHealthMatch) {
+    const [_, _filename, score] = codeHealthMatch;
+    const range = new vscode.Range(0, 0, 0, 0);
+    return produceDiagnostic('info', range, `Code health score: ${score}`);
+  }
+
+  // Each line contains severity, filename, line, function name and message
+  // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
+  const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);
+
+  if (match) {
+    const [_, severity, _filename, line, functionName, message] = match;
+    const lineNumber = Number(line) - 1;
+
+    console.log(`CodeScene: ${severity} ${lineNumber} ${functionName} ${message}`);
+
+    const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
+
+    // Produce the diagnostic
+    const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
+    return produceDiagnostic(severity, range, message);
+  }
+}
 
 export function check(cliPath: string, document: vscode.TextDocument, skipCache = false) {
   if (!skipCache) {
@@ -44,38 +75,8 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
           return;
         }
 
-        const diagnostics: vscode.Diagnostic[] = [];
-
         const lines = stdout.split('\n');
-        for (const line of lines) {
-          // The first line has the following format:
-          // info: src/extension:1: Code health score: 9,75
-          const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
-          if (codeHealthMatch) {
-            const [_, _filename, score] = codeHealthMatch;
-            const range = new vscode.Range(0, 0, 0, 0);
-            const diagnostic = produceDiagnostic('info', range, `Code health score: ${score}`);
-            diagnostics.push(diagnostic);
-            continue;
-          }
-
-          // Each line contains severity, filename, line, function name and message
-          // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
-          const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);
-
-          if (match) {
-            const [_, severity, _filename, line, functionName, message] = match;
-            const lineNumber = Number(line) - 1;
-
-            const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
-
-            // Produce the diagnostic
-            const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
-            const diagnostic = produceDiagnostic(severity, range, message);
-
-            diagnostics.push(diagnostic);
-          }
-        }
+        const diagnostics = lines.map((line) => parseLine(line, document)).filter(isDefined);
 
         resolve(diagnostics);
       }
