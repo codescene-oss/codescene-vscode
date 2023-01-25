@@ -27,20 +27,18 @@ function parseLine(line: string, document: vscode.TextDocument) {
   }
 
   // Each line contains severity, filename, line, function name and message
-  // Example: info: src/extension.ts:22:bad-fn Complex function (cc: 10)
-  const match = line.match(/(\w+): (.+):(\d+):([^\s]+): (.+)/);
+  // Example: info: src/extension.ts:22:bad-fn:complex-fn Complex function (cc: 10)
+  const match = line.match(/(\w+): (.+):(\d+):([^\s]+):([^\s]+) (.+)/);
 
   if (match) {
-    const [_, severity, _filename, line, functionName, message] = match;
+    const [_, severity, _filename, line, functionName, issueCode, message] = match;
     const lineNumber = Number(line) - 1;
-
-    console.log(`CodeScene: ${severity} ${lineNumber} ${functionName} ${message}`);
 
     const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
 
     // Produce the diagnostic
     const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
-    return produceDiagnostic(severity, range, message);
+    return produceDiagnostic(severity, range, message, issueCode);
   }
 }
 
@@ -99,7 +97,7 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
   return completedPromise;
 }
 
-function produceDiagnostic(severity: string, range: vscode.Range, message: string) {
+function produceDiagnostic(severity: string, range: vscode.Range, message: string, issueCode?: string) {
   let diagnosticSeverity: vscode.DiagnosticSeverity;
   switch (severity) {
     case 'info':
@@ -118,9 +116,9 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
   const diagnostic = new vscode.Diagnostic(range, message, diagnosticSeverity);
   diagnostic.source = 'CodeScene';
 
-  if (diagnostic.severity !== vscode.DiagnosticSeverity.Information) {
+  if (issueCode) {
     diagnostic.code = {
-      value: 'generic-function-level-code-issue',
+      value: issueCode,
       target: vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'),
     };
   }
