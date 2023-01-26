@@ -11,5 +11,6 @@ vsc-extension-quickstart.md
 *.zip
 cs
 cs.last-modified
+screenshots
 *.vsix
 .DS_Store
