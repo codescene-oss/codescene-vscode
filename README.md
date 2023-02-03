@@ -5,6 +5,7 @@ This extension enables you to run CodeScene's code health analysis in VS Code. I
 Examples on code health issues include – but are not limited to – the following:
 
 - Nested complexity (highly nested if-statements or loops)
+- Bumpy road (multiple chunks of nested complexity)
 - Complex method, or high cyclomatic complexity
 - Functions with too many arguments
 - Functions that are too long

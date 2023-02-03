@@ -117,9 +117,13 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
   diagnostic.source = 'CodeScene';
 
   if (issueCode) {
+    const args = [vscode.Uri.parse(`csdoc:${issueCode}.md`)];
+    const openDocCommandUri = vscode.Uri.parse(
+          `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
+    );
     diagnostic.code = {
       value: issueCode,
-      target: vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'),
+      target: openDocCommandUri
     };
   }
 
