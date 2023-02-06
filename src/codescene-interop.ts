@@ -18,10 +18,15 @@ const checkCache = new Map<string, CheckCacheItem>();
  */
 function parseLine(line: string, document: vscode.TextDocument) {
   // The first line has the following format:
-  // info: src/extension:1: Code health score: 9,75
+  // info: src/extension:1: Code health score: 9.75
   const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
   if (codeHealthMatch) {
     const [_, _filename, score] = codeHealthMatch;
+
+    // When the score is 0.00, that could mean some kind of parse error or that there is no
+    // scorable code in the file. In either case, we don't want to display the score.
+    if (score === '0.00') return;
+
     const range = new vscode.Range(0, 0, 0, 0);
     return produceDiagnostic('info', range, `Code health score: ${score}`);
   }
