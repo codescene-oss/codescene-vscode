@@ -6,6 +6,7 @@ import path = require('path');
 import { registerCsDocProvider } from './csdoc';
 import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
+import { createRulesTemplate } from './rules-template'
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -17,11 +18,16 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
   return supportedLanguages.map((language) => ({ language, scheme: 'file' }));
 }
 
-function registerCommands(context: vscode.ExtensionContext) {
+function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
   });
   context.subscriptions.push(openCodeHealthDocsCmd);
+
+  const createRulesTemplateCmd = vscode.commands.registerCommand('codescene.createRulesTemplate', () => {
+    createRulesTemplate(cliPath);
+  });
+  context.subscriptions.push(createRulesTemplateCmd);
 
   const openDocsForDiagnostic = vscode.commands.registerCommand(
     'codescene.openDocsForDiagnostic',
@@ -48,11 +54,11 @@ function registerCommands(context: vscode.ExtensionContext) {
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
-  registerCommands(context);
+  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+
+  registerCommands(context, cliPath);
 
   registerCsDocProvider(join(context.extensionPath, 'docs'));
-
-  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
   const supportedLanguages = getSupportedLanguages(context.extension);
 

@@ -64,7 +64,7 @@ CodeScene supports most popular languages. Here is the full list:
 
 - Diagnostics for functions with code health issues
 - Optionally show code issues as code lenses for the affected function
-- Customizable code health rules via `.codescene/code-health-rules.json` ([format description](https://codescene.io/docs/guides/technical/code-health.html#advanced-override-the-low-level-code-health-thresholds))
+- Customizable code health rules via `.codescene/code-health-rules.json` ([format description](https://codescene.io/docs/guides/technical/code-health.html#advanced-override-the-low-level-code-health-thresholds)). You can create a template with the command `CodeScene: create rules template`.
 
 Note on custom code health rules: this is the same mechanism as the full CodeScene product.
 Adding this file to your repo affects analyses by CodeScene as well.

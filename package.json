@@ -52,6 +52,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "codescene.createRulesTemplate",
+        "title": "CodeScene: create rules template"
+      },
+      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: open code health documentation"
       }
@@ -80,13 +84,18 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
-    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/eslint-plugin": "^5.51.0",
     "@typescript-eslint/parser": "^5.45.0",
     "@vscode/test-electron": "^2.2.0",
-    "eslint": "^8.28.0",
+    "eslint": "^8.33.0",
+    "eslint-config-standard-with-typescript": "^34.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-n": "^15.6.1",
+    "eslint-plugin-promise": "^6.1.1",
+    "eslint-plugin-react": "^7.32.2",
     "glob": "^8.0.3",
     "mocha": "^10.1.0",
-    "typescript": "^4.9.3"
+    "typescript": "^4.9.5"
   },
   "dependencies": {
     "@types/follow-redirects": "^1.14.1",
