@@ -134,3 +134,23 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
 
   return diagnostic;
 }
+
+/**
+ * Excecutes the command for creating a code health rules template, and returns the result as a string.
+ */
+export function codeHealthRulesJson(cliPath: string) {
+
+  const completedPromise = new Promise<string>((resolve, reject) => {
+    console.log('CodeScene: running "cs help code-health-rules-template"');
+    exec(`"${cliPath}" help code-health-rules-template`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`);
+        reject(error);
+        return;
+      }
+      resolve(stdout);
+    });
+  });
+
+  return completedPromise;
+}
