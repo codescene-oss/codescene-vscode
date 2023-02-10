@@ -6,7 +6,7 @@ import path = require('path');
 import { registerCsDocProvider } from './csdoc';
 import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
-import { createRulesTemplate } from './rules-template'
+import { createRulesTemplate } from './rules-template';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
