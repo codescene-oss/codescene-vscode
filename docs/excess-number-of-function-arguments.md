@@ -1,4 +1,4 @@
-Function with many arguments
+Excess number of function arguments
 
 Functions with many arguments indicate either
 

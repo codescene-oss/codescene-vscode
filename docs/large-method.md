@@ -1,4 +1,4 @@
-Excessively long functions
+Large method
 
 The definition is simple: the function exceeds the threshold for excessive function length.
 

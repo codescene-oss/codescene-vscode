@@ -1,4 +1,4 @@
-Bumpy road
+Bumpy road ahead
 
 The Bumpy Road code smell is a function that contains multiple chunks of nested conditional logic. Just like a bumpy road slows down your driving, a bumpy road in code presents an obstacle to comprehension.
 

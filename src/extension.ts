@@ -79,8 +79,10 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
     check(cliPath, document, skipCache).then((diagnostics) => {
-      // Remove the first diagnostic, which is an info level message about the overall code health.
-      diagnosticCollection.set(document.uri, diagnostics.slice(1));
+      // Remove the diagnostics that are for file level issues.
+      // These are only shown as code lenses
+      const importantDiagnostics = diagnostics.filter((d) => d.range.start.line > 0);
+      diagnosticCollection.set(document.uri, importantDiagnostics);
     });
   };
 

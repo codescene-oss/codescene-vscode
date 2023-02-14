@@ -1,6 +1,6 @@
-Deeply nested function
+Deep nested complexity
 
-Deeply nested logic means that you have control structures like if-statements or loops inside other control structures. Deeply nested logic increases the cognitive load on the programmer reading the code. The human working memory has a maximum capacity of 3-4 items; beyond that threshold, we struggle with keeping things in our head. Consequently, deep nested logic has a strong correlation to defects and accounts for roughly 20% of all programming mistakes.
+Deep nested complexity means that you have control structures like if-statements or loops inside other control structures. Deeply nested complexity increases the cognitive load on the programmer reading the code. The human working memory has a maximum capacity of 3-4 items; beyond that threshold, we struggle with keeping things in our head. Consequently, deeply nested complexity has a strong correlation to defects, and it accounts for roughly 20% of all programming mistakes.
 
 ## Solution
 
