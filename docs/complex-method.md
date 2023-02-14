@@ -1,6 +1,6 @@
-Complex function
+Complex method
 
-A complex function is a function with a high cyclomatic complexity. Cyclomatic complexity counts the number of logical paths through a function. That is, each if-statement, each control structure like a for or while loop adds complexity. We count them and sum it up to get a complexity value.
+A complex method is a function with a high cyclomatic complexity. Cyclomatic complexity counts the number of logical paths through a function. That is, each if-statement, each control structure like a for or while loop adds complexity. We count them and sum it up to get a complexity value.
 
 It's somewhat of a crude metric, because whether or not the function is difficult to understand
 may depend on other factor as well, such as how [deeply nested](./deeply-nested-fn.md) the code is.

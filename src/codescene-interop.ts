@@ -11,40 +11,42 @@ interface CheckCacheItem {
   diagnostics: Promise<vscode.Diagnostic[]>;
 }
 
+// This details the structure of the JSON output from the 'cs review' command
+interface ReviewIssue {
+  category: string;
+  code: string;
+  description: string;
+  functions?: IssueDetails[];
+}
+
+interface IssueDetails {
+  details: string;
+  title: string;
+  "start-line": number;
+}
+
 const checkCache = new Map<string, CheckCacheItem>();
 
-/**
- * Parse one line of output from the 'cs check' command and return a diagnostic.
- */
-function parseLine(line: string, document: vscode.TextDocument) {
-  // The first line has the following format:
-  // info: src/extension:1: Code health score: 9.75
-  const codeHealthMatch = line.match(/info: (.+):1: Code health score: (.+)/);
-  if (codeHealthMatch) {
-    const [_, _filename, score] = codeHealthMatch;
-
-    // When the score is 0.00, that could mean some kind of parse error or that there is no
-    // scorable code in the file. In either case, we don't want to display the score.
-    if (score === '0.00') return;
-
-    const range = new vscode.Range(0, 0, 0, 0);
-    return produceDiagnostic('info', range, `Code health score: ${score}`);
+function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
+  if (!reviewIssue.functions) {
+    return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue.code)];
   }
 
-  // Each line contains severity, filename, line, function name and message
-  // Example: info: src/extension.ts:22:bad-fn:complex-fn Complex function (cc: 10)
-  const match = line.match(/(\w+): (.+):(\d+):([^\s]+):([^\s]+) (.+)/);
-
-  if (match) {
-    const [_, severity, _filename, line, functionName, issueCode, message] = match;
-    const lineNumber = Number(line) - 1;
-
-    const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, functionName);
-
-    // Produce the diagnostic
+  return reviewIssue.functions.map((func: IssueDetails) => {
+    console.log(func);
+    const lineNumber = func["start-line"] - 1;
+    const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, func.title);
     const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
-    return produceDiagnostic(severity, range, message, issueCode);
-  }
+
+    let description;
+    if (func.details) {
+      description = `${reviewIssue.category} (${func.details})`;
+    } else {
+      description = reviewIssue.category;
+    }
+
+    return produceDiagnostic("warning", range, description, reviewIssue.code);
+  });
 }
 
 export function check(cliPath: string, document: vscode.TextDocument, skipCache = false) {
@@ -57,7 +59,7 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
   }
 
   const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
-    console.log('CodeScene: running "cs check" on ' + document.fileName);
+    console.log('CodeScene: running "cs review" on ' + document.fileName);
 
     const fileExtension = getFileExtension(document.fileName);
 
@@ -69,7 +71,7 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
     const childProcess = exec(
-      `"${cliPath}" check -f ${fileExtension}`,
+      `"${cliPath}" review -f ${fileExtension}`,
       { cwd: documentDirectory },
       (error, stdout, stderr) => {
         if (error) {
@@ -78,8 +80,8 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
           return;
         }
 
-        const lines = stdout.split('\n');
-        const diagnostics = lines.map((line) => parseLine(line, document)).filter(isDefined);
+        const data = JSON.parse(stdout) as ReviewIssue[];
+        const diagnostics = data.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
         resolve(diagnostics);
       }
@@ -121,6 +123,8 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
   const diagnostic = new vscode.Diagnostic(range, message, diagnosticSeverity);
   diagnostic.source = 'CodeScene';
 
+  // We don't want to add diagnostics for the "file level" issues, because it looks a bit ugly.
+  // Instead, they are only shown as code lenses.
   if (issueCode) {
     const args = [vscode.Uri.parse(`csdoc:${issueCode}.md`)];
     const openDocCommandUri = vscode.Uri.parse(
