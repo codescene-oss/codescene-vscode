@@ -88,11 +88,13 @@ async function isUpToDate(cliPath: string, lastModifiedPath: string, url: string
 
   if (remoteDate === null) {
     // We can't trust the remote, so we'll just assume the local version is up to date.
+    console.log('CodeScene: could not check last-modified header of remote artifact, assuming local copy is up to date');
     return true;
   }
 
   if (localDate === null) {
     // We don't have a local date, so the local copy can't be up to date.
+    console.log('CodeScene: could not check last-modified date of local artifact, assuming local copy is not up to date');
     return false;
   }
 

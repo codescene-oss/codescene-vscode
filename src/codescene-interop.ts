@@ -12,6 +12,11 @@ interface CheckCacheItem {
 }
 
 // This details the structure of the JSON output from the 'cs review' command
+interface ReviewResult {
+  score: number;
+  review: ReviewIssue[];
+}
+
 interface ReviewIssue {
   category: string;
   code: string;
@@ -80,10 +85,11 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
           return;
         }
 
-        const data = JSON.parse(stdout) as ReviewIssue[];
-        const diagnostics = data.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+        const data = JSON.parse(stdout) as ReviewResult;
+        const scoreDiagnostic = produceDiagnostic("info", new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
+        const diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
-        resolve(diagnostics);
+        resolve([scoreDiagnostic, ...diagnostics]);
       }
     );
 
