@@ -1,4 +1,4 @@
-# High Degree of Code Duplication
+High Degree of Code Duplication
 
 Avoid duplicated, aka copy-pasted, code inside the module. More duplication lowers the code health.
 
