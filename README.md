@@ -3,8 +3,15 @@
 This extension brings a free, standalone version of CodeScene's code health analysis that shows you the results directly in your editor. It very likely supports your language. See the full list of supported languages below.
 
 ## Code Health
-Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects. A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code. There’s also a statistically significant correlation between software vulnerabilities and several of the code health factors; red code is more vulnerable. For further details on the business impact of code health, see the [Code Red whitepaper](https://codescene.com/hubfs/web_docs/Business-impact-of-low-code-quality.pdf).
+Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects. 
 
+A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code. 
+
+For further details on the business impact of code health, see the [Code Red research paper](https://arxiv.org/abs/2203.04374).
+
+## Code Health Factors
+
+Here are some examples of the factors that we measure:
 
 - Nested complexity (highly nested if-statements or loops)
 - Bumpy road (multiple chunks of nested complexity)
@@ -12,7 +19,9 @@ Code Health is an aggregated metric based on 25+ factors scanned from the source
 - Functions with too many arguments
 - Functions that are too long
 
-Take a look at the [docs](https://codescene.io/docs/guides/technical/code-health.html) on code health for more info.
+You will find detailed information under each 
+
+You can also look at our main CodeScene [docs](https://codescene.io/docs/guides/technical/code-health.html) on code health for more info.
 
 ## Example screenshots
 
