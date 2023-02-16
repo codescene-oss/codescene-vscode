@@ -6,8 +6,4 @@ Just like duplicated logic in application code is problematic, duplicated test c
 
 ## Solution
 
-Consider to encapsulate the duplicated assertions (i.e. test criteria) in a 
-custom assert statement that you can then re-use. 
-We also recommend to consider the granularity of the tests; sometimes a single test 
-tests too many things; extracting smaller tests can usually help you get 
-rid of the duplication.
+Consider to encapsulate the duplicated assertions (i.e. test criteria) in a custom assert statement that you can then re-use. We also recommend to consider the granularity of the tests; sometimes a single test tests too many things; extracting smaller tests can usually help you get rid of the duplication.
