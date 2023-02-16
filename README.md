@@ -2,7 +2,9 @@
 
 This extension brings a free, standalone version of CodeScene's code health analysis that shows you the results directly in your editor. It very likely supports your language. See the full list of supported languages below.
 
-Examples on code health issues include – but are not limited to – the following:
+## Code Health
+Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects. A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code. There’s also a statistically significant correlation between software vulnerabilities and several of the code health factors; red code is more vulnerable. For further details on the business impact of code health, see the [Code Red whitepaper](https://codescene.com/hubfs/web_docs/Business-impact-of-low-code-quality.pdf).
+
 
 - Nested complexity (highly nested if-statements or loops)
 - Bumpy road (multiple chunks of nested complexity)
