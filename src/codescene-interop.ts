@@ -38,7 +38,6 @@ function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.Tex
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
-    console.log(func);
     const lineNumber = func["start-line"] - 1;
     const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, func.title);
     const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
@@ -75,6 +74,7 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
 
     // Execute the CodeScene 'check' command and parse out the results,
     // and convert them to VS Code diagnostics
+    const start = Date.now();
     const childProcess = exec(
       `"${cliPath}" review -f ${fileExtension}`,
       { cwd: documentDirectory },
@@ -84,6 +84,9 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
           reject(error);
           return;
         }
+
+        const end = Date.now();
+        console.log(`CodeScene: 'cs review' took ${end - start} milliseconds`);
 
         const data = JSON.parse(stdout) as ReviewResult;
         const scoreDiagnostic = produceDiagnostic("info", new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
