@@ -26,12 +26,12 @@ const artifacts: { [platform: string]: { [arch: string]: string } } = {
   },
 };
 
-function getArtifactDownloadName(platform: string, arch: string): string | undefined {
+function getArtifactDownloadName(platform: NodeJS.Platform, arch: string): string | undefined {
   return artifacts[platform]?.[arch];
 }
 
-function getArtifactDownloadUrl(artifactName: string): string {
-  return `https://downloads.codescene.io/enterprise/cli/${artifactName}`;
+function getArtifactDownloadUrl(artifactName: string): URL {
+  return new URL(`https://downloads.codescene.io/enterprise/cli/${artifactName}`);
 }
 
 async function unzipFile(zipFilePath: string, extensionPath: string): Promise<void> {
@@ -44,7 +44,7 @@ function ensureExecutable(filePath: string) {
   fs.chmodSync(filePath, '755');
 }
 
-function checkRemoteLastModifiedDate(url: string) {
+function checkRemoteLastModifiedDate(url: URL) {
   // Issue a HTTP HEAD request to check the last-modified header of the artifact.
   console.log('CodeScene: checking last-modified header of', url, '...');
 
@@ -77,7 +77,7 @@ async function checkLocalLastModifiedDate(lastModifiedPath: string) {
   }
 }
 
-async function isUpToDate(cliPath: string, lastModifiedPath: string, url: string) {
+async function isUpToDate(cliPath: string, lastModifiedPath: string, url: URL) {
   // If the local copy does not exist, it's obviously not up to date.
   if (!fs.existsSync(cliPath)) {
     return false;
@@ -101,11 +101,11 @@ async function isUpToDate(cliPath: string, lastModifiedPath: string, url: string
   return localDate >= remoteDate;
 }
 
-async function updateLocalLastModifiedDate(filePath: string, date: string) {
-  await fs.promises.writeFile(filePath, date);
+async function updateLocalLastModifiedDate(filePath: string, date: Date) {
+  await fs.promises.writeFile(filePath, date.toString());
 }
 
-function download(url: string, filePath: string) {
+function download(url: URL, filePath: string) {
   outputChannel.appendLine(`Downloading ${url}`);
 
   return new Promise<Date | null>((resolve, reject) => {
@@ -166,7 +166,7 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   ensureExecutable(cliPath);
 
   if (lastModified) {
-    await updateLocalLastModifiedDate(lastModifiedPath, lastModified.toString());
+    await updateLocalLastModifiedDate(lastModifiedPath, lastModified);
   }
 
   if (fs.existsSync(cliPath)) {
