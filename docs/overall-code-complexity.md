@@ -2,11 +2,11 @@ Overall Code Complexity
 
 This file has many conditional statements (e.g. if, for, while) across its implementation, leading to lower code health. Avoid adding more conditionals.
 
-Code complexity is detected by the Cyclomatic Complexity metric, which counts the number of conditional statements. Cyclomatic Complexity indicates the minimum number of unit tests you would need for the implementation in this file. The more tests you need, the more complicated the method. This code smell indicates that the whole implementation would benefit from being simplified.
+Code complexity is detected by the [cyclomatic complexity](https://en.wikipedia.org/wiki/Cyclomatic_complexity) metric, which counts the number of conditional statements. Cyclomatic complexity indicates the minimum number of unit tests you would need for the implementation in this file. The more tests you need, the more complicated the method. This code smell indicates that the whole implementation would benefit from being simplified.
 
 ## Solution
 
-Start by addressing possible [bumpy road](./bumpy-road-ahead.md) and/or [deeply nested logic](./deep-nested-complexity.md) issues if applicable. This will help you lower the average Cyclomatic Complexity too.
+Start by addressing possible [bumpy road](./bumpy-road-ahead.md) and/or [deeply nested logic](./deep-nested-complexity.md) issues if applicable. This will help you lower the average cyclomatic complexity too.
 
 You can then address the overall cyclomatic complexity by a) modularizing the code, and b) abstract away the complexity. Let's look at some examples:
 

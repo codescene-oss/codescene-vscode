@@ -28,7 +28,7 @@ void autoRepairsWhenDamaged() {
 
 ## Solution
 
-Consider to encapsulate the duplicated assertions (i.e. test criteria) in a custom assert statement that you can then re-use. 
+Consider encapsulating the duplicated assertions (i.e. test criteria) in a custom assert statement that you can then re-use.
 We also recommend to consider the granularity of the tests; sometimes a single test tests too many things; extracting smaller tests can usually help you get rid of the duplication.
 
 Working with the previous example, and the idea of encapsulation in a custom assert statement, we can make an attempt at straightening out the code:
