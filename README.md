@@ -19,9 +19,9 @@ Here are some examples of the factors that we measure:
 - Functions with too many arguments
 - Functions that are too long
 
-You will find detailed information under each 
+You can find more detailed information for each Code Health issue by drilling down in the editor.
 
-You can also look at our main CodeScene [docs](https://codescene.io/docs/guides/technical/code-health.html) on code health for more info.
+You may also look at our main CodeScene [docs](https://codescene.io/docs/guides/technical/code-health.html) on code health for more info.
 
 ## Example screenshots
 
