@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { check } from './codescene-interop';
+import { review } from './codescene-interop';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -32,7 +32,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
       return [];
     }
 
-    const diagnostics = await check(this.cliPath, document);
+    const diagnostics = await review(this.cliPath, document);
 
     if (!diagnostics || diagnostics.length === 0) {
       console.log('CodeScene: no diagnostics for ' + document.fileName);

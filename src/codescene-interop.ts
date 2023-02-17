@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { dirname } from 'path';
 import * as vscode from 'vscode';
-import { getFileExtension, getFunctionNameRange, isDefined } from './utils';
+import { execWithInput, getFileExtension, getFunctionNameRange, isDefined } from './utils';
 
 // Cache the results of the 'cs check' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
@@ -27,7 +27,7 @@ interface ReviewIssue {
 interface IssueDetails {
   details: string;
   title: string;
-  "start-line": number;
+  'start-line': number;
 }
 
 const checkCache = new Map<string, CheckCacheItem>();
@@ -38,7 +38,7 @@ function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.Tex
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
-    const lineNumber = func["start-line"] - 1;
+    const lineNumber = func['start-line'] - 1;
     const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, func.title);
     const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
 
@@ -49,11 +49,13 @@ function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.Tex
       description = reviewIssue.category;
     }
 
-    return produceDiagnostic("warning", range, description, reviewIssue.code);
+    return produceDiagnostic('warning', range, description, reviewIssue.code);
   });
 }
 
-export function check(cliPath: string, document: vscode.TextDocument, skipCache = false) {
+export function review(cliPath: string, document: vscode.TextDocument, skipCache = false) {
+  console.log('CodeScene: running "cs review" on ' + document.fileName);
+
   if (!skipCache) {
     const cachedResults = checkCache.get(document.fileName);
     if (cachedResults && cachedResults.documentVersion === document.version) {
@@ -62,55 +64,26 @@ export function check(cliPath: string, document: vscode.TextDocument, skipCache 
     }
   }
 
-  const completedPromise = new Promise<vscode.Diagnostic[]>((resolve, reject) => {
-    console.log('CodeScene: running "cs review" on ' + document.fileName);
+  const fileExtension = getFileExtension(document.fileName);
 
-    const fileExtension = getFileExtension(document.fileName);
+  // Get the fsPath of the current document because we want to execute the 'cs review' command
+  // in the same directory as the current document (to pick up on any .codescene/code-health-config.json file)
+  const documentPath = document.uri.fsPath;
+  const documentDirectory = dirname(documentPath);
 
-    // Get the fsPath of the current document because we want to execute the 'cs check' command
-    // in the same directory as the current document (to pick up on any .codescene/code-health-config.json file)
-    const documentPath = document.uri.fsPath;
-    const documentDirectory = dirname(documentPath);
+  const output = execWithInput(`"${cliPath}" review -f ${fileExtension}`, documentDirectory, document.getText());
 
-    // Execute the CodeScene 'check' command and parse out the results,
-    // and convert them to VS Code diagnostics
-    const start = Date.now();
-    const childProcess = exec(
-      `"${cliPath}" review -f ${fileExtension}`,
-      { cwd: documentDirectory },
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error(`exec error: ${error}`);
-          reject(error);
-          return;
-        }
-
-        const end = Date.now();
-        console.log(`CodeScene: 'cs review' took ${end - start} milliseconds`);
-
-        const data = JSON.parse(stdout) as ReviewResult;
-        const scoreDiagnostic = produceDiagnostic("info", new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
-        const diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
-
-        resolve([scoreDiagnostic, ...diagnostics]);
-      }
-    );
-
-    if (childProcess.stdin) {
-      childProcess.stdin.write(document.getText(), () => {
-        if (childProcess.stdin) {
-          childProcess.stdin.end();
-        }
-      });
-    } else {
-      reject('Error: cannot write to stdin of the CodeScene process');
-    }
+  const diagnosticsPromise = output.then((output) => {
+    const data = JSON.parse(output) as ReviewResult;
+    const scoreDiagnostic = produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
+    const diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+    return [scoreDiagnostic, ...diagnostics];
   });
 
   // Store result in cache.
-  checkCache.set(document.fileName, { documentVersion: document.version, diagnostics: completedPromise });
+  checkCache.set(document.fileName, { documentVersion: document.version, diagnostics: diagnosticsPromise });
 
-  return completedPromise;
+  return diagnosticsPromise;
 }
 
 function produceDiagnostic(severity: string, range: vscode.Range, message: string, issueCode?: string) {
@@ -137,11 +110,11 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
   if (issueCode) {
     const args = [vscode.Uri.parse(`csdoc:${issueCode}.md`)];
     const openDocCommandUri = vscode.Uri.parse(
-          `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
+      `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
     );
     diagnostic.code = {
       value: issueCode,
-      target: openDocCommandUri
+      target: openDocCommandUri,
     };
   }
 
@@ -152,7 +125,6 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
  * Excecutes the command for creating a code health rules template, and returns the result as a string.
  */
 export function codeHealthRulesJson(cliPath: string) {
-
   const completedPromise = new Promise<string>((resolve, reject) => {
     console.log('CodeScene: running "cs help code-health-rules-template"');
     exec(`"${cliPath}" help code-health-rules-template`, (error, stdout, stderr) => {

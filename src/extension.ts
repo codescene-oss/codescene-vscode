@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
-import { check } from './codescene-interop';
+import { review } from './codescene-interop';
 import { ensureLatestCompatibleCliExists } from './download';
 import path = require('path');
 import { registerCsDocProvider } from './csdoc';
@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
       return;
     }
-    check(cliPath, document, skipCache).then((diagnostics) => {
+    review(cliPath, document, skipCache).then((diagnostics) => {
       // Remove the diagnostics that are for file level issues.
       // These are only shown as code lenses
       const importantDiagnostics = diagnostics.filter((d) => d.range.start.line > 0);
