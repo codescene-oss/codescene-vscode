@@ -3,7 +3,7 @@ Excess number of function arguments
 Functions with many arguments indicate either
 
 - low [cohesion](./low-cohesion.md) where the function has too many responsibilities, or
-- a [missing abstraction](./missing-function-argument-abstraction.md) that encapsulates those arguments.
+- a [missing abstraction](./missing-arguments-abstractions.md) that encapsulates those arguments.
 
 ## Solution
 
