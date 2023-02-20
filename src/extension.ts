@@ -7,6 +7,7 @@ import { registerCsDocProvider } from './csdoc';
 import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
+import { outputChannel } from './log';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -109,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
-    console.log('CodeScene: code-health-rules.json changed, updating diagnostics');
+    outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       run(document, diagnosticCollection, true);
     });
