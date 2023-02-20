@@ -75,9 +75,14 @@ export function review(cliPath: string, document: vscode.TextDocument, skipCache
 
   const diagnosticsPromise = output.then((output) => {
     const data = JSON.parse(output) as ReviewResult;
-    const scoreDiagnostic = produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
     const diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
-    return [scoreDiagnostic, ...diagnostics];
+    // If the score is zero, there's no scorable code in the file, so don't create a diagnostic for it.
+    if (data.score > 0) {
+      const scoreDiagnostic = produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), `Code health score: ${data.score}`);
+      return [scoreDiagnostic, ...diagnostics];
+    } else {
+      return diagnostics;
+    }
   });
 
   // Store result in cache.
