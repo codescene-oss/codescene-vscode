@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into Visual Studio Code",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
