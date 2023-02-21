@@ -1,11 +1,12 @@
 # CodeScene for VS Code
+![CodeScene Code Health](https://codescene.io/projects/18677/status-badges/code-health?component-name=Codescene-vscode)
 
 This extension brings a free, standalone version of CodeScene's code health analysis that shows you the results directly in your editor. It very likely supports your language. See the full list of supported languages below.
 
 ## Code Health
-Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects. 
+Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects.
 
-A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code. 
+A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code.
 
 For further details on the business impact of code health, see the [Code Red research paper](https://arxiv.org/abs/2203.04374).
 
