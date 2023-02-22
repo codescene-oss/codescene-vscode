@@ -8,6 +8,7 @@ import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
+import { telemetryLogger } from './telemetry';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -55,17 +56,8 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
-  const sender: vscode.TelemetrySender = {
-      sendEventData: (eventName, eventData)  => {
-        console.log(eventName);
-        console.log(`Data: ${JSON.stringify(eventData)}`);
-      },
-      sendErrorData: (error) => {
-          console.log(error);
-      }
-  }
-  const logger: vscode.TelemetryLogger = vscode.env.createTelemetryLogger(sender);
-  logger.logUsage('codescene-extension-activated', {'my-event-data-here': 'testval'});
+  telemetryLogger.logUsage('onActivateExtension');
+
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
   registerCommands(context, cliPath);
@@ -131,4 +123,6 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  telemetryLogger.logUsage('onDeactivateExtension');
+}
