@@ -55,6 +55,17 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
+  const sender: vscode.TelemetrySender = {
+      sendEventData: (eventName, eventData)  => {
+        console.log(eventName);
+        console.log(`Data: ${JSON.stringify(eventData)}`);
+      },
+      sendErrorData: (error) => {
+          console.log(error);
+      }
+  }
+  const logger: vscode.TelemetryLogger = vscode.env.createTelemetryLogger(sender);
+  logger.logUsage('codescene-extension-activated', {'my-event-data-here': 'testval'});
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
   registerCommands(context, cliPath);
