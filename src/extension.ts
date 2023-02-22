@@ -8,6 +8,8 @@ import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
+import Telemetry from './telemetry';
+
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -56,6 +58,12 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+
+  // initialize telemetry
+  Telemetry.init(cliPath);
+
+  // send telemetry
+  Telemetry.instance.logUsage('onActivateExtension');
 
   registerCommands(context, cliPath);
 
@@ -120,4 +128,5 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+}
