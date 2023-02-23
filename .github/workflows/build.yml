@@ -1,4 +1,4 @@
-name: Build version
+name: Build vsix
 
 on:
   workflow_dispatch:
@@ -37,7 +37,7 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Bump version in package.json
         run: npm version ${{ inputs.bump }}
