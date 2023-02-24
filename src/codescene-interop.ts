@@ -1,12 +1,12 @@
 import { exec } from 'child_process';
 import { dirname } from 'path';
 import * as vscode from 'vscode';
-import { execWithInput, getFileExtension, getFunctionNameRange, isDefined } from './utils';
+import { execWithInput, getFileExtension, getFunctionNameRange } from './utils';
 
-// Cache the results of the 'cs check' command so that we don't have to run it again
+// Cache the results of the 'cs review' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
-// That way there is only one 'cs check' command running at a time for the same document version.
-interface CheckCacheItem {
+// That way there is only one 'cs review' command running at a time for the same document version.
+interface ReviewCacheItem {
   documentVersion: number;
   diagnostics: Promise<vscode.Diagnostic[]>;
 }
@@ -30,7 +30,7 @@ interface IssueDetails {
   'start-line': number;
 }
 
-const checkCache = new Map<string, CheckCacheItem>();
+const reviewCache = new Map<string, ReviewCacheItem>();
 
 function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
   if (!reviewIssue.functions) {
@@ -57,7 +57,7 @@ export function review(cliPath: string, document: vscode.TextDocument, skipCache
   console.log('CodeScene: running "cs review" on ' + document.fileName);
 
   if (!skipCache) {
-    const cachedResults = checkCache.get(document.fileName);
+    const cachedResults = reviewCache.get(document.fileName);
     if (cachedResults && cachedResults.documentVersion === document.version) {
       console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
       return cachedResults.diagnostics;
@@ -86,7 +86,7 @@ export function review(cliPath: string, document: vscode.TextDocument, skipCache
   });
 
   // Store result in cache.
-  checkCache.set(document.fileName, { documentVersion: document.version, diagnostics: diagnosticsPromise });
+  reviewCache.set(document.fileName, { documentVersion: document.version, diagnostics: diagnosticsPromise });
 
   return diagnosticsPromise;
 }
