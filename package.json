@@ -77,7 +77,10 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "release:minor": "standard-version --release-as minor",
+    "release:patch": "standard-version --release-as patch",
+    "release:major": "standard-version --release-as major"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",
@@ -90,6 +93,7 @@
     "eslint": "^8.33.0",
     "glob": "^8.0.3",
     "mocha": "^10.1.0",
+    "standard-version": "^9.5.0",
     "typescript": "^4.9.5"
   },
   "dependencies": {
