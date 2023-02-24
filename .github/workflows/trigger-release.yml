@@ -1,4 +1,9 @@
-name: Build vsix
+# This can be run manually to trigger either a patch, minor och major release.
+# It updated the release number in package.json, updates CHANGELOG.md (the one
+# you see in the vscode marketplace), tags the commit and pushes it.
+#
+# See also the github-release workflow.
+name: Trigger release
 
 on:
   workflow_dispatch:
@@ -40,19 +45,8 @@ jobs:
         run: npm ci
 
       - name: Bump version in package.json
-        run: npm version ${{ inputs.bump }}
+        run: npm run release:${{ inputs.bump }}
 
-      - name: Build extension vsix file
-        run: |
-          npm install --global @vscode/vsce
-          vsce package
+      - name: Push package.json, CHANGELOG.md and tags
+        run: git push --follow-tags origin main
 
-      - name: Upload vsix file as attachment to this job
-        uses: actions/upload-artifact@v3
-        with:
-          path: ./*.vsix
-          name: vsix
-
-      - name: Push package.json with bumped version
-        run: git push
-        
