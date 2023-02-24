@@ -4,7 +4,7 @@ Deep nested complexity means that you have control structures like if-statements
 
 ## Solution
 
-Occassionally, it's possible to get rid of the nested logic withe the [REPLACING CONDITIONALS WITH GUARD CLAUSES](https://refactoring.com/catalog/replaceNestedConditionalWithGuardClauses.html) refactoring.
+Occasionally, it's possible to get rid of the nested logic withe the [REPLACING CONDITIONALS WITH GUARD CLAUSES](https://refactoring.com/catalog/replaceNestedConditionalWithGuardClauses.html) refactoring.
 
 Another viable strategy is to identify smaller building blocks inside the
 nested chunks of logic and extract those responsibilities into smaller, cohesive, and well-named functions. The [EXTRACT FUNCTION](https://refactoring.com/catalog/extractFunction.html) refactoring explains the steps.

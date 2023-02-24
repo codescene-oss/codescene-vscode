@@ -65,4 +65,4 @@ public class BumpyRoadExample {
 }
 ```
 
-In this case we were able to express the bumps in terms of more general functions that we able to place elsewhere. This enables re-use and makes the code easier to understand. We could even eliminate the comments as they now became superflous.
+In this case we were able to express the bumps in terms of more general functions that we able to place elsewhere. This enables re-use and makes the code easier to understand. We could even eliminate the comments as they now became superfluous.
