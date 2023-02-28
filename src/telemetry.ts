@@ -1,9 +1,19 @@
 // This module provides a global interface to the CodeScene telemetry.
 import * as vscode from 'vscode';
 import axios from 'axios';
+import * as jws from 'jws';
+
 
 
 console.log('CodeScene: creating telemetry logger');
+
+function signPayload (data :any) {
+  return jws.sign({
+    header: { alg: 'HS256' },
+    payload: data,
+    secret: '12345', //TODO
+  });
+}
 
 function toJsonString (eventName :string, eventData? :Record<string, any>) {
   let dataMap :Map<string, any> = new Map();
@@ -20,8 +30,14 @@ function toJsonString (eventName :string, eventData? :Record<string, any>) {
 function postTelemetry (jsonString :string) {
   const config = {
     headers: { 'content-type': 'application/json' },
-    timeout: 5000 //milliseconds
+    timeout: 5000, //milliseconds
+    transformRequest: [function (data :any, headers :any) {
+      const xCodesceneSignature = signPayload(data);
+      headers['x-codescene-signature'] = xCodesceneSignature;
+      return data;
+    }],
   }
+  
   axios.post('http://localhost:10000', jsonString, config)
     .catch((error) => {
       if (error.response) {
