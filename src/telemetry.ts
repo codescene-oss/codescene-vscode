@@ -37,8 +37,8 @@ function postTelemetry (jsonString :string) {
 
   axios.interceptors.request.use(
     async config => {
-      const xCodesceneSignature = await signPayload(config.data);
-      config.headers['x-codescene-signature'] = xCodesceneSignature;
+      const signature = await signPayload(config.data);
+      config.headers['x-codescene-devtools'] = signature;
       return config
     },
     error => {
