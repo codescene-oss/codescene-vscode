@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
-import { review } from './codescene-interop';
+import { review, secretKey } from './codescene-interop';
 import { ensureLatestCompatibleCliExists } from './download';
 import path = require('path');
 import { registerCsDocProvider } from './csdoc';
@@ -9,6 +9,7 @@ import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import { telemetryLogger } from './telemetry';
+import AuthSettings from './auth-settings'
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -56,9 +57,12 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
-  telemetryLogger.logUsage('onActivateExtension');
-
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+
+  AuthSettings.init(context);
+  AuthSettings.instance.storeTelemetryKey(secretKey(cliPath));
+  telemetryLogger.logUsage('onActivateExtension');;
+
 
   registerCommands(context, cliPath);
 

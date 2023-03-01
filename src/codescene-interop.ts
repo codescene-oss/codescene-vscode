@@ -144,3 +144,7 @@ export function codeHealthRulesJson(cliPath: string) {
 
   return completedPromise;
 }
+
+export function secretKey(cliPath: string) {
+  return "12345"; //TODO
+}

@@ -2,16 +2,18 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import * as jws from 'jws';
+import AuthSettings from './auth-settings';
 
 
 
 console.log('CodeScene: creating telemetry logger');
 
-function signPayload (data :any) {
+async function signPayload (data :any) {
+  const telemetryKey = await AuthSettings.instance.getTelemetryKey();
   return jws.sign({
     header: { alg: 'HS256' },
     payload: data,
-    secret: '12345', //TODO
+    secret: telemetryKey, 
   });
 }
 
@@ -30,13 +32,19 @@ function toJsonString (eventName :string, eventData? :Record<string, any>) {
 function postTelemetry (jsonString :string) {
   const config = {
     headers: { 'content-type': 'application/json' },
-    timeout: 5000, //milliseconds
-    transformRequest: [function (data :any, headers :any) {
-      const xCodesceneSignature = signPayload(data);
-      headers['x-codescene-signature'] = xCodesceneSignature;
-      return data;
-    }],
+    timeout: 5000 //milliseconds
   }
+
+  axios.interceptors.request.use(
+    async config => {
+      const xCodesceneSignature = await signPayload(config.data);
+      config.headers['x-codescene-signature'] = xCodesceneSignature;
+      return config
+    },
+    error => {
+      return Promise.reject(error)
+    }
+  );
   
   axios.post('http://localhost:10000', jsonString, config)
     .catch((error) => {
