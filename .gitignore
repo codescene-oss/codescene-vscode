@@ -4,6 +4,9 @@ node_modules
 .vscode-test/
 *.vsix
 .DS_Store
+## Ignore executables and zips created (in the download process) when running the extension in dev mode
 cs
 cs.last-modified
+cs-*-*
+cs-*.last-modified
 *.zip
