@@ -30,18 +30,27 @@ function getArtifactDownloadName(platform: NodeJS.Platform, arch: string): strin
   return artifacts[platform]?.[arch];
 }
 
+function getExecutableName(platform: NodeJS.Platform, arch: 'x64'): string {
+  // E.g. cs-darwin-x64, cs-linux-x64, cs-win32-x64.exe
+  return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+}
+
 function getArtifactDownloadUrl(artifactName: string): URL {
   return new URL(`https://downloads.codescene.io/enterprise/cli/${artifactName}`);
 }
 
-async function unzipFile(zipFilePath: string, extensionPath: string): Promise<void> {
+async function unzipFile(zipFilePath: string, extensionPath: string, executablePath: string): Promise<void> {
   console.log('Unzipping file');
-  return extractZip(zipFilePath, { dir: extensionPath });
+  await extractZip(zipFilePath, { dir: extensionPath });
+  // The zip file contains a single file named "cs", or "cs.exe" on Windows.
+  // We rename it to the name of the executable for the current platform.
+  const execFromZip = path.join(extensionPath, 'cs' + (process.platform === 'win32' ? '.exe' : ''));
+  await fs.promises.rename(execFromZip, executablePath);
 }
 
-function ensureExecutable(filePath: string) {
+async function ensureExecutable(filePath: string) {
   console.log('Ensuring file is executable');
-  fs.chmodSync(filePath, '755');
+  await fs.promises.chmod(filePath, '755');
 }
 
 function checkRemoteLastModifiedDate(url: URL) {
@@ -140,8 +149,9 @@ function download(url: URL, filePath: string) {
 export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
   outputChannel.appendLine('Ensuring we have the latest CodeScene CLI version...');
 
-  const cliPath = path.join(extensionPath, process.platform === 'win32' ? 'cs.exe' : 'cs');
-  const lastModifiedPath = path.join(extensionPath, 'cs.last-modified');
+  const executableName = getExecutableName(process.platform, 'x64');
+  const cliPath = path.join(extensionPath, executableName);
+  const lastModifiedPath = path.join(extensionPath, executableName + '.last-modified');
 
   // We only support x64 for now. Once we have arm64 support, we can start
   // using process.arch to determine the architecture.
@@ -162,8 +172,8 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
 
   const downloadPath = path.join(extensionPath, artifactName);
   const lastModified = await download(downloadUrl, downloadPath);
-  await unzipFile(downloadPath, extensionPath);
-  ensureExecutable(cliPath);
+  await unzipFile(downloadPath, extensionPath, cliPath);
+  await ensureExecutable(cliPath);
 
   if (lastModified) {
     await updateLocalLastModifiedDate(lastModifiedPath, lastModified);
