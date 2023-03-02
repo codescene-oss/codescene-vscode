@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
-import { review, secretKey } from './codescene-interop';
+import { review } from './codescene-interop';
 import { ensureLatestCompatibleCliExists } from './download';
 import path = require('path');
 import { registerCsDocProvider } from './csdoc';
@@ -8,8 +8,8 @@ import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
-import { telemetryLogger } from './telemetry';
-import AuthSettings from './auth-settings'
+import Telemetry from './telemetry';
+
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -59,10 +59,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
-  AuthSettings.init(context);
-  AuthSettings.instance.storeTelemetryKey(secretKey(cliPath));
-  telemetryLogger.logUsage('onActivateExtension');;
+  // initialize telemetry
+  Telemetry.init(cliPath);
 
+  // send telemetry
+  Telemetry.instance.logUsage('onActivateExtension');
 
   registerCommands(context, cliPath);
 
