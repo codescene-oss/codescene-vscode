@@ -131,7 +131,7 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
  */
 export function codeHealthRulesJson(cliPath: string) {
   console.log('CodeScene: running "cs help code-health-rules-template"');
-  const command :string = `"${cliPath}" help code-health-rules-template`;
+  const command: string = `"${cliPath}" help code-health-rules-template`;
   return execAndLog(command, '"cs help code-health-rules-template"');
 }
 
@@ -140,6 +140,6 @@ export function codeHealthRulesJson(cliPath: string) {
  */
 export function sign(cliPath: string, payload: string) {
   console.log('CodeScene: running "cs sign" on ' + payload);
-  const command :string = `"${cliPath}" sign ${payload}`;
+  const command: string = `"${cliPath}" sign ${payload}`;
   return execAndLog(command, '"cs sign"');
 }

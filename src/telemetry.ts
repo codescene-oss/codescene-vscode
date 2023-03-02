@@ -34,7 +34,7 @@ export default class Telemetry {
     this.telemetryLogger.logUsage(eventName);
   }
 
-  private postTelemetry(eventName :string, eventData :any) {
+  private postTelemetry(eventName: string, eventData: any) {
     const config = {
       headers: { 'content-type': 'application/json' },
       timeout: 5000 //milliseconds
