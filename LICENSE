@@ -1,5 +1,9 @@
 Copyright CodeScene AB
 
+The following license applies only to files located in this repository, and not to other utilities
+used by this software to perform code analysis. These utilities are only for use in the
+codescene-oss/codescene-vscode open source project.
+
 MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
