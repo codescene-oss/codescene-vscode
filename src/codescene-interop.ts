@@ -138,8 +138,8 @@ export function codeHealthRulesJson(cliPath: string) {
 /**
  * Executes the command for signing a payload, and returns the resulting signature as a string.
  */
-export function sign(cliPath: string, payload: string) {
+export async function sign(cliPath: string, payload: string) {
   console.log('CodeScene: running "cs sign" on ' + payload);
-  const command: string = `"${cliPath}" sign ${payload}`;
-  return execAndLog(command, '"cs sign"');
+  const command: string = `"${cliPath}" sign`;
+  return await execWithInput(command, "", payload);
 }
