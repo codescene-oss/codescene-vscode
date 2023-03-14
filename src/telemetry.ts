@@ -51,7 +51,7 @@ export default class Telemetry {
       }
     );
 
-    const data = { ...eventData, 'event-time': new Date().toISOString(), 'event-type': eventName, 'editor-type' : 'vscode' };
+    const data = { ...eventData, 'event-time': new Date().toISOString(), 'event-name': eventName, 'editor-type' : 'vscode' };
     const jsonData = JSON.stringify(data); //for consistency in signature, we take care of jsonification here.
 
     axios.post('http://localhost:10000', jsonData, config) //TODO change to real URL
