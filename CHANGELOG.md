@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.1.0](https://github.com/empear-analytics/codescene-vscode/compare/v0.0.21...v0.1.0) (2023-03-27)
+
+
+### Features
+
+* Add usage telemetry ([b068669](https://github.com/empear-analytics/codescene-vscode/commit/b06866937e0a2b389c163ed549df5526f1c82256))
+
 ### [0.0.21](https://github.com/empear-analytics/codescene-vscode/compare/v0.0.20...v0.0.21) (2023-03-02)
 
 
