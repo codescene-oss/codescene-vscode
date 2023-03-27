@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { dirname } from 'path';
 import * as vscode from 'vscode';
-import { execWithInput, getFileExtension, getFunctionNameRange } from './utils';
+import { execWithInput, getFileExtension, getFunctionNameRange, execAndLog } from './utils';
 
 // Cache the results of the 'cs review' command so that we don't have to run it again
 // We store the promise so that even if a call hasn't completed yet, we can still return the same promise.
@@ -130,17 +130,16 @@ function produceDiagnostic(severity: string, range: vscode.Range, message: strin
  * Excecutes the command for creating a code health rules template, and returns the result as a string.
  */
 export function codeHealthRulesJson(cliPath: string) {
-  const completedPromise = new Promise<string>((resolve, reject) => {
-    console.log('CodeScene: running "cs help code-health-rules-template"');
-    exec(`"${cliPath}" help code-health-rules-template`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-        return;
-      }
-      resolve(stdout);
-    });
-  });
+  console.log('CodeScene: running "cs help code-health-rules-template"');
+  const command: string = `"${cliPath}" help code-health-rules-template`;
+  return execAndLog(command, '"cs help code-health-rules-template"');
+}
 
-  return completedPromise;
+/**
+ * Executes the command for signing a payload, and returns the resulting signature as a string.
+ */
+export async function sign(cliPath: string, payload: string) {
+  console.log('CodeScene: running "cs sign" on ' + payload);
+  const command: string = `"${cliPath}" sign`;
+  return await execWithInput(command, "", payload);
 }

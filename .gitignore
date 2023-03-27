@@ -10,3 +10,4 @@ cs.last-modified
 cs-*-*
 cs-*.last-modified
 *.zip
+.idea/

@@ -53,3 +53,21 @@ export function execWithInput(command: string, cwd: string, input: string) {
     }
   });
 }
+
+export function execAndLog(command: string, commandName: string) {
+  const completedPromise = new Promise<string>((resolve, reject) => {
+    const start = Date.now();
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`);
+        reject(error);
+        return;
+      }
+      const end = Date.now();
+      console.log(`CodeScene: ${commandName} took ${end - start} milliseconds`);
+      resolve(stdout);
+    });
+  });
+
+  return completedPromise;
+}
