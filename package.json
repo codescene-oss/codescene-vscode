@@ -5,7 +5,7 @@
     "url": "https://github.com/empear-analytics/codescene-vscode.git"
   },
   "icon": "assets/cs-logo.png",
-  "displayName": "CodeScene",
+  "displayName": "CodeScene Coach",
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into Visual Studio Code",
