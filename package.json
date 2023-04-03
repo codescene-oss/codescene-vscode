@@ -2,7 +2,7 @@
   "name": "codescene-vscode",
   "repository": {
     "type": "git",
-    "url": "https://github.com/empear-analytics/codescene-vscode.git"
+    "url": "https://github.com/codescene-oss/codescene-vscode.git"
   },
   "icon": "assets/cs-logo.png",
   "displayName": "CodeScene",
