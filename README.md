@@ -1,4 +1,4 @@
-# CodeScene Coach
+# CodeScene for VS Code
 [![CodeScene Code Health](https://codescene.io/projects/36131/status-badges/code-health)](https://codescene.io/projects/36131)
 
 This extension brings a free, standalone version of CodeScene's code health analysis that shows you the results directly in your editor. It very likely supports your language. See the full list of supported languages below.
