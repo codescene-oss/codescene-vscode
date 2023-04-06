@@ -3,8 +3,10 @@
 
 This extension brings a free, standalone version of CodeScene's code health analysis that shows you the results directly in your editor. It very likely supports your language. See the full list of supported languages below.
 
+It performs the analysis in the background automatically and reports any issues right next to your code. See the screenshots to see how it's presented.
+
 ## Code Health
-Code Health is an aggregated metric based on 25+ factors scanned from the source code. The code health factors correlate with increased maintenance costs and an increased risk for defects.
+Aside from reporting individual issues, we also display a Code Health score of 1-10 for each file. Code Health is an aggregated metric based on 25+ factors scanned from the source code. The Code Health factors correlate with increased maintenance costs and an increased risk for defects.
 
 A healthy codebase enables a fast time-to-market with, on average, 124% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code.
 
@@ -16,7 +18,7 @@ Here are some examples of the factors that we measure:
 
 - Nested complexity (highly nested if-statements or loops)
 - Bumpy road (multiple chunks of nested complexity)
-- Complex method, or high cyclomatic complexity
+- Complex functions (measured as high cyclomatic complexity)
 - Functions with too many arguments
 - Functions that are too long
 
@@ -26,7 +28,7 @@ You may also look at our main CodeScene [docs](https://codescene.io/docs/guides/
 
 ## Example screenshots
 
-*Issues are displayed above the affected functions*
+*Issues are displayed above the affected functions. Clicking on them shows an explanation.*
 
 ![screenshot1](screenshots/screenshot1.png)
 
