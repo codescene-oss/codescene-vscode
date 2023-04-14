@@ -52,7 +52,7 @@ export async function createRulesTemplate(cliPath: string) {
     return;
   }
   const configUri: Uri = Uri.joinPath(folder.uri, rulesPathAndFile);
-  const rj: string = await codeHealthRulesJson(cliPath);
-  await Workspace.fs.writeFile(configUri, Buffer.from(rj, 'utf8'));
+  const result = await codeHealthRulesJson(cliPath);
+  await Workspace.fs.writeFile(configUri, Buffer.from(result.stdout, 'utf8'));
   Window.showInformationMessage('CodeScene rules file successfully generated.');
 }
