@@ -1,5 +1,3 @@
-import { exec } from "child_process";
-
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }
@@ -26,48 +24,4 @@ export function getFileNameWithoutExtension(filename: string) {
 
 export function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined;
-}
-
-export function execWithInput(command: string, cwd: string, input: string) {
-  return new Promise<string>((resolve, reject) => {
-    const start = Date.now();
-    const childProcess = exec(command, { cwd }, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-        return;
-      }
-      const end = Date.now();
-      console.log(`CodeScene: ${command} took ${end - start} milliseconds`);
-      resolve(stdout);
-    });
-
-    if (childProcess.stdin) {
-      childProcess.stdin.write(input, () => {
-        if (childProcess.stdin) {
-          childProcess.stdin.end();
-        }
-      });
-    } else {
-      reject(`error: cannot write to stdin of the ${command} process. Unable to execute?`);
-    }
-  });
-}
-
-export function execAndLog(command: string, commandName: string) {
-  const completedPromise = new Promise<string>((resolve, reject) => {
-    const start = Date.now();
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        reject(error);
-        return;
-      }
-      const end = Date.now();
-      console.log(`CodeScene: ${commandName} took ${end - start} milliseconds`);
-      resolve(stdout);
-    });
-  });
-
-  return completedPromise;
 }

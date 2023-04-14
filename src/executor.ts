@@ -1,0 +1,90 @@
+import { ChildProcess, ExecOptions, execFile } from 'child_process';
+
+export interface ExecResult {
+  stdout: string;
+  stderr: string;
+}
+
+export interface Command {
+  command: string;
+  args: string[];
+}
+
+export class SimpleExecutor {
+  private writeInput(childProcess: ChildProcess, input: string) {
+    if (childProcess.stdin) {
+      childProcess.stdin.write(input, () => {
+        if (childProcess.stdin) {
+          childProcess.stdin.end();
+        }
+      });
+    } else {
+      throw Error(`error: cannot write to stdin of the ${childProcess.spawnfile} process. Unable to execute?`);
+    }
+  }
+
+  execute(command: Command, options: ExecOptions = {}, input?: string) {
+    const logName = [command.command, ...command.args].join(' ');
+
+    const completedPromise = new Promise<ExecResult>((resolve, reject) => {
+      const start = Date.now();
+      const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
+        if (error) {
+          console.log(`CodeScene: ${logName} with pid ${childProcess.pid} failed with error: ${error}`);
+          reject(error);
+          return;
+        }
+        const end = Date.now();
+        console.log(`CodeScene: ${logName} with pid ${childProcess.pid} took ${end - start} milliseconds`);
+        resolve({ stdout, stderr });
+      });
+
+      if (input && childProcess.stdin) {
+        this.writeInput(childProcess, input);
+      }
+
+      console.log(`CodeScene: ${logName} started with pid ${childProcess.pid}`);
+    });
+
+    return completedPromise;
+  }
+}
+
+
+export interface Task extends Command {
+  taskId: string;
+}
+
+/**
+ * An executioner that only allows one execution per "task" at a time.
+ *
+ * If a task is already running, it will be terminated and its promise will be rejected.
+ */
+export class LimitingExecutor {
+  private readonly executioner = new SimpleExecutor();
+  private readonly runningCommands: Map<string, AbortController> = new Map();
+
+  execute(command: Task, options: ExecOptions = {}, input?: string) {
+    const taskId = command.taskId;
+
+    // Check if running already
+    const runningProcess = this.runningCommands.get(taskId);
+    if (runningProcess) {
+      runningProcess.abort();
+    }
+
+    const abortController = new AbortController();
+    this.runningCommands.set(taskId, abortController);
+
+    const completedPromise = this.executioner.execute(command, {...options, signal: abortController.signal}, input).finally(() => {
+      // Remove the abortController from the map.
+      // The process has exited, and we don't want to risk calling abort() on
+      // a process that has already exited (what if the pid has been reused?)
+      if (this.runningCommands.get(taskId) === abortController) {
+        this.runningCommands.delete(taskId);
+      }
+    });
+
+    return completedPromise;
+  }
+}
