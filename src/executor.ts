@@ -10,7 +10,11 @@ export interface Command {
   args: string[];
 }
 
-export class SimpleExecutor {
+export interface Executor {
+  execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
+}
+
+export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
     if (childProcess.stdin) {
       childProcess.stdin.write(input, () => {
@@ -60,9 +64,13 @@ export interface Task extends Command {
  *
  * If a task is already running, it will be terminated and its promise will be rejected.
  */
-export class LimitingExecutor {
-  private readonly executioner = new SimpleExecutor();
+export class LimitingExecutor implements Executor {
+  private readonly executor;
   private readonly runningCommands: Map<string, AbortController> = new Map();
+
+  constructor(executor: Executor = new SimpleExecutor()) {
+    this.executor = executor;
+  }
 
   execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
@@ -76,7 +84,7 @@ export class LimitingExecutor {
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    const completedPromise = this.executioner.execute(command, {...options, signal: abortController.signal}, input).finally(() => {
+    const completedPromise = this.executor.execute(command, {...options, signal: abortController.signal}, input).finally(() => {
       // Remove the abortController from the map.
       // The process has exited, and we don't want to risk calling abort() on
       // a process that has already exited (what if the pid has been reused?)
