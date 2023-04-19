@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
-import { review } from './codescene-interop';
 import { ensureLatestCompatibleCliExists } from './download';
 import path = require('path');
 import { registerCsDocProvider } from './csdoc';
@@ -9,6 +8,7 @@ import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import Telemetry from './telemetry';
+import { CachingReviewer, SimpleReviewer } from './review/reviewer';
 
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
@@ -75,10 +75,12 @@ export async function activate(context: vscode.ExtensionContext) {
   const diagnosticCollection = vscode.languages.createDiagnosticCollection('codescene');
   context.subscriptions.push(diagnosticCollection);
 
+  const reviewer = new CachingReviewer(new SimpleReviewer(cliPath));
+
   // Add CodeLens support
   const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
 
-  const codeLensProvider = new CsCodeLensProvider(cliPath);
+  const codeLensProvider = new CsCodeLensProvider(reviewer);
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
@@ -87,7 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
       return;
     }
-    review(cliPath, document, skipCache).then((diagnostics) => {
+    reviewer.review(document, skipCache).then((diagnostics) => {
       // Remove the diagnostics that are for file level issues.
       // These are only shown as code lenses
       const importantDiagnostics = diagnostics.filter((d) => d.range.start.line > 0);
