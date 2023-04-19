@@ -14,6 +14,11 @@ export interface Executor {
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
 }
 
+/**
+ * Executes a process and returns its output.
+ *
+ * Optionally, it can also write to the process' stdin.
+ */
 export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
     if (childProcess.stdin) {
