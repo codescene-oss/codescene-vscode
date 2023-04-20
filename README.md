@@ -1,7 +1,7 @@
 # CodeScene for VS Code
 [![CodeScene Code Health](https://codescene.io/projects/36131/status-badges/code-health)](https://codescene.io/projects/36131)
 
-This extension brings a free, standalone version of CodeScene's code health analysis. It very likely supports your language. See the full list of supported languages below.
+This extension analyses your code, and warns you if there are issues that makes it more difficult to maintain. This is a free, standalone version of [CodeScene's](http://www.codescene.com) code health analysis. It very likely supports your language. See the full list of supported languages below.
 
 It performs the analysis in the background automatically and reports any issues right next to your code. See the screenshots to see how it's presented.
 
@@ -82,9 +82,3 @@ CodeScene supports most popular languages. Here is the full list:
 
 Note on custom code health rules: this is the same mechanism as the full CodeScene product.
 Adding this file to your repo affects analyses by CodeScene as well.
-
-## Extension Settings
-
-This extension contributes the following settings:
-
-- `codescene.enableCodeLenses`: Show code issues as code lenses.
