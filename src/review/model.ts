@@ -14,5 +14,6 @@ export interface ReviewIssue {
 export interface IssueDetails {
   details: string;
   title: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   'start-line': number;
 }
