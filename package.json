@@ -78,6 +78,11 @@
           "type": "boolean",
           "default": true,
           "description": "Exclude files in .gitignore from analysis"
+        },
+        "codescene.excludeExternal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Exclude files outside of the workspace from analysis"
         }
       }
     }

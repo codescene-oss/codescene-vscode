@@ -112,9 +112,23 @@ export class FilteringReviewer implements Reviewer {
     this.gitExecutorCache = new Map<string, boolean>();
   }
 
+  private isExternalToWorkspace(document: vscode.TextDocument) {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+
+    // In this case we don't have a workspace, so we decide it's not external.
+    // The file will be reviewed anyway.
+    if (!workspaceFolders) return false;
+
+    return !vscode.workspace.getWorkspaceFolder(document.uri);
+  }
+
   private async isIgnored(document: vscode.TextDocument) {
+    const gitignore = vscode.workspace.getConfiguration('codescene').get('gitignore');
+    const excludeExternal = vscode.workspace.getConfiguration('codescene').get('excludeExternal');
+
+    if (!gitignore) return false;
+    if (excludeExternal && this.isExternalToWorkspace(document)) return true;
     if (!this.gitExecutor) return false;
-    if (!vscode.workspace.getConfiguration('codescene').get('gitignore')) return false;
 
     const filePath = document.uri.fsPath;
 
