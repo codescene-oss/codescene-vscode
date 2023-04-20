@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import { sign } from './codescene-interop';
+import { ExecResult } from './executor';
 
 export default class Telemetry {
   private static _instance: Telemetry;
@@ -41,8 +42,8 @@ export default class Telemetry {
 
     axios.interceptors.request.use(
       async (config) => {
-        const signature = await sign(this.cliPath, config.data);
-        config.headers['x-codescene-signature'] = signature;
+        const signResult: ExecResult = await sign(this.cliPath, config.data);
+        config.headers['x-codescene-signature'] = signResult.stdout;
         return config;
       },
       (error) => {
