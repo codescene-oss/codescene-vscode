@@ -73,6 +73,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable CodeScene code lenses"
+        },
+        "codescene.gitignore": {
+          "type": "boolean",
+          "default": true,
+          "description": "Exclude files in .gitignore from analysis"
         }
       }
     }

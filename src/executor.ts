@@ -3,11 +3,14 @@ import { ChildProcess, ExecOptions, execFile } from 'child_process';
 export interface ExecResult {
   stdout: string;
   stderr: string;
+  exitCode: number;
 }
 
 export interface Command {
   command: string;
   args: string[];
+  /** Don't reject the promise on error */
+  ignoreError?: boolean;
 }
 
 export interface Executor {
@@ -38,14 +41,14 @@ export class SimpleExecutor implements Executor {
     const completedPromise = new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
-        if (error) {
+        if (!command.ignoreError && error) {
           console.log(`CodeScene: ${logName} with pid ${childProcess.pid} failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
         console.log(`CodeScene: ${logName} with pid ${childProcess.pid} took ${end - start} milliseconds`);
-        resolve({ stdout, stderr });
+        resolve({ stdout, stderr, exitCode: error?.code || 0 });
       });
 
       if (input && childProcess.stdin) {
