@@ -1,16 +1,16 @@
 import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { getFileExtension } from '../utils';
-import { LimitingExecutor } from '../executor';
+import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { produceDiagnostic, reviewIssueToDiagnostics } from './utils';
 import { ReviewResult } from './model';
 
 export interface ReviewOpts {
-  [key: string]: string;
+  [key: string]: string | boolean;
 }
 
 export interface Reviewer {
-  review(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<vscode.Diagnostic[]>;
+  review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
 }
 
 export class SimpleReviewer implements Reviewer {
@@ -83,5 +83,64 @@ export class CachingReviewer implements Reviewer {
     this.reviewCache.set(document.fileName, { documentVersion: document.version, diagnostics });
 
     return diagnostics;
+  }
+}
+
+/**
+ * A reviewer that respects .gitignore settings.
+ *
+ * If git is not installed, or if the current document is not part of workspace
+ * (i.e. it's opened as a standalone file), then this reviewer will basically be
+ * downgraded to the injected reviewer.
+ */
+export class FilteringReviewer implements Reviewer {
+  private gitExecutor: SimpleExecutor | null = null;
+  private gitExecutorCache = new Map<string, boolean>();
+
+  constructor(private reviewer: Reviewer) {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (workspaceFolders) {
+      this.gitExecutor = new SimpleExecutor();
+      const watcher = vscode.workspace.createFileSystemWatcher('**/.gitignore');
+      watcher.onDidChange(() => this.clearCache());
+      watcher.onDidCreate(() => this.clearCache());
+      watcher.onDidDelete(() => this.clearCache());
+    }
+  }
+
+  private clearCache() {
+    this.gitExecutorCache = new Map<string, boolean>();
+  }
+
+  private async isIgnored(document: vscode.TextDocument) {
+    if (!this.gitExecutor) return false;
+    if (!vscode.workspace.getConfiguration('codescene').get('gitignore')) return false;
+
+    const filePath = document.uri.fsPath;
+
+    if (this.gitExecutorCache.has(filePath)) {
+      return this.gitExecutorCache.get(filePath);
+    }
+
+    const result = await this.gitExecutor.execute(
+      { command: 'git', args: ['check-ignore', filePath], ignoreError: true },
+      { cwd: dirname(document.uri.fsPath) }
+    );
+
+    const ignored = result.exitCode === 0;
+
+    this.gitExecutorCache.set(filePath, ignored);
+
+    return ignored;
+  }
+
+  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
+    const ignored = await this.isIgnored(document);
+
+    if (ignored) {
+      return [];
+    }
+
+    return this.reviewer.review(document, reviewOpts);
   }
 }
