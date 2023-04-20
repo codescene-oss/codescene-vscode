@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.2.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.1.3...v0.2.0) (2023-04-20)
+
+
+### Features
+
+* ignore files outside of the workspace ([1d5a95f](https://github.com/codescene-oss/codescene-vscode/commit/1d5a95f4b70461f2e27067f65dbdb3827e3f882b))
+* respect .gitignore settings ([11f98c8](https://github.com/codescene-oss/codescene-vscode/commit/11f98c8562a1549a5e9d931c895916da62cb5d5c))
+
+
+### Bug fixes
+
+* error sending usage stats ([e0c9471](https://github.com/codescene-oss/codescene-vscode/commit/e0c9471c5440db9e95418057d3d4166479ad9dbb))
+
 ### [0.1.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.1.2...v0.1.3) (2023-04-14)
 
 
