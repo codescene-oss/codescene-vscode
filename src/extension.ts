@@ -135,8 +135,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Send execution stats by language
     if (stats.analysis.length > 0) {
-      for (const language of stats.analysis) {
-        Telemetry.instance.logUsage('stats', {stats: { analysis: language }});
+      for (const byLanguage of stats.analysis) {
+        Telemetry.instance.logUsage('stats', {stats: { analysis: byLanguage }});
       }
     }
 
