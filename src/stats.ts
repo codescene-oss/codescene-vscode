@@ -16,6 +16,9 @@ export class StatsCollector {
   };
 
   recordAnalysis(language: string, time: number) {
+    // Skip record if time is negative or zero. Must be some kind of error.
+    if (time <= 0) return;
+
     const analysis = this.stats.analysis.find((a) => a.language === language);
     if (analysis) {
       analysis.runs++;
