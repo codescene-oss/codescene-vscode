@@ -1,6 +1,6 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { sign } from './codescene-interop';
 import { ExecResult } from './executor';
 
@@ -18,27 +18,8 @@ export default class Telemetry {
         console.log(error);
       },
     };
+
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender);
-  }
-
-  static init(cliPath: string): void {
-    console.log('CodeScene: initializing telemetry logger');
-    Telemetry._instance = new Telemetry(cliPath);
-  }
-
-  static get instance(): Telemetry {
-    return Telemetry._instance;
-  }
-
-  logUsage(eventName: string) {
-    this.telemetryLogger.logUsage(eventName);
-  }
-
-  private postTelemetry(eventName: string, eventData: any) {
-    const config = {
-      headers: { 'content-type': 'application/json' },
-      timeout: 5000, //milliseconds
-    };
 
     axios.interceptors.request.use(
       async (config) => {
@@ -50,6 +31,26 @@ export default class Telemetry {
         return Promise.reject(error);
       }
     );
+  }
+
+  static init(cliPath: string): void {
+    console.log('CodeScene: initializing telemetry logger');
+    Telemetry._instance = new Telemetry(cliPath);
+  }
+
+  static get instance(): Telemetry {
+    return Telemetry._instance;
+  }
+
+  logUsage(eventName: string, eventData?: any) {
+    this.telemetryLogger.logUsage(eventName, eventData);
+  }
+
+  private postTelemetry(eventName: string, eventData: any) {
+    const config: AxiosRequestConfig = {
+      headers: { 'content-type': 'application/json' },
+      timeout: 5000, //milliseconds
+    };
 
     const data = {
       ...eventData,
@@ -57,6 +58,7 @@ export default class Telemetry {
       'event-name': eventName,
       'editor-type': 'vscode',
     };
+
     const jsonData = JSON.stringify(data); //for consistency in signature, we take care of jsonification here.
 
     axios.post('https://devtools.codescene.io/api/analytics/events/ide', jsonData, config).catch((error) => {

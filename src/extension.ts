@@ -9,6 +9,7 @@ import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import Telemetry from './telemetry';
 import { CachingReviewer, FilteringReviewer, SimpleReviewer } from './review/reviewer';
+import { StatsCollector } from './stats';
 
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
@@ -127,6 +128,20 @@ export async function activate(context: vscode.ExtensionContext) {
     codeLensProvider.update();
   });
   context.subscriptions.push(fileSystemWatcher);
+
+  // Setup a scheduled event for sending statistics
+  setInterval(() => {
+    const stats = StatsCollector.instance.stats;
+
+    // Send execution stats by language
+    if (stats.analysis.length > 0) {
+      for (const language of stats.analysis) {
+        Telemetry.instance.logUsage('stats', {stats: { analysis: language }});
+      }
+    }
+
+    StatsCollector.instance.clear();
+  }, 1800 * 1000);
 }
 
 // This method is called when your extension is deactivated
