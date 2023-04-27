@@ -4,6 +4,7 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+  duration: number;
 }
 
 export interface Command {
@@ -48,7 +49,7 @@ export class SimpleExecutor implements Executor {
         }
         const end = Date.now();
         console.log(`CodeScene: ${logName} with pid ${childProcess.pid} took ${end - start} milliseconds`);
-        resolve({ stdout, stderr, exitCode: error?.code || 0 });
+        resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
       });
 
       if (input && childProcess.stdin) {

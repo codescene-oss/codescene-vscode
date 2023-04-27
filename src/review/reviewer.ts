@@ -4,6 +4,7 @@ import { getFileExtension } from '../utils';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { produceDiagnostic, reviewIssueToDiagnostics } from './utils';
 import { ReviewResult } from './model';
+import { StatsCollector } from '../stats';
 
 export interface ReviewOpts {
   [key: string]: string | boolean;
@@ -33,7 +34,9 @@ export class SimpleReviewer implements Reviewer {
       document.getText()
     );
 
-    const diagnostics = result.then(({ stdout }) => {
+    const diagnostics = result.then(({ stdout, duration }) => {
+      StatsCollector.instance.recordAnalysis(fileExtension, duration);
+
       const data = JSON.parse(stdout) as ReviewResult;
       let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
