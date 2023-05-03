@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { ensureLatestCompatibleCliExists } from './download';
-import path = require('path');
 import { registerCsDocProvider } from './csdoc';
 import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
@@ -10,7 +9,15 @@ import { outputChannel } from './log';
 import Telemetry from './telemetry';
 import { CachingReviewer, FilteringReviewer, SimpleReviewer } from './review/reviewer';
 import { StatsCollector } from './stats';
+import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 
+import { ScmCouplingsView } from './coupling/scm-couplings-view';
+import { CsWorkspace } from './workspace';
+import { Links } from './links';
+import { CsRestApi } from './cs-rest-api';
+import { Git } from './git';
+import { CouplingDataProvider } from './coupling/coupling-data-provider';
+import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -55,16 +62,55 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
   context.subscriptions.push(openDocsForDiagnostic);
 }
 
+function setupTelemetry(cliPath: string) {
+  Telemetry.init(cliPath);
+
+  // send telemetry on activation (gives us basic usage stats)
+  Telemetry.instance.logUsage('onActivateExtension');
+}
+
+async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
+  const authProvider = new CsAuthenticationProvider(context, csWorkspace);
+  context.subscriptions.push(authProvider);
+
+  const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
+
+  if (session) {
+    csWorkspace.updateIsLoggedInContext(true);
+  } else {
+    csWorkspace.updateIsLoggedInContext(false);
+  }
+
+  authProvider.onDidChangeSessions(async (e) => {
+    if (e.added && e.added.length > 0) {
+      csWorkspace.updateIsLoggedInContext(true);
+    } else {
+      // Without the following getSession call, the login option in the accounts picker will not reappear!
+      // No idea why.
+      await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
+      csWorkspace.updateIsLoggedInContext(false);
+    }
+  });
+
+  return authProvider;
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
-  // initialize telemetry
-  Telemetry.init(cliPath);
+  const csRestApi = new CsRestApi();
 
-  // send telemetry
-  Telemetry.instance.logUsage('onActivateExtension');
+  const csWorkspace = new CsWorkspace(context, csRestApi);
+  context.subscriptions.push(csWorkspace);
+
+  const links = new Links(csWorkspace);
+  context.subscriptions.push(links);
+
+  const authProvider = await createAuthProvider(context, csWorkspace);
+
+  setupTelemetry(cliPath);
 
   registerCommands(context, cliPath);
 
@@ -142,6 +188,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
     StatsCollector.instance.clear();
   }, 1800 * 1000);
+
+  const git = new Git();
+  const couplingDataProvider = new CouplingDataProvider(git, csRestApi, csWorkspace);
+  // Init tree view in scm container
+  const couplingView = new ScmCouplingsView(git, couplingDataProvider);
+  context.subscriptions.push(couplingView);
+
+  // Init tree view in explorer container
+  const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
+  context.subscriptions.push(explorerCouplingsView);
 }
 
 // This method is called when your extension is deactivated

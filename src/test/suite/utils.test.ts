@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 
-import { getFileExtension, getFileNameWithoutExtension, getFunctionNameRange } from '../../utils';
+import { getFileExtension, getFileNameWithoutExtension, getFunctionNameRange, rankNamesBy } from '../../utils';
 
 suite('Utils Test Suite', () => {
   test('getFileExtension', () => {
@@ -26,5 +26,23 @@ suite('Utils Test Suite', () => {
     // If the actual line contains the full name including the period, we should match the full name.
     // Perhaps the language supports using periods in function names.
     assert.deepStrictEqual(getFunctionNameRange('    public weird.name() {', 'weird.name'), [11, 21]);
+  });
+
+  test('rankNamesBy - best match first', () => {
+    const names = ['foo', 'bar', 'baz', 'foobar', 'bazbar'];
+    const match = 'foo';
+    const expected = ['foo', 'foobar', 'bar', 'baz', 'bazbar'];
+    const actual = names.slice();
+    rankNamesBy(match, actual);
+    assert.deepStrictEqual(actual, expected);
+  });
+
+  test('rankNamesBy - case insensitive', () => {
+    const names = ['foo', 'bar', 'baz', 'foobar', 'bazbar'];
+    const match = 'FOO';
+    const expected = ['foo', 'foobar', 'bar', 'baz', 'bazbar'];
+    const actual = names.slice();
+    rankNamesBy(match, actual);
+    assert.deepStrictEqual(actual, expected);
   });
 });
