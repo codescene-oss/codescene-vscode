@@ -16,4 +16,6 @@ export interface IssueDetails {
   title: string;
   // eslint-disable-next-line @typescript-eslint/naming-convention
   'start-line': number;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'end-line': number;
 }
