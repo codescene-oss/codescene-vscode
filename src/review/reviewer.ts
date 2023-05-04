@@ -2,7 +2,7 @@ import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { getFileExtension } from '../utils';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
-import { produceDiagnostic, reviewIssueToDiagnostics } from './utils';
+import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
 import { ReviewResult } from './model';
 import { StatsCollector } from '../stats';
 

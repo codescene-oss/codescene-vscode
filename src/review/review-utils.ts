@@ -2,15 +2,31 @@ import * as vscode from 'vscode';
 import { ReviewIssue, IssueDetails } from "./model";
 import { getFunctionNameRange } from '../utils';
 
+function issueToRange(issueCode: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
+  const startLine = issue['start-line'] - 1;
+  const startLineText = document.lineAt(startLine).text;
+
+  // Complex conditional does NOT occur on the same line as the function name,
+  // it occurs on the line(s) of the conditional itself.
+  if (issueCode === 'complex-conditional') {
+    const startColumn = startLineText.search(/\S|$/);
+    const endColumn = 0;
+    return new vscode.Range(startLine, startColumn > 0 ? startColumn : 0, issue['end-line'], endColumn);
+  }
+
+  // Other issues occur on the same line as the function name and we use the
+  // function name to find the range
+  const [startColumn, endColumn] = getFunctionNameRange(startLineText, issue.title);
+  return new vscode.Range(startLine, startColumn, startLine, endColumn);
+}
+
 export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
   if (!reviewIssue.functions) {
     return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue.code)];
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
-    const lineNumber = func['start-line'] - 1;
-    const [startColumn, endColumn] = getFunctionNameRange(document.lineAt(lineNumber).text, func.title);
-    const range = new vscode.Range(lineNumber, startColumn, lineNumber, endColumn);
+    const range = issueToRange(reviewIssue.code, func, document);
 
     let description;
     if (func.details) {
