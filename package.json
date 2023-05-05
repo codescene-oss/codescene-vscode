@@ -22,7 +22,8 @@
     "code health",
     "complexity",
     "code review",
-    "refactoring"
+    "refactoring",
+    "code quality"
   ],
   "activationEvents": [
     "onLanguage:apex",
