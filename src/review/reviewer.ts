@@ -41,10 +41,11 @@ export class SimpleReviewer implements Reviewer {
       let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
       if (data.score > 0) {
+        const roundedScore = +data.score.toFixed(2);
         const scoreDiagnostic = produceDiagnostic(
           'info',
           new vscode.Range(0, 0, 0, 0),
-          `Code health score: ${data.score}`
+          `Code health score: ${roundedScore}`
         );
         return [scoreDiagnostic, ...diagnostics];
       } else {
