@@ -6,7 +6,7 @@
       "value" : 500
     }, {
       "name" : "function_lines_of_code_warning",
-      "value" : 80
+      "value" : 81
     } ],
     "thresholds_doc" : "The thresholds let you redefine the details of the code health issues. For example, specifying what a Complex Method means to you. Be restrictive with overrides.",
     "matching_content_path" : "**/*",
