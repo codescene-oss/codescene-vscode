@@ -95,7 +95,7 @@ export class CachingReviewer implements Reviewer {
  *
  * If git is not installed, or if the current document is not part of workspace
  * (i.e. it's opened as a standalone file), then this reviewer will basically be
- * downgraded to the injected reviewer.
+ * downgraded to the injected reviewer (which for normal use is the CachingReviewer)
  */
 export class FilteringReviewer implements Reviewer {
   private gitExecutor: SimpleExecutor | null = null;

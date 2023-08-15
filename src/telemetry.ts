@@ -20,17 +20,6 @@ export default class Telemetry {
     };
 
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender);
-
-    axios.interceptors.request.use(
-      async (config) => {
-        const signResult: ExecResult = await sign(this.cliPath, config.data);
-        config.headers['x-codescene-signature'] = signResult.stdout;
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
   }
 
   static init(cliPath: string): void {
@@ -46,12 +35,7 @@ export default class Telemetry {
     this.telemetryLogger.logUsage(eventName, eventData);
   }
 
-  private postTelemetry(eventName: string, eventData: any) {
-    const config: AxiosRequestConfig = {
-      headers: { 'content-type': 'application/json' },
-      timeout: 5000, //milliseconds
-    };
-
+  private async postTelemetry(eventName: string, eventData: any) {
     const data = {
       ...eventData,
       'event-time': new Date().toISOString(),
@@ -59,7 +43,19 @@ export default class Telemetry {
       'editor-type': 'vscode',
     };
 
-    const jsonData = JSON.stringify(data); //for consistency in signature, we take care of jsonification here.
+
+    // To ensure we are sending exactly the same data to the sign command as we are sending in the body of the request,
+    // we stringify the data manually.
+    const jsonData = JSON.stringify(data);
+    const signResult: ExecResult = await sign(this.cliPath, jsonData);
+
+    const config: AxiosRequestConfig = {
+      headers: {
+        'content-type': 'application/json',
+        'x-codescene-signature': signResult.stdout,
+      },
+      timeout: 5000, //milliseconds
+    };
 
     axios.post('https://devtools.codescene.io/api/analytics/events/ide', jsonData, config).catch((error) => {
       if (error.response) {

@@ -60,30 +60,193 @@
     "commands": [
       {
         "command": "codescene.createRulesTemplate",
-        "title": "CodeScene: create rules template"
+        "title": "CodeScene: Create Rules Template"
       },
       {
         "command": "codescene.openCodeHealthDocs",
-        "title": "CodeScene: open code health documentation"
+        "title": "CodeScene: Open Code Health Documentation"
+      },
+      {
+        "command": "codescene.associateWithProject",
+        "title": "CodeScene: Associate Workspace with CodeScene Project"
+      },
+      {
+        "command": "codescene.scmCouplingsView.open",
+        "title": "Open File",
+        "icon": "$(preferences-open-settings)"
+      },
+      {
+        "command": "codescene.scmCouplingsView.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codescene.openDashboard",
+        "title": "CodeScene: Open Project Dashboard"
+      },
+      {
+        "command": "codescene.openHotspots",
+        "title": "CodeScene: Open Hotspots Map"
+      },
+      {
+        "command": "codescene.openChangeCoupling",
+        "title": "CodeScene: Open Change Coupling"
+      },
+      {
+        "command": "codescene.openCodeReview",
+        "title": "CodeScene: Open Code Review"
+      },
+      {
+        "command": "codescene.openXRay",
+        "title": "CodeScene: Open X-Ray"
       }
     ],
+    "views": {
+      "scm": [
+        {
+          "id": "codescene.scmCouplingsView",
+          "name": "Change coupling",
+          "when": "codescene.remoteFeaturesEnabled"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "codescene.explorerCouplingsView",
+          "name": "Change coupling",
+          "when": "codescene.remoteFeaturesEnabled"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "codescene.scmCouplingsView",
+        "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
+      },
+      {
+        "view": "codescene.scmCouplingsView",
+        "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+      },
+      {
+        "view": "codescene.explorerCouplingsView",
+        "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
+      },
+      {
+        "view": "codescene.explorerCouplingsView",
+        "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codescene.scmCouplingsView.refresh",
+          "when": "view == codescene.scmCouplingsView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codescene.scmCouplingsView.open",
+          "when": "view == codescene.scmCouplingsView && viewItem == rootItem",
+          "group": "inline"
+        },
+        {
+          "command": "codescene.openXRay",
+          "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
+        },
+        {
+          "command": "codescene.openCodeReview",
+          "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codescene.openDashboard",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.openHotspots",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.openChangeCoupling",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.associateWithProject",
+          "when": "codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.openXRay",
+          "when": "false"
+        },
+        {
+          "command": "codescene.openCodeReview",
+          "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codescene.openCodeReview",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.openXRay",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "codescene.openCodeReview",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        },
+        {
+          "command": "codescene.openXRay",
+          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        }
+      ]
+    },
     "configuration": {
       "title": "CodeScene",
       "properties": {
         "codescene.enableCodeLenses": {
           "type": "boolean",
           "default": true,
-          "description": "Enable CodeScene code lenses"
+          "description": "Enable CodeScene code lenses",
+          "order": 1
         },
         "codescene.gitignore": {
           "type": "boolean",
           "default": true,
-          "description": "Exclude files in .gitignore from analysis"
+          "description": "Exclude files in .gitignore from analysis",
+          "order": 2
         },
         "codescene.excludeExternal": {
           "type": "boolean",
           "default": true,
-          "description": "Exclude files outside of the workspace from analysis"
+          "description": "Exclude files outside of the workspace from analysis",
+          "order": 3
+        },
+        "codescene.enableRemoteFeatures": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable remote features. This enables the use of pre-analyzed data on an existing CodeScene server. Requires codescene login. VS Code has to be restarted after changing this setting.",
+          "order": 4
+        },
+        "codescene.cloudUrl": {
+          "type": "string",
+          "default": "https://staging.codescene.io",
+          "description": "The URL to the CodeScene Cloud service",
+          "order": 5
+        },
+        "codescene.cloudApiUrl": {
+          "type": "string",
+          "default": "https://api-staging.codescene.io",
+          "description": "The API URL of the CodeScene Cloud service",
+          "order": 6
         }
       }
     }
@@ -103,6 +266,7 @@
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
+    "@types/uuid": "^9.0.1",
     "@types/vscode": "^1.75.1",
     "@typescript-eslint/eslint-plugin": "^5.51.0",
     "@typescript-eslint/parser": "^5.45.0",
@@ -116,9 +280,10 @@
   "dependencies": {
     "@types/follow-redirects": "^1.14.1",
     "@types/lodash.debounce": "^4.0.7",
+    "axios": "^1.3.4",
     "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.2",
     "lodash.debounce": "^4.0.8",
-    "axios": "^1.3.4"
+    "uuid": "^9.0.0"
   }
 }
