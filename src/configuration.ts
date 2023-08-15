@@ -1,7 +1,15 @@
 import * as vscode from 'vscode';
 
-export function getConfiguration<T>(key: string): T | undefined {
-  return vscode.workspace.getConfiguration('codescene').get<T>(key);
+export function getConfiguration<T>(section: string): T | undefined {
+  return vscode.workspace.getConfiguration('codescene').get<T>(section);
+}
+
+export function onDidChangeConfiguration(section: string, listener: (e: vscode.ConfigurationChangeEvent) => any) {
+  vscode.workspace.onDidChangeConfiguration((e) => {
+    if (e.affectsConfiguration('codescene.' + section)) {
+      listener(e);
+    }
+  });
 }
 
 /**

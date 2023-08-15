@@ -86,6 +86,13 @@ export class CsWorkspace implements vscode.Disposable {
   }
 
   /**
+   * Updates the codescene.remoteFeaturesEnabled context variable. This can be used in package.json to conditionally enable/disable views.
+   */
+  updateRemoteFeatureEnabledContext(enable: boolean) {
+    vscode.commands.executeCommand('setContext', 'codescene.remoteFeaturesEnabled', enable);
+  }
+
+  /**
    * Project path here means the path used by the codescene server to denote the file.
    *
    * This is a relative file path with the repo name as the root. E.g. codescene-vscode/src/extension.ts.

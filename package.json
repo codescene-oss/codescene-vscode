@@ -105,13 +105,15 @@
       "scm": [
         {
           "id": "codescene.scmCouplingsView",
-          "name": "Change coupling"
+          "name": "Change coupling",
+          "when": "codescene.remoteFeaturesEnabled"
         }
       ],
       "explorer": [
         {
           "id": "codescene.explorerCouplingsView",
-          "name": "Change coupling"
+          "name": "Change coupling",
+          "when": "codescene.remoteFeaturesEnabled"
         }
       ]
     },
@@ -119,22 +121,22 @@
       {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
-        "when": "!codescene.isLoggedIn"
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
       },
       {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
-        "when": "!codescene.isLoggedIn"
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
       }
     ],
     "menus": {
@@ -213,27 +215,38 @@
         "codescene.enableCodeLenses": {
           "type": "boolean",
           "default": true,
-          "description": "Enable CodeScene code lenses"
+          "description": "Enable CodeScene code lenses",
+          "order": 1
         },
         "codescene.gitignore": {
           "type": "boolean",
           "default": true,
-          "description": "Exclude files in .gitignore from analysis"
+          "description": "Exclude files in .gitignore from analysis",
+          "order": 2
         },
         "codescene.excludeExternal": {
           "type": "boolean",
           "default": true,
-          "description": "Exclude files outside of the workspace from analysis"
+          "description": "Exclude files outside of the workspace from analysis",
+          "order": 3
+        },
+        "codescene.enableRemoteFeatures": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable remote features. This enables the use of pre-analyzed data on an existing CodeScene server. Requires codescene login. VS Code has to be restarted after changing this setting.",
+          "order": 4
         },
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://staging.codescene.io",
-          "description": "The URL to the CodeScene Cloud service"
+          "description": "The URL to the CodeScene Cloud service",
+          "order": 5
         },
         "codescene.cloudApiUrl": {
           "type": "string",
           "default": "https://api-staging.codescene.io",
-          "description": "The API URL of the CodeScene Cloud service"
+          "description": "The API URL of the CodeScene Cloud service",
+          "order": 6
         }
       }
     }

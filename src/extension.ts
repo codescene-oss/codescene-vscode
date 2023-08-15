@@ -18,6 +18,7 @@ import { CsRestApi } from './cs-rest-api';
 import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
+import { getConfiguration, onDidChangeConfiguration } from './configuration';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -69,46 +70,10 @@ function setupTelemetry(cliPath: string) {
   Telemetry.instance.logUsage('onActivateExtension');
 }
 
-async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
-  const authProvider = new CsAuthenticationProvider(context, csWorkspace);
-  context.subscriptions.push(authProvider);
-
-  const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
-
-  if (session) {
-    csWorkspace.updateIsLoggedInContext(true);
-  } else {
-    csWorkspace.updateIsLoggedInContext(false);
-  }
-
-  authProvider.onDidChangeSessions(async (e) => {
-    if (e.added && e.added.length > 0) {
-      csWorkspace.updateIsLoggedInContext(true);
-    } else {
-      // Without the following getSession call, the login option in the accounts picker will not reappear!
-      // No idea why.
-      await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
-      csWorkspace.updateIsLoggedInContext(false);
-    }
-  });
-
-  return authProvider;
-}
-
 export async function activate(context: vscode.ExtensionContext) {
   console.log('CodeScene: the extension is now active!');
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
-
-  const csRestApi = new CsRestApi();
-
-  const csWorkspace = new CsWorkspace(context, csRestApi);
-  context.subscriptions.push(csWorkspace);
-
-  const links = new Links(csWorkspace);
-  context.subscriptions.push(links);
-
-  const authProvider = await createAuthProvider(context, csWorkspace);
 
   setupTelemetry(cliPath);
 
@@ -189,8 +154,41 @@ export async function activate(context: vscode.ExtensionContext) {
     StatsCollector.instance.clear();
   }, 1800 * 1000);
 
+  const enableRemoteFeaturesFF = getConfiguration<boolean>('enableRemoteFeatures');
+  if (enableRemoteFeaturesFF) {
+    enableRemoteFeatures(context);
+  }
+
+  // If the feature flag is changed, alert the user that a reload is needed
+  onDidChangeConfiguration("enableRemoteFeatures", async (e) => {
+    const result = await vscode.window.showInformationMessage(
+      "CodeScene: VS Code needs to be reloaded to enable/disable remote features.",
+      "Reload"
+    );
+    if (result === "Reload") {
+      vscode.commands.executeCommand("workbench.action.reloadWindow");
+    }
+  });
+}
+
+/**
+ * Active functionality that requires a connection to a CodeScene server.
+ */
+async function enableRemoteFeatures(context: vscode.ExtensionContext) {
+  const csRestApi = new CsRestApi();
+
+  const csWorkspace = new CsWorkspace(context, csRestApi);
+  csWorkspace.updateRemoteFeatureEnabledContext(true); // used in package.json to enable new views
+  context.subscriptions.push(csWorkspace);
+
+  const links = new Links(csWorkspace);
+  context.subscriptions.push(links);
+
+  await createAuthProvider(context, csWorkspace);
+
   const git = new Git();
   const couplingDataProvider = new CouplingDataProvider(git, csRestApi, csWorkspace);
+
   // Init tree view in scm container
   const couplingView = new ScmCouplingsView(git, couplingDataProvider);
   context.subscriptions.push(couplingView);
@@ -198,6 +196,32 @@ export async function activate(context: vscode.ExtensionContext) {
   // Init tree view in explorer container
   const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
   context.subscriptions.push(explorerCouplingsView);
+}
+
+async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
+  const authProvider = new CsAuthenticationProvider(context, csWorkspace);
+  context.subscriptions.push(authProvider);
+
+  const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
+
+  if (session) {
+    csWorkspace.updateIsLoggedInContext(true);
+  } else {
+    csWorkspace.updateIsLoggedInContext(false);
+  }
+
+  authProvider.onDidChangeSessions(async (e) => {
+    if (e.added && e.added.length > 0) {
+      csWorkspace.updateIsLoggedInContext(true);
+    } else {
+      // Without the following getSession call, the login option in the accounts picker will not reappear!
+      // No idea why.
+      await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
+      csWorkspace.updateIsLoggedInContext(false);
+    }
+  });
+
+  return authProvider;
 }
 
 // This method is called when your extension is deactivated

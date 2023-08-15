@@ -4,6 +4,9 @@ import { CsWorkspace } from './workspace';
 import { getServerUrl } from './configuration';
 import { CoupledEntity } from './coupling/model';
 
+/**
+ * Registers commands for opening CodeScene links in the browser.
+ */
 export class Links implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
 
