@@ -98,7 +98,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       this.sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
 
       outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
-      outputChannel.appendLine(`Secret token: ${session.accessToken}`);
 
       if (this.csWorkspace.getProjectId() === undefined) {
        const result = await window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`, "Associate workspace with project");
