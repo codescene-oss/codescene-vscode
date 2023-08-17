@@ -8,7 +8,6 @@
 import * as vscode from 'vscode';
 import { groupByProperty } from '../utils';
 import { Git } from '../git';
-import { outputChannel } from '../log';
 import { CouplingDataProvider, CouplingWithUri } from './coupling-data-provider';
 import { CoupledEntity } from './model';
 
@@ -36,7 +35,6 @@ export class ScmCouplingsView implements vscode.Disposable {
     // Refresh view on certain events
     this.disposables.push(
       this.git.onDidModifyChangeSet(() => {
-        outputChannel.appendLine('Change set modified, refreshing coupling tree view');
         this.treeDataProvider.refresh();
       })
     );
