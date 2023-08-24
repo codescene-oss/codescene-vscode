@@ -233,18 +233,18 @@
         "codescene.enableRemoteFeatures": {
           "type": "boolean",
           "default": false,
-          "description": "Enable remote features. This enables the use of pre-analyzed data on an existing CodeScene server. Requires codescene login. VS Code has to be restarted after changing this setting.",
+          "description": "Includes Change Coupling. Requires a CodeScene subscription. VS Code has to be restarted.",
           "order": 4
         },
         "codescene.cloudUrl": {
           "type": "string",
-          "default": "https://staging.codescene.io",
-          "description": "The URL to the CodeScene Cloud service",
+          "default": "https://codescene.io",
+          "description": "CodeScene Cloud URL",
           "order": 5
         },
         "codescene.cloudApiUrl": {
           "type": "string",
-          "default": "https://api-staging.codescene.io",
+          "default": "https://api.codescene.io",
           "description": "The API URL of the CodeScene Cloud service",
           "order": 6
         }
