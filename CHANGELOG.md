@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.3.0...v0.3.1) (2023-08-24)
+
+
+### Features
+
+* add login to codescene server to enable more advanced features ([1a65caa](https://github.com/codescene-oss/codescene-vscode/commit/1a65caa4c85609ea4150744aa7d4b31aac8cd8a4))
+
 ## [0.3.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.2.1...v0.3.0) (2023-05-08)
 
 
