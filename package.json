@@ -19,11 +19,14 @@
     "Linters"
   ],
   "keywords": [
+    "code analysis",
     "code health",
-    "complexity",
     "code review",
+    "code quality",
+    "code metrics",
+    "complexity",
     "refactoring",
-    "code quality"
+    "technical debt"
   ],
   "activationEvents": [
     "onLanguage:apex",
