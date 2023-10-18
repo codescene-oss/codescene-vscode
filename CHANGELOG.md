@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.4.0...v0.5.0) (2023-10-18)
+
+
+### Features
+
+* Simpler one-to-one mapping for change coupling ([#26](https://github.com/codescene-oss/codescene-vscode/issues/26)) ([bf4ecc3](https://github.com/codescene-oss/codescene-vscode/commit/bf4ecc3fad20673513a2f85c0f9fe80b3f1e71be))
+
 ## [0.4.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.3.1...v0.4.0) (2023-08-28)
 
 ### [0.3.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.3.0...v0.3.1) (2023-08-24)
