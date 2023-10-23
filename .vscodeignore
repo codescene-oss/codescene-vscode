@@ -1,6 +1,9 @@
 .vscode/**
 .vscode-test/**
+.idea/
 src/**
+out/**
+!out/main.js
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
@@ -8,6 +11,7 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+node_modules/
 
 ## Ignore executables and zips created (in the download process) when running the extension in dev mode
 cs
@@ -15,6 +19,11 @@ cs.last-modified
 cs-*-*
 cs-*.last-modified
 *.zip
+
+## Misc dotfiles
+.github/**
+.versionrc.json
+.codescene/
 
 screenshots
 *.vsix
