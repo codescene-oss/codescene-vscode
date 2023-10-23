@@ -11,7 +11,7 @@
 import { https } from 'follow-redirects';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as extractZip from 'extract-zip';
+import extractZip from 'extract-zip';
 import { outputChannel } from './log';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
