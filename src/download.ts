@@ -17,6 +17,7 @@ import { outputChannel } from './log';
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
     x64: 'codescene-cli-ide-macos-amd64-v2.zip',
+    arm64: 'codescene-cli-ide-macos-aarch64-v2.zip',
   },
   linux: {
     x64: 'codescene-cli-ide-linux-amd64-v2.zip',
@@ -30,8 +31,8 @@ function getArtifactDownloadName(platform: NodeJS.Platform, arch: string): strin
   return artifacts[platform]?.[arch];
 }
 
-function getExecutableName(platform: NodeJS.Platform, arch: 'x64'): string {
-  // E.g. cs-darwin-x64, cs-linux-x64, cs-win32-x64.exe
+function getExecutableName(platform: NodeJS.Platform, arch: string): string {
+  // E.g. cs-darwin-x64/arm64, cs-linux-x64, cs-win32-x64.exe
   return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
 }
 
@@ -55,7 +56,7 @@ async function ensureExecutable(filePath: string) {
 
 function checkRemoteLastModifiedDate(url: URL) {
   // Issue a HTTP HEAD request to check the last-modified header of the artifact.
-  console.log('CodeScene: checking last-modified header of', url, '...');
+  console.log(`CodeScene: checking last-modified header of ${url.href}...`);
 
   return new Promise<Date | null>((resolve) => {
     https.request(url, {method: 'HEAD'}, (response) => {
@@ -149,21 +150,19 @@ function download(url: URL, filePath: string) {
 export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
   outputChannel.appendLine('Ensuring we have the latest CodeScene CLI version...');
 
-  const executableName = getExecutableName(process.platform, 'x64');
+  const executableName = getExecutableName(process.platform, process.arch);
   const cliPath = path.join(extensionPath, executableName);
   const lastModifiedPath = path.join(extensionPath, executableName + '.last-modified');
 
-  // We only support x64 for now. Once we have arm64 support, we can start
-  // using process.arch to determine the architecture.
-  const artifactName = getArtifactDownloadName(process.platform, 'x64');
+  const artifactName = getArtifactDownloadName(process.platform, process.arch);
 
   if (!artifactName) {
-    throw new Error(`Unsupported platform: ${process.platform} x64`);
+    throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
   }
 
   const downloadUrl = getArtifactDownloadUrl(artifactName);
 
-  if (await isUpToDate(cliPath, lastModifiedPath, getArtifactDownloadUrl(artifactName))) {
+  if (await isUpToDate(cliPath, lastModifiedPath, downloadUrl)) {
     outputChannel.appendLine('CodeScene CLI already exists and is up to date');
     return cliPath;
   }

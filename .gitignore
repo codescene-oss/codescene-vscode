@@ -8,6 +8,7 @@ node_modules
 cs
 cs.last-modified
 cs-*-x64
+cs-*-arm64
 cs-*.last-modified
 *.zip
 .idea/
