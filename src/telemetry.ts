@@ -41,6 +41,8 @@ export default class Telemetry {
       'event-time': new Date().toISOString(),
       'event-name': eventName,
       'editor-type': 'vscode',
+      'process-platform': process.platform,
+      'process-arch': process.arch,
     };
 
 
