@@ -43,6 +43,10 @@ function getArtifactDownloadUrl(artifactName: string): URL {
 async function unzipFile(zipFilePath: string, extensionPath: string, executablePath: string): Promise<void> {
   console.log('Unzipping file');
   await extractZip(zipFilePath, { dir: extensionPath });
+
+  console.log('Clean up download');
+  await fs.promises.unlink(zipFilePath);
+
   // The zip file contains a single file named "cs", or "cs.exe" on Windows.
   // We rename it to the name of the executable for the current platform.
   const execFromZip = path.join(extensionPath, 'cs' + (process.platform === 'win32' ? '.exe' : ''));
