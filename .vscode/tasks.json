@@ -13,8 +13,20 @@
 			},
 			"group": {
 				"kind": "build",
+			}
+		},
+		{
+			"type": "npm",
+			"script": "esbuild",
+			"problemMatcher": "$tsc-watch",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never"
+			},
+			"group": {
+				"kind": "build",
 				"isDefault": true
 			}
-		}
+		},
 	]
 }
