@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.5.1...v0.6.0) (2023-11-13)
+
+
+### Features
+
+* Add darwin amd64 binary download capability ([3fb0295](https://github.com/codescene-oss/codescene-vscode/commit/3fb0295cacc562395775d3693b71c4125452e6f0))
+
 ### [0.5.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.5.0...v0.5.1) (2023-10-23)
 
 ## [0.5.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.4.0...v0.5.0) (2023-10-18)
