@@ -4,7 +4,7 @@ import { SimpleExecutor } from './executor';
  * Executes the command for creating a code health rules template.
  */
 export function codeHealthRulesJson(cliPath: string) {
-  return new SimpleExecutor().execute({ command: cliPath, args: ['help', 'code-health-rules-template'] });
+  return new SimpleExecutor().execute({ command: cliPath, args: ['code-health-rules-template'] });
 }
 
 /**

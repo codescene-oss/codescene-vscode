@@ -20,7 +20,7 @@ export class SimpleReviewer implements Reviewer {
   constructor(private cliPath: string) {}
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
-    const fileExtension = getFileExtension(document.fileName);
+    const extension = getFileExtension(document.fileName);
 
     // Get the fsPath of the current document because we want to execute the
     // 'cs review' command in the same directory as the current document
@@ -29,13 +29,13 @@ export class SimpleReviewer implements Reviewer {
     const documentDirectory = dirname(documentPath);
 
     const result = this.executor.execute(
-      { command: this.cliPath, args: ['review', '-f', fileExtension], taskId: documentPath },
+      { command: this.cliPath, args: ['review', '--file-type', extension, '--output-format', 'json'], taskId: documentPath },
       { cwd: documentDirectory },
       document.getText()
     );
 
     const diagnostics = result.then(({ stdout, duration }) => {
-      StatsCollector.instance.recordAnalysis(fileExtension, duration);
+      StatsCollector.instance.recordAnalysis(extension, duration);
 
       const data = JSON.parse(stdout) as ReviewResult;
       let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
