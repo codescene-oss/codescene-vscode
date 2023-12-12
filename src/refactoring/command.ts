@@ -5,7 +5,7 @@ import { getRefactoringServerBaseUrl } from '../configuration';
 export const name = 'codescene.requestRefactoring';
 
 function tokenAuth(): string {
-  const accessToken = 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiamwifQ.zX8NKY4WQfD2jg8NNP03ObdUK_jraWabdOlsXkfM-JA';
+  const accessToken = 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibWUifQ.kUHhSLr5Aj2VIpb5tpz2IfOtSgxkVt8IQHFedAGDkz4';
   return 'Token ' + accessToken;
 }
 
@@ -48,9 +48,25 @@ async function refactorRequest(
   const sourceSnippet: SourceSnippet = {
     language: 'JavaScript',
     start_line: fn.range.start.line,
+    end_line: fn.range.end.line,
     content: document.getText(fn.range),
   };
   return { review: [review], source_snippet: sourceSnippet };
+}
+
+function handleRefactoringResponse(before: RefactorRequest, after: RefactorResponse) {
+  // we need the start_line, and the end_line that we want to replace with the refactored code
+  const { start_line, end_line } = before.source_snippet;
+  // from the after object, we need the code
+  const { code } = after;
+  // then we need to get the document that we want to refactor
+  const editor = window.activeTextEditor;
+  if (!editor) return;
+  // and then we need to replace the lines with the refactored code
+  const range = new vscode.Range(start_line, 0, end_line, 0);
+  editor.edit((editBuilder) => {
+    editBuilder.replace(range, code);
+  });
 }
 
 export async function requestRefactoring(
@@ -83,8 +99,9 @@ export async function requestRefactoring(
     .then((response) => {
       const refactoring: RefactorResponse = response.data;
       console.log('Received refactoring response: ' + JSON.stringify(refactoring));
+      handleRefactoringResponse(requestData, refactoring);
     })
     .catch((err) => {
-      console.log('Error in refactor request');
+      console.log('Error in refactor request, ', err);
     });
 }

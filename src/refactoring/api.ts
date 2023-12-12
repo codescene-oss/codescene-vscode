@@ -8,6 +8,7 @@ interface SourceSnippet {
   language: 'JavaScript'; // 'TypeScript'
   // eslint-disable-next-line @typescript-eslint/naming-convention
   start_line: number;
+  end_line: number;
   content: string;
 }
 
