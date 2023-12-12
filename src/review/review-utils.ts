@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
 import { ReviewIssue, IssueDetails } from './model';
 import { getFunctionNameRange } from '../utils';
+import { categoryToDocsCode } from '../csdoc';
 
-function issueToRange(issueCode: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
+function issueToRange(category: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
   const startLine = issue['start-line'] - 1;
   const startLineText = document.lineAt(startLine).text;
 
   // Complex conditional does NOT occur on the same line as the function name,
   // it occurs on the line(s) of the conditional itself.
-  if (issueCode === 'complex-conditional') {
+  if (category === 'Complex Conditional') {
     const startColumn = startLineText.search(/\S|$/);
     const endColumn = 0;
     return new vscode.Range(startLine, startColumn > 0 ? startColumn : 0, issue['end-line'], endColumn);
@@ -26,7 +27,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
-    const range = issueToRange(reviewIssue.code, func, document);
+    const range = issueToRange(reviewIssue.category, func, document);
 
     let description;
     if (func.details) {
@@ -60,13 +61,14 @@ export function produceDiagnostic(severity: string, range: vscode.Range, message
 
   // We don't want to add diagnostics for the "file level" issues, because it looks a bit ugly.
   // Instead, they are only shown as code lenses.
-  if (issue?.code) {
-    const args = [vscode.Uri.parse(`csdoc:${issue.code}.md`)];
+  if (issue?.category) {
+    const docsCode = categoryToDocsCode(issue.category);
+    const args = [vscode.Uri.parse(`csdoc:${docsCode}.md`)];
     const openDocCommandUri = vscode.Uri.parse(
       `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
     );
     diagnostic.code = {
-      value: JSON.stringify({code: issue.code, category: issue.category}),
+      value: issue.category,
       target: openDocCommandUri,
     };
   }

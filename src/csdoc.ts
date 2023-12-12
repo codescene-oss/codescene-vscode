@@ -33,3 +33,7 @@ export function registerCsDocProvider(docPath: string) {
   const providerRegistration = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
   return providerRegistration;
 }
+
+export function categoryToDocsCode(issueCategory: string) {
+  return issueCategory.replace(/ /g, '-').replace(/,/g, '').toLowerCase();
+}

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { ensureLatestCompatibleCliExists } from './download';
-import { registerCsDocProvider } from './csdoc';
+import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
@@ -47,8 +47,8 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
       if (diag.code instanceof Object) {
-        const valueObj = JSON.parse(diag.code.value.toString());
-        vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${valueObj.code}.md`));
+        const docsCode = categoryToDocsCode(diag.code.value.toString());
+        vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
       } else {
         const codeHealthDocs = 'Open general code health documentation';
 

@@ -26,8 +26,7 @@ async function findFunctions(document: TextDocument) {
 
 function codeToCategory(diagnosticCode: string | number | { value: string | number; target: Uri } | undefined) {
   if (diagnosticCode instanceof Object) {
-    const valueObj = JSON.parse(diagnosticCode.value.toString());
-    return valueObj.category;
+    return diagnosticCode.value.toString();
   }
   return 'unknown category';
 }
