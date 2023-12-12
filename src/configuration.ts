@@ -29,3 +29,8 @@ export function getServerUrl() {
 export function getServerApiUrl() {
   return getConfiguration<string>('cloudApiUrl');
 }
+
+
+export function getRefactoringServerBaseUrl() {
+  return getConfiguration<string>('refactorServiceBaseUrl');
+}

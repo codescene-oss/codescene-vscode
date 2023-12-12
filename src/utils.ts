@@ -1,3 +1,6 @@
+import { join } from 'path';
+import { readFile } from 'fs/promises';
+
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }
@@ -66,4 +69,15 @@ export function rankNamesBy(match: string, names: string[]): void {
 
 export function difference<T>(a: Set<T>, b: Set<T>) {
   return new Set([...a].filter((x) => !b.has(x)));
+}
+
+let logoUrl : string |undefined;
+export async function getLogoUrl(extensionPath: string): Promise<string> {
+  if (!logoUrl) {
+    // Read the logo from the extension's assets folder and base64 encode it.
+    const path = join(extensionPath, 'assets', 'cs-logo-small.png');
+    const data = await readFile(path);
+    logoUrl = data.toString('base64');
+  }
+  return logoUrl;
 }
