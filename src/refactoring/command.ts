@@ -1,5 +1,6 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import axios, { AxiosRequestConfig } from 'axios';
+import { getRefactoringServerBaseUrl } from '../configuration';
 
 export const name = 'codescene.requestRefactoring';
 
@@ -96,15 +97,16 @@ export async function requestRefactoring(
     headers: {
       'Content-Type': 'application/json',
       Authorization: tokenAuth(),
+      'x-codescene-trace-id': 'trace-id',
     },
     timeout: 15000,
   };
 
-  console.log(`POST ${endpoint}: ${JSON.stringify(requestData)}`);
-  // return;
+  const refactorUrl = `${getRefactoringServerBaseUrl()}/api/refactor`;
+  console.log(`Requesting a refactoring from ${refactorUrl}`);
 
   axios
-    .post(endpoint, requestData, config)
+    .post(refactorUrl, requestData, config)
     .then((response) => {
       const refactoring: RefactorResponse = response.data;
       console.log('Received refactoring response: ' + JSON.stringify(refactoring));
