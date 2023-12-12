@@ -19,6 +19,8 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
+import { CsRefactorCodeAction } from './refactoring/codeaction';
+import { name as refactoringCommandName, requestRefactoring } from './refactoring/command';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -45,7 +47,8 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
       if (diag.code instanceof Object) {
-        vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${diag.code.value}.md`));
+        const valueObj = JSON.parse(diag.code.value.toString());
+        vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${valueObj.code}.md`));
       } else {
         const codeHealthDocs = 'Open general code health documentation';
 
@@ -61,6 +64,9 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     }
   );
   context.subscriptions.push(openDocsForDiagnostic);
+
+  const requestRefactoringCmd = vscode.commands.registerCommand(refactoringCommandName, requestRefactoring);
+  context.subscriptions.push(requestRefactoringCmd);
 }
 
 function setupTelemetry(cliPath: string) {
@@ -96,12 +102,22 @@ export async function activate(context: vscode.ExtensionContext) {
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: 'file', language: 'javascript' },
+      new CsRefactorCodeAction(),
+      {
+        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+      }
+    )
+  );
+
   // Diagnostics will be updated when a file is opened or when it is changed.
   const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {
     if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
       return;
     }
-    reviewer.review(document, {skipCache}).then((diagnostics) => {
+    reviewer.review(document, { skipCache }).then((diagnostics) => {
       // Remove the diagnostics that are for file level issues.
       // These are only shown as code lenses
       const importantDiagnostics = diagnostics.filter((d) => d.range.start.line > 0);
@@ -147,7 +163,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Send execution stats by language
     if (stats.analysis.length > 0) {
       for (const byLanguage of stats.analysis) {
-        Telemetry.instance.logUsage('stats', {stats: { analysis: byLanguage }});
+        Telemetry.instance.logUsage('stats', { stats: { analysis: byLanguage } });
       }
     }
 
@@ -160,13 +176,13 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
-  onDidChangeConfiguration("enableRemoteFeatures", async (e) => {
+  onDidChangeConfiguration('enableRemoteFeatures', async (e) => {
     const result = await vscode.window.showInformationMessage(
-      "CodeScene: VS Code needs to be reloaded to enable/disable remote features.",
-      "Reload"
+      'CodeScene: VS Code needs to be reloaded to enable/disable remote features.',
+      'Reload'
     );
-    if (result === "Reload") {
-      vscode.commands.executeCommand("workbench.action.reloadWindow");
+    if (result === 'Reload') {
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
     }
   });
 }
@@ -225,5 +241,4 @@ async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace:
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {
-}
+export function deactivate() {}

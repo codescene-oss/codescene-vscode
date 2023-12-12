@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ReviewIssue, IssueDetails } from "./model";
+import { ReviewIssue, IssueDetails } from './model';
 import { getFunctionNameRange } from '../utils';
 
 function issueToRange(issueCode: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
@@ -22,7 +22,7 @@ function issueToRange(issueCode: string, issue: IssueDetails, document: vscode.T
 
 export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
   if (!reviewIssue.functions) {
-    return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue.code)];
+    return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue)];
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
@@ -35,11 +35,11 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
       description = reviewIssue.category;
     }
 
-    return produceDiagnostic('warning', range, description, reviewIssue.code);
+    return produceDiagnostic('warning', range, description, reviewIssue);
   });
 }
 
-export function produceDiagnostic(severity: string, range: vscode.Range, message: string, issueCode?: string) {
+export function produceDiagnostic(severity: string, range: vscode.Range, message: string, issue?: ReviewIssue) {
   let diagnosticSeverity: vscode.DiagnosticSeverity;
   switch (severity) {
     case 'info':
@@ -60,13 +60,13 @@ export function produceDiagnostic(severity: string, range: vscode.Range, message
 
   // We don't want to add diagnostics for the "file level" issues, because it looks a bit ugly.
   // Instead, they are only shown as code lenses.
-  if (issueCode) {
-    const args = [vscode.Uri.parse(`csdoc:${issueCode}.md`)];
+  if (issue?.code) {
+    const args = [vscode.Uri.parse(`csdoc:${issue.code}.md`)];
     const openDocCommandUri = vscode.Uri.parse(
       `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
     );
     diagnostic.code = {
-      value: issueCode,
+      value: JSON.stringify({code: issue.code, category: issue.category}),
       target: openDocCommandUri,
     };
   }
