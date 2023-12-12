@@ -251,6 +251,13 @@
           "description": "The API URL of the CodeScene Cloud service",
           "order": 6
         }
+        ,
+        "codescene.refactorServiceBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:3005",
+          "description": "The base URL of the CodeScene AI Refactoring service",
+          "order": 7
+        }
       }
     }
   },
