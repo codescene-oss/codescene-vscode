@@ -113,7 +113,7 @@ export class Git implements vscode.Disposable {
 
     // This happens when the file is not in a git repository.
     if (opts.throwOnFailure && result.exitCode === 128) {
-      throw new Error(`git check-ignore failed with exit code ${result.exitCode}`);
+      throw new Error(`git check-ignore failed with exit code ${result.exitCode} - checking ${filePath}`);
     }
 
     const ignored = result.exitCode === 0;

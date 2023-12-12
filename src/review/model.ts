@@ -6,7 +6,6 @@ export interface ReviewResult {
 
 export interface ReviewIssue {
   category: string;
-  code: string;
   description: string;
   functions?: IssueDetails[];
 }
