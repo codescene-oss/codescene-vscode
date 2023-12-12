@@ -1,6 +1,5 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import axios, { AxiosRequestConfig } from 'axios';
-import { getRefactoringServerBaseUrl } from '../configuration';
 
 export const name = 'codescene.requestRefactoring';
 
@@ -47,22 +46,34 @@ async function refactorRequest(
   const sourceSnippet: SourceSnippet = {
     language: 'JavaScript',
     start_line: fn.range.start.line,
-    end_line: fn.range.end.line,
+    end_line: fn.range.end.line + 1, // +1 because we want the linebreak at the end
     content: document.getText(fn.range),
   };
   return { review: [review], source_snippet: sourceSnippet };
 }
 
+/**
+ * Handles the response of a refactoring request.
+ * - Currently we only handle the happiest of paths, where we immediately
+ *   replace selected snippet with the result from the server.
+ *
+ *
+ * @param before - The original refactoring request for the start_line and end_line.
+ * @param after - The refactoring response containing the modified code.
+ */
 function handleRefactoringResponse(before: RefactorRequest, after: RefactorResponse) {
-  // we need the start_line, and the end_line that we want to replace with the refactored code
   const { start_line, end_line } = before.source_snippet;
-  // from the after object, we need the code
-  const { code } = after;
-  // then we need to get the document that we want to refactor
+  let { code } = after;
   const editor = window.activeTextEditor;
   if (!editor) return;
-  // and then we need to replace the lines with the refactored code
   const range = new vscode.Range(start_line, 0, end_line, 0);
+  // special case if we're starting at the first line of the file
+  // - we should then strip the first \n in our `code` variable so we don't insert
+  // empty lines
+  if (code.startsWith('\n') && start_line === 0) {
+    code = code.substring(1);
+  }
+
   editor.edit((editBuilder) => {
     editBuilder.replace(range, code);
   });
@@ -85,16 +96,15 @@ export async function requestRefactoring(
     headers: {
       'Content-Type': 'application/json',
       Authorization: tokenAuth(),
-      'x-codescene-trace-id': 'trace-id',
     },
     timeout: 15000,
   };
 
-  const refactorUrl = `${getRefactoringServerBaseUrl()}/api/refactor`;
-  console.log(`Requesting a refactoring from ${refactorUrl}`);
+  console.log(`POST ${endpoint}: ${JSON.stringify(requestData)}`);
+  // return;
 
   axios
-    .post(refactorUrl, requestData, config)
+    .post(endpoint, requestData, config)
     .then((response) => {
       const refactoring: RefactorResponse = response.data;
       console.log('Received refactoring response: ' + JSON.stringify(refactoring));
