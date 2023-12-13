@@ -1,6 +1,7 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import axios, { AxiosRequestConfig } from 'axios';
 import { getRefactoringServerBaseUrl } from '../configuration';
+import { RefactoringPanel } from './refactoring-panel';
 
 export const name = 'codescene.requestRefactoring';
 
@@ -75,9 +76,10 @@ function handleRefactoringResponse(before: RefactorRequest, after: RefactorRespo
     code = code.substring(1);
   }
 
-  editor.edit((editBuilder) => {
-    editBuilder.replace(range, code);
-  });
+  new RefactoringPanel();
+//  editor.edit((editBuilder) => {
+//    editBuilder.replace(range, code);
+//  });
 }
 
 export async function requestRefactoring(
