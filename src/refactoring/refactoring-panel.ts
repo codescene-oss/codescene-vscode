@@ -37,6 +37,7 @@ private _update() {
         <head>
             <meta charset="UTF-8">
             <script nonce="${nonce}">
+                const vscode = acquireVsCodeApi();
                 function sendMessage() {
                     const message = { command: 'apply', text: 'Hello from webview!' };
                     vscode.postMessage(message);
