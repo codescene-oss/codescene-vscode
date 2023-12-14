@@ -19,8 +19,8 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
-import { CsRefactorCodeAction } from './refactoring/codeaction';
-import { name as refactoringCommandName, requestRefactoring } from './refactoring/command';
+import { CsRefactorCodeAction, } from './refactoring/codeaction';
+import { name as refactoringCommandName, requestRefactoring, refactorPreFlight } from './refactoring/command';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -64,6 +64,8 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     }
   );
   context.subscriptions.push(openDocsForDiagnostic);
+
+  const refactoringCapabilities = refactorPreFlight();
 
   const requestRefactoringCmd = vscode.commands.registerCommand(refactoringCommandName, requestRefactoring);
   context.subscriptions.push(requestRefactoringCmd);

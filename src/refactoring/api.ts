@@ -27,3 +27,13 @@ interface RefactorResponse {
   code: string;
   success?: boolean; // probably redundant - do not use
 }
+
+interface SupportedData {
+  languages: string[];
+  codeSmells: string[];
+}
+
+interface PreFlightResponse {
+  supported: SupportedData
+  maxInputTokens: number
+}

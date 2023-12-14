@@ -91,3 +91,28 @@ export async function requestRefactoring(
       console.log('Error in refactor request, ', err);
     });
 }
+
+// TODO both this API call and the one above should be moved out to cs-rest-api.ts when we are ready
+// for that
+export async function refactorPreFlight() {
+  const preflightUrl = `${getRefactoringServerBaseUrl()}/api/refactor/preflight`;
+
+  // copying this stuff, can fix later
+  const config: AxiosRequestConfig = {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: tokenAuth(),
+      'x-codescene-trace-id': 'trace-id',
+    },
+    timeout: 15000,
+  };
+  axios
+    .get(preflightUrl, config)
+    .then((response) => {
+      // body json
+      console.log('Received preflight response: ' + JSON.stringify(response.data));
+    })
+    .catch((err) => {
+      console.log('Error when making preflight request, ', err);
+    });
+}
