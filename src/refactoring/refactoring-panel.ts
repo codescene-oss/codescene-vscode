@@ -1,10 +1,10 @@
-import vscode, { window } from 'vscode';
+import vscode, { WorkspaceEdit, window, workspace } from 'vscode';
+import { getLogoUrl } from '../utils';
 
 interface RefactoringSuggestion {
-  editor: vscode.TextEditor;
-  document: vscode.TextDocument;
   range: vscode.Range;
   code: string;
+  documentToEdit: vscode.TextDocument;
 }
 
 export class RefactoringPanel {
@@ -44,46 +44,67 @@ export class RefactoringPanel {
   }
 
   private applyRefactoring() {
-    if (!this.currentRefactorSuggestion) return;
-
-    const { editor, document, range, code } = this.currentRefactorSuggestion;
-    editor.edit((editBuilder) => {
-      editBuilder.replace(range, code);
-    });
-  }
-
-  // todo this could take the refactoring I guess
-  private update(
-    extensionUri: vscode.Uri,
-    document: vscode.TextDocument,
-    before: RefactorRequest,
-    after: RefactorResponse
-  ) {
-    let { code, reasons, confidence } = after;
-    code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
-    const { start_line: startLine, end_line: endLine } = before.source_snippet;
-    const range = new vscode.Range(startLine, 0, endLine, 0);
-    const editor = window.activeTextEditor;
-    if (!editor) {
-      console.log('No active texteditor available!');
+    if (!this.currentRefactorSuggestion) {
+      console.error('No refactoring suggestion to apply');
       return;
     }
-    this.currentRefactorSuggestion = {
-      editor,
-      document,
-      code,
-      range,
-    };
+    const { documentToEdit, range, code } = this.currentRefactorSuggestion;
+    const workSpaceEdit = new WorkspaceEdit();
+    workSpaceEdit.replace(documentToEdit.uri, range, code);
+    workspace.applyEdit(workSpaceEdit);
+  }
+
+  private update(extensionUri: vscode.Uri, document: vscode.TextDocument, request: RefactorRequest, response?: RefactorResponse) {
+    if (!response) {
+      this.setupLoadingView(extensionUri);
+      return;
+    }
+
+    let { code, reasons, confidence } = response;
+    code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
+    const { start_line: startLine, end_line: endLine } = request.source_snippet;
+    const range = new vscode.Range(startLine, 0, endLine, 0);
+    this.currentRefactorSuggestion = { documentToEdit: document, code, range };
 
     this.setupWebView(extensionUri, confidence, reasons, code);
   }
 
-  private setupWebView(extensionUri: vscode.Uri, confidence: RefactorConfidence, reasons: string[], code: string) {
+  private async setupLoadingView(extensionUri: vscode.Uri) {
+    const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
+    const styleUri = this.webViewPanel.webview.asWebviewUri(
+      vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
+    );
+
+    this.webViewPanel.webview.html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <link href="${styleUri}" rel="stylesheet" />
+    </head>
+    <body>
+        <img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center" />
+        <h1>Refactoring recommendation</h1>
+        <hr>
+        <h2>Loading refactoring...</h2>
+    </body>
+    </html>
+`;
+  }
+
+  private async setupWebView(
+    extensionUri: vscode.Uri,
+    confidence: RefactorConfidence,
+    reasons: string[],
+    code: string
+  ) {
     const { level, description } = confidence;
     const reasonText = reasons.join('. ');
     const styleUri = this.webViewPanel.webview.asWebviewUri(
       vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
     );
+    const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
+
     this.webViewPanel.webview.html = `
     <!DOCTYPE html>
     <html lang="en">
@@ -101,6 +122,7 @@ export class RefactoringPanel {
     </head>
     
     <body>
+        <img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center" />
         <h1>Refactoring recommendation</h1>
         <hr>
         <h2>Confidence score</h2>
@@ -134,25 +156,20 @@ export class RefactoringPanel {
    *
    * @param extensionUri Used to resolve resource paths for the webview content
    * @param document Ref to document to apply refactoring to
-   * @param before
-   * @param after
+   * @param request
+   * @param response
    * @returns
    */
-  public static createOrShow(
-    extensionUri: vscode.Uri,
-    document: vscode.TextDocument,
-    before: RefactorRequest,
-    after: RefactorResponse
-  ) {
+  public static createOrShow(extensionUri: vscode.Uri, document: vscode.TextDocument, request: RefactorRequest, response?: RefactorResponse) {
     if (RefactoringPanel.currentPanel) {
+      RefactoringPanel.currentPanel.update(extensionUri, document, request, response);
       RefactoringPanel.currentPanel.webViewPanel.reveal(RefactoringPanel.column);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel();
-
-    RefactoringPanel.currentPanel.update(extensionUri, document, before, after);
+    RefactoringPanel.currentPanel.update(extensionUri, document, request, response);
   }
 }
 

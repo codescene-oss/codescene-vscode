@@ -87,7 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   registerCommands(context, cliPath);
 
-  registerCsDocProvider(join(context.extensionPath, 'docs'));
+  registerCsDocProvider(context.extensionPath);
 
   const supportedLanguages = getSupportedLanguages(context.extension);
 

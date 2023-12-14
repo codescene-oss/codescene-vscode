@@ -80,15 +80,16 @@ export async function requestRefactoring(
   const refactorUrl = `${getRefactoringServerBaseUrl()}/api/refactor`;
   console.log(`Requesting a refactoring from ${refactorUrl}`);
 
+  RefactoringPanel.createOrShow(context.extensionUri, document, requestData);
   axios
     .post(refactorUrl, requestData, config)
     .then((response) => {
-      const refactoring: RefactorResponse = response.data;
-      console.log('Received refactoring response: ' + JSON.stringify(refactoring));
-      RefactoringPanel.createOrShow(context.extensionUri, document, requestData, refactoring);
+      const refactorResponse: RefactorResponse = response.data;
+      console.log('Received refactoring response: ' + JSON.stringify(refactorResponse));
+      RefactoringPanel.createOrShow(context.extensionUri, document, requestData, refactorResponse);
     })
     .catch((err) => {
-      console.log('Error in refactor request, ', err);
+      console.log('Error in refactor request!', JSON.stringify(requestData), err);
     });
 }
 
