@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 .idea/
+assets/refactoring-dev.html
 src/**
 out/**
 !out/main.js

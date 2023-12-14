@@ -1,91 +1,160 @@
-import * as vscode from 'vscode';
+import vscode, { window } from 'vscode';
+
+interface RefactoringSuggestion {
+  editor: vscode.TextEditor;
+  document: vscode.TextDocument;
+  range: vscode.Range;
+  code: string;
+}
 
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
-  public static viewType = 'refactoringPanel';
-  private readonly _panel: vscode.WebviewPanel;
-  private _disposables: vscode.Disposable[] = [];
+  private static readonly viewType = 'refactoringPanel';
+  private readonly webViewPanel: vscode.WebviewPanel;
+  private static readonly column: vscode.ViewColumn = vscode.ViewColumn.Beside;
+  private disposables: vscode.Disposable[] = [];
+
+  private currentRefactorSuggestion: RefactoringSuggestion | undefined;
 
   public constructor() {
-    this._panel = vscode.window.createWebviewPanel(
+    this.webViewPanel = vscode.window.createWebviewPanel(
       RefactoringPanel.viewType,
-      'CodeScene Refactor',
-      vscode.ViewColumn.One,
-      { enableScripts: true },
+      'CodeScene AI Refactor',
+      RefactoringPanel.column,
+      {
+        enableScripts: true,
+      }
     );
 
-    this._panel.webview.onDidReceiveMessage(
-      message => {
+    this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.webViewPanel.webview.onDidReceiveMessage(
+      (message) => {
         switch (message.command) {
           case 'apply':
-            vscode.window.showErrorMessage(message.text);
+            this.applyRefactoring();
+            this.dispose();
             return;
+          case 'reject':
+            this.dispose();
         }
       },
       null,
-      this._disposables
+      this.disposables
     );
+  }
 
-    this._update();
+  private applyRefactoring() {
+    if (!this.currentRefactorSuggestion) return;
+
+    const { editor, document, range, code } = this.currentRefactorSuggestion;
+    editor.edit((editBuilder) => {
+      editBuilder.replace(range, code);
+    });
   }
 
   // todo this could take the refactoring I guess
-private _update() {
-    this._panel.webview.html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <script nonce="${nonce}">
-                const vscode = acquireVsCodeApi();
-                function sendMessage() {
-                    const message = { command: 'apply', text: 'Hello from webview!' };
-                    vscode.postMessage(message);
-                }
-            </script>
-        </head>
-        <body>
-            <button onclick="sendMessage()">Click me</button>
-        </body>
-        </html>
-    `;
-}
+  private update(
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+    before: RefactorRequest,
+    after: RefactorResponse
+  ) {
+    let { code, reasons, confidence } = after;
+    code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
+    const { start_line: startLine, end_line: endLine } = before.source_snippet;
+    const range = new vscode.Range(startLine, 0, endLine, 0);
+    const editor = window.activeTextEditor;
+    if (!editor) {
+      console.log('No active texteditor available!');
+      return;
+    }
+    this.currentRefactorSuggestion = {
+      editor,
+      document,
+      code,
+      range,
+    };
+
+    this.setupWebView(extensionUri, confidence, reasons, code);
+  }
+
+  private setupWebView(extensionUri: vscode.Uri, confidence: RefactorConfidence, reasons: string[], code: string) {
+    const { level, description } = confidence;
+    const reasonText = reasons.join('. ');
+    const styleUri = this.webViewPanel.webview.asWebviewUri(
+      vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
+    );
+    this.webViewPanel.webview.html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    
+    <head>
+        <meta charset="UTF-8">
+        <link href="${styleUri}" rel="stylesheet" />
+        <script nonce="${nonce}">
+            const vscode = acquireVsCodeApi();
+            function sendMessage(cmd) {
+                const message = { command: cmd, text: 'Hello from webview!' };
+                vscode.postMessage(message);
+            }
+        </script>
+    </head>
+    
+    <body>
+        <h1>Refactoring recommendation</h1>
+        <hr>
+        <h2>Confidence score</h2>
+        <div class="confidence-label confidence-${level}">${description}</div>
+        <div class="reasons">${reasonText}</div>
+        <div>
+          <pre><code>${code}</code></pre>
+        </div>
+        <div class="buttons">
+          <button class="reject" onclick="sendMessage('reject')">Reject</button>
+          <button class="apply" onclick="sendMessage('apply')">Apply</button>
+        </div>
+    </body>
+    
+    </html>
+`;
+  }
 
   public dispose() {
-    this._panel.dispose();
-    while (this._disposables.length) {
-      const x = this._disposables.pop()
+    RefactoringPanel.currentPanel = undefined;
+    this.webViewPanel.dispose();
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
       if (x) {
-        x.dispose()
+        x.dispose();
       }
     }
   }
 
-  // TODO I don't get it
-  public static createOrShow() {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
-
-    // TODO how do we send data to the fing panel?
+  /**
+   *
+   * @param extensionUri Used to resolve resource paths for the webview content
+   * @param document Ref to document to apply refactoring to
+   * @param before
+   * @param after
+   * @returns
+   */
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+    before: RefactorRequest,
+    after: RefactorResponse
+  ) {
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel._panel.reveal(column);
+      RefactoringPanel.currentPanel.webViewPanel.reveal(RefactoringPanel.column);
       return;
     }
 
-    // Otherwise, create a new panel.
-    const panel = vscode.window.createWebviewPanel(
-      RefactoringPanel.viewType,
-      'CodeScene Refactor',
-      column || vscode.ViewColumn.One,
-      { enableScripts: true },
-    );
+    // Otherwise, create a new web view panel.
+    RefactoringPanel.currentPanel = new RefactoringPanel();
 
-    RefactoringPanel.currentPanel = new RefactoringPanel(panel);
+    RefactoringPanel.currentPanel.update(extensionUri, document, before, after);
   }
-
 }
-
 
 function nonce() {
   let text = '';

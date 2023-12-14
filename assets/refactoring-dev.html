@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <link href="refactor-styles.css" rel="stylesheet" />
+</head>
+<!-- Used when testing and changing around the refactoring webview content. Added to .vscodeignore as 
+  to not get included in the extension package -->
+
+<body>
+  <h1>[TODO: CSLOGO] Refactoring recommendation</h1>
+  <hr>
+  <h2>Confidence score</h2>
+  <div class="confidence-label confidence-3">${description}</div>
+  <div class="reasons">Great refactor, big win</div>
+  <div>
+    <pre><code>
+            function propagationHandler2(qi, options) {
+                return function (query, queryOptions) {
+                  const shouldPropagate =
+                    !options.stopPropagation &&
+                    !qi.options.stopPropagation &&
+                    qi.options.parent;
+              
+                  if (shouldPropagate) {
+                    return qi.options.parent.$query(options);
+                  }
+                };
+              }              
+        </code></pre>
+  </div>
+  <div class="buttons">
+    <button class="reject" onclick="sendMessage('reject')">Reject</button>
+    <button class="apply" onclick="sendMessage('apply')">Apply</button>
+  </div>
+</body>
+
+</html>

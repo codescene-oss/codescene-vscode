@@ -2,10 +2,16 @@ import * as vscode from 'vscode';
 import { name as refactoringCommandName } from './command';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
+  private context: vscode.ExtensionContext;
+
   public static readonly providedCodeActionKinds = [
     vscode.CodeActionKind.Refactor,
     // vscode.CodeActionKind.QuickFix,
   ];
+
+  public constructor(context: vscode.ExtensionContext) {
+    this.context = context;
+  }
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -21,11 +27,10 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     refactorAction.command = {
       command: refactoringCommandName,
       title: 'Request AI Refactoring',
-      arguments: [document, range, csDiagnostics],
+      arguments: [this.context, document, range, csDiagnostics],
     };
     // const quickFixAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.QuickFix);
     // quickFixAction.command = { command: refactoringCommandName, title: 'Request AI Refactoring' };
     return [refactorAction /*, quickFixAction*/];
   }
-
 }

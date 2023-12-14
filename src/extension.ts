@@ -105,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { scheme: 'file', language: 'javascript' },
-      new CsRefactorCodeAction(),
+      new CsRefactorCodeAction(context),
       {
         providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
       }

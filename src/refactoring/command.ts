@@ -6,11 +6,11 @@ import { RefactoringPanel } from './refactoring-panel';
 export const name = 'codescene.requestRefactoring';
 
 function tokenAuth(): string {
-  const accessToken = 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoibWUifQ.kUHhSLr5Aj2VIpb5tpz2IfOtSgxkVt8IQHFedAGDkz4';
+  const accessToken = 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiamwifQ.oH372TqYmz7Cm3SB5A-sn3AlpFXy1G3EaNBDVE3jmc8';
   return 'Token ' + accessToken;
 }
 
-async function findFunctions(document: TextDocument) {
+async function functionsInDoc(document: TextDocument) {
   const symbolsToFind = [SymbolKind.Function, SymbolKind.Method];
 
   const docSymbols = (await commands.executeCommand(
@@ -36,7 +36,7 @@ async function refactorRequest(
   document: vscode.TextDocument,
   diagnostic: vscode.Diagnostic
 ): Promise<RefactorRequest | undefined> {
-  const functions = await findFunctions(document);
+  const functions = await functionsInDoc(document);
   const fn = functions?.find((f) => f.range.intersection(diagnostic.range));
   if (!fn) return undefined;
 
@@ -54,35 +54,8 @@ async function refactorRequest(
   return { review: [review], source_snippet: sourceSnippet };
 }
 
-/**
- * Handles the response of a refactoring request.
- * - Currently we only handle the happiest of paths, where we immediately
- *   replace selected snippet with the result from the server.
- *
- *
- * @param before - The original refactoring request for the start_line and end_line.
- * @param after - The refactoring response containing the modified code.
- */
-function handleRefactoringResponse(before: RefactorRequest, after: RefactorResponse) {
-  const { start_line, end_line } = before.source_snippet;
-  let { code } = after;
-  const editor = window.activeTextEditor;
-  if (!editor) return;
-  const range = new vscode.Range(start_line, 0, end_line, 0);
-  // special case if we're starting at the first line of the file
-  // - we should then strip the first \n in our `code` variable so we don't insert
-  // empty lines
-  if (code.startsWith('\n') && start_line === 0) {
-    code = code.substring(1);
-  }
-
-  new RefactoringPanel();
-//  editor.edit((editBuilder) => {
-//    editBuilder.replace(range, code);
-//  });
-}
-
 export async function requestRefactoring(
+  context: vscode.ExtensionContext,
   document: vscode.TextDocument,
   range: vscode.Range | vscode.Selection,
   diagnostics: vscode.Diagnostic[]
@@ -112,7 +85,7 @@ export async function requestRefactoring(
     .then((response) => {
       const refactoring: RefactorResponse = response.data;
       console.log('Received refactoring response: ' + JSON.stringify(refactoring));
-      handleRefactoringResponse(requestData, refactoring);
+      RefactoringPanel.createOrShow(context.extensionUri, document, requestData, refactoring);
     })
     .catch((err) => {
       console.log('Error in refactor request, ', err);

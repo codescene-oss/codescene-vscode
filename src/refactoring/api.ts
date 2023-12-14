@@ -1,12 +1,11 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 interface Review {
   category: string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   start_line: number;
 }
 
 interface SourceSnippet {
   language: 'JavaScript'; // 'TypeScript'
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   start_line: number;
   end_line: number;
   content: string;
@@ -14,12 +13,17 @@ interface SourceSnippet {
 
 interface RefactorRequest {
   review: Review[];
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   source_snippet: SourceSnippet;
 }
 
+interface RefactorConfidence {
+  description: string;
+  level: number;
+}
+
 interface RefactorResponse {
+  confidence: RefactorConfidence;
+  reasons: string[];
   code: string;
-  result: string;
-  success: boolean;
+  success?: boolean; // probably redundant - do not use
 }
