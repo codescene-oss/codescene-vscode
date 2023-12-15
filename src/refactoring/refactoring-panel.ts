@@ -75,20 +75,18 @@ export class RefactoringPanel {
       vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
     );
 
-    this.webViewPanel.webview.html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <link href="${styleUri}" rel="stylesheet" />
-    </head>
-    <body>
-        <img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center" />
-        <h1>Refactoring recommendation</h1>
-        <hr>
-        <h2>Loading refactoring...</h2>
-    </body>
-    </html>
+    this.webViewPanel.webview.html = /*html*/`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link href="${styleUri}" rel="stylesheet" />
+</head>
+<body>
+    <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; Refactoring recommendation</h1>
+    <h2>Loading refactoring...</h2>
+</body>
+</html>
 `;
   }
 
@@ -105,39 +103,38 @@ export class RefactoringPanel {
     );
     const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
 
-    this.webViewPanel.webview.html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    
-    <head>
-        <meta charset="UTF-8">
-        <link href="${styleUri}" rel="stylesheet" />
-        <script nonce="${nonce}">
-            const vscode = acquireVsCodeApi();
-            function sendMessage(cmd) {
-                const message = { command: cmd, text: 'Hello from webview!' };
-                vscode.postMessage(message);
-            }
-        </script>
-    </head>
-    
-    <body>
-        <img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center" />
-        <h1>Refactoring recommendation</h1>
-        <hr>
-        <h2>Confidence score</h2>
-        <div class="confidence-label confidence-${level}">${description}</div>
-        <div class="reasons">${reasonText}</div>
-        <div>
-          <pre><code>${code}</code></pre>
-        </div>
-        <div class="buttons">
-          <button class="reject" onclick="sendMessage('reject')">Reject</button>
-          <button class="apply" onclick="sendMessage('apply')">Apply</button>
-        </div>
-    </body>
-    
-    </html>
+    // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
+    this.webViewPanel.webview.html = /*html*/`
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link href="${styleUri}" rel="stylesheet" />
+    <script nonce="${nonce}">
+        const vscode = acquireVsCodeApi();
+        function sendMessage(cmd) {
+            const message = { command: cmd, text: 'Hello from webview!' };
+            vscode.postMessage(message);
+        }
+    </script>
+</head>
+
+<body>
+    <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; Refactoring recommendation</h1>
+    <h2>Confidence score</h2>
+    <div class="confidence-label confidence-${level}">${description}</div>
+    <div class="reasons">${reasonText}</div>
+    <div>
+      <pre><code>${code}</code></pre>
+    </div>
+    <div class="buttons">
+      <button class="reject" onclick="sendMessage('reject')">Reject</button>
+      <button class="apply" onclick="sendMessage('apply')">Apply</button>
+    </div>
+</body>
+
+</html>
 `;
   }
 

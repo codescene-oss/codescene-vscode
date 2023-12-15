@@ -2,6 +2,11 @@ body {
   font-family: sans-serif;
 }
 
+h1 {
+  border-bottom: 1px solid;
+  padding-bottom: 0.3em;
+}
+
 .confidence-label {
   border-radius: 4px;
   padding: 4px 10px;
