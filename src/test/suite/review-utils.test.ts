@@ -8,7 +8,6 @@ suite('reviewIssueToDiagnostics', () => {
   test('returns info diagnostic for document level issues', async () => {
     const reviewIssue: ReviewIssue = {
       category: 'Primitive Obsession',
-      code: 'primitive-obsession',
       description: 'Test description',
     };
 
@@ -28,7 +27,6 @@ suite('reviewIssueToDiagnostics', () => {
   test('returns warning diagnostic for function level issues', async () => {
     const reviewIssue: ReviewIssue = {
       category: 'Complex Method',
-      code: 'complex-method',
       description: 'Test description',
       functions: [
         {
@@ -58,7 +56,6 @@ suite('reviewIssueToDiagnostics', () => {
   test('handles case where function name cannot be found', async () => {
     const reviewIssue: ReviewIssue = {
         category: 'Complex Method',
-        code: 'complex-method',
         description: 'Test description',
         functions: [
           {
@@ -90,7 +87,6 @@ suite('reviewIssueToDiagnostics', () => {
   test('handles complex conditional', async () => {
     const reviewIssue: ReviewIssue = {
         category: 'Complex Conditional',
-        code: 'complex-conditional',
         description: 'Test description',
         functions: [
             {
@@ -124,7 +120,6 @@ suite('reviewIssueToDiagnostics', () => {
   test('handles multi-line complex conditional', async () => {
     const reviewIssue: ReviewIssue = {
         category: 'Complex Conditional',
-        code: 'complex-conditional',
         description: 'Test description',
         functions: [
             {
