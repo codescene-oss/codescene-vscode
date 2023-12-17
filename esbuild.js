@@ -16,6 +16,14 @@ const extensionConfig = {
   external: ['vscode'],
 };
 
+const webviewConfig = {
+  ...baseConfig,
+  target: 'es2020',
+  format: 'esm',
+  entryPoints: ['./src/refactoring/webview-script.ts'],
+  outfile: './out/webview-script.js',
+};
+
 const plugins = [
   {
     name: 'my-watcher',
@@ -35,15 +43,21 @@ const plugins = [
     if (args.includes('--watch')) {
       // Build and watch source code
       console.log('[watch] starting');
-      const ctx = await context({
+      const extContext = await context({
         ...extensionConfig,
         plugins,
       });
-      await ctx.watch();
+      await extContext.watch();
+      const webviewContext = await context({
+        ...webviewConfig,
+        plugins,
+      });
+      await webviewContext.watch();
       console.log('[watch] active');
     } else {
       // Build source code
       await build(extensionConfig);
+      await build(webviewConfig);
       console.log('[build] complete');
     }
   } catch (err) {
