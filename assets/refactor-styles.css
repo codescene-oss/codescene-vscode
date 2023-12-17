@@ -46,23 +46,7 @@ pre code {
   border: 1px solid gray;
 }
 
-button {
-  padding: 12px;
-  border-radius: 6px;
-  border: none;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 .buttons {
   display: inline;
   float: right;
-}
-.apply {
-  background-color: #4baaae;
-  color: #132b2b;
-}
-.reject {
-  background-color: #f3babe;
-  color: #863137;
 }

@@ -16,13 +16,14 @@ export class RefactoringPanel {
 
   private currentRefactorSuggestion: RefactoringSuggestion | undefined;
 
-  public constructor() {
-    this.webViewPanel = vscode.window.createWebviewPanel(
+  public constructor(extensionUri: vscode.Uri) {
+    this.webViewPanel = window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
       RefactoringPanel.column,
       {
         enableScripts: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out'), vscode.Uri.joinPath(extensionUri, 'assets')],
       }
     );
 
@@ -36,6 +37,7 @@ export class RefactoringPanel {
             return;
           case 'reject':
             this.dispose();
+            return;
         }
       },
       null,
@@ -54,7 +56,12 @@ export class RefactoringPanel {
     workspace.applyEdit(workSpaceEdit);
   }
 
-  private update(extensionUri: vscode.Uri, document: vscode.TextDocument, request: RefactorRequest, response?: RefactorResponse) {
+  private update(
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+    request: RefactorRequest,
+    response?: RefactorResponse
+  ) {
     if (!response) {
       this.setupLoadingView(extensionUri);
       return;
@@ -71,11 +78,9 @@ export class RefactoringPanel {
 
   private async setupLoadingView(extensionUri: vscode.Uri) {
     const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
-    const styleUri = this.webViewPanel.webview.asWebviewUri(
-      vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
-    );
+    const styleUri = getUri(this.webViewPanel.webview, extensionUri, ['assets', 'refactor-styles.css']);
 
-    this.webViewPanel.webview.html = /*html*/`
+    this.webViewPanel.webview.html = /*html*/ `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,29 +103,23 @@ export class RefactoringPanel {
   ) {
     const { level, description } = confidence;
     const reasonText = reasons.join('. ');
-    const styleUri = this.webViewPanel.webview.asWebviewUri(
-      vscode.Uri.joinPath(extensionUri, 'assets', 'refactor-styles.css')
-    );
+
+    const styleUri = getUri(this.webViewPanel.webview, extensionUri, ['assets', 'refactor-styles.css']);
+    const webviewScript = getUri(this.webViewPanel.webview, extensionUri, ['out', 'webview-script.js']);
     const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
 
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
-    this.webViewPanel.webview.html = /*html*/`
+    this.webViewPanel.webview.html = /*html*/ `
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <link href="${styleUri}" rel="stylesheet" />
-    <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
-        function sendMessage(cmd) {
-            const message = { command: cmd, text: 'Hello from webview!' };
-            vscode.postMessage(message);
-        }
-    </script>
 </head>
 
 <body>
+    <script type="module" nonce="${nonce}" src="${webviewScript}"></script>
     <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; Refactoring recommendation</h1>
     <h2>Confidence score</h2>
     <div class="confidence-label confidence-${level}">${description}</div>
@@ -129,8 +128,8 @@ export class RefactoringPanel {
       <pre><code>${code}</code></pre>
     </div>
     <div class="buttons">
-      <button class="reject" onclick="sendMessage('reject')">Reject</button>
-      <button class="apply" onclick="sendMessage('apply')">Apply</button>
+      <vscode-button id="reject-button" appearance="secondary">Reject</vscode-button>
+      <vscode-button id="apply-button" appearance="primary">Apply</vscode-button>
     </div>
 </body>
 
@@ -157,7 +156,12 @@ export class RefactoringPanel {
    * @param response
    * @returns
    */
-  public static createOrShow(extensionUri: vscode.Uri, document: vscode.TextDocument, request: RefactorRequest, response?: RefactorResponse) {
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    document: vscode.TextDocument,
+    request: RefactorRequest,
+    response?: RefactorResponse
+  ) {
     if (RefactoringPanel.currentPanel) {
       RefactoringPanel.currentPanel.update(extensionUri, document, request, response);
       RefactoringPanel.currentPanel.webViewPanel.reveal(RefactoringPanel.column);
@@ -165,9 +169,14 @@ export class RefactoringPanel {
     }
 
     // Otherwise, create a new web view panel.
-    RefactoringPanel.currentPanel = new RefactoringPanel();
+    RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
     RefactoringPanel.currentPanel.update(extensionUri, document, request, response);
   }
+}
+
+// Webview utility functions below
+function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
+  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
 }
 
 function nonce() {
