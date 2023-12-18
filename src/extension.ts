@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { ensureLatestCompatibleCliExists } from './download';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
-import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
@@ -19,8 +18,8 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
-import { CsRefactorCodeAction, } from './refactoring/codeaction';
-import { name as refactoringCommandName, requestRefactoring, refactorPreFlight } from './refactoring/command';
+import { CsRefactorCodeAction } from './refactoring/codeaction';
+import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -46,7 +45,7 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
   const openDocsForDiagnostic = vscode.commands.registerCommand(
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
-      if (diag.code instanceof Object) {
+      if (typeof diag.code === 'object') {
         const docsCode = categoryToDocsCode(diag.code.value.toString());
         vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
       } else {
@@ -64,11 +63,6 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     }
   );
   context.subscriptions.push(openDocsForDiagnostic);
-
-  const refactoringCapabilities = refactorPreFlight();
-
-  const requestRefactoringCmd = vscode.commands.registerCommand(refactoringCommandName, requestRefactoring);
-  context.subscriptions.push(requestRefactoringCmd);
 }
 
 function setupTelemetry(cliPath: string) {
@@ -76,6 +70,10 @@ function setupTelemetry(cliPath: string) {
 
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
+}
+
+function supportedLanguagesForRefactoring(languages: string[]) {
+  return languages.map((language) => ({ language, scheme: 'file' }));
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -103,16 +101,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const codeLensProvider = new CsCodeLensProvider(reviewer);
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
-
-  context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(
-      { scheme: 'file', language: 'javascript' },
-      new CsRefactorCodeAction(context),
-      {
-        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-      }
-    )
-  );
 
   // Diagnostics will be updated when a file is opened or when it is changed.
   const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {
@@ -189,6 +177,18 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 }
 
+function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      supportedLanguagesForRefactoring(capabilities.supported.languages),
+      new CsRefactorCodeAction(context, capabilities.supported.codeSmells),
+      {
+        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+      }
+    )
+  );
+}
+
 /**
  * Active functionality that requires a connection to a CodeScene server.
  */
@@ -214,6 +214,19 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext) {
   // Init tree view in explorer container
   const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
   context.subscriptions.push(explorerCouplingsView);
+
+  // Refactoring features
+  const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
+  if (refactorCapabilities) {
+    addRefactoringCodeAction(context, refactorCapabilities);
+    const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
+    const requestRefactoringCmd = vscode.commands.registerCommand(
+      refactoringCommandName,
+      csRefactoringCommand.requestRefactoring,
+      csRefactoringCommand
+    );
+    context.subscriptions.push(requestRefactoringCmd);
+  }
 }
 
 async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
