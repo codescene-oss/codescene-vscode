@@ -217,14 +217,16 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext) {
 
   // Refactoring features
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
-  addRefactoringCodeAction(context, refactorCapabilities);
-  const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
-  const requestRefactoringCmd = vscode.commands.registerCommand(
-    refactoringCommandName,
-    csRefactoringCommand.requestRefactoring,
-    csRefactoringCommand
-  );
-  context.subscriptions.push(requestRefactoringCmd);
+  if (refactorCapabilities) {
+    addRefactoringCodeAction(context, refactorCapabilities);
+    const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
+    const requestRefactoringCmd = vscode.commands.registerCommand(
+      refactoringCommandName,
+      csRefactoringCommand.requestRefactoring,
+      csRefactoringCommand
+    );
+    context.subscriptions.push(requestRefactoringCmd);
+  }
 }
 
 async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
