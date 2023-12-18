@@ -2,15 +2,14 @@ import * as vscode from 'vscode';
 import { name as refactoringCommandName } from './command';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
-  private context: vscode.ExtensionContext;
+  private readonly context: vscode.ExtensionContext;
+  private supportedCodeSmells: string[];
 
-  public static readonly providedCodeActionKinds = [
-    vscode.CodeActionKind.Refactor,
-    // vscode.CodeActionKind.QuickFix,
-  ];
+  public static readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix];
 
-  public constructor(context: vscode.ExtensionContext) {
+  public constructor(context: vscode.ExtensionContext, supportedCodeSmells: string[]) {
     this.context = context;
+    this.supportedCodeSmells = supportedCodeSmells;
   }
 
   provideCodeActions(
@@ -19,18 +18,28 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const csDiagnostics = context.diagnostics.filter((d: any) => d.source === 'CodeScene');
-    // Filter out complex-conditionals only?
-    if (csDiagnostics.length <= 0) return;
+    const supportedCsDiagnostics = context.diagnostics
+      .filter((d: vscode.Diagnostic) => d.source === 'CodeScene')
+      .filter((d: vscode.Diagnostic) => {
+        if (typeof d.code === 'object') {
+          return this.supportedCodeSmells.includes(d.code.value.toString());
+        }
+        return false;
+      });
 
-    const refactorAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.Refactor);
-    refactorAction.command = {
+    if (supportedCsDiagnostics.length <= 0) return;
+
+    const command = {
       command: refactoringCommandName,
-      title: 'Request AI Refactoring',
-      arguments: [this.context, document, range, csDiagnostics],
+      title: 'refactor', // Unclear where this is shown in the UI
+      tooltip: 'Refactor this code using the CodeScene AI Refactoring service',
+      arguments: [this.context, document, range, supportedCsDiagnostics],
     };
-    // const quickFixAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.QuickFix);
-    // quickFixAction.command = { command: refactoringCommandName, title: 'Request AI Refactoring' };
-    return [refactorAction /*, quickFixAction*/];
+    // const refactorAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.Refactor);
+    // refactorAction.command = command;
+
+    const quickFixAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.QuickFix);
+    quickFixAction.command = command;
+    return [quickFixAction];
   }
 }
