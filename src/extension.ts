@@ -19,7 +19,7 @@ import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
-import { name as refactoringCommandName, requestRefactoring, refactorPreFlight } from './refactoring/command';
+import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -63,9 +63,6 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     }
   );
   context.subscriptions.push(openDocsForDiagnostic);
-
-  const requestRefactoringCmd = vscode.commands.registerCommand(refactoringCommandName, requestRefactoring);
-  context.subscriptions.push(requestRefactoringCmd);
 }
 
 function setupTelemetry(cliPath: string) {
@@ -77,21 +74,6 @@ function setupTelemetry(cliPath: string) {
 
 function supportedLanguagesForRefactoring(languages: string[]) {
   return languages.map((language) => ({ language, scheme: 'file' }));
-}
-
-async function addRefactoringCodeAction(context: vscode.ExtensionContext) {
-  const refactorCapabilities = await refactorPreFlight();
-  if (refactorCapabilities) {
-    context.subscriptions.push(
-      vscode.languages.registerCodeActionsProvider(
-        supportedLanguagesForRefactoring(refactorCapabilities.supported.languages),
-        new CsRefactorCodeAction(context, refactorCapabilities.supported.codeSmells),
-        {
-          providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-        }
-      )
-    );
-  }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -119,8 +101,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const codeLensProvider = new CsCodeLensProvider(reviewer);
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
-
-  addRefactoringCodeAction(context);
 
   // Diagnostics will be updated when a file is opened or when it is changed.
   const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {
@@ -197,6 +177,18 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 }
 
+function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      supportedLanguagesForRefactoring(capabilities.supported.languages),
+      new CsRefactorCodeAction(context, capabilities.supported.codeSmells),
+      {
+        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+      }
+    )
+  );
+}
+
 /**
  * Active functionality that requires a connection to a CodeScene server.
  */
@@ -222,6 +214,17 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext) {
   // Init tree view in explorer container
   const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
   context.subscriptions.push(explorerCouplingsView);
+
+  // Refactoring features
+  const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
+  addRefactoringCodeAction(context, refactorCapabilities);
+  const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
+  const requestRefactoringCmd = vscode.commands.registerCommand(
+    refactoringCommandName,
+    csRefactoringCommand.requestRefactoring,
+    csRefactoringCommand
+  );
+  context.subscriptions.push(requestRefactoringCmd);
 }
 
 async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {

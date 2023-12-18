@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { AUTH_TYPE } from './auth/auth-provider';
 import { outputChannel } from './log';
 import { getServerApiUrl } from './configuration';
@@ -13,6 +13,7 @@ export interface Coupling {
 
 export class CsRestApi {
   private axiosInstance: AxiosInstance;
+  private refactoringAxiosInstance: AxiosInstance;
 
   constructor() {
     this.axiosInstance = axios.create({
@@ -29,7 +30,26 @@ export class CsRestApi {
     this.axiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const token = await getToken();
-        const baseUrl = getServerApiUrl() + '/v2/devtools';
+        const baseUrl = getServerApiUrl() + '/v2';
+        if (config.url && config.url.startsWith(baseUrl)) {
+          config.headers['Accept'] = 'application/json';
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    this.refactoringAxiosInstance = axios.create({
+      timeout: 15000,
+    });
+    this.refactoringAxiosInstance.interceptors.request.use(
+      async (config: InternalAxiosRequestConfig) => {
+        const token = await getToken();
+        const baseUrl = getServerApiUrl() + '/v2/refactor';
         if (config.url && config.url.startsWith(baseUrl)) {
           config.headers['Accept'] = 'application/json';
           config.headers['Authorization'] = `Bearer ${token}`;
@@ -49,6 +69,11 @@ export class CsRestApi {
     return response.data as T;
   }
 
+  private async postJson<T>(url: string, data: any, config: AxiosRequestConfig) {
+    const response = await this.axiosInstance.post(url, data, config);
+    outputChannel.appendLine(`POST ${url} ${response.status}`);
+    return response.data as T;
+  }
 
   async fetchCouplings(projectId: number) {
     const couplingsUrl = `${getServerApiUrl()}/v2/devtools/projects/${projectId}/couplings`;
@@ -68,5 +93,20 @@ export class CsRestApi {
   async fetchProjects() {
     const projectsUrl = getServerApiUrl() + '/v2/devtools/projects';
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
+  }
+
+  async fetchRefactoring(request: RefactorRequest, traceId: string) {
+    const config: AxiosRequestConfig = {
+      headers: {
+        'x-codescene-trace-id': traceId,
+      },
+    };
+    const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
+    return await this.postJson<RefactorResponse>(refactorUrl, request, config);
+  }
+
+  async fetchRefactorPreflight() {
+    const refactorUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
+    return await this.fetchJson<PreFlightResponse>(refactorUrl);
   }
 }
