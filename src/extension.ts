@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { ensureLatestCompatibleCliExists } from './download';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
-import { join } from 'path';
 import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
@@ -19,7 +18,7 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
-import { CsRefactorCodeAction, } from './refactoring/codeaction';
+import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { name as refactoringCommandName, requestRefactoring, refactorPreFlight } from './refactoring/command';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
@@ -46,7 +45,7 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
   const openDocsForDiagnostic = vscode.commands.registerCommand(
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
-      if (diag.code instanceof Object) {
+      if (typeof diag.code === 'object') {
         const docsCode = categoryToDocsCode(diag.code.value.toString());
         vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
       } else {
@@ -65,8 +64,6 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
   );
   context.subscriptions.push(openDocsForDiagnostic);
 
-  const refactoringCapabilities = refactorPreFlight();
-
   const requestRefactoringCmd = vscode.commands.registerCommand(refactoringCommandName, requestRefactoring);
   context.subscriptions.push(requestRefactoringCmd);
 }
@@ -76,6 +73,25 @@ function setupTelemetry(cliPath: string) {
 
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
+}
+
+function supportedLanguagesForRefactoring(languages: string[]) {
+  return languages.map((language) => ({ language, scheme: 'file' }));
+}
+
+async function addRefactoringCodeAction(context: vscode.ExtensionContext) {
+  const refactorCapabilities = await refactorPreFlight();
+  if (refactorCapabilities) {
+    context.subscriptions.push(
+      vscode.languages.registerCodeActionsProvider(
+        supportedLanguagesForRefactoring(refactorCapabilities.supported.languages),
+        new CsRefactorCodeAction(context, refactorCapabilities.supported.codeSmells),
+        {
+          providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+        }
+      )
+    );
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -104,15 +120,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
-  context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(
-      { scheme: 'file', language: 'javascript' },
-      new CsRefactorCodeAction(context),
-      {
-        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-      }
-    )
-  );
+  addRefactoringCodeAction(context);
 
   // Diagnostics will be updated when a file is opened or when it is changed.
   const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {

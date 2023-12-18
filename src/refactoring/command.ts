@@ -1,13 +1,14 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import axios, { AxiosRequestConfig } from 'axios';
-import { getRefactoringServerBaseUrl } from '../configuration';
+import { getServerApiUrl } from '../configuration';
 import { RefactoringPanel } from './refactoring-panel';
 
 export const name = 'codescene.requestRefactoring';
 
 function tokenAuth(): string {
-  const accessToken = 'eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiamwifQ.oH372TqYmz7Cm3SB5A-sn3AlpFXy1G3EaNBDVE3jmc8';
-  return 'Token ' + accessToken;
+  const accessToken =
+    'MQ-MjAyNC0xMi0xMlQxMzowNjoyMw-I3sicmVmYWN0b3IuYWNjZXNzIiAiY2xpLmFjY2VzcyJ9.BY7cfqzAHYBMRAR-h9saBiSUvfgRCpBK0R69lNVOl6A';
+  return 'Bearer ' + accessToken;
 }
 
 async function functionsInDoc(document: TextDocument) {
@@ -26,7 +27,7 @@ async function functionsInDoc(document: TextDocument) {
 }
 
 function codeToCategory(diagnosticCode: string | number | { value: string | number; target: Uri } | undefined) {
-  if (diagnosticCode instanceof Object) {
+  if (typeof diagnosticCode === 'object') {
     return diagnosticCode.value.toString();
   }
   return 'unknown category';
@@ -77,7 +78,7 @@ export async function requestRefactoring(
     timeout: 15000,
   };
 
-  const refactorUrl = `${getRefactoringServerBaseUrl()}/api/refactor`;
+  const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
   console.log(`Requesting a refactoring from ${refactorUrl}`);
 
   RefactoringPanel.createOrShow(context.extensionUri, document, requestData);
@@ -96,8 +97,9 @@ export async function requestRefactoring(
 // TODO both this API call and the one above should be moved out to cs-rest-api.ts when we are ready
 // for that
 export async function refactorPreFlight() {
-  const preflightUrl = `${getRefactoringServerBaseUrl()}/api/refactor/preflight`;
+  const preflightUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
 
+  console.log(`Requesting preflight data from ${preflightUrl}`);
   // copying this stuff, can fix later
   const config: AxiosRequestConfig = {
     headers: {
@@ -107,13 +109,12 @@ export async function refactorPreFlight() {
     },
     timeout: 15000,
   };
-  axios
+  return axios
     .get(preflightUrl, config)
     .then((response) => {
-      // body json
-      console.log('Received preflight response: ' + JSON.stringify(response.data));
+      return response.data as PreFlightResponse;
     })
     .catch((err) => {
-      console.log('Error when making preflight request, ', err);
+      console.error('Error when making preflight request, ', err);
     });
 }
