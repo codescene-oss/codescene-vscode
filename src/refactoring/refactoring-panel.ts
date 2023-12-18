@@ -54,6 +54,7 @@ export class RefactoringPanel {
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(documentToEdit.uri, range, code);
     workspace.applyEdit(workSpaceEdit);
+    window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
   }
 
   private async updateWebView(
