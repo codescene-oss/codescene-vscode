@@ -63,7 +63,7 @@ export class RefactoringPanel {
     response?: RefactorResponse
   ) {
     const styleUri = getUri(this.webViewPanel.webview, extensionUri, ['assets', 'refactor-styles.css']);
-    const webviewScript = getUri(this.webViewPanel.webview, extensionUri, ['out', 'webview-script.js']);
+    const webviewScript = getUri(this.webViewPanel.webview, extensionUri, ['out', 'refactoring-webview-script.js']);
     const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
     const content = response ? this.getContent(document, request, response) : this.getLoadingContent(extensionUri);
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
