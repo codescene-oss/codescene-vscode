@@ -1,12 +1,13 @@
 .vscode/**
 .vscode-test/**
 .idea/
-assets/refactoring-dev.html
 src/**
 out/**
 !out/main.js
+!out/refactoring-webview-script.js
 .gitignore
 .yarnrc
+esbuild.js
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json

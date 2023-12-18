@@ -21,7 +21,7 @@ const webviewConfig = {
   target: 'es2020',
   format: 'esm',
   entryPoints: ['./src/refactoring/webview-script.ts'],
-  outfile: './out/webview-script.js',
+  outfile: './out/refactoring-webview-script.js',
 };
 
 const plugins = [
