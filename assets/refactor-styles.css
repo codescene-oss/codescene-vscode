@@ -2,37 +2,8 @@ body {
   font-family: sans-serif;
 }
 
-h1 {
-  border-bottom: 1px solid;
-  padding-bottom: 0.3em;
-}
-
-.confidence-label {
-  border-radius: 4px;
-  padding: 4px 10px;
-  margin: 6px 0;
-  display: inline;
-}
-
-.confidence-0 {
-  background-color: #f2f4f8;
-  color: #626f8b;
-}
-.confidence-1 {
-  background-color: #ec979d;
-  color: #b3424a;
-}
-.confidence-2 {
-  background-color: #f9d4c2;
-  color: #c17652;
-}
-.confidence-3 {
-  background-color: #b9d9c9;
-  color: #3f7f60;
-}
-
 .reasons {
-  margin: 10px 0;
+  margin: 0.8em 0 1.5em 0;
 }
 
 pre code {
