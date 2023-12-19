@@ -71,7 +71,7 @@ export function difference<T>(a: Set<T>, b: Set<T>) {
   return new Set([...a].filter((x) => !b.has(x)));
 }
 
-let logoUrl : string |undefined;
+let logoUrl: string | undefined;
 export async function getLogoUrl(extensionPath: string): Promise<string> {
   if (!logoUrl) {
     // Read the logo from the extension's assets folder and base64 encode it.
