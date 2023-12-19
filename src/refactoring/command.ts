@@ -1,6 +1,7 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import { RefactoringPanel } from './refactoring-panel';
 import { CsRestApi } from '../cs-rest-api';
+import { AxiosError } from 'axios';
 
 export const name = 'codescene.requestRefactoring';
 
@@ -31,8 +32,9 @@ export class CsRefactoringCommand {
         console.log('Received refactoring response: ' + JSON.stringify(refactorResponse));
         RefactoringPanel.createOrShow(context.extensionUri, document, requestData, refactorResponse);
       })
-      .catch((err) => {
+      .catch((err: Error | AxiosError) => {
         console.log('Error in refactor request!', JSON.stringify(requestData), err);
+        RefactoringPanel.createOrShow(context.extensionUri, document, requestData, err.message);
       });
   }
 }

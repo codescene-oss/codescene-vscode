@@ -10,13 +10,16 @@ interface RefactoringSuggestion {
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
   private static readonly viewType = 'refactoringPanel';
-  private readonly webViewPanel: vscode.WebviewPanel;
   private static readonly column: vscode.ViewColumn = vscode.ViewColumn.Beside;
+
+  private readonly extensionUri: vscode.Uri;
+  private readonly webViewPanel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
 
   private currentRefactorSuggestion: RefactoringSuggestion | undefined;
 
   public constructor(extensionUri: vscode.Uri) {
+    this.extensionUri = extensionUri;
     this.webViewPanel = window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
@@ -58,15 +61,26 @@ export class RefactoringPanel {
   }
 
   private async updateWebView(
-    extensionUri: vscode.Uri,
     document: vscode.TextDocument,
     request: RefactorRequest,
-    response?: RefactorResponse
+    response?: RefactorResponse | string
   ) {
-    const styleUri = getUri(this.webViewPanel.webview, extensionUri, ['assets', 'refactor-styles.css']);
-    const webviewScript = getUri(this.webViewPanel.webview, extensionUri, ['out', 'refactoring-webview-script.js']);
-    const csLogoUrl = await getLogoUrl(extensionUri.fsPath);
-    const content = response ? this.getContent(document, request, response) : this.getLoadingContent(extensionUri);
+    const styleUri = getUri(this.webViewPanel.webview, this.extensionUri, ['assets', 'refactor-styles.css']);
+    const webviewScript = getUri(this.webViewPanel.webview, this.extensionUri, [
+      'out',
+      'refactoring-webview-script.js',
+    ]);
+    const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
+
+    let content = this.loadingContent();
+    switch (typeof response) {
+      case 'string':
+        content = this.errorContent(response);
+        break;
+      case 'object':
+        content = this.refactoringSuggestionContent(document, request, response);
+        break;
+    }
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
     this.webViewPanel.webview.html = /*html*/ `
     <!DOCTYPE html>
@@ -88,7 +102,11 @@ export class RefactoringPanel {
     `;
   }
 
-  private getContent(document: vscode.TextDocument, request: RefactorRequest, response: RefactorResponse) {
+  private refactoringSuggestionContent(
+    document: vscode.TextDocument,
+    request: RefactorRequest,
+    response: RefactorResponse
+  ) {
     let { code, reasons, confidence } = response;
     code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
     const { start_line: startLine, end_line: endLine } = request.source_snippet;
@@ -101,7 +119,7 @@ export class RefactoringPanel {
     const acceptDefault = level >= 2;
 
     return /*html*/ `
-      <h2>Confidence score</h2>
+      <br/>
       <vscode-tag>${description}</vscode-tag>
       <div class="reasons">${reasonText}</div>
       <h2>Proposed change</h2>
@@ -115,9 +133,14 @@ export class RefactoringPanel {
   `;
   }
 
-  private getLoadingContent(extensionUri: vscode.Uri) {
+  private loadingContent() {
     return /*html*/ `<h2>Loading refactoring...</h2>
     <vscode-progress-ring></vscode-progress-ring>`;
+  }
+
+  private errorContent(errorMessage: string) {
+    return /*html*/ `<h2>Refactoring failed</h2>
+    <p>${errorMessage}</p>`;
   }
 
   public dispose() {
@@ -143,17 +166,17 @@ export class RefactoringPanel {
     extensionUri: vscode.Uri,
     document: vscode.TextDocument,
     request: RefactorRequest,
-    response?: RefactorResponse
+    response?: RefactorResponse | string
   ) {
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView(extensionUri, document, request, response);
+      RefactoringPanel.currentPanel.updateWebView(document, request, response);
       RefactoringPanel.currentPanel.webViewPanel.reveal(RefactoringPanel.column);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView(extensionUri, document, request, response);
+    RefactoringPanel.currentPanel.updateWebView(document, request, response);
   }
 }
 
