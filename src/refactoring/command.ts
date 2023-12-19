@@ -11,19 +11,29 @@ export class CsRefactoringCommand {
     this.csRestApi = csRestApi;
   }
 
+  /**
+   *
+   * @param context
+   * @param document The document the user has invoked the refactoring on
+   * @param refactorInitializationRange Where in the source code the user has invoked the refactoring
+   * @param diagnostics List of valid CodeScene diagnostics. length guaranteed > 0. See refactor/codeaction.ts
+   * for details on how the diagnostics are filtered.
+   * @returns
+   */
   async requestRefactoring(
     context: vscode.ExtensionContext,
     document: vscode.TextDocument,
-    range: vscode.Range | vscode.Selection,
+    refactorInitializationRange: vscode.Range | vscode.Selection,
     diagnostics: vscode.Diagnostic[]
   ) {
-    // find function in functions matching the one in the diagnostics[0] range
-    const requestData = await refactorRequest(document, diagnostics[0]);
-
-    if (!requestData) {
-      console.error('Could not get refactor request data');
+    const diagnostic = diagnostics[0];
+    const fn = await findFunctionToRefactor(document, diagnostic.range);
+    if (!fn) {
+      console.error('Could not find a suitable function to refactor.');
+      window.showErrorMessage('Could not find a suitable function to refactor.');
       return;
     }
+    const requestData = await refactorRequest(document, diagnostic, fn);
 
     RefactoringPanel.createOrShow(context.extensionUri, document, requestData);
     this.csRestApi
@@ -41,11 +51,9 @@ export class CsRefactoringCommand {
 
 async function refactorRequest(
   document: vscode.TextDocument,
-  diagnostic: vscode.Diagnostic
-): Promise<RefactorRequest | undefined> {
-  const fn = await findFunctionToRefactor(document, diagnostic.range);
-  if (!fn) return undefined;
-
+  diagnostic: vscode.Diagnostic,
+  fn: DocumentSymbol
+): Promise<RefactorRequest> {
   const review: Review = {
     category: codeToCategory(diagnostic.code),
     start_line: diagnostic.range.start.line,
