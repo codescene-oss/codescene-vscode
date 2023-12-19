@@ -17,7 +17,7 @@ export class CsRefactoringCommand {
     diagnostics: vscode.Diagnostic[]
   ) {
     // find function in functions matching the one in the diagnostics[0] range
-    const requestData = await this.refactorRequest(document, diagnostics[0]);
+    const requestData = await refactorRequest(document, diagnostics[0]);
 
     if (!requestData) {
       console.error('Could not get refactor request data');
@@ -35,48 +35,59 @@ export class CsRefactoringCommand {
         console.log('Error in refactor request!', JSON.stringify(requestData), err);
       });
   }
+}
 
-  private async functionsInDoc(document: TextDocument) {
-    const symbolsToFind = [SymbolKind.Function, SymbolKind.Method];
+async function refactorRequest(
+  document: vscode.TextDocument,
+  diagnostic: vscode.Diagnostic
+): Promise<RefactorRequest | undefined> {
+  const fn = await findFunctionToRefactor(document, diagnostic.range);
+  if (!fn) return undefined;
 
-    const docSymbols = (await commands.executeCommand(
-      'vscode.executeDocumentSymbolProvider',
-      document.uri
-    )) as DocumentSymbol[];
+  const review: Review = {
+    category: codeToCategory(diagnostic.code),
+    start_line: diagnostic.range.start.line,
+  };
 
-    const docSymbolsFunctionsMethods = docSymbols
-      ? docSymbols.filter((symbol) => symbolsToFind.includes(symbol.kind))
-      : undefined;
+  const sourceSnippet: SourceSnippet = {
+    language: 'JavaScript',
+    start_line: fn.range.start.line,
+    end_line: fn.range.end.line + 1, // +1 because we want the linebreak at the end
+    content: document.getText(fn.range),
+  };
+  return { review: [review], source_snippet: sourceSnippet };
+}
 
-    return Promise.resolve(docSymbolsFunctionsMethods);
+function codeToCategory(diagnosticCode: string | number | { value: string | number; target: Uri } | undefined) {
+  if (typeof diagnosticCode === 'object') {
+    return diagnosticCode.value.toString();
   }
+  return 'unknown category';
+}
 
-  private codeToCategory(diagnosticCode: string | number | { value: string | number; target: Uri } | undefined) {
-    if (typeof diagnosticCode === 'object') {
-      return diagnosticCode.value.toString();
-    }
-    return 'unknown category';
-  }
+const symbolsToFind = [SymbolKind.Function, SymbolKind.Method];
+const symbolFilter = (symbol: DocumentSymbol) => symbolsToFind.includes(symbol.kind);
 
-  private async refactorRequest(
-    document: vscode.TextDocument,
-    diagnostic: vscode.Diagnostic
-  ): Promise<RefactorRequest | undefined> {
-    const functions = await this.functionsInDoc(document);
-    const fn = functions?.find((f) => f.range.intersection(diagnostic.range));
-    if (!fn) return undefined;
+function getFilteredSymbols(symbols: DocumentSymbol[]) {
+  const filteredSymbols = symbols.filter(symbolFilter);
+  const childSymbols = symbols.flatMap((s) => getFilteredSymbols(s.children));
+  filteredSymbols.push(...childSymbols);
+  return filteredSymbols;
+}
 
-    const review: Review = {
-      category: this.codeToCategory(diagnostic.code),
-      start_line: diagnostic.range.start.line,
-    };
+async function findFunctionToRefactor(document: TextDocument, range: vscode.Range) {
+  const docSymbols = (await commands.executeCommand(
+    'vscode.executeDocumentSymbolProvider',
+    document.uri
+  )) as DocumentSymbol[];
 
-    const sourceSnippet: SourceSnippet = {
-      language: 'JavaScript',
-      start_line: fn.range.start.line,
-      end_line: fn.range.end.line + 1, // +1 because we want the linebreak at the end
-      content: document.getText(fn.range),
-    };
-    return { review: [review], source_snippet: sourceSnippet };
-  }
+  const allFunctionsAndMethods = getFilteredSymbols(docSymbols);
+  const potentialFunctions = allFunctionsAndMethods.filter((s) => s.range.intersection(range));
+  const smallestRangeFunction = potentialFunctions.reduce((prev, curr) => {
+    const prevRange = prev.range.end.line - prev.range.start.line;
+    const currRange = curr.range.end.line - curr.range.start.line;
+    return currRange < prevRange ? curr : prev;
+  });
+
+  return Promise.resolve(smallestRangeFunction);
 }
