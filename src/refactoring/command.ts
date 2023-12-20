@@ -1,4 +1,4 @@
-import vscode, { DocumentHighlight, DocumentHighlightKind, DocumentHighlightProvider, DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
+import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import { RefactoringPanel } from './refactoring-panel';
 import { CsRestApi } from '../cs-rest-api';
 import { AxiosError } from 'axios';
@@ -33,24 +33,32 @@ export class CsRefactoringCommand {
       window.showErrorMessage('Could not find a suitable function to refactor.');
       return;
     }
-    const requestData = await refactorRequest(document, diagnostic, fn);
 
     const editor = window.activeTextEditor;
     if (editor) {
       editor.selection = new vscode.Selection(fn.range.start, fn.range.end);
       editor.revealRange(fn.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
+    const extensionUri = context.extensionUri;
+    const request = await refactorRequest(document, diagnostic, fn);
+    const initiatorViewColumn = editor?.viewColumn;
 
-    RefactoringPanel.createOrShow(context.extensionUri, document, requestData);
+    RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn });
     this.csRestApi
-      .fetchRefactoring(requestData, 'trace-id')
-      .then((refactorResponse) => {
-        console.log('Received refactoring response: ' + JSON.stringify(refactorResponse));
-        RefactoringPanel.createOrShow(context.extensionUri, document, requestData, refactorResponse);
+      .fetchRefactoring(request, 'trace-id')
+      .then((response) => {
+        console.log('Received refactoring response: ' + JSON.stringify(response));
+        RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn, response });
       })
       .catch((err: Error | AxiosError) => {
-        console.log('Error in refactor request!', JSON.stringify(requestData), err);
-        RefactoringPanel.createOrShow(context.extensionUri, document, requestData, err.message);
+        console.log('Error in refactor request!', JSON.stringify(request), err);
+        RefactoringPanel.createOrShow({
+          extensionUri,
+          document,
+          initiatorViewColumn,
+          fnToRefactor: fn,
+          response: err.message,
+        });
       });
   }
 }

@@ -1,29 +1,35 @@
 import vscode, { WorkspaceEdit, window, workspace } from 'vscode';
 import { getLogoUrl } from '../utils';
 
-interface RefactoringSuggestion {
-  range: vscode.Range;
-  code: string;
-  documentToEdit: vscode.TextDocument;
+interface CurrentRefactorState {
+  range: vscode.Range; // Range of code to be refactored
+  code: string; // The code to replace the range with
+  document: vscode.TextDocument; // The document to apply the refactoring to
+  initiatorViewColumn?: vscode.ViewColumn; // ViewColumn of the initiating editor
 }
 
+interface RefactorPanelParams {
+  document: vscode.TextDocument;
+  initiatorViewColumn?: vscode.ViewColumn;
+  fnToRefactor: vscode.DocumentSymbol;
+  response?: RefactorResponse | string;
+}
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
   private static readonly viewType = 'refactoringPanel';
-  private static readonly column: vscode.ViewColumn = vscode.ViewColumn.Beside;
 
   private readonly extensionUri: vscode.Uri;
   private readonly webViewPanel: vscode.WebviewPanel;
   private disposables: vscode.Disposable[] = [];
 
-  private currentRefactorSuggestion: RefactoringSuggestion | undefined;
+  private currentRefactorState: CurrentRefactorState | undefined;
 
   public constructor(extensionUri: vscode.Uri) {
     this.extensionUri = extensionUri;
     this.webViewPanel = window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
-      RefactoringPanel.column,
+      vscode.ViewColumn.Beside,
       {
         enableScripts: true,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out'), vscode.Uri.joinPath(extensionUri, 'assets')],
@@ -39,6 +45,7 @@ export class RefactoringPanel {
             this.dispose();
             return;
           case 'reject':
+            this.rejectRefactoring();
             this.dispose();
             return;
         }
@@ -48,23 +55,44 @@ export class RefactoringPanel {
     );
   }
 
-  private applyRefactoring() {
-    if (!this.currentRefactorSuggestion) {
+  private async applyRefactoring() {
+    if (!this.currentRefactorState) {
       console.error('No refactoring suggestion to apply');
       return;
     }
-    const { documentToEdit, range, code } = this.currentRefactorSuggestion;
+    const { document, range, code, initiatorViewColumn } = this.currentRefactorState;
     const workSpaceEdit = new WorkspaceEdit();
-    workSpaceEdit.replace(documentToEdit.uri, range, code);
+    workSpaceEdit.replace(document.uri, range, code);
     workspace.applyEdit(workSpaceEdit);
+
+    const editor = await vscode.window.showTextDocument(document.uri, {
+      preview: false,
+      viewColumn: initiatorViewColumn,
+    });
+
+    const loc = code.split(/\r\n|\r|\n/).length;
+    const newRange = new vscode.Range(range.start, range.start.translate(loc));
+    editor.selection = new vscode.Selection(newRange.start, newRange.end);
+    editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+
     window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
   }
 
-  private async updateWebView(
-    document: vscode.TextDocument,
-    request: RefactorRequest,
-    response?: RefactorResponse | string
-  ) {
+  private async rejectRefactoring() {
+    if (!this.currentRefactorState) {
+      console.error('No refactoring suggestion to apply');
+      return;
+    }
+    // Get original document and deselect the function to refactor.
+    const { document, range, initiatorViewColumn } = this.currentRefactorState;
+    const editor = await vscode.window.showTextDocument(document.uri, {
+      preview: false,
+      viewColumn: initiatorViewColumn,
+    });
+    editor.selection = new vscode.Selection(range.start, range.start);
+  }
+
+  private async updateWebView({ document, initiatorViewColumn, fnToRefactor, response }: RefactorPanelParams) {
     const styleUri = getUri(this.webViewPanel.webview, this.extensionUri, ['assets', 'refactor-styles.css']);
     const webviewScript = getUri(this.webViewPanel.webview, this.extensionUri, [
       'out',
@@ -72,13 +100,20 @@ export class RefactoringPanel {
     ]);
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
 
+    const range = fnToRefactor.range;
     let content = this.loadingContent();
     switch (typeof response) {
       case 'string':
+        this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn };
         content = this.errorContent(response);
         break;
       case 'object':
-        content = this.refactoringSuggestionContent(document, request, response);
+        let { code, reasons, confidence } = response;
+        const { level, description } = confidence;
+        code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
+        this.currentRefactorState = { document, code, range, initiatorViewColumn };
+
+        content = this.refactoringSuggestionContent(description, reasons, code, level >= 2);
         break;
     }
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
@@ -103,21 +138,12 @@ export class RefactoringPanel {
   }
 
   private refactoringSuggestionContent(
-    document: vscode.TextDocument,
-    request: RefactorRequest,
-    response: RefactorResponse
+    description: string,
+    reasons: string[],
+    code: string,
+    acceptDefault: boolean = false
   ) {
-    let { code, reasons, confidence } = response;
-    code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
-    const { start_line: startLine, end_line: endLine } = request.source_snippet;
-    const range = new vscode.Range(startLine, 0, endLine, 0);
-    this.currentRefactorSuggestion = { documentToEdit: document, code, range };
-
-    const { level, description } = confidence;
     const reasonText = reasons.join('. ');
-
-    const acceptDefault = level >= 2;
-
     return /*html*/ `
       <br/>
       <vscode-tag>${description}</vscode-tag>
@@ -134,13 +160,17 @@ export class RefactoringPanel {
   }
 
   private loadingContent() {
-    return /*html*/ `<h2>Loading refactoring...</h2>
+    return /*html*/ `<h2>Refactoring...</h2>
     <vscode-progress-ring></vscode-progress-ring>`;
   }
 
   private errorContent(errorMessage: string) {
     return /*html*/ `<h2>Refactoring failed</h2>
-    <p>${errorMessage}</p>`;
+    <p>${errorMessage}</p>
+    <div class="buttons">
+      <vscode-button id="reject-button" appearance="primary">Close</vscode-button>
+    </div>
+`;
   }
 
   public dispose() {
@@ -162,21 +192,24 @@ export class RefactoringPanel {
    * @param response
    * @returns
    */
-  public static createOrShow(
-    extensionUri: vscode.Uri,
-    document: vscode.TextDocument,
-    request: RefactorRequest,
-    response?: RefactorResponse | string
-  ) {
+  public static createOrShow({
+    extensionUri,
+    document,
+    initiatorViewColumn,
+    fnToRefactor,
+    response,
+  }: RefactorPanelParams & { extensionUri: vscode.Uri }) {
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView(document, request, response);
-      RefactoringPanel.currentPanel.webViewPanel.reveal(RefactoringPanel.column);
+      RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
+      RefactoringPanel.currentPanel.webViewPanel.reveal(
+        initiatorViewColumn ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active
+      );
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView(document, request, response);
+    RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
   }
 }
 
