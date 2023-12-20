@@ -10,6 +10,7 @@ import { dirname } from 'path';
 import debounce = require('lodash.debounce');
 
 export class Git implements vscode.Disposable {
+  private readonly executor = new SimpleExecutor();
   private changeSetModifiedEmitter = new vscode.EventEmitter<void>();
   private gitIgnoreCache = new Map<string, boolean>();
   private disposables: vscode.Disposable[] = [];
@@ -62,12 +63,10 @@ export class Git implements vscode.Disposable {
 
     if (!workspaceFolders) return changeSet;
 
-    const executor = new SimpleExecutor();
-
     for (const workspaceFolder of workspaceFolders) {
       const workspacePath = workspaceFolder.uri.fsPath;
 
-      const result = await executor.execute(
+      const result = await this.executor.execute(
         { command: 'git', args: ['diff', '--name-only'], ignoreError: true },
         { cwd: workspacePath }
       );
@@ -93,8 +92,6 @@ export class Git implements vscode.Disposable {
   }
 
   async isIgnored(file: vscode.Uri | vscode.TextDocument, opts = { throwOnFailure: false }) {
-    const executor = new SimpleExecutor();
-
     let filePath;
     if (file instanceof vscode.Uri) {
       filePath = file.fsPath;
@@ -102,11 +99,15 @@ export class Git implements vscode.Disposable {
       filePath = file.uri.fsPath;
     }
 
+    if (filePath.includes('.git/')) {
+      return true;
+    }
+
     if (this.gitIgnoreCache.has(filePath)) {
       return this.gitIgnoreCache.get(filePath);
     }
 
-    const result = await executor.execute(
+    const result = await this.executor.execute(
       { command: 'git', args: ['check-ignore', filePath], ignoreError: true },
       { cwd: dirname(filePath) }
     );
@@ -124,9 +125,7 @@ export class Git implements vscode.Disposable {
   }
 
   async repoRootFromDirectory(dir: string) {
-    const executor = new SimpleExecutor();
-
-    const result = await executor.execute({ command: 'git', args: ['rev-parse', '--show-toplevel'] }, { cwd: dir });
+    const result = await this.executor.execute({ command: 'git', args: ['rev-parse', '--show-toplevel'] }, { cwd: dir });
 
     if (result.exitCode !== 0) {
       throw new Error(`git rev-parse failed with exit code ${result.exitCode}`);
