@@ -1,38 +1,52 @@
-import vscode, { WorkspaceEdit, window, workspace } from 'vscode';
+import {
+  WorkspaceEdit,
+  window,
+  workspace,
+  Webview,
+  Uri,
+  Range,
+  TextDocument,
+  DocumentSymbol,
+  Selection,
+  ViewColumn,
+  WebviewPanel,
+  Disposable,
+  TextEditorRevealType,
+} from 'vscode';
 import { getLogoUrl } from '../utils';
 
 interface CurrentRefactorState {
-  range: vscode.Range; // Range of code to be refactored
+  range: Range; // Range of code to be refactored
   code: string; // The code to replace the range with
-  document: vscode.TextDocument; // The document to apply the refactoring to
-  initiatorViewColumn?: vscode.ViewColumn; // ViewColumn of the initiating editor
+  document: TextDocument; // The document to apply the refactoring to
+  initiatorViewColumn?: ViewColumn; // ViewColumn of the initiating editor
 }
 
 interface RefactorPanelParams {
-  document: vscode.TextDocument;
-  initiatorViewColumn?: vscode.ViewColumn;
-  fnToRefactor: vscode.DocumentSymbol;
+  document: TextDocument;
+  initiatorViewColumn?: ViewColumn;
+  fnToRefactor: DocumentSymbol;
   response?: RefactorResponse | string;
 }
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
   private static readonly viewType = 'refactoringPanel';
 
-  private readonly extensionUri: vscode.Uri;
-  private readonly webViewPanel: vscode.WebviewPanel;
-  private disposables: vscode.Disposable[] = [];
+  private readonly extensionUri: Uri;
+  private readonly webViewPanel: WebviewPanel;
+  private disposables: Disposable[] = [];
 
   private currentRefactorState: CurrentRefactorState | undefined;
 
-  public constructor(extensionUri: vscode.Uri) {
+  public constructor(extensionUri: Uri) {
     this.extensionUri = extensionUri;
     this.webViewPanel = window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
-      vscode.ViewColumn.Beside,
+      ViewColumn.Beside,
       {
         enableScripts: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out'), vscode.Uri.joinPath(extensionUri, 'assets')],
+        localResourceRoots: [Uri.joinPath(extensionUri, 'out'), Uri.joinPath(extensionUri, 'assets')],
       }
     );
 
@@ -60,22 +74,27 @@ export class RefactoringPanel {
       console.error('No refactoring suggestion to apply');
       return;
     }
-    const { document, range, code, initiatorViewColumn } = this.currentRefactorState;
+    const { document, range, code } = this.currentRefactorState;
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
     workspace.applyEdit(workSpaceEdit);
+    this.selectCurrentRefactoring();
+    window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
+  }
 
-    const editor = await vscode.window.showTextDocument(document.uri, {
+  private async selectCurrentRefactoring() {
+    if (!this.currentRefactorState) return;
+    const { document, range, code, initiatorViewColumn } = this.currentRefactorState;
+    const editor = await window.showTextDocument(document.uri, {
       preview: false,
       viewColumn: initiatorViewColumn,
     });
-
-    const loc = code.split(/\r\n|\r|\n/).length;
-    const newRange = new vscode.Range(range.start, range.start.translate(loc));
-    editor.selection = new vscode.Selection(newRange.start, newRange.end);
-    editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-
-    window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
+    const lines = code.split(/\r\n|\r|\n/);
+    const lineDelta = lines.length - 1;
+    const characterDelta = lines[lines.length - 1].length - 1;
+    const newRange = new Range(range.start, range.start.translate({ lineDelta, characterDelta }));
+    editor.selection = new Selection(newRange.start, newRange.end);
+    editor.revealRange(range, TextEditorRevealType.InCenterIfOutsideViewport);
   }
 
   private async rejectRefactoring() {
@@ -85,11 +104,11 @@ export class RefactoringPanel {
     }
     // Get original document and deselect the function to refactor.
     const { document, range, initiatorViewColumn } = this.currentRefactorState;
-    const editor = await vscode.window.showTextDocument(document.uri, {
+    const editor = await window.showTextDocument(document.uri, {
       preview: false,
       viewColumn: initiatorViewColumn,
     });
-    editor.selection = new vscode.Selection(range.start, range.start);
+    editor.selection = new Selection(range.start, range.start);
   }
 
   private async updateWebView({ document, initiatorViewColumn, fnToRefactor, response }: RefactorPanelParams) {
@@ -198,12 +217,10 @@ export class RefactoringPanel {
     initiatorViewColumn,
     fnToRefactor,
     response,
-  }: RefactorPanelParams & { extensionUri: vscode.Uri }) {
+  }: RefactorPanelParams & { extensionUri: Uri }) {
     if (RefactoringPanel.currentPanel) {
       RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
-      RefactoringPanel.currentPanel.webViewPanel.reveal(
-        initiatorViewColumn ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active
-      );
+      RefactoringPanel.currentPanel.webViewPanel.reveal(initiatorViewColumn ? ViewColumn.Beside : ViewColumn.Active);
       return;
     }
 
@@ -214,8 +231,8 @@ export class RefactoringPanel {
 }
 
 // Webview utility functions below
-function getUri(webview: vscode.Webview, extensionUri: vscode.Uri, pathList: string[]) {
-  return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...pathList));
+function getUri(webview: Webview, extensionUri: Uri, pathList: string[]) {
+  return webview.asWebviewUri(Uri.joinPath(extensionUri, ...pathList));
 }
 
 function nonce() {
