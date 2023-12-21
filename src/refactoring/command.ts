@@ -45,7 +45,7 @@ export class CsRefactoringCommand {
 
     RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn });
     this.csRestApi
-      .fetchRefactoring(request, 'trace-id')
+      .fetchRefactoring(request)
       .then((response) => {
         console.log('Received refactoring response: ' + JSON.stringify(response));
         RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn, response });
