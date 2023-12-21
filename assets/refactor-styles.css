@@ -17,6 +17,16 @@ pre code {
   border: 1px solid gray;
 }
 
+.code-container {
+  position: relative;
+}
+
+#copy-to-clipboard {
+  position: absolute;
+  top: 0.5em;
+  right: 0.5em;
+}
+
 .buttons {
   display: inline;
   float: right;
