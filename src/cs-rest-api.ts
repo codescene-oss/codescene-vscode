@@ -3,6 +3,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } 
 import { AUTH_TYPE } from './auth/auth-provider';
 import { outputChannel } from './log';
 import { getServerApiUrl } from './configuration';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Coupling {
   entity: string;
@@ -93,7 +94,8 @@ export class CsRestApi {
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
   }
 
-  async fetchRefactoring(request: RefactorRequest, traceId: string) {
+  async fetchRefactoring(request: RefactorRequest) {
+    const traceId = uuidv4();
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
