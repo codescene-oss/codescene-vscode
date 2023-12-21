@@ -1,4 +1,5 @@
 const { build, context } = require('esbuild');
+const { copy } = require('esbuild-plugin-copy');
 
 const baseConfig = {
   bundle: true,
@@ -22,6 +23,17 @@ const webviewConfig = {
   format: 'esm',
   entryPoints: ['./src/refactoring/webview-script.ts'],
   outfile: './out/refactoring-webview-script.js',
+  plugins: [
+    copy({
+      resolveFrom: 'cwd',
+      assets: {
+        from: ['./node_modules/@vscode/codicons/dist/**'],
+        to: ['./out/codicons'],
+      },
+      watch: true,
+      verbose: true,
+    }),
+  ],
 };
 
 const plugins = [

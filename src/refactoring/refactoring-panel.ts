@@ -1,7 +1,5 @@
-import {
+import vscode, {
   WorkspaceEdit,
-  window,
-  workspace,
   Webview,
   Uri,
   Range,
@@ -40,7 +38,7 @@ export class RefactoringPanel {
 
   public constructor(extensionUri: Uri) {
     this.extensionUri = extensionUri;
-    this.webViewPanel = window.createWebviewPanel(
+    this.webViewPanel = vscode.window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
       ViewColumn.Beside,
@@ -62,6 +60,10 @@ export class RefactoringPanel {
             this.rejectRefactoring();
             this.dispose();
             return;
+          case 'copy-code':
+            vscode.window.setStatusBarMessage(`$(clippy) Copied refactoring suggestion to clipboard`, 3000);
+            vscode.env.clipboard.writeText(this.currentRefactorState?.code || '');
+            return;
         }
       },
       null,
@@ -77,15 +79,15 @@ export class RefactoringPanel {
     const { document, range, code } = this.currentRefactorState;
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
-    workspace.applyEdit(workSpaceEdit);
+    vscode.workspace.applyEdit(workSpaceEdit);
     this.selectCurrentRefactoring();
-    window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
+    vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
   }
 
   private async selectCurrentRefactoring() {
     if (!this.currentRefactorState) return;
     const { document, range, code, initiatorViewColumn } = this.currentRefactorState;
-    const editor = await window.showTextDocument(document.uri, {
+    const editor = await vscode.window.showTextDocument(document.uri, {
       preview: false,
       viewColumn: initiatorViewColumn,
     });
@@ -104,7 +106,7 @@ export class RefactoringPanel {
     }
     // Get original document and deselect the function to refactor.
     const { document, range, initiatorViewColumn } = this.currentRefactorState;
-    const editor = await window.showTextDocument(document.uri, {
+    const editor = await vscode.window.showTextDocument(document.uri, {
       preview: false,
       viewColumn: initiatorViewColumn,
     });
@@ -112,12 +114,10 @@ export class RefactoringPanel {
   }
 
   private async updateWebView({ document, initiatorViewColumn, fnToRefactor, response }: RefactorPanelParams) {
-    const styleUri = getUri(this.webViewPanel.webview, this.extensionUri, ['assets', 'refactor-styles.css']);
-    const webviewScript = getUri(this.webViewPanel.webview, this.extensionUri, [
-      'out',
-      'refactoring-webview-script.js',
-    ]);
+    const styleUri = this.getUri('assets', 'refactor-styles.css');
+    const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
+    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
 
     const range = fnToRefactor.range;
     let content = this.loadingContent();
@@ -135,6 +135,7 @@ export class RefactoringPanel {
         content = this.refactoringSuggestionContent(description, reasons, code, level >= 2);
         break;
     }
+
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
     this.webViewPanel.webview.html = /*html*/ `
     <!DOCTYPE html>
@@ -143,6 +144,7 @@ export class RefactoringPanel {
     <head>
         <meta charset="UTF-8">
         <link href="${styleUri}" rel="stylesheet" />
+        <link href="${codiconsUri}" rel="stylesheet" />
     </head>
 
     <body>
@@ -154,6 +156,10 @@ export class RefactoringPanel {
 
     </html>
     `;
+  }
+
+  private getUri(...pathSegments: string[]) {
+    return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
 
   private refactoringSuggestionContent(
@@ -168,7 +174,10 @@ export class RefactoringPanel {
       <vscode-tag>${description}</vscode-tag>
       <div class="reasons">${reasonText}</div>
       <h2>Proposed change</h2>
-      <div>
+      <div class="code-container">
+        <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
+          <span class="codicon codicon-clippy"></span>
+        </vscode-button>
         <pre><code>${code}</code></pre>
       </div>
       <div class="buttons">
@@ -228,11 +237,6 @@ export class RefactoringPanel {
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
     RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
   }
-}
-
-// Webview utility functions below
-function getUri(webview: Webview, extensionUri: Uri, pathList: string[]) {
-  return webview.asWebviewUri(Uri.joinPath(extensionUri, ...pathList));
 }
 
 function nonce() {
