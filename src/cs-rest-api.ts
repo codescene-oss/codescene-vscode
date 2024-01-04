@@ -48,8 +48,9 @@ export class CsRestApi {
     );
 
     this.refactoringAxiosInstance = axios.create({
-      timeout: 15000,
+      timeout: 60000,
     });
+
     this.refactoringAxiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const baseUrl = getServerApiUrl() + '/v2/refactor';
