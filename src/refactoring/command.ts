@@ -100,10 +100,11 @@ function getFilteredSymbols(symbols: DocumentSymbol[]) {
 }
 
 async function findFunctionToRefactor(document: TextDocument, range: vscode.Range) {
-  const docSymbols = (await commands.executeCommand(
-    'vscode.executeDocumentSymbolProvider',
-    document.uri
-  )) as DocumentSymbol[];
+  const docSymbols = (await commands.executeCommand('vscode.executeDocumentSymbolProvider', document.uri)) as
+    | DocumentSymbol[]
+    | undefined;
+
+  if (!docSymbols) return;
 
   const allFunctionsAndMethods = getFilteredSymbols(docSymbols);
   const potentialFunctions = allFunctionsAndMethods.filter((s) => s.range.intersection(range));
