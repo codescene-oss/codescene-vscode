@@ -18,7 +18,9 @@ import { outputChannel } from '../log';
 import { getServerUrl } from '../configuration';
 import { CsWorkspace } from '../workspace';
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const AUTH_TYPE = 'codescene';
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const SESSIONS_STORAGE_KEY = `${AUTH_TYPE}.sessions`;
 
 class UriEventHandler extends EventEmitter<Uri> implements UriHandler {
