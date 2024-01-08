@@ -62,6 +62,10 @@
   "contributes": {
     "commands": [
       {
+        "command": "codescene.loginToCodeScene",
+        "title": "CodeScene: Login to CodeScene"
+      },
+      {
         "command": "codescene.createRulesTemplate",
         "title": "CodeScene: Create Rules Template"
       },
@@ -117,44 +121,52 @@
       "scm": [
         {
           "id": "codescene.scmCouplingsView",
-          "name": "Change coupling",
-          "when": "codescene.remoteFeaturesEnabled"
+          "name": "Change coupling"
         }
       ],
       "explorer": [
         {
           "id": "codescene.explorerCouplingsView",
-          "name": "Change coupling",
-          "when": "codescene.remoteFeaturesEnabled"
+          "name": "Change coupling"
         }
       ],
       "codescene-activity-bar": [
         {
-          "id": "codescene.onlineCapabilitiesView",
-          "name": "Online Capabilities"
+          "id": "codescene.remoteFeaturesView",
+          "name": "Remote Features"
         }
       ]
     },
     "viewsWelcome": [
       {
+        "view": "codescene.remoteFeaturesView",
+        "contents": "In order to fully utilize the CodeScene extension, you need to be logged in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Login to CodeScene](command:codescene.loginToCodeScene?[true])",
+        "when": "!codescene.isLoggedIn"
+      },
+      {
+        "view": "codescene.remoteFeaturesView",
+        "contents": "Congratulations, you're logged in. You can now use the CodeScene extension to its full potential.",
+        "when": "codescene.isLoggedIn"
+      },
+      {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
-        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
+        "when": "!codescene.isLoggedIn"
       },
       {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
-        "when": "codescene.remoteFeaturesEnabled && !codescene.isLoggedIn"
+        "when": "!codescene.isLoggedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "codescene.remoteFeaturesEnabled && !codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
       }
     ],
     "menus": {
@@ -248,23 +260,17 @@
           "description": "Exclude files outside of the workspace from analysis",
           "order": 3
         },
-        "codescene.enableRemoteFeatures": {
-          "type": "boolean",
-          "default": false,
-          "description": "Includes Change Coupling and AI Refactoring. Requires a CodeScene subscription. Requires a VS Code restart.",
-          "order": 4
-        },
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://codescene.io",
           "description": "CodeScene Cloud URL",
-          "order": 5
+          "order": 4
         },
         "codescene.cloudApiUrl": {
           "type": "string",
           "default": "https://api.codescene.io",
           "description": "The API URL of the CodeScene Cloud service",
-          "order": 6
+          "order": 5
         }
       }
     }
