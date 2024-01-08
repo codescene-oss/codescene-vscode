@@ -104,6 +104,15 @@
         "title": "CodeScene: Open X-Ray"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codescene-activity-bar",
+          "title": "CodeScene",
+          "icon": "assets/cs-logo.svg"
+        }
+      ]
+    },
     "views": {
       "scm": [
         {
@@ -117,6 +126,12 @@
           "id": "codescene.explorerCouplingsView",
           "name": "Change coupling",
           "when": "codescene.remoteFeaturesEnabled"
+        }
+      ],
+      "codescene-activity-bar": [
+        {
+          "id": "codescene.onlineCapabilitiesView",
+          "name": "Online Capabilities"
         }
       ]
     },
