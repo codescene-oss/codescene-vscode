@@ -2,19 +2,12 @@ body {
   font-family: sans-serif;
 }
 
-.reasons {
-  margin: 0.8em 0 1.5em 0;
+h2 {
+  border: none;
 }
 
-pre code {
-  display: block;
-  white-space: pre;
-  overflow-x: scroll;
-  max-width: 100%;
-  min-width: 100px;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid gray;
+.reasons {
+  margin: 0.8em 0 1.5em 0;
 }
 
 .code-container {
