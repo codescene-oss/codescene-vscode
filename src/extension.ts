@@ -235,6 +235,9 @@ async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace:
       // No idea why. (Probably refreshing the account picker under the hood)
       await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
       csWorkspace.updateIsLoggedInContext(false);
+      
+      // TODO - disable/unload the remote features
+
     }
   });
   context.subscriptions.push(authProvider);

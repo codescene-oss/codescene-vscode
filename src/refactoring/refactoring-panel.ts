@@ -1,15 +1,14 @@
 import vscode, {
-  WorkspaceEdit,
-  Webview,
-  Uri,
-  Range,
-  TextDocument,
+  Disposable,
   DocumentSymbol,
+  Range,
   Selection,
+  TextDocument,
+  TextEditorRevealType,
+  Uri,
   ViewColumn,
   WebviewPanel,
-  Disposable,
-  TextEditorRevealType,
+  WorkspaceEdit,
 } from 'vscode';
 import { getLogoUrl } from '../utils';
 
@@ -26,18 +25,17 @@ interface RefactorPanelParams {
   fnToRefactor: DocumentSymbol;
   response?: RefactorResponse | string;
 }
+
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
   private static readonly viewType = 'refactoringPanel';
 
-  private readonly extensionUri: Uri;
   private readonly webViewPanel: WebviewPanel;
   private disposables: Disposable[] = [];
 
   private currentRefactorState: CurrentRefactorState | undefined;
 
-  public constructor(extensionUri: Uri) {
-    this.extensionUri = extensionUri;
+  public constructor(private extensionUri: Uri) {
     this.webViewPanel = vscode.window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene AI Refactor',
@@ -80,7 +78,7 @@ export class RefactoringPanel {
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
     vscode.workspace.applyEdit(workSpaceEdit);
-    this.selectCurrentRefactoring();
+    await this.selectCurrentRefactoring();
     vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
   }
 
@@ -114,7 +112,9 @@ export class RefactoringPanel {
   }
 
   private async updateWebView({ document, initiatorViewColumn, fnToRefactor, response }: RefactorPanelParams) {
-    const styleUri = this.getUri('assets', 'refactor-styles.css');
+    const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
+    const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
+    const highlightCss = this.getUri('assets', 'highlight.css');
     const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
     const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
@@ -132,7 +132,7 @@ export class RefactoringPanel {
         code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
         this.currentRefactorState = { document, code, range, initiatorViewColumn };
 
-        content = this.refactoringSuggestionContent(description, reasons, code, level >= 2);
+        content = await this.refactoringSuggestionContent(confidence, reasons, code, document.languageId);
         break;
     }
 
@@ -143,14 +143,15 @@ export class RefactoringPanel {
 
     <head>
         <meta charset="UTF-8">
-        <link href="${styleUri}" rel="stylesheet" />
-        <link href="${codiconsUri}" rel="stylesheet" />
+        <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
+        <link href="${highlightCss}" type="text/css" rel="stylesheet" />
+        <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
+        <link href="${refactorStylesCss}" type="text/css" rel="stylesheet" />
     </head>
 
     <body>
         <script type="module" nonce="${nonce}" src="${webviewScript}"></script>
         <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; Refactoring recommendation</h1>
-        <vscode-divider></vscode-divider>
         ${content}
     </body>
 
@@ -162,12 +163,20 @@ export class RefactoringPanel {
     return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
 
-  private refactoringSuggestionContent(
-    description: string,
+  private async refactoringSuggestionContent(
+    confidence: RefactorConfidence,
     reasons: string[],
     code: string,
-    acceptDefault: boolean = false
+    languageId: string
   ) {
+    const { level, description } = confidence;
+    const acceptDefault = level >= 2;
+    // Use built in  markdown extension for rendering code
+    const mdRenderedCode = await vscode.commands.executeCommand(
+      'markdown.api.render',
+      '```' + languageId + '\n' + code + '\n```'
+    );
+
     const reasonText = reasons.join('. ');
     return /*html*/ `
       <br/>
@@ -178,7 +187,7 @@ export class RefactoringPanel {
         <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
           <span class="codicon codicon-clippy"></span>
         </vscode-button>
-        <pre><code>${code}</code></pre>
+        ${mdRenderedCode}
       </div>
       <div class="buttons">
         <vscode-button id="reject-button" appearance="${acceptDefault ? 'secondary' : 'primary'}">Reject</vscode-button>
