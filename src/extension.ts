@@ -111,7 +111,7 @@ export async function activate(context: vscode.ExtensionContext) {
     reviewer.review(document, { skipCache }).then((diagnostics) => {
       // Remove the diagnostics that are for file level issues.
       // These are only shown as code lenses
-      const importantDiagnostics = diagnostics.filter((d) => d.range.start.line > 0);
+      const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
       diagnosticCollection.set(document.uri, importantDiagnostics);
     });
   };
