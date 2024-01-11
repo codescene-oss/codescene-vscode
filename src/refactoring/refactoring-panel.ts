@@ -169,7 +169,10 @@ export class RefactoringPanel {
     code: string,
     languageId: string
   ) {
-    const { level, description } = confidence;
+    const {
+      level,
+      recommendedAction: { details: actionDetails, description: action },
+    } = confidence;
     const acceptDefault = level >= 2;
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
@@ -177,12 +180,22 @@ export class RefactoringPanel {
       '```' + languageId + '\n' + code + '\n```'
     );
 
-    const reasonText = reasons.join('. ');
+    const actionBadgeClass = `action-badge level-${level}`;
+
+    let reasonsContent = '';
+    if (reasons && reasons.length > 0) {
+      const reasonText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
+      reasonsContent = /*html*/ `
+        <h4>Reasons for manual review</h4>
+        <ul>${reasonText}</ul>
+      `;
+    }
     return /*html*/ `
-      <br/>
-      <vscode-tag>${description}</vscode-tag>
-      <div class="reasons">${reasonText}</div>
-      <h2>Proposed change</h2>
+      <p> 
+        <span class="${actionBadgeClass}"}>${action}</span> ${actionDetails}
+      </p>  
+      ${reasonsContent}
+      <h4>Proposed refactoring</h4>
       <div class="code-container">
         <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
           <span class="codicon codicon-clippy"></span>
