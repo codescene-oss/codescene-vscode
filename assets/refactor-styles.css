@@ -6,10 +6,6 @@ h2 {
   border: none;
 }
 
-.reasons {
-  margin: 0.8em 0 1.5em 0;
-}
-
 .code-container {
   position: relative;
 }
@@ -23,4 +19,29 @@ h2 {
 .buttons {
   display: inline;
   float: right;
+}
+
+.action-badge {
+  display: inline-block;
+  font-family: var(--font-family);
+  font-size: var(--type-ramp-minus1-font-size);
+  line-height: var(--type-ramp-minus1-line-height);
+  border: calc(var(--border-width) * 1px) solid var(--button-border);
+  border-radius: var(--tag-corner-radius);
+  color: var(--badge-foreground);
+  padding: calc(var(--design-unit) * 0.5px) calc(var(--design-unit) * 1px);
+  text-transform: uppercase;
+}
+
+.action-badge.level-1 {
+  color: #f9dcde;
+  background-color: #863137;
+}
+.action-badge.level-2 {
+  color: #fce9e1;
+  background-color: #91583e;
+}
+.action-badge.level-3 {
+  color: #dcece4;
+  background-color: #2F5F48;
 }

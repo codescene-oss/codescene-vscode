@@ -19,6 +19,7 @@ interface RefactorRequest {
 interface RefactorConfidence {
   description: string;
   level: number;
+  recommendedAction: { description: string; details: string };
 }
 
 interface RefactorResponse {
@@ -34,6 +35,6 @@ interface SupportedData {
 }
 
 interface PreFlightResponse {
-  supported: SupportedData
-  maxInputTokens: number
+  supported: SupportedData;
+  maxInputTokens: number;
 }
