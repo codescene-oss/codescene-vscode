@@ -3,10 +3,9 @@ import {
   vsCodeButton,
   vsCodeDivider,
   vsCodeProgressRing,
-  vsCodeTag,
 } from '@vscode/webview-ui-toolkit';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeProgressRing(), vsCodeTag());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeProgressRing());
 
 const vscode = acquireVsCodeApi();
 
