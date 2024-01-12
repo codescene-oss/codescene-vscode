@@ -204,6 +204,14 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
     );
     context.subscriptions.push(requestRefactoringCmd);
   }
+
+  // Use this scheme for the virtual documents when diffing the refactoring
+  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
+    provideTextDocumentContent(uri: vscode.Uri): string {
+      return uri.query;
+    }
+  })();
+  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider));
 }
 
 async function setupAuthentication(context: vscode.ExtensionContext) {
@@ -212,7 +220,7 @@ async function setupAuthentication(context: vscode.ExtensionContext) {
   context.subscriptions.push(csWorkspace);
 
   await createAuthProvider(context, csWorkspace);
-  
+
   const loginCommand = vscode.commands.registerCommand('codescene.loginToCodeScene', async (force: boolean) => {
     const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: force });
     if (session) {
@@ -235,9 +243,8 @@ async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace:
       // No idea why. (Probably refreshing the account picker under the hood)
       await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
       csWorkspace.updateIsLoggedInContext(false);
-      
-      // TODO - disable/unload the remote features
 
+      // TODO - disable/unload the remote features
     }
   });
   context.subscriptions.push(authProvider);
