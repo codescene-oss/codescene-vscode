@@ -282,8 +282,9 @@ export class RefactoringPanel {
   }
 
   private loadingContent() {
-    return /*html*/ `<h2>Refactoring...</h2>
-    <vscode-progress-ring></vscode-progress-ring>`;
+    return /*html*/ `<div class="loading-content">
+      <vscode-progress-ring class="progress-ring"></vscode-progress-ring><span id="loading-span"></span>
+    </div>`;
   }
 
   private errorContent(errorMessage: string) {
