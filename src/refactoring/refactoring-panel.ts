@@ -48,7 +48,7 @@ export class RefactoringPanel {
 
     this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.webViewPanel.webview.onDidReceiveMessage(
-      (message) => {
+      async (message) => {
         switch (message.command) {
           case 'apply':
             this.applyRefactoring();
@@ -62,11 +62,45 @@ export class RefactoringPanel {
             vscode.window.setStatusBarMessage(`$(clippy) Copied refactoring suggestion to clipboard`, 3000);
             vscode.env.clipboard.writeText(this.currentRefactorState?.code || '');
             return;
+          case 'show-diff':
+            await this.showDiff();
+            return;
         }
       },
       null,
       this.disposables
     );
+  }
+
+  /**
+   * Create a virtual document used for tmp diffing in the editor.
+   * The scheme is registered with a content provider in extension.ts
+   * @param content
+   * @param languageId
+   * @returns
+   */
+  private async createTempDocument(name: string, content: string, languageId: string) {
+    const tmpUri = vscode.Uri.from({ scheme: 'tmp-diff', path: name, query: content });
+    const tmpDoc = await vscode.workspace.openTextDocument(tmpUri);
+    return vscode.languages.setTextDocumentLanguage(tmpDoc, languageId);
+  }
+
+  private async showDiff() {
+    if (!this.currentRefactorState) {
+      console.error('No refactoring suggestion to apply');
+      return;
+    }
+    const { document, range, code } = this.currentRefactorState;
+
+    // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
+    // imposes a save dialog on the user when closing the diff.
+    const originalCodeTmpDoc = await this.createTempDocument('original', document.getText(range), document.languageId);
+    const refactoringTmpDoc = await this.createTempDocument('refactoring', code, document.languageId);
+
+    // Make sure the initiator view is active, otherwise the diff might replace the entire Refactoring webview!
+    await vscode.window.showTextDocument(document.uri, { viewColumn: this.currentRefactorState.initiatorViewColumn });
+
+    await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
   }
 
   private async applyRefactoring() {
@@ -186,7 +220,7 @@ export class RefactoringPanel {
     if (reasons && reasons.length > 0) {
       const reasonText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
       reasonsContent = /*html*/ `
-        <h4>Reasons for manual review</h4>
+        <h4>Reasons for detailed review</h4>
         <ul>${reasonText}</ul>
       `;
     }
@@ -203,6 +237,7 @@ export class RefactoringPanel {
         ${mdRenderedCode}
       </div>
       <div class="buttons">
+        <vscode-button id="diff-button" appearance="secondary">Show diff</vscode-button>
         <vscode-button id="reject-button" appearance="${acceptDefault ? 'secondary' : 'primary'}">Reject</vscode-button>
         <vscode-button id="apply-button" appearance="${acceptDefault ? 'primary' : 'secondary'}">Apply</vscode-button>
       </div>
