@@ -248,11 +248,17 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
+        "codescene.enableAiRefactoring": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AI Refactoring (alpha feature)",
+          "order": 2
+        },
         "codescene.gitignore": {
           "type": "boolean",
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
-          "order": 2
+          "order": 3
         },
         "codescene.excludeExternal": {
           "type": "boolean",
