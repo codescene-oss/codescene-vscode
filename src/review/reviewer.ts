@@ -5,6 +5,7 @@ import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
 import { ReviewResult } from './model';
 import { StatsCollector } from '../stats';
+import {getConfiguration}  from '../configuration';
 
 export interface ReviewOpts {
   [key: string]: string | boolean;
@@ -116,22 +117,10 @@ export class FilteringReviewer implements Reviewer {
     this.gitExecutorCache = new Map<string, boolean>();
   }
 
-  private isExternalToWorkspace(document: vscode.TextDocument) {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-
-    // In this case we don't have a workspace, so we decide it's not external.
-    // The file will be reviewed anyway.
-    if (!workspaceFolders) return false;
-
-    return !vscode.workspace.getWorkspaceFolder(document.uri);
-  }
-
   private async isIgnored(document: vscode.TextDocument) {
-    const gitignore = vscode.workspace.getConfiguration('codescene').get('gitignore');
-    const excludeExternal = vscode.workspace.getConfiguration('codescene').get('excludeExternal');
+    const gitignore = getConfiguration('gitignore');
 
     if (!gitignore) return false;
-    if (excludeExternal && this.isExternalToWorkspace(document)) return true;
     if (!this.gitExecutor) return false;
 
     const filePath = document.uri.fsPath;
