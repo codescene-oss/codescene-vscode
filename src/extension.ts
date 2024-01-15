@@ -19,6 +19,7 @@ import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
+import { getConfiguration, onDidChangeConfiguration } from './configuration';
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -193,6 +194,24 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
   context.subscriptions.push(explorerCouplingsView);
 
   // Refactoring features
+  const enableAiRefactoring = getConfiguration('enableAiRefactoring');
+  if (enableAiRefactoring) {
+    await enableRefactoringCommand(context, csRestApi);
+  }
+
+  // If the feature flag is changed, alert the user that a reload is needed
+  onDidChangeConfiguration('enableAiRefactoring', async (e) => {
+    const result = await vscode.window.showInformationMessage(
+      'CodeScene: VS Code needs to be reloaded to enable/disable this feature.',
+      'Reload'
+    );
+    if (result === 'Reload') {
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+  });
+}
+
+async function enableRefactoringCommand(context: vscode.ExtensionContext, csRestApi: CsRestApi) {
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     addRefactoringCodeAction(context, refactorCapabilities);
@@ -203,15 +222,17 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
       csRefactoringCommand
     );
     context.subscriptions.push(requestRefactoringCmd);
-  }
 
-  // Use this scheme for the virtual documents when diffing the refactoring
-  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
-    provideTextDocumentContent(uri: vscode.Uri): string {
-      return uri.query;
-    }
-  })();
-  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider));
+    // Use this scheme for the virtual documents when diffing the refactoring
+    const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
+      provideTextDocumentContent(uri: vscode.Uri): string {
+        return uri.query;
+      }
+    })();
+    context.subscriptions.push(
+      vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider)
+    );
+  }
 }
 
 async function setupAuthentication(context: vscode.ExtensionContext) {
