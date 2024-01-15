@@ -260,12 +260,6 @@
           "description": "Exclude files in .gitignore from analysis",
           "order": 3
         },
-        "codescene.excludeExternal": {
-          "type": "boolean",
-          "default": true,
-          "description": "Exclude files outside of the workspace from analysis",
-          "order": 3
-        },
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://codescene.io",
