@@ -47,11 +47,9 @@ export class CsRefactoringCommand {
     this.csRestApi
       .fetchRefactoring(request)
       .then((response) => {
-        console.log('Received refactoring response: ' + JSON.stringify(response));
         RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn, response });
       })
       .catch((err: Error | AxiosError) => {
-        console.log('Error in refactor request!', JSON.stringify(request), err);
         RefactoringPanel.createOrShow({
           extensionUri,
           document,

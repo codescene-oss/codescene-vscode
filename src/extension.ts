@@ -6,7 +6,7 @@ import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import Telemetry from './telemetry';
-import { CachingReviewer, FilteringReviewer, SimpleReviewer } from './review/reviewer';
+import Reviewer, { ReviewOpts } from './review/reviewer';
 import { StatsCollector } from './stats';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 
@@ -20,6 +20,8 @@ import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
+
+let diagnosticCollection: vscode.DiagnosticCollection;
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -81,6 +83,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
 
+  Reviewer.init(cliPath);
+
+  // The DiagnosticCollection subscription provides the squigglies and also form the basis for the CodeLenses.
+  diagnosticCollection = vscode.languages.createDiagnosticCollection('codescene');
+  context.subscriptions.push(diagnosticCollection);
+
   await setupAuthentication(context);
 
   setupTelemetry(cliPath);
@@ -91,62 +99,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const supportedLanguages = getSupportedLanguages(context.extension);
 
-  // Diagnostics provides the squigglies and also form the basis for the CodeLenses.
-  const diagnosticCollection = vscode.languages.createDiagnosticCollection('codescene');
-  context.subscriptions.push(diagnosticCollection);
-
-  const reviewer = new FilteringReviewer(new CachingReviewer(new SimpleReviewer(cliPath)));
-
   // Add CodeLens support
   const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
-
-  const codeLensProvider = new CsCodeLensProvider(reviewer);
+  const codeLensProvider = new CsCodeLensProvider();
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
-  // Diagnostics will be updated when a file is opened or when it is changed.
-  const run = (document: vscode.TextDocument, diagnosticCollection: vscode.DiagnosticCollection, skipCache = false) => {
-    if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
-      return;
-    }
-    reviewer.review(document, { skipCache }).then((diagnostics) => {
-      // Remove the diagnostics that are for file level issues.
-      // These are only shown as code lenses
-      const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
-      diagnosticCollection.set(document.uri, importantDiagnostics);
-    });
-  };
-
-  // This provides the initial diagnostics when a file is opened.
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
-      run(document, diagnosticCollection);
-    })
-  );
-
-  // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(run, 2000);
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) =>
-      debouncedRun(e.document, diagnosticCollection)
-    )
-  );
-
-  // This provides the initial diagnostics when the extension is first activated.
-  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    run(document, diagnosticCollection);
-  });
-
-  // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
-  const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
-  fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
-    outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
-    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      run(document, diagnosticCollection, true);
-    });
-    codeLensProvider.update();
-  });
-  context.subscriptions.push(fileSystemWatcher);
+  addReviewListeners(context, supportedLanguages);
 
   // Setup a scheduled event for sending statistics
   setInterval(() => {
@@ -161,6 +120,68 @@ export async function activate(context: vscode.ExtensionContext) {
 
     StatsCollector.instance.clear();
   }, 1800 * 1000);
+}
+
+/**
+ * Reviews a document using the Reviewer instance and sets the CodeScene diagnostic collection.
+ *
+ */
+function reviewToDiagnostics({
+  document,
+  supportedLanguages,
+  reviewOpts = { skipCache: false },
+}: {
+  document: vscode.TextDocument;
+  supportedLanguages: string[];
+  reviewOpts?: ReviewOpts;
+}) {
+  // Diagnostics will be updated when a file is opened or when it is changed.
+  if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
+    return;
+  }
+  Reviewer.instance.review(document, reviewOpts).then((diagnostics) => {
+    // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+    const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
+    diagnosticCollection.set(document.uri, importantDiagnostics);
+  });
+}
+
+/**
+ * Adds listeners for all events that should trigger a review.
+ *
+ * @param context
+ * @param supportedLanguages
+ */
+function addReviewListeners(context: vscode.ExtensionContext, supportedLanguages: string[]) {
+  // This provides the initial diagnostics when a file is opened.
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
+      reviewToDiagnostics({ document, supportedLanguages });
+    })
+  );
+
+  // For live updates, we debounce the runs to avoid consuming too many resources.
+  const debouncedRun = debounce(reviewToDiagnostics, 2000);
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) =>
+      debouncedRun({ document: e.document, supportedLanguages })
+    )
+  );
+
+  // This provides the initial diagnostics when the extension is first activated.
+  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+    reviewToDiagnostics({ document, supportedLanguages });
+  });
+
+  // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
+  const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
+  fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
+    outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
+    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+      reviewToDiagnostics({ document, supportedLanguages, reviewOpts: { skipCache: true } });
+    });
+  });
+  context.subscriptions.push(fileSystemWatcher);
 }
 
 function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
@@ -214,6 +235,14 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
 async function enableRefactoringCommand(context: vscode.ExtensionContext, csRestApi: CsRestApi) {
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
+    Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported.codeSmells);
+
+    // Force update diagnosticCollection to show the supported code smells indication
+    const supportedLanguages = getSupportedLanguages(context.extension);
+    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+      reviewToDiagnostics({ document, supportedLanguages, reviewOpts: { skipCache: true } });
+    });
+  
     addRefactoringCodeAction(context, refactorCapabilities);
     const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
     const requestRefactoringCmd = vscode.commands.registerCommand(
