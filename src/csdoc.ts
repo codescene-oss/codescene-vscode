@@ -4,8 +4,6 @@ import * as vscode from 'vscode';
 import { getLogoUrl } from './utils';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
-  logoUrl: string | undefined;
-
   constructor(private extensionPath: string) {}
 
   async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
@@ -19,10 +17,10 @@ class CsDocProvider implements vscode.TextDocumentContentProvider {
   }
 }
 
-export function registerCsDocProvider(extensionPath: string) {
-  const provider = new CsDocProvider(extensionPath);
-  const providerRegistration = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
-  return providerRegistration;
+export function registerCsDocProvider(context: vscode.ExtensionContext) {
+  const provider = new CsDocProvider(context.extensionPath);
+  const providerDisposable = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
+  context.subscriptions.push(providerDisposable);
 }
 
 export function categoryToDocsCode(issueCategory: string) {

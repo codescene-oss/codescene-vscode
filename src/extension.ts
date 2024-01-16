@@ -6,10 +6,9 @@ import { CsCodeLensProvider } from './codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import Telemetry from './telemetry';
-import Reviewer, { ReviewOpts } from './review/reviewer';
+import Reviewer from './review/reviewer';
 import { StatsCollector } from './stats';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-
 import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import { CsWorkspace } from './workspace';
 import { Links } from './links';
@@ -20,8 +19,76 @@ import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
+import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 
-let diagnosticCollection: vscode.DiagnosticCollection;
+interface CsContext {
+  cliPath: string;
+  csWorkspace: CsWorkspace;
+  csDiagnostics: CsDiagnostics;
+  csRestApi: CsRestApi;
+}
+
+/**
+ * Extension entry point
+ * @param context
+ */
+export async function activate(context: vscode.ExtensionContext) {
+  console.log('CodeScene: Activating extension!');
+
+  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+  const csRestApi = new CsRestApi();
+  const csWorkspace = new CsWorkspace(context, csRestApi);
+  context.subscriptions.push(csWorkspace);
+  const supportedLanguages = getSupportedLanguages(context.extension);
+  const csDiagnostics = new CsDiagnostics(supportedLanguages);
+
+  const csContext: CsContext = {
+    cliPath,
+    csRestApi,
+    csWorkspace,
+    csDiagnostics,
+  };
+
+  Reviewer.init(cliPath);
+
+  // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
+  CsDiagnosticsCollection.init(context);
+
+  await createAuthProvider(context, csWorkspace);
+
+  setupTelemetry(cliPath);
+
+  registerCommands(context, csContext);
+
+  // Try to log in using the registered loginToCodeScene command. Will enable remote features if successfully logged in
+  vscode.commands.executeCommand('codescene.loginToCodeScene');
+
+  registerCsDocProvider(context);
+
+  addReviewListeners(context, csDiagnostics);
+
+  // Add CodeLens support
+  const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
+  const codeLensProvider = new CsCodeLensProvider();
+  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
+  context.subscriptions.push(codeLensProviderDisposable);
+
+  // Setup a scheduled event for sending statistics
+  setInterval(() => {
+    const stats = StatsCollector.instance.stats;
+
+    // Send execution stats by language
+    if (stats.analysis.length > 0) {
+      for (const byLanguage of stats.analysis) {
+        Telemetry.instance.logUsage('stats', { stats: { analysis: byLanguage } });
+      }
+    }
+
+    StatsCollector.instance.clear();
+  }, 1800 * 1000);
+
+  console.log('CodeScene: Extension is now active!');
+}
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
   return extension.packageJSON.activationEvents
@@ -33,7 +100,9 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
   return supportedLanguages.map((language) => ({ language, scheme: 'file' }));
 }
 
-function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
+function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { cliPath, csWorkspace } = csContext;
+
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
   });
@@ -65,6 +134,17 @@ function registerCommands(context: vscode.ExtensionContext, cliPath: string) {
     }
   );
   context.subscriptions.push(openDocsForDiagnostic);
+
+  // This command tries to get a "codescene" session. If successful it will enable the remote features,
+  // otherwise it will just update the accounts picker with a Login to CodeScene option
+  const loginCommand = vscode.commands.registerCommand('codescene.loginToCodeScene', async (force: boolean) => {
+    const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: force });
+    if (session) {
+      csWorkspace.updateIsLoggedInContext(true);
+      await enableRemoteFeatures(context, csContext);
+    }
+  });
+  context.subscriptions.push(loginCommand);
 }
 
 function setupTelemetry(cliPath: string) {
@@ -74,103 +154,27 @@ function setupTelemetry(cliPath: string) {
   Telemetry.instance.logUsage('onActivateExtension');
 }
 
-function supportedLanguagesForRefactoring(languages: string[]) {
-  return languages.map((language) => ({ language, scheme: 'file' }));
-}
-
-export async function activate(context: vscode.ExtensionContext) {
-  console.log('CodeScene: the extension is now active!');
-
-  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
-
-  Reviewer.init(cliPath);
-
-  // The DiagnosticCollection subscription provides the squigglies and also form the basis for the CodeLenses.
-  diagnosticCollection = vscode.languages.createDiagnosticCollection('codescene');
-  context.subscriptions.push(diagnosticCollection);
-
-  await setupAuthentication(context);
-
-  setupTelemetry(cliPath);
-
-  registerCommands(context, cliPath);
-
-  registerCsDocProvider(context.extensionPath);
-
-  const supportedLanguages = getSupportedLanguages(context.extension);
-
-  // Add CodeLens support
-  const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
-  const codeLensProvider = new CsCodeLensProvider();
-  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
-  context.subscriptions.push(codeLensProviderDisposable);
-
-  addReviewListeners(context, supportedLanguages);
-
-  // Setup a scheduled event for sending statistics
-  setInterval(() => {
-    const stats = StatsCollector.instance.stats;
-
-    // Send execution stats by language
-    if (stats.analysis.length > 0) {
-      for (const byLanguage of stats.analysis) {
-        Telemetry.instance.logUsage('stats', { stats: { analysis: byLanguage } });
-      }
-    }
-
-    StatsCollector.instance.clear();
-  }, 1800 * 1000);
-}
-
-/**
- * Reviews a document using the Reviewer instance and sets the CodeScene diagnostic collection.
- *
- */
-function reviewToDiagnostics({
-  document,
-  supportedLanguages,
-  reviewOpts = { skipCache: false },
-}: {
-  document: vscode.TextDocument;
-  supportedLanguages: string[];
-  reviewOpts?: ReviewOpts;
-}) {
-  // Diagnostics will be updated when a file is opened or when it is changed.
-  if (document.uri.scheme !== 'file' || !supportedLanguages.includes(document.languageId)) {
-    return;
-  }
-  Reviewer.instance.review(document, reviewOpts).then((diagnostics) => {
-    // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-    const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
-    diagnosticCollection.set(document.uri, importantDiagnostics);
-  });
-}
-
 /**
  * Adds listeners for all events that should trigger a review.
  *
- * @param context
- * @param supportedLanguages
  */
-function addReviewListeners(context: vscode.ExtensionContext, supportedLanguages: string[]) {
+function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsDiagnostics) {
   // This provides the initial diagnostics when a file is opened.
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
-      reviewToDiagnostics({ document, supportedLanguages });
+      csDiagnostics.review(document);
     })
   );
 
   // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(reviewToDiagnostics, 2000);
+  const debouncedRun = debounce(csDiagnostics.review.bind(csDiagnostics), 2000);
   context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) =>
-      debouncedRun({ document: e.document, supportedLanguages })
-    )
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => debouncedRun(e.document))
   );
 
   // This provides the initial diagnostics when the extension is first activated.
   vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    reviewToDiagnostics({ document, supportedLanguages });
+    csDiagnostics.review(document);
   });
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
@@ -178,16 +182,20 @@ function addReviewListeners(context: vscode.ExtensionContext, supportedLanguages
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
     outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      reviewToDiagnostics({ document, supportedLanguages, reviewOpts: { skipCache: true } });
+      csDiagnostics.review(document, { skipCache: true });
     });
   });
   context.subscriptions.push(fileSystemWatcher);
 }
 
 function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
+  const supportedLanguagesForRefactoring = capabilities.supported.languages.map((language) => ({
+    language,
+    scheme: 'file',
+  }));
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
-      supportedLanguagesForRefactoring(capabilities.supported.languages),
+      supportedLanguagesForRefactoring,
       new CsRefactorCodeAction(context, capabilities.supported.codeSmells),
       {
         providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
@@ -199,7 +207,8 @@ function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities
 /**
  * Active functionality that requires a connection to a CodeScene server.
  */
-async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi: CsRestApi, csWorkspace: CsWorkspace) {
+async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { csWorkspace, csRestApi, csDiagnostics } = csContext;
   const links = new Links(csWorkspace);
   context.subscriptions.push(links);
 
@@ -217,7 +226,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
   // Refactoring features
   const enableAiRefactoring = getConfiguration('enableAiRefactoring');
   if (enableAiRefactoring) {
-    await enableRefactoringCommand(context, csRestApi);
+    await enableRefactoringCommand(context, csRestApi, csDiagnostics);
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
@@ -232,17 +241,20 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csRestApi:
   });
 }
 
-async function enableRefactoringCommand(context: vscode.ExtensionContext, csRestApi: CsRestApi) {
+async function enableRefactoringCommand(
+  context: vscode.ExtensionContext,
+  csRestApi: CsRestApi,
+  csDiagnostics: CsDiagnostics
+) {
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported.codeSmells);
 
     // Force update diagnosticCollection to show the supported code smells indication
-    const supportedLanguages = getSupportedLanguages(context.extension);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      reviewToDiagnostics({ document, supportedLanguages, reviewOpts: { skipCache: true } });
+      csDiagnostics.review(document, { skipCache: true });
     });
-  
+
     addRefactoringCodeAction(context, refactorCapabilities);
     const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
     const requestRefactoringCmd = vscode.commands.registerCommand(
@@ -262,25 +274,6 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csRest
       vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider)
     );
   }
-}
-
-async function setupAuthentication(context: vscode.ExtensionContext) {
-  const csRestApi = new CsRestApi();
-  const csWorkspace = new CsWorkspace(context, csRestApi);
-  context.subscriptions.push(csWorkspace);
-
-  await createAuthProvider(context, csWorkspace);
-
-  const loginCommand = vscode.commands.registerCommand('codescene.loginToCodeScene', async (force: boolean) => {
-    const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: force });
-    if (session) {
-      csWorkspace.updateIsLoggedInContext(true);
-      await enableRemoteFeatures(context, csRestApi, csWorkspace);
-    }
-  });
-  context.subscriptions.push(loginCommand);
-
-  vscode.commands.executeCommand('codescene.loginToCodeScene');
 }
 
 async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
