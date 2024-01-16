@@ -41,7 +41,9 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
   constructor(private context: ExtensionContext, private csWorkspace: CsWorkspace) {
     this.disposable = Disposable.from(
-      authentication.registerAuthenticationProvider(AUTH_TYPE, "CodeScene Cloud", this, { supportsMultipleAccounts: false }),
+      authentication.registerAuthenticationProvider(AUTH_TYPE, 'CodeScene Cloud', this, {
+        supportsMultipleAccounts: false,
+      }),
       window.registerUriHandler(this.uriHandler)
     );
   }
@@ -82,7 +84,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       const loginResponse = await this.login();
 
       if (!loginResponse) {
-        throw new Error("CodeScene login failure");
+        throw new Error('CodeScene login failure');
       }
 
       const session: AuthenticationSession = {
@@ -102,10 +104,16 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
 
       if (this.csWorkspace.getProjectId() === undefined) {
-       const result = await window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`, "Associate workspace with project");
-       if (result === "Associate workspace with project") {
-         this.csWorkspace.associateWithProject();
-       }
+        window
+          .showInformationMessage(
+            `Signed in to CodeScene as ${session.account.label}`,
+            'Associate workspace with project'
+          )
+          .then((result) => {
+            if (result === 'Associate workspace with project') {
+              this.csWorkspace.associateWithProject();
+            }
+          });
       } else {
         window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
       }
@@ -127,7 +135,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       let sessions = JSON.parse(allSessions) as AuthenticationSession[];
       const session = sessions.find((s) => s.id === sessionId);
       if (session) {
-        await this.context.secrets.store(SESSIONS_STORAGE_KEY, "[]");
+        await this.context.secrets.store(SESSIONS_STORAGE_KEY, '[]');
         this.sessionChangeEmitter.fire({ added: [], removed: [session], changed: [] });
         this.csWorkspace.clearProjectAssociation();
       }
@@ -153,7 +161,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       },
       async (_, cancel) => {
         const searchParams = new URLSearchParams({
-          'redirect-url': this.redirectUri
+          'redirect-url': this.redirectUri,
         });
 
         const tokenPath = `/configuration/devtools-tokens/add?${searchParams.toString()}`;
@@ -202,7 +210,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         return;
       }
 
-      resolve({ name, token});
+      resolve({ name, token });
     };
   }
 }

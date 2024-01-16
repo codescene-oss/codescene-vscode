@@ -62,10 +62,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "codescene.loginToCodeScene",
-        "title": "CodeScene: Login to CodeScene"
-      },
-      {
         "command": "codescene.createRulesTemplate",
         "title": "CodeScene: Create Rules Template"
       },
@@ -140,7 +136,7 @@
     "viewsWelcome": [
       {
         "view": "codescene.remoteFeaturesView",
-        "contents": "In order to fully utilize the CodeScene extension, you need to be logged in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Login to CodeScene](command:codescene.loginToCodeScene?[true])",
+        "contents": "In order to fully utilize the CodeScene extension, you need to be logged in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Sign in with CodeScene](command:codescene.signInWithCodeScene)",
         "when": "!codescene.isLoggedIn"
       },
       {
