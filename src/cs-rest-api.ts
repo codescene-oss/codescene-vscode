@@ -95,12 +95,13 @@ export class CsRestApi {
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
   }
 
-  async fetchRefactoring(request: RefactorRequest) {
+  async fetchRefactoring(request: RefactorRequest, signal?: AbortSignal) {
     const traceId = uuidv4();
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
       },
+      signal,
     };
     const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
     return await this.refactoringPostJson<RefactorResponse>(refactorUrl, request, config);

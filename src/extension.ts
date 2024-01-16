@@ -255,7 +255,6 @@ async function enableRefactoringCommand(
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    addRefactoringCodeAction(context, refactorCapabilities);
     const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
     const requestRefactoringCmd = vscode.commands.registerCommand(
       refactoringCommandName,
@@ -263,6 +262,7 @@ async function enableRefactoringCommand(
       csRefactoringCommand
     );
     context.subscriptions.push(requestRefactoringCmd);
+    addRefactoringCodeAction(context, refactorCapabilities);
 
     // Use this scheme for the virtual documents when diffing the refactoring
     const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
