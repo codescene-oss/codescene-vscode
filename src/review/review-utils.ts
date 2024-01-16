@@ -21,7 +21,11 @@ function issueToRange(category: string, issue: IssueDetails, document: vscode.Te
   return new vscode.Range(startLine, startColumn, startLine, endColumn);
 }
 
-export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
+export function reviewIssueToDiagnostics(
+  reviewIssue: ReviewIssue,
+  document: vscode.TextDocument,
+  supportedAiLanguages?: string[]
+) {
   if (!reviewIssue.functions) {
     return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue)];
   }
@@ -34,6 +38,10 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
       description = `${reviewIssue.category} (${func.details})`;
     } else {
       description = reviewIssue.category;
+    }
+
+    if (supportedAiLanguages && supportedAiLanguages.includes(reviewIssue.category)) {
+      description = `✨ ${description}`;
     }
 
     return produceDiagnostic('warning', range, description, reviewIssue);
