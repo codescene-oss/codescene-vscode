@@ -5,18 +5,33 @@ import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
 import { ReviewResult } from './model';
 import { StatsCollector } from '../stats';
-import {getConfiguration}  from '../configuration';
+import { getConfiguration } from '../configuration';
+
+export default class Reviewer {
+  private static _instance: IReviewer;
+
+  static init(cliPath: string): void {
+    console.log('CodeScene: initializing reviewer');
+    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(cliPath)));
+  }
+
+  static get instance(): IReviewer {
+    return Reviewer._instance;
+  }
+}
 
 export interface ReviewOpts {
   [key: string]: string | boolean;
 }
 
-export interface Reviewer {
+export interface IReviewer {
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
+  setSupportedRefactoringSmells(languages?: string[]): void;
 }
 
-export class SimpleReviewer implements Reviewer {
+class SimpleReviewer implements IReviewer {
   private readonly executor: LimitingExecutor = new LimitingExecutor();
+  private supportedAiLanguages?: string[];
 
   constructor(private cliPath: string) {}
 
@@ -30,7 +45,11 @@ export class SimpleReviewer implements Reviewer {
     const documentDirectory = dirname(documentPath);
 
     const result = this.executor.execute(
-      { command: this.cliPath, args: ['review', '--file-type', extension, '--output-format', 'json'], taskId: documentPath },
+      {
+        command: this.cliPath,
+        args: ['review', '--file-type', extension, '--output-format', 'json'],
+        taskId: documentPath,
+      },
       { cwd: documentDirectory },
       document.getText()
     );
@@ -39,7 +58,9 @@ export class SimpleReviewer implements Reviewer {
       StatsCollector.instance.recordAnalysis(extension, duration);
 
       const data = JSON.parse(stdout) as ReviewResult;
-      let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+      let diagnostics = data.review.flatMap((reviewIssue) =>
+        reviewIssueToDiagnostics(reviewIssue, document, this.supportedAiLanguages)
+      );
 
       if (data.score > 0) {
         const roundedScore = +data.score.toFixed(2);
@@ -56,6 +77,10 @@ export class SimpleReviewer implements Reviewer {
 
     return diagnostics;
   }
+
+  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
+    this.supportedAiLanguages = codeSmells;
+  }
 }
 
 // Cache the results of the 'cs review' command so that we don't have to run it again
@@ -67,10 +92,10 @@ interface ReviewCacheItem {
 /**
  * Adds a caching layer on top of a Reviewer.
  */
-export class CachingReviewer implements Reviewer {
+class CachingReviewer implements IReviewer {
   private readonly reviewCache = new Map<string, ReviewCacheItem>();
 
-  constructor(private reviewer: Reviewer) {}
+  constructor(private reviewer: IReviewer) {}
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
     // If we have a cached result for this document, return it.
@@ -89,6 +114,10 @@ export class CachingReviewer implements Reviewer {
 
     return diagnostics;
   }
+
+  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
+    this.reviewer.setSupportedRefactoringSmells(codeSmells);
+  }
 }
 
 /**
@@ -98,11 +127,11 @@ export class CachingReviewer implements Reviewer {
  * (i.e. it's opened as a standalone file), then this reviewer will basically be
  * downgraded to the injected reviewer (which for normal use is the CachingReviewer)
  */
-export class FilteringReviewer implements Reviewer {
+class FilteringReviewer implements IReviewer {
   private gitExecutor: SimpleExecutor | null = null;
   private gitExecutorCache = new Map<string, boolean>();
 
-  constructor(private reviewer: Reviewer) {
+  constructor(private reviewer: IReviewer) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
       this.gitExecutor = new SimpleExecutor();
@@ -149,5 +178,9 @@ export class FilteringReviewer implements Reviewer {
     }
 
     return this.reviewer.review(document, reviewOpts);
+  }
+
+  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
+    this.reviewer.setSupportedRefactoringSmells(codeSmells);
   }
 }
