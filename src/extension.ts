@@ -54,14 +54,11 @@ export async function activate(context: vscode.ExtensionContext) {
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnosticsCollection.init(context);
 
-  await createAuthProvider(context, csWorkspace);
+  createAuthProvider(context, csContext);
 
   setupTelemetry(cliPath);
 
   registerCommands(context, csContext);
-
-  // Try to log in using the registered loginToCodeScene command. Will enable remote features if successfully logged in
-  vscode.commands.executeCommand('codescene.loginToCodeScene');
 
   registerCsDocProvider(context);
 
@@ -135,14 +132,11 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   );
   context.subscriptions.push(openDocsForDiagnostic);
 
-  // This command tries to get a "codescene" session. If successful it will enable the remote features,
-  // otherwise it will just update the accounts picker with a Login to CodeScene option
-  const loginCommand = vscode.commands.registerCommand('codescene.loginToCodeScene', async (force: boolean) => {
-    const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: force });
-    if (session) {
-      csWorkspace.updateIsLoggedInContext(true);
-      await enableRemoteFeatures(context, csContext);
-    }
+  // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
+  // asking the user to log in. Should only be called/available when codescene.isLoggedIn is false.
+  // (see package.json)
+  const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {
+    vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: true });
   });
   context.subscriptions.push(loginCommand);
 }
@@ -276,15 +270,27 @@ async function enableRefactoringCommand(
   }
 }
 
-async function createAuthProvider(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
+function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { csWorkspace } = csContext;
   const authProvider = new CsAuthenticationProvider(context, csWorkspace);
-  authProvider.onDidChangeSessions(async (e) => {
+
+  // Provides the initial session - will enable remote features and update workspace state
+  vscode.authentication.getSession(AUTH_TYPE, []).then((session) => {
+    if (session) {
+      csWorkspace.updateIsLoggedInContext(true);
+      enableRemoteFeatures(context, csContext);
+    }
+  });
+
+  // Handle login/logout session changes
+  authProvider.onDidChangeSessions((e) => {
     if (e.added && e.added.length > 0) {
       csWorkspace.updateIsLoggedInContext(true);
+      enableRemoteFeatures(context, csContext);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
-      // No idea why. (Probably refreshing the account picker under the hood)
-      await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
+      // This is probably refreshing the account picker under the hood
+      vscode.authentication.getSession(AUTH_TYPE, []);
       csWorkspace.updateIsLoggedInContext(false);
 
       // TODO - disable/unload the remote features
