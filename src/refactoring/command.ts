@@ -1,12 +1,14 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import { RefactoringPanel } from './refactoring-panel';
 import { CsRestApi } from '../cs-rest-api';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 export const name = 'codescene.requestRefactoring';
 
 export class CsRefactoringCommand {
   private readonly csRestApi: CsRestApi;
+  private abortController: AbortController | undefined;
+
   constructor(csRestApi: CsRestApi) {
     this.csRestApi = csRestApi;
   }
@@ -29,7 +31,7 @@ export class CsRefactoringCommand {
     const diagnostic = diagnostics[0];
     const fn = await findFunctionToRefactor(document, diagnostic.range);
     if (!fn) {
-      console.error('Could not find a suitable function to refactor.');
+      console.error('CodeScene: Could not find a suitable function to refactor.');
       window.showErrorMessage('Could not find a suitable function to refactor.');
       return;
     }
@@ -40,16 +42,26 @@ export class CsRefactoringCommand {
       editor.revealRange(fn.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
     const extensionUri = context.extensionUri;
-    const request = await refactorRequest(document, diagnostic, fn);
+    const request = refactorRequest(document, diagnostic, fn);
     const initiatorViewColumn = editor?.viewColumn;
 
+    // Send abort signal to currently running refactoring request (if any)
+    if (this.abortController) this.abortController.abort();
+
+    this.abortController = new AbortController(); // New abort controller for the new request
+    console.log(`CodeScene: Requesting refactoring suggestion for "${fn.name}" from CodeScene's AI service`);
     RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn });
     this.csRestApi
-      .fetchRefactoring(request)
+      .fetchRefactoring(request, this.abortController.signal)
       .then((response) => {
         RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor: fn, response });
       })
       .catch((err: Error | AxiosError) => {
+        if (err instanceof AxiosError && axios.isCancel(err)) {
+          console.log('CodeScene: Previous refactor request cancelled.');
+          return;
+        }
+
         RefactoringPanel.createOrShow({
           extensionUri,
           document,
@@ -61,11 +73,11 @@ export class CsRefactoringCommand {
   }
 }
 
-async function refactorRequest(
+function refactorRequest(
   document: vscode.TextDocument,
   diagnostic: vscode.Diagnostic,
   fn: DocumentSymbol
-): Promise<RefactorRequest> {
+): RefactorRequest {
   const review: Review = {
     category: codeToCategory(diagnostic.code),
     start_line: diagnostic.range.start.line,
