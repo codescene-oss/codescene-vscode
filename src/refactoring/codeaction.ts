@@ -35,8 +35,6 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
       tooltip: 'Refactor this code using the CodeScene AI Refactoring service',
       arguments: [this.context, document, range, supportedCsDiagnostics],
     };
-    // const refactorAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.Refactor);
-    // refactorAction.command = command;
 
     const quickFixAction = new vscode.CodeAction('CodeScene AI Refactor', vscode.CodeActionKind.QuickFix);
     quickFixAction.command = command;
