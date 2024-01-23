@@ -12,7 +12,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import { CsWorkspace } from './workspace';
 import { Links } from './links';
-import { CsRestApi } from './cs-rest-api';
+import { CsRestApi, PreFlightResponse } from './cs-rest-api';
 import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
@@ -190,7 +190,7 @@ function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       supportedLanguagesForRefactoring,
-      new CsRefactorCodeAction(context, capabilities.supported.codeSmells),
+      new CsRefactorCodeAction(context, capabilities.supported['code-smells']),
       {
         providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
       }
@@ -202,7 +202,7 @@ function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities
  * Active functionality that requires a connection to a CodeScene server.
  */
 async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace, csRestApi, csDiagnostics } = csContext;
+  const { csWorkspace, csRestApi } = csContext;
   const links = new Links(csWorkspace);
   context.subscriptions.push(links);
 
@@ -220,7 +220,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   // Refactoring features
   const enableAiRefactoring = getConfiguration('enableAiRefactoring');
   if (enableAiRefactoring) {
-    await enableRefactoringCommand(context, csRestApi, csDiagnostics);
+    await enableRefactoringCommand(context, csContext);
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
@@ -235,21 +235,18 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   });
 }
 
-async function enableRefactoringCommand(
-  context: vscode.ExtensionContext,
-  csRestApi: CsRestApi,
-  csDiagnostics: CsDiagnostics
-) {
+async function enableRefactoringCommand(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { csRestApi, csDiagnostics, cliPath } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
-    Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported.codeSmells);
+    Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported['code-smells']);
 
     // Force update diagnosticCollection to show the supported code smells indication
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    const csRefactoringCommand = new CsRefactoringCommand(csRestApi);
+    const csRefactoringCommand = new CsRefactoringCommand(csRestApi, cliPath);
     const requestRefactoringCmd = vscode.commands.registerCommand(
       refactoringCommandName,
       csRefactoringCommand.requestRefactoring,

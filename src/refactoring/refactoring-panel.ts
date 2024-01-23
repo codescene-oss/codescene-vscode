@@ -11,6 +11,8 @@ import vscode, {
   WorkspaceEdit,
 } from 'vscode';
 import { getLogoUrl } from '../utils';
+import { FnToRefactor } from './command';
+import { RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 
 interface CurrentRefactorState {
   range: Range; // Range of code to be refactored
@@ -23,7 +25,7 @@ interface CurrentRefactorState {
 interface RefactorPanelParams {
   document: TextDocument;
   initiatorViewColumn?: ViewColumn;
-  fnToRefactor: DocumentSymbol;
+  fnToRefactor: FnToRefactor;
   response?: RefactorResponse | string;
 }
 
@@ -129,7 +131,6 @@ export class RefactoringPanel {
     refactoringState.applied = !refactoringState.applied;
     refactoringState.code = previousCode;
     refactoringState.range = newRange;
-    console.log('New range: ' + JSON.stringify(refactoringState.range));
   }
 
   private async applyRefactoring(refactoringState: CurrentRefactorState) {
@@ -237,7 +238,7 @@ export class RefactoringPanel {
   ) {
     const {
       level,
-      recommendedAction: { details: actionDetails, description: action },
+      'recommended-action': { details: actionDetails, description: action },
     } = confidence;
     const acceptDefault = level >= 2;
     // Use built in  markdown extension for rendering code
