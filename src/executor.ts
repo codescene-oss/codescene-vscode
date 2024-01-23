@@ -43,12 +43,12 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          console.log(`CodeScene: ${logName} with pid ${childProcess.pid} failed with error: ${error}`);
+          console.log(`CodeScene: "${logName}" [pid ${childProcess.pid}] failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
-        console.log(`CodeScene: ${logName} with pid ${childProcess.pid} took ${end - start} milliseconds`);
+        console.log(`CodeScene: "${logName}" [pid ${childProcess.pid}] took ${end - start} milliseconds`);
         resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
       });
 
@@ -56,7 +56,7 @@ export class SimpleExecutor implements Executor {
         this.writeInput(childProcess, input);
       }
 
-      console.log(`CodeScene: ${logName} started with pid ${childProcess.pid}`);
+      console.log(`CodeScene: "${logName}" [pid ${childProcess.pid}] started`);
     });
 
     return completedPromise;
