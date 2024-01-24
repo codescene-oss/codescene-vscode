@@ -105,13 +105,13 @@ export class CsRestApi {
 
   private async fetchJson<T>(url: string) {
     const response = await this.axiosInstance.get(url);
-    outputChannel.appendLine(`GET ${url} ${response.status}`);
+    outputChannel.appendLine(`GET ${url} [${response.status}]`);
     return response.data as T;
   }
 
   private async refactoringPostJson<T>(url: string, data: RefactorRequest, config: AxiosRequestConfig) {
     const response = await this.refactoringAxiosInstance.post(url, data, config);
-    outputChannel.appendLine(`POST ${url} ${response.status}`);
+    outputChannel.appendLine(`POST ${url} [${response.status}]`);
     return response.data as T;
   }
 
@@ -165,9 +165,6 @@ export class CsRestApi {
       body: fnToRefactor.content,
     };
     const request: RefactorRequest = { review: [review], 'source-snippet': sourceSnippet };
-
-    console.log(`CodeScene: refactor request: ${JSON.stringify(request)}`);
-
     return await this.refactoringPostJson<RefactorResponse>(refactorUrl, request, config);
   }
 
@@ -183,12 +180,12 @@ export class CsRestApi {
     const refactorUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
     return this.refactoringAxiosInstance.get(refactorUrl).then(
       (response) => {
-        outputChannel.appendLine(`GET ${refactorUrl} ${response.status}`);
+        outputChannel.appendLine(`GET ${refactorUrl} [${response.status}]`);
         return response.data as PreFlightResponse;
       },
       (error) => {
         const { message } = error;
-        outputChannel.appendLine(`GET ${refactorUrl} ${error.response.status}`);
+        outputChannel.appendLine(`GET ${refactorUrl} [${error.code}] ${message}`);
         vscode.window.showErrorMessage(`Unable to fetch refactoring capabilities. ${message}`);
       }
     );

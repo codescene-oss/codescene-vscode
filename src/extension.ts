@@ -17,7 +17,11 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
-import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
+import {
+  refactoringRequestCmdName,
+  requestAndShowRefactoringCmdName,
+  CsRefactoringCommand,
+} from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { isDefined } from './utils';
@@ -212,7 +216,7 @@ function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       supportedLanguagesForRefactoring,
-      new CsRefactorCodeAction(context, capabilities.supported['code-smells']),
+      new CsRefactorCodeAction(capabilities.supported['code-smells']),
       {
         providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
       }
@@ -259,7 +263,15 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
 
 async function enableRefactoringCommand(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath } = csContext;
-  const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
+  const refactorCapabilities: void | PreFlightResponse = /* {
+    supported: {
+      'code-smells': ['Complex Conditional', 'Bumpy Road Ahead'],
+      languages: ['javascript', 'typescript'],
+      'file-types': ['js', 'jsx', 'ts', 'tsx'],
+    },
+    'max-input-tokens': 3,
+  }; */
+   await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported['code-smells']);
 
@@ -268,13 +280,7 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    const csRefactoringCommand = new CsRefactoringCommand(csRestApi, cliPath);
-    const requestRefactoringCmd = vscode.commands.registerCommand(
-      refactoringCommandName,
-      csRefactoringCommand.requestRefactoring,
-      csRefactoringCommand
-    );
-    context.subscriptions.push(requestRefactoringCmd);
+    new CsRefactoringCommand(context, csRestApi, cliPath).register();
     addRefactoringCodeAction(context, refactorCapabilities);
 
     // Use this scheme for the virtual documents when diffing the refactoring

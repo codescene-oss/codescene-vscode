@@ -1,12 +1,15 @@
 import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
 import { RefactoringPanel } from './refactoring-panel';
-import { CsRestApi, RefactorRequest } from '../cs-rest-api';
+import { CsRestApi, RefactorRequest, RefactorResponse } from '../cs-rest-api';
 import axios, { AxiosError } from 'axios';
 import { findEnclosingFunction } from '../codescene-interop';
 import { env } from 'process';
+import CsRefactoringRequests, { CsRefactoringRequest } from './cs-refactoring-requests';
+import { keyStr } from '../utils';
 
-export const name = 'codescene.requestRefactoring';
-
+export const refactoringRequestCmdName = 'codescene.refactoringRequest';
+export const awaitAndShowRefactoringCmdName = 'codescene.awaitAndShowRefactoring';
+export const requestAndShowRefactoringCmdName = 'codescene.requestAndShowRefactoring';
 export interface FnToRefactor {
   name: string;
   range: vscode.Range;
@@ -19,11 +22,34 @@ export interface FnToRefactor {
 export class CsRefactoringCommand {
   private readonly csRestApi: CsRestApi;
   private readonly cliPath: string;
+  private readonly context: vscode.ExtensionContext;
   private abortController: AbortController | undefined;
 
-  constructor(csRestApi: CsRestApi, cliPath: string) {
+  constructor(context: vscode.ExtensionContext, csRestApi: CsRestApi, cliPath: string) {
+    this.context = context;
     this.csRestApi = csRestApi;
     this.cliPath = cliPath;
+  }
+
+  register() {
+    const requestAndShowRefactoringCmd = vscode.commands.registerCommand(
+      requestAndShowRefactoringCmdName,
+      this.requestAndShowRefactoring,
+      this
+    );
+    this.context.subscriptions.push(requestAndShowRefactoringCmd);
+    const refactoringRequestCmd = vscode.commands.registerCommand(
+      refactoringRequestCmdName,
+      this.refactoringRequest,
+      this
+    );
+    this.context.subscriptions.push(refactoringRequestCmd);
+    const awaitAndShowRefactoringCmd = vscode.commands.registerCommand(
+      awaitAndShowRefactoringCmdName,
+      this.awaitAndShowRefactoring,
+      this
+    );
+    this.context.subscriptions.push(awaitAndShowRefactoringCmd);
   }
 
   /**
@@ -35,8 +61,7 @@ export class CsRefactoringCommand {
    * for details on how the diagnostics are filtered.
    * @returns
    */
-  async requestRefactoring(
-    context: vscode.ExtensionContext,
+  async requestAndShowRefactoring(
     document: vscode.TextDocument,
     refactorInitializationRange: vscode.Range | vscode.Selection,
     diagnostics: vscode.Diagnostic[]
@@ -62,7 +87,7 @@ export class CsRefactoringCommand {
     this.abortController = new AbortController(); // New abort controller for the new request
     console.log(`CodeScene: Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
 
-    const extensionUri = context.extensionUri;
+    const extensionUri = this.context.extensionUri;
     RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor });
     this.csRestApi
       .fetchRefactoring(diagnostic, fnToRefactor, this.abortController.signal)
@@ -83,6 +108,76 @@ export class CsRefactoringCommand {
           response: err.message,
         });
       });
+  }
+
+  async awaitAndShowRefactoring(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const diagnostic = diagnostics[0];
+    /* 
+    const editor = window.activeTextEditor;
+    const initiatorViewColumn = editor?.viewColumn;
+ */
+
+    //     RefactoringPanel.createOrShow({ extensionUri: this.context.extensionUri, document, initiatorViewColumn, fnToRefactor });
+    console.log('Awaiting refactoring for ' + keyStr(diagnostic));
+    const request = CsRefactoringRequests.get(diagnostic);
+    if (!request) {
+      console.log('CodeScene: Request was not initiated properly. (no function to refactor?)');
+      return;
+    }
+
+    const { fnToRefactor, refactorResponse } = request;
+
+    const editor = window.activeTextEditor;
+    if (editor) {
+      editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+      editor.revealRange(fnToRefactor.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }
+    const initiatorViewColumn = editor?.viewColumn;
+
+    // Present loading screen (should be brief now...)
+    RefactoringPanel.createOrShow({
+      extensionUri: this.context.extensionUri,
+      document,
+      initiatorViewColumn,
+      fnToRefactor,
+    });
+
+    const response = await refactorResponse;
+    // window.showInformationMessage('Refactoring promise resolved!');
+    RefactoringPanel.createOrShow({
+      extensionUri: this.context.extensionUri,
+      document,
+      initiatorViewColumn,
+      fnToRefactor,
+      response,
+    });
+  }
+
+  async refactoringRequest(
+    document: vscode.TextDocument,
+    diagnostic: vscode.Diagnostic
+  ): Promise<CsRefactoringRequest | undefined> {
+    const fnToRefactor = await findFunctionToRefactor(this.cliPath, document, diagnostic.range);
+    if (!fnToRefactor) {
+      console.error('CodeScene: Could not find a suitable function to refactor.');
+      window.showErrorMessage('Could not find a suitable function to refactor.');
+      return;
+    }
+
+    console.log(`CodeScene: Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
+
+    const refactorResponse = this.csRestApi
+      .fetchRefactoring(diagnostic, fnToRefactor)
+      .catch((err: Error | AxiosError) => {
+        let msg = `CodeScene: Refactoring error: ${err.message}`;
+        if (err instanceof AxiosError) {
+          msg = `CodeScene: Refactoring error: [${err.code}] ${err.message}`;
+        }
+        console.log(msg);
+        return msg;
+      });
+
+    return { fnToRefactor, refactorResponse };
   }
 }
 
