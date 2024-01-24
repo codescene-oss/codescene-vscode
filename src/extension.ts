@@ -20,6 +20,7 @@ import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { name as refactoringCommandName, CsRefactoringCommand } from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
+import { isDefined } from './utils';
 
 interface CsContext {
   cliPath: string;
@@ -182,11 +183,32 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   context.subscriptions.push(fileSystemWatcher);
 }
 
+/**
+ * Maps the preflight response file extensions to langauge identifiers supported by vscode.
+ * https://code.visualstudio.com/docs/languages/identifiers#_known-language-identifiers
+ */
+function fileTypeToLanguageId(fileType: string) {
+  switch (fileType) {
+    case 'js':
+      return 'javascript';
+    case 'jsx':
+      return 'javascriptreact';
+    case 'ts':
+      return 'typescript';
+    case 'tsx':
+      return 'typescriptreact';
+  }
+}
+
 function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
-  const supportedLanguagesForRefactoring = capabilities.supported.languages.map((language) => ({
-    language,
-    scheme: 'file',
-  }));
+  const supportedLanguagesForRefactoring = capabilities.supported['file-types']
+    .map(fileTypeToLanguageId)
+    .filter(isDefined)
+    .map((language) => ({
+      language,
+      scheme: 'file',
+    }));
+
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       supportedLanguagesForRefactoring,
