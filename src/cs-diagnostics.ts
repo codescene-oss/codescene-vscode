@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
 import Reviewer, { ReviewOpts } from './review/reviewer';
+import { refactoringRequestCmdName } from './refactoring/command';
+import { RefactorResponse } from './cs-rest-api';
+import CsRefactoringRequests, { CsRefactoringRequest } from './refactoring/cs-refactoring-requests';
+import { keyStr } from './utils';
 
 export default class CsDiagnosticsCollection {
   private static _instance: vscode.DiagnosticCollection;
@@ -10,8 +14,9 @@ export default class CsDiagnosticsCollection {
       context.subscriptions.push(CsDiagnosticsCollection._instance);
     }
   }
-  static get instance(): vscode.DiagnosticCollection {
-    return CsDiagnosticsCollection._instance;
+
+  static set(uri: vscode.Uri, diagnostics: vscode.Diagnostic[]) {
+    CsDiagnosticsCollection._instance.set(uri, diagnostics);
   }
 }
 
@@ -26,10 +31,30 @@ export class CsDiagnostics {
     if (document.uri.scheme !== 'file' || !this.supportedLanguages.includes(document.languageId)) {
       return;
     }
-    Reviewer.instance.review(document, reviewOpts).then((diagnostics) => {
-      // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-      const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
-      CsDiagnosticsCollection.instance.set(document.uri, importantDiagnostics);
-    });
+    Reviewer.instance
+      .review(document, reviewOpts)
+      .then((diagnostics) => {
+        // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+        const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
+        CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
+        preInitiateRefactoringRequests(document, importantDiagnostics);
+      })
+      .catch((_err) => {
+        // Empty catch to avoid unhandled promise rejection when a previous review command is aborted by the executor
+      });
   }
+}
+
+async function preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+  const refactorableDiagnostics = diagnostics.filter((d) => d.message.startsWith('✨'));
+  refactorableDiagnostics.forEach(async (d) => {
+    console.log(`CodeScene: Send refac request for "${keyStr(d)}"`);
+    // Return object with some diagnostic key and the promise?
+    const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(
+      refactoringRequestCmdName,
+      document,
+      d
+    );
+    CsRefactoringRequests.add(d, cmdResult);
+  });
 }

@@ -1,3 +1,4 @@
+import { Diagnostic } from 'vscode';
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 
@@ -80,4 +81,14 @@ export async function getLogoUrl(extensionPath: string): Promise<string> {
     logoUrl = data.toString('base64');
   }
   return logoUrl;
+}
+
+/**
+ * Common unique diagnostic string representation
+ * @param diagnostic
+ * @returns 
+ */
+export function keyStr(diagnostic: Diagnostic) {
+  const keyStr = `${diagnostic.message} [${diagnostic.range.start.line}:${diagnostic.range.start.character}->${diagnostic.range.end.line}:${diagnostic.range.end.character}]`;
+  return keyStr;
 }
