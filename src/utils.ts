@@ -25,8 +25,8 @@ export function getFileNameWithoutExtension(filename: string) {
   return filename.slice(0, index > 0 ? index : filename.length);
 }
 
-export function isDefined<T>(value: T | undefined): value is T {
-  return value !== undefined;
+export function isDefined<T>(value: T | null |undefined): value is T {
+  return value !== undefined && value !== null;
 }
 
 export function groupByProperty<T>(arr: T[], property: keyof T): { [k: string]: T[] } {
