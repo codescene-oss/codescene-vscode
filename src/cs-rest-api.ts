@@ -17,6 +17,7 @@ export interface Coupling {
 export interface PreFlightResponse {
   supported: {
     languages: string[];
+    'file-types': string[];
     'code-smells': string[];
   };
   'max-input-tokens': number;
