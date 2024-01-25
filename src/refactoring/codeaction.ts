@@ -50,6 +50,6 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
       arguments: [document, supportedCsDiagnostics],
     };
 
-    return [synchronizedRefactorAction, refacAction];
+    return [/* synchronizedRefactorAction,  */refacAction];
   }
 }
