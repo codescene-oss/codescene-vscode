@@ -263,15 +263,20 @@ export class RefactoringPanel {
       </p>  
       ${reasonsContent}
       <h4>Proposed refactoring</h4>
+      <div class="top-controls">
+        <vscode-button id="diff-button" aria-label="Show diff">
+          Show diff
+          <span slot="start" class="codicon codicon-diff"></span>
+        </vscode-button>
+        <vscode-checkbox id="toggle-apply">Toggle preview</vscode-checkbox>
+      </div>
       <div class="code-container">
         <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
           <span class="codicon codicon-clippy"></span>
         </vscode-button>
         ${mdRenderedCode}
       </div>
-      <vscode-checkbox id="toggle-apply">Toggle preview</vscode-checkbox>
       <div class="buttons">
-        <vscode-button id="diff-button" appearance="secondary" aria-label="Show diff">Show diff</vscode-button>
         <vscode-button id="reject-button" appearance="${
           acceptDefault ? 'secondary' : 'primary'
         }" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>

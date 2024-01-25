@@ -16,6 +16,12 @@ h2 {
   right: 0.5em;
 }
 
+.top-controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 0.8em;
+}
+
 .buttons {
   display: inline;
   float: right;
