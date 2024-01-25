@@ -26,12 +26,12 @@ export interface ReviewOpts {
 
 export interface IReviewer {
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
-  setSupportedRefactoringSmells(languages?: string[]): void;
+  setSupportedRefactoringSmells(codeSmells?: string[]): void;
 }
 
 class SimpleReviewer implements IReviewer {
   private readonly executor: LimitingExecutor = new LimitingExecutor();
-  private supportedAiLanguages?: string[];
+  private supportedCodeSmells?: string[];
 
   constructor(private cliPath: string) {}
 
@@ -59,7 +59,7 @@ class SimpleReviewer implements IReviewer {
 
       const data = JSON.parse(stdout) as ReviewResult;
       let diagnostics = data.review.flatMap((reviewIssue) =>
-        reviewIssueToDiagnostics(reviewIssue, document, this.supportedAiLanguages)
+        reviewIssueToDiagnostics(reviewIssue, document, this.supportedCodeSmells)
       );
 
       if (data.score > 0) {
@@ -79,7 +79,7 @@ class SimpleReviewer implements IReviewer {
   }
 
   setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
-    this.supportedAiLanguages = codeSmells;
+    this.supportedCodeSmells = codeSmells;
   }
 }
 
