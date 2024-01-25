@@ -263,17 +263,10 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
 
 async function enableRefactoringCommand(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath } = csContext;
-  const refactorCapabilities: void | PreFlightResponse = /* {
-    supported: {
-      'code-smells': ['Complex Conditional', 'Bumpy Road Ahead'],
-      languages: ['javascript', 'typescript'],
-      'file-types': ['js', 'jsx', 'ts', 'tsx'],
-    },
-    'max-input-tokens': 3,
-  }; */
-   await csRestApi.fetchRefactorPreflight();
+  const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported['code-smells']);
+    csDiagnostics.setSupportedCodeSmells(refactorCapabilities.supported['code-smells']);
 
     // Force update diagnosticCollection to show the supported code smells indication
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
