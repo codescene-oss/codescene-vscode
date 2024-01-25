@@ -112,16 +112,10 @@ export class CsRefactoringCommand {
 
   async awaitAndShowRefactoring(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
     const diagnostic = diagnostics[0];
-    /* 
-    const editor = window.activeTextEditor;
-    const initiatorViewColumn = editor?.viewColumn;
- */
-
-    //     RefactoringPanel.createOrShow({ extensionUri: this.context.extensionUri, document, initiatorViewColumn, fnToRefactor });
-    console.log('Awaiting refactoring for ' + keyStr(diagnostic));
     const request = CsRefactoringRequests.get(diagnostic);
     if (!request) {
       console.log('CodeScene: Request was not initiated properly. (no function to refactor?)');
+      // A user facing message should already have been shown in refactoringRequest()
       return;
     }
 
@@ -134,16 +128,14 @@ export class CsRefactoringCommand {
     }
     const initiatorViewColumn = editor?.viewColumn;
 
-    // Present loading screen (should be brief now...)
+    // Present loading screen
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
       document,
       initiatorViewColumn,
       fnToRefactor,
     });
-
     const response = await refactorResponse;
-    // window.showInformationMessage('Refactoring promise resolved!');
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
       document,
@@ -164,20 +156,20 @@ export class CsRefactoringCommand {
       return;
     }
 
-    console.log(`CodeScene: Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
-
+    console.log(`CodeScene: ✨ Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
+    const abortController = new AbortController();
     const refactorResponse = this.csRestApi
-      .fetchRefactoring(diagnostic, fnToRefactor)
+      .fetchRefactoring(diagnostic, fnToRefactor, abortController.signal)
       .catch((err: Error | AxiosError) => {
-        let msg = `CodeScene: Refactoring error: ${err.message}`;
+        let msg = `Refactoring error: ${err.message}`;
         if (err instanceof AxiosError) {
-          msg = `CodeScene: Refactoring error: [${err.code}] ${err.message}`;
+          msg = `Refactoring error: [${err.code}] ${err.message}`;
         }
-        console.log(msg);
+        console.log(`CodeScene: ${msg}`);
         return msg;
       });
 
-    return { fnToRefactor, refactorResponse };
+    return { fnToRefactor, abortController, refactorResponse };
   }
 }
 

@@ -24,7 +24,7 @@ function issueToRange(category: string, issue: IssueDetails, document: vscode.Te
 export function reviewIssueToDiagnostics(
   reviewIssue: ReviewIssue,
   document: vscode.TextDocument,
-  supportedAiLanguages?: string[]
+  supportedCodeSmells?: string[]
 ) {
   if (!reviewIssue.functions) {
     return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue)];
@@ -40,7 +40,7 @@ export function reviewIssueToDiagnostics(
       description = reviewIssue.category;
     }
 
-    if (supportedAiLanguages && supportedAiLanguages.includes(reviewIssue.category)) {
+    if (supportedCodeSmells && supportedCodeSmells.includes(reviewIssue.category)) {
       description = `✨ ${description}`;
     }
 
