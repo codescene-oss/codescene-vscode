@@ -164,7 +164,12 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   // For live updates, we debounce the runs to avoid consuming too many resources.
   const debouncedRun = debounce(csDiagnostics.review.bind(csDiagnostics), 2000);
   context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => debouncedRun(e.document))
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+      // avoid debouncing 'output' documents etc.
+      if (e.document.uri.scheme === 'file') {
+        debouncedRun(e.document);
+      }
+    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
