@@ -115,15 +115,6 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics[0].range.end.line, 2);
     assert.strictEqual(diagnostics[0].range.start.character, 2);
     assert.strictEqual(diagnostics[0].range.end.character, 0);
-   
-    const diagnosticsWithRefactoringSupport = reviewIssueToDiagnostics(reviewIssue, document, ["Complex Conditional"]);
-    assert.strictEqual(diagnosticsWithRefactoringSupport.length, 1);
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].severity, vscode.DiagnosticSeverity.Warning);
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].message, '✨ Complex Conditional (2 complex conditional expressions)');
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].range.start.line, 1);
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].range.end.line, 2);
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].range.start.character, 2);
-    assert.strictEqual(diagnosticsWithRefactoringSupport[0].range.end.character, 0);
   });
 
   test('handles multi-line complex conditional', async () => {

@@ -1,6 +1,6 @@
-import { Diagnostic } from 'vscode';
-import { join } from 'path';
 import { readFile } from 'fs/promises';
+import { join } from 'path';
+import { Diagnostic, Range } from 'vscode';
 
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
@@ -26,7 +26,7 @@ export function getFileNameWithoutExtension(filename: string) {
   return filename.slice(0, index > 0 ? index : filename.length);
 }
 
-export function isDefined<T>(value: T | null |undefined): value is T {
+export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== undefined && value !== null;
 }
 
@@ -84,11 +84,14 @@ export async function getLogoUrl(extensionPath: string): Promise<string> {
 }
 
 /**
- * Common unique diagnostic string representation
+ * Common unique string representation for a diagnostic.
  * @param diagnostic
- * @returns 
+ * @returns
  */
 export function keyStr(diagnostic: Diagnostic) {
-  const keyStr = `${diagnostic.message} [${diagnostic.range.start.line}:${diagnostic.range.start.character}->${diagnostic.range.end.line}:${diagnostic.range.end.character}]`;
-  return keyStr;
+  return `${diagnostic.message} ${rangeStr(diagnostic.range)}`;
+}
+
+export function rangeStr(range: Range) {
+  return `[${range.start.line}:${range.start.character}->${range.end.line}:${range.end.character}]`;
 }

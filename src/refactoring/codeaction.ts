@@ -1,14 +1,16 @@
-import * as vscode from 'vscode';
-import { awaitAndShowRefactoringCmdName, requestAndShowRefactoringCmdName } from './command';
+import vscode, { CodeActionKind } from 'vscode';
+import { RefactorResponse } from '../cs-rest-api';
+import { isDefined } from '../utils';
+import { FnToRefactor, commandFromLevel } from './command';
+import CsRefactoringRequests from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
-  private supportedCodeSmells: string[];
+  public static readonly providedCodeActionKinds = [
+    CodeActionKind.QuickFix,
+    CodeActionKind.Empty,
+  ];
 
-  public static readonly providedCodeActionKinds = [vscode.CodeActionKind.RefactorRewrite];
-
-  public constructor(supportedCodeSmells: string[]) {
-    this.supportedCodeSmells = supportedCodeSmells;
-  }
+  public constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {}
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -16,40 +18,45 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const supportedCsDiagnostics = context.diagnostics
-      .filter((d: vscode.Diagnostic) => d.source === 'CodeScene')
-      .filter((d: vscode.Diagnostic) => {
-        if (typeof d.code === 'object') {
-          return this.supportedCodeSmells.includes(d.code.value.toString());
+    const codeActions = context.diagnostics
+      .filter(this.codeSmellFilter)
+      .map((diagnostic) => {
+        const refacRequest = CsRefactoringRequests.get(diagnostic);
+        if (!refacRequest?.resolvedResponse) {
+          return;
         }
-        return false;
-      });
+        const response = refacRequest.resolvedResponse;
+        const fnToRefactor = refacRequest.fnToRefactor;
+        return toCodeAction(document, response, fnToRefactor);
+      })
+      .filter(isDefined);
 
-    if (supportedCsDiagnostics.length <= 0) return;
-
-    // TODO - get the RefactoringRequest from our map, and if it's done we could show different types of code actions!
-
-    const syncRefactorCommand = {
-      command: requestAndShowRefactoringCmdName,
-      title: 'CodeScene Refactor', // Unclear where this is shown in the UI
-      tooltip: 'Refactor this code using the CodeScene AI Refactoring service',
-      arguments: [document, range, supportedCsDiagnostics],
-    };
-
-    const synchronizedRefactorAction = new vscode.CodeAction(
-      'CodeScene Refactor',
-      vscode.CodeActionKind.RefactorRewrite
-    );
-    synchronizedRefactorAction.command = syncRefactorCommand;
-
-    const refacAction = new vscode.CodeAction('CodeScene Prefactor', vscode.CodeActionKind.RefactorRewrite);
-    refacAction.command = {
-      command: awaitAndShowRefactoringCmdName,
-      title: 'CodeScene Prefactor',
-      tooltip: 'Refactor this code using the CodeScene AI Refactoring service',
-      arguments: [document, supportedCsDiagnostics],
-    };
-
-    return [/* synchronizedRefactorAction,  */refacAction];
+    return codeActions;
   }
+}
+
+function toCodeAction(document: vscode.TextDocument, response: RefactorResponse, fnToRefactor: FnToRefactor) {
+  const {
+    confidence: { level },
+  } = response;
+
+  let codeActionKind;
+  let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: response });
+
+  switch (level) {
+    case 3:
+    case 2:
+      codeActionKind = CodeActionKind.QuickFix;
+      break;
+    case 1:
+      codeActionKind = CodeActionKind.Empty;
+      break;
+    default:
+      // No code action!
+      return;
+  }
+
+  const codeAction = new vscode.CodeAction(command.title, codeActionKind);
+  codeAction.command = command;
+  return codeAction;
 }

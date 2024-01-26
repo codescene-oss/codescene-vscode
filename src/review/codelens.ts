@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
-import { getConfiguration } from './configuration';
-import { logOutputChannel, outputChannel } from './log';
-import Reviewer from './review/reviewer';
+import { getConfiguration } from '../configuration';
+import { logOutputChannel, outputChannel } from '../log';
+import Reviewer from './reviewer';
+import { keyStr } from '../utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
  */
-export class CsCodeLens extends vscode.CodeLens {
+export class CsReviewCodeLens extends vscode.CodeLens {
   readonly diagnostic: vscode.Diagnostic;
 
   constructor(range: vscode.Range, diagnostic: vscode.Diagnostic, command?: vscode.Command) {
@@ -15,11 +16,11 @@ export class CsCodeLens extends vscode.CodeLens {
   }
 }
 
-export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
+export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsReviewCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
 
   constructor() {
-    outputChannel.appendLine('Creating CodeLens provider');
+    outputChannel.appendLine('Creating Review CodeLens provider');
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
@@ -27,8 +28,6 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
-    logOutputChannel.debug('Providing CodeLenses for ' + document.fileName);
-
     // Return empty set if code lenses are disabled.
     if (!getConfiguration('enableCodeLenses')) {
       return [];
@@ -41,17 +40,12 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
       return [];
     }
 
-    const lenses = [];
-    for (const diagnostic of diagnostics) {
-      const range = diagnostic.range;
-      const lens = new CsCodeLens(range, diagnostic);
-      lenses.push(lens);
-    }
-
-    return lenses;
+    return diagnostics.map((d)=> new CsReviewCodeLens(d.range, d));
   }
 
-  resolveCodeLens?(codeLens: CsCodeLens, token: vscode.CancellationToken): vscode.ProviderResult<CsCodeLens> {
+  resolveCodeLens?(codeLens: CsReviewCodeLens, token: vscode.CancellationToken): vscode.ProviderResult<CsReviewCodeLens> {
+    logOutputChannel.debug('Resolving Review CodeLenses for ' + keyStr(codeLens.diagnostic));
+
     codeLens.command = {
       title: codeLens.diagnostic.message,
       command: 'codescene.openDocsForDiagnostic',
