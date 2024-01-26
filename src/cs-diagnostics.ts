@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import Reviewer, { ReviewOpts } from './review/reviewer';
-import { refactoringRequestCmdName } from './refactoring/command';
+import { requestRefactoringCmdName } from './refactoring/command';
 import CsRefactoringRequests, { CsRefactoringRequest } from './refactoring/cs-refactoring-requests';
-import { isDefined, keyStr } from './utils';
+import Reviewer, { ReviewOpts } from './review/reviewer';
+import { isDefined } from './utils';
 
 export default class CsDiagnosticsCollection {
   private static _instance: vscode.DiagnosticCollection;
@@ -44,7 +44,7 @@ export class CsDiagnostics {
         CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
         this.preInitiateRefactoringRequests(document, importantDiagnostics);
       })
-      .catch((_err) => {
+      .catch((err) => {
         // Empty catch to avoid unhandled promise rejection when a previous review command is aborted by the executor
       });
   }
@@ -57,7 +57,7 @@ export class CsDiagnostics {
     refactorableDiagnostics.forEach(async (d) => {
       // Return object with some diagnostic key and the promise?
       const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(
-        refactoringRequestCmdName,
+        requestRefactoringCmdName,
         document,
         d
       );

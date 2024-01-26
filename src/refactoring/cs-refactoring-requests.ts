@@ -1,12 +1,43 @@
 import { Diagnostic } from 'vscode';
-import { RefactorResponse } from '../cs-rest-api';
-import { keyStr } from '../utils';
+import { CsRestApi, RefactorResponse } from '../cs-rest-api';
+import { keyStr, rangeStr } from '../utils';
 import { FnToRefactor } from './command';
+import { AxiosError } from 'axios';
+import { logOutputChannel } from '../log';
 
-export interface CsRefactoringRequest {
+export class CsRefactoringRequest {
+  resolvedResponse?: RefactorResponse;
+  refactorResponse?: Promise<RefactorResponse | string>;
   fnToRefactor: FnToRefactor;
-  abortController: AbortController;
-  refactorResponse: Promise<RefactorResponse | string>;
+  private abortController: AbortController;
+
+  constructor(csRestApi: CsRestApi, diagnostic: Diagnostic, fnToRefactor: FnToRefactor) {
+    this.fnToRefactor = fnToRefactor;
+    this.abortController = new AbortController();
+    this.refactorResponse = csRestApi
+      .fetchRefactoring(diagnostic, fnToRefactor, this.abortController.signal)
+      .then((response) => {
+        logOutputChannel.info(
+          `Refactor response for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}: ${JSON.stringify(
+            response.confidence
+          )}`
+        );
+        this.resolvedResponse = response;
+        return response;
+      })
+      .catch((err: Error | AxiosError) => {
+        let msg = err.message;
+        if (err instanceof AxiosError) {
+          msg = `[${err.code}] ${err.message}`;
+        }
+        logOutputChannel.error(`Refactor response error: ${msg} for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`);
+        return msg;
+      });
+  }
+
+  abort() {
+    this.abortController.abort();
+  }
 }
 
 export default class CsRefactoringRequests {
@@ -15,7 +46,7 @@ export default class CsRefactoringRequests {
   private static interalAbort(key: string) {
     const request = CsRefactoringRequests.map[key];
     if (request) {
-      request.abortController.abort();
+      request.abort();
     }
   }
 

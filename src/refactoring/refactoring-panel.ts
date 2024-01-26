@@ -7,7 +7,7 @@ import vscode, {
   Uri,
   ViewColumn,
   WebviewPanel,
-  WorkspaceEdit
+  WorkspaceEdit,
 } from 'vscode';
 import { RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
@@ -189,17 +189,18 @@ export class RefactoringPanel {
 
     const range = fnToRefactor.range;
     let content = this.loadingContent();
+    let title = 'Refactoring...';
     switch (typeof response) {
       case 'string':
         this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn };
         content = this.errorContent(response);
+        title = 'Refactoring error';
         break;
       case 'object':
         let { code, reasons, confidence } = response;
         code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
         this.currentRefactorState = { document, code, range, initiatorViewColumn };
-
-        content = await this.refactoringSuggestionContent(confidence, reasons, code, document.languageId);
+        ({ content, title } = await this.refactoringSuggestionContent(confidence, reasons, code, document.languageId));
         break;
     }
 
@@ -218,7 +219,7 @@ export class RefactoringPanel {
 
     <body>
         <script type="module" nonce="${nonce}" src="${webviewScript}"></script>
-        <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; Refactoring recommendation</h1>
+        <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
         ${content}
     </body>
 
@@ -240,7 +241,7 @@ export class RefactoringPanel {
       level,
       'recommended-action': { details: actionDetails, description: action },
     } = confidence;
-    const acceptDefault = level >= 2;
+    const acceptDefault = level === 3;
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
       'markdown.api.render',
@@ -257,7 +258,23 @@ export class RefactoringPanel {
         <ul>${reasonText}</ul>
       `;
     }
-    return /*html*/ `
+    let title; // Maybe provide these from the service?
+    switch (level) {
+      case 3:
+        title = 'Refactoring recommendation';
+        break;
+      case 2:
+        title = 'Refactoring suggestion';
+        break;
+      case 1:
+        title = 'Code Improvement Guide';
+        break;
+      default:
+        title = 'Refactoring';
+        break;
+    }
+
+    const content = /*html*/ `
       <p> 
         <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
       </p>  
@@ -283,8 +300,8 @@ export class RefactoringPanel {
         <vscode-button id="apply-button" appearance="${
           acceptDefault ? 'primary' : 'secondary'
         }" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
-      </div>
-  `;
+      </div>`;
+    return { content, title };
   }
 
   private loadingContent() {
