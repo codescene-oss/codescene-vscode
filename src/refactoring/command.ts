@@ -1,11 +1,10 @@
-import vscode, { DocumentSymbol, SymbolKind, TextDocument, Uri, commands, window } from 'vscode';
-import { RefactoringPanel } from './refactoring-panel';
-import { CsRestApi, RefactorRequest, RefactorResponse } from '../cs-rest-api';
 import axios, { AxiosError } from 'axios';
+import vscode, { TextDocument, window } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { env } from 'process';
+import { CsRestApi } from '../cs-rest-api';
+import { logOutputChannel } from '../log';
 import CsRefactoringRequests, { CsRefactoringRequest } from './cs-refactoring-requests';
-import { keyStr } from '../utils';
+import { RefactoringPanel } from './refactoring-panel';
 
 export const refactoringRequestCmdName = 'codescene.refactoringRequest';
 export const awaitAndShowRefactoringCmdName = 'codescene.awaitAndShowRefactoring';
@@ -69,7 +68,7 @@ export class CsRefactoringCommand {
     const diagnostic = diagnostics[0];
     const fnToRefactor = await findFunctionToRefactor(this.cliPath, document, diagnostic.range);
     if (!fnToRefactor) {
-      console.error('CodeScene: Could not find a suitable function to refactor.');
+      logOutputChannel.error('Could not find a suitable function to refactor.');
       window.showErrorMessage('Could not find a suitable function to refactor.');
       return;
     }
@@ -85,7 +84,7 @@ export class CsRefactoringCommand {
     if (this.abortController) this.abortController.abort();
 
     this.abortController = new AbortController(); // New abort controller for the new request
-    console.log(`CodeScene: Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
+    logOutputChannel.debug(`Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
 
     const extensionUri = this.context.extensionUri;
     RefactoringPanel.createOrShow({ extensionUri, document, initiatorViewColumn, fnToRefactor });
@@ -96,7 +95,7 @@ export class CsRefactoringCommand {
       })
       .catch((err: Error | AxiosError) => {
         if (err instanceof AxiosError && axios.isCancel(err)) {
-          console.log('CodeScene: Previous refactor request cancelled.');
+          logOutputChannel.debug('Previous refactor request cancelled.');
           return;
         }
 
@@ -114,7 +113,7 @@ export class CsRefactoringCommand {
     const diagnostic = diagnostics[0];
     const request = CsRefactoringRequests.get(diagnostic);
     if (!request) {
-      console.log('CodeScene: Request was not initiated properly. (no function to refactor?)');
+      logOutputChannel.warn('Request was not initiated properly. (no function to refactor?)');
       // A user facing message should already have been shown in refactoringRequest()
       return;
     }
@@ -135,6 +134,9 @@ export class CsRefactoringCommand {
       initiatorViewColumn,
       fnToRefactor,
     });
+
+    // TODO - handle initiating another awaitAndShowRefactoring command while one is already running
+
     const response = await refactorResponse;
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
@@ -156,7 +158,9 @@ export class CsRefactoringCommand {
       return;
     }
 
-    console.log(`CodeScene: ✨ Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`);
+    logOutputChannel.info(
+      `✨ Requesting refactoring suggestion for "${fnToRefactor.name}" from CodeScene's AI service`
+    );
     const abortController = new AbortController();
     const refactorResponse = this.csRestApi
       .fetchRefactoring(diagnostic, fnToRefactor, abortController.signal)
@@ -165,7 +169,7 @@ export class CsRefactoringCommand {
         if (err instanceof AxiosError) {
           msg = `Refactoring error: [${err.code}] ${err.message}`;
         }
-        console.log(`CodeScene: ${msg}`);
+        logOutputChannel.error(`Refactor response error: ${msg}`);
         return msg;
       });
 

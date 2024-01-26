@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import * as vscode from 'vscode';
-import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import { AUTH_TYPE } from './auth/auth-provider';
-import { outputChannel } from './log';
-import { getServerApiUrl } from './configuration';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import * as vscode from 'vscode';
+import { AUTH_TYPE } from './auth/auth-provider';
+import { getServerApiUrl } from './configuration';
+import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/command';
 
 interface Coupling {
@@ -76,42 +76,41 @@ export class CsRestApi {
       }
     };
 
-    this.axiosInstance.interceptors.request.use(
-      async (config: InternalAxiosRequestConfig) => {
-        const baseUrl = getServerApiUrl() + '/v2/devtools';
-        await conditionalAddConfig(baseUrl, config);
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
+    this.axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+      logOutputChannel.debug(`[${config.method}] ${config.url}`);
+      const baseUrl = getServerApiUrl() + '/v2/devtools';
+      await conditionalAddConfig(baseUrl, config);
+      return config;
+    });
+
+    const logResponse = (response: AxiosResponse) => {
+      const { config, status, statusText } = response;
+      logOutputChannel.debug(`${config.url} [${status}] ${statusText}`);
+      return response;
+    };
+
+    this.axiosInstance.interceptors.response.use(logResponse, logAxiosError);
 
     this.refactoringAxiosInstance = axios.create({
       timeout: 60000,
     });
 
-    this.refactoringAxiosInstance.interceptors.request.use(
-      async (config: InternalAxiosRequestConfig) => {
-        const baseUrl = getServerApiUrl() + '/v2/refactor';
-        await conditionalAddConfig(baseUrl, config);
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
+    this.refactoringAxiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+      logOutputChannel.debug(`[${config.method}] ${config.url}`);
+      const baseUrl = getServerApiUrl() + '/v2/refactor';
+      await conditionalAddConfig(baseUrl, config);
+      return config;
+    });
+    this.refactoringAxiosInstance.interceptors.response.use(logResponse, logAxiosError);
   }
 
   private async fetchJson<T>(url: string) {
     const response = await this.axiosInstance.get(url);
-    outputChannel.appendLine(`GET ${url} [${response.status}]`);
     return response.data as T;
   }
 
   private async refactoringPostJson<T>(url: string, data: RefactorRequest, config: AxiosRequestConfig) {
     const response = await this.refactoringAxiosInstance.post(url, data, config);
-    outputChannel.appendLine(`POST ${url} [${response.status}]`);
     return response.data as T;
   }
 
@@ -180,14 +179,28 @@ export class CsRestApi {
     const refactorUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
     return this.refactoringAxiosInstance.get(refactorUrl).then(
       (response) => {
-        outputChannel.appendLine(`GET ${refactorUrl} [${response.status}]`);
         return response.data as PreFlightResponse;
       },
       (error) => {
         const { message } = error;
-        outputChannel.appendLine(`GET ${refactorUrl} [${error.code}] ${message}`);
+        outputChannel.appendLine(`Unable to fetch refactoring capabilities. ${message}`);
         vscode.window.showErrorMessage(`Unable to fetch refactoring capabilities. ${message}`);
       }
     );
   }
+}
+
+export function logAxiosError(error: any) {
+  if (error.response) {
+    const { config, status, statusText } = error.response;
+    // The request was made and the server responded with a status code != 2xx
+    logOutputChannel.error(`[${config.method}] ${config.url} [${status}] ${statusText}`);
+  } else if (error.request) {
+    // The request was made but no response was received
+    logOutputChannel.error(`Error in request ${JSON.stringify(error.request)} - no response received`);
+  } else {
+    // Something happened in setting up the request that triggered an Error
+    logOutputChannel.error(`Request error: ${error.message}`);
+  }
+  return Promise.reject(error);
 }
