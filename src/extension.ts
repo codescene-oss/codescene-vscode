@@ -17,11 +17,7 @@ import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
-import {
-  refactoringRequestCmdName,
-  requestAndShowRefactoringCmdName,
-  CsRefactoringCommand,
-} from './refactoring/command';
+import { CsRefactoringCommand } from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { isDefined } from './utils';
@@ -38,7 +34,7 @@ interface CsContext {
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('CodeScene: Activating extension!');
+  outputChannel.appendLine('Activating extension...');
 
   const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
   const csRestApi = new CsRestApi();
@@ -89,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
     StatsCollector.instance.clear();
   }, 1800 * 1000);
 
-  console.log('CodeScene: Extension is now active!');
+  outputChannel.appendLine('Extension is now active!');
 }
 
 function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
@@ -168,7 +164,12 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   // For live updates, we debounce the runs to avoid consuming too many resources.
   const debouncedRun = debounce(csDiagnostics.review.bind(csDiagnostics), 2000);
   context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => debouncedRun(e.document))
+    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+      // avoid debouncing 'output' documents etc.
+      if (e.document.uri.scheme === 'file') {
+        debouncedRun(e.document);
+      }
+    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
@@ -242,6 +243,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   // Init tree view in explorer container
   const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
   context.subscriptions.push(explorerCouplingsView);
+  outputChannel.appendLine('Change Coupling enabled');
 
   // Refactoring features
   const enableAiRefactoring = getConfiguration('enableAiRefactoring');
@@ -285,6 +287,7 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
     context.subscriptions.push(
       vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider)
     );
+    outputChannel.appendLine('AI refactoring features enabled');
   }
 }
 

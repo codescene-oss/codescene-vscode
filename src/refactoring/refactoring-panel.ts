@@ -1,6 +1,5 @@
 import vscode, {
   Disposable,
-  DocumentSymbol,
   Range,
   Selection,
   TextDocument,
@@ -8,11 +7,12 @@ import vscode, {
   Uri,
   ViewColumn,
   WebviewPanel,
-  WorkspaceEdit,
+  WorkspaceEdit
 } from 'vscode';
+import { RefactorConfidence, RefactorResponse } from '../cs-rest-api';
+import { logOutputChannel } from '../log';
 import { getLogoUrl } from '../utils';
 import { FnToRefactor } from './command';
-import { RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 
 interface CurrentRefactorState {
   range: Range; // Range of code to be refactored
@@ -53,7 +53,7 @@ export class RefactoringPanel {
     this.webViewPanel.webview.onDidReceiveMessage(
       async (message) => {
         if (!this.currentRefactorState) {
-          console.log('No current refactoring state');
+          logOutputChannel.info('No current refactoring state');
           return;
         }
         const refactoringState = this.currentRefactorState;

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import Reviewer from './review/reviewer';
 import { getConfiguration } from './configuration';
+import { logOutputChannel, outputChannel } from './log';
+import Reviewer from './review/reviewer';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -18,7 +19,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
 
   constructor() {
-    console.log('CodeScene: creating CodeLens provider');
+    outputChannel.appendLine('Creating CodeLens provider');
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
@@ -26,7 +27,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
-    console.log('CodeScene: providing CodeLenses for ' + document.fileName);
+    logOutputChannel.debug('Providing CodeLenses for ' + document.fileName);
 
     // Return empty set if code lenses are disabled.
     if (!getConfiguration('enableCodeLenses')) {
@@ -36,7 +37,7 @@ export class CsCodeLensProvider implements vscode.CodeLensProvider<CsCodeLens> {
     const diagnostics = await Reviewer.instance.review(document);
 
     if (!diagnostics || diagnostics.length === 0) {
-      console.log('CodeScene: no diagnostics for ' + document.fileName);
+      logOutputChannel.debug('No diagnostics for ' + document.fileName);
       return [];
     }
 
