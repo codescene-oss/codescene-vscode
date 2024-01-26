@@ -6,6 +6,7 @@ import { AUTH_TYPE } from './auth/auth-provider';
 import { getServerApiUrl } from './configuration';
 import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/command';
+import { rangeStr } from './utils';
 
 export interface Coupling {
   entity: string;
@@ -21,6 +22,7 @@ export interface PreFlightResponse {
     'code-smells': string[];
   };
   'max-input-tokens': number;
+  'max-input-loc': number;
 }
 
 interface Review {
@@ -164,6 +166,9 @@ export class CsRestApi {
       body: fnToRefactor.content,
     };
     const request: RefactorRequest = { review: [review], 'source-snippet': sourceSnippet };
+    logOutputChannel.info(
+      `Refactor request: [traceId ${traceId}] for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`
+    );
     return await this.refactoringPostJson<RefactorResponse>(refactorUrl, request, config);
   }
 

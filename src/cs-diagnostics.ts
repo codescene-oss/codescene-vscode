@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
-import Reviewer, { ReviewOpts } from './review/reviewer';
-import { refactoringRequestCmdName } from './refactoring/command';
+import { requestRefactoringCmdName } from './refactoring/command';
 import CsRefactoringRequests, { CsRefactoringRequest } from './refactoring/cs-refactoring-requests';
-import { isDefined, keyStr } from './utils';
+import Reviewer, { ReviewOpts } from './review/reviewer';
+import { isDefined } from './utils';
+
+export const csSource = 'CodeScene';
+export const csRefactorableSource = 'CodeScene AutoRefactor';
 
 export default class CsDiagnosticsCollection {
   private static _instance: vscode.DiagnosticCollection;
@@ -23,12 +26,12 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  private supportedCodeSmells: string[] | undefined;
+  private codeSmellFilter: ((d: vscode.Diagnostic) => boolean) | undefined;
 
   constructor(private supportedLanguages: string[]) {}
 
-  setSupportedCodeSmells(supportedCodeSmells?: string[]) {
-    this.supportedCodeSmells = supportedCodeSmells;
+  setCodeSmellFilter(codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
+    this.codeSmellFilter = codeSmellFilter;
   }
 
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
@@ -44,20 +47,18 @@ export class CsDiagnostics {
         CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
         this.preInitiateRefactoringRequests(document, importantDiagnostics);
       })
-      .catch((_err) => {
+      .catch((err) => {
         // Empty catch to avoid unhandled promise rejection when a previous review command is aborted by the executor
       });
   }
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (!isDefined(this.supportedCodeSmells)) return;
-    
-    // sparcle emoji implies that the diagnostic is a candidate for refactoring - see reviewIssueToDiagnostics() in review-utils.ts
-    const refactorableDiagnostics = diagnostics.filter((d) => d.message.startsWith('✨'));
-    refactorableDiagnostics.forEach(async (d) => {
+    if (!isDefined(this.codeSmellFilter)) return;
+
+    diagnostics.filter(this.codeSmellFilter).forEach(async (d) => {
       // Return object with some diagnostic key and the promise?
       const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(
-        refactoringRequestCmdName,
+        requestRefactoringCmdName,
         document,
         d
       );
