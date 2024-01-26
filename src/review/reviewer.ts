@@ -1,17 +1,18 @@
 import { dirname } from 'path';
 import * as vscode from 'vscode';
-import { getFileExtension } from '../utils';
-import { LimitingExecutor, SimpleExecutor } from '../executor';
-import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
-import { ReviewResult } from './model';
-import { StatsCollector } from '../stats';
 import { getConfiguration } from '../configuration';
+import { LimitingExecutor, SimpleExecutor } from '../executor';
+import { logOutputChannel, outputChannel } from '../log';
+import { StatsCollector } from '../stats';
+import { getFileExtension } from '../utils';
+import { ReviewResult } from './model';
+import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
 
 export default class Reviewer {
   private static _instance: IReviewer;
 
   static init(cliPath: string): void {
-    console.log('CodeScene: initializing reviewer');
+    outputChannel.appendLine('Initializing code Reviewer');
     Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(cliPath)));
   }
 
@@ -102,7 +103,7 @@ class CachingReviewer implements IReviewer {
     if (!reviewOpts.skipCache) {
       const cachedResults = this.reviewCache.get(document.fileName);
       if (cachedResults && cachedResults.documentVersion === document.version) {
-        console.log('CodeScene: returning cached diagnostics for ' + document.fileName);
+        logOutputChannel.debug(`Returning cached diagnostics for ${document.fileName}`);
         return cachedResults.diagnostics;
       }
     }

@@ -8,11 +8,11 @@
 //    the extension won't accidentally try to download it until it's been updated to support the new
 //    version.
 
-import { https } from 'follow-redirects';
-import * as path from 'path';
-import * as fs from 'fs';
 import extractZip from 'extract-zip';
-import { outputChannel } from './log';
+import { https } from 'follow-redirects';
+import * as fs from 'fs';
+import * as path from 'path';
+import { logOutputChannel, outputChannel } from './log';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -41,10 +41,7 @@ function getArtifactDownloadUrl(artifactName: string): URL {
 }
 
 async function unzipFile(zipFilePath: string, extensionPath: string, executablePath: string): Promise<void> {
-  console.log('Unzipping file');
   await extractZip(zipFilePath, { dir: extensionPath });
-
-  console.log('Clean up download');
   await fs.promises.unlink(zipFilePath);
 
   // The zip file contains a single file named "cs", or "cs.exe" on Windows.
@@ -54,13 +51,12 @@ async function unzipFile(zipFilePath: string, extensionPath: string, executableP
 }
 
 async function ensureExecutable(filePath: string) {
-  console.log('Ensuring file is executable');
   await fs.promises.chmod(filePath, '755');
 }
 
 function checkRemoteLastModifiedDate(url: URL) {
   // Issue a HTTP HEAD request to check the last-modified header of the artifact.
-  console.log(`CodeScene: checking last-modified header of ${url.href}...`);
+  logOutputChannel.debug(`Checking last-modified header of ${url.href}`);
 
   return new Promise<Date | null>((resolve) => {
     https.request(url, {method: 'HEAD'}, (response) => {
@@ -74,7 +70,7 @@ function checkRemoteLastModifiedDate(url: URL) {
       resolve(null);
     })
     .on('error', e => {
-      console.log('CodeScene: error while checking last-modified header:', e);
+      logOutputChannel.debug('Error while checking last-modified header:', e);
       resolve(null);
     })
     .end();
@@ -102,13 +98,13 @@ async function isUpToDate(cliPath: string, lastModifiedPath: string, url: URL) {
 
   if (remoteDate === null) {
     // We can't trust the remote, so we'll just assume the local version is up to date.
-    console.log('CodeScene: could not check last-modified header of remote artifact, assuming local copy is up to date');
+    logOutputChannel.debug('Could not check last-modified header of remote artifact, assuming local copy is up to date');
     return true;
   }
 
   if (localDate === null) {
     // We don't have a local date, so the local copy can't be up to date.
-    console.log('CodeScene: could not check last-modified date of local artifact, assuming local copy is not up to date');
+    logOutputChannel.debug('Could not check last-modified date of local artifact, assuming local copy is not up to date');
     return false;
   }
 
@@ -130,7 +126,7 @@ function download(url: URL, filePath: string) {
           response
             .on('end', () => {
               writeStream.close();
-              console.log('codescene cli artifact downloaded to', filePath);
+              logOutputChannel.debug('CodeScene cli artifact downloaded to', filePath);
               const lastModified = response.headers['last-modified'];
               if (lastModified) {
                 resolve(new Date(lastModified));

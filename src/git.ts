@@ -4,9 +4,10 @@
  * It keeps track of changes to the git change set and emits an event when it changes. This
  * is used to refresh e.g. the couplings view in the SCM panel.
  */
+import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { SimpleExecutor } from './executor';
-import { dirname } from 'path';
+import { logOutputChannel } from './log';
 import debounce = require('lodash.debounce');
 
 export class Git implements vscode.Disposable {
@@ -72,7 +73,7 @@ export class Git implements vscode.Disposable {
       );
 
       if (result.exitCode !== 0) {
-        console.log(`git diff failed with exit code ${result.exitCode}`);
+        logOutputChannel.error(`git diff failed with exit code ${result.exitCode}`);
         continue;
       }
 

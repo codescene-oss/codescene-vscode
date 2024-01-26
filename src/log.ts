@@ -1,7 +1,7 @@
 // This module provides a global interface to the CodeScene output channel.
 import * as vscode from 'vscode';
 
-console.log('CodeScene: creating output channel');
-let outputChannel = vscode.window.createOutputChannel('CodeScene');
+const outputChannel = vscode.window.createOutputChannel('CodeScene');
+const logOutputChannel = vscode.window.createOutputChannel('CodeScene Log', { log: true });
 
-export { outputChannel };
+export { logOutputChannel, outputChannel };
