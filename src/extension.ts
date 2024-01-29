@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import debounce = require('lodash.debounce');
 import { ensureLatestCompatibleCliExists } from './download';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
-import { CsCodeLensProvider } from './codelens';
+import { CsReviewCodeLensProvider } from './review/codelens';
 import { createRulesTemplate } from './rules-template';
 import { outputChannel } from './log';
 import Telemetry from './telemetry';
@@ -12,7 +12,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import { CsWorkspace } from './workspace';
 import { Links } from './links';
-import { CsRestApi, PreFlightResponse } from './cs-rest-api';
+import { CsRestApi } from './cs-rest-api';
 import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
@@ -21,6 +21,7 @@ import { CsRefactoringCommand } from './refactoring/command';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { isDefined } from './utils';
+import { CsRefactorCodeLensProvider } from './refactoring/codelens';
 
 interface CsContext {
   cliPath: string;
@@ -65,9 +66,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   addReviewListeners(context, csDiagnostics);
 
-  // Add CodeLens support
+  // Add Review CodeLens support
   const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
-  const codeLensProvider = new CsCodeLensProvider();
+  const codeLensProvider = new CsReviewCodeLensProvider();
   const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
@@ -205,23 +206,15 @@ function fileTypeToLanguageId(fileType: string) {
   }
 }
 
-function addRefactoringCodeAction(context: vscode.ExtensionContext, capabilities: PreFlightResponse) {
-  const supportedLanguagesForRefactoring = capabilities.supported['file-types']
-    .map(fileTypeToLanguageId)
-    .filter(isDefined)
-    .map((language) => ({
-      language,
-      scheme: 'file',
-    }));
-
+function addRefactoringCodeAction(
+  context: vscode.ExtensionContext,
+  documentSelector: vscode.DocumentSelector,
+  supportedCodeSmells: string[]
+) {
   context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(
-      supportedLanguagesForRefactoring,
-      new CsRefactorCodeAction(capabilities.supported['code-smells']),
-      {
-        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-      }
-    )
+    vscode.languages.registerCodeActionsProvider(documentSelector, new CsRefactorCodeAction(supportedCodeSmells), {
+      providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+    })
   );
 }
 
@@ -267,16 +260,29 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
   const { csRestApi, csDiagnostics, cliPath } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
-    Reviewer.instance.setSupportedRefactoringSmells(refactorCapabilities.supported['code-smells']);
-    csDiagnostics.setSupportedCodeSmells(refactorCapabilities.supported['code-smells']);
+    const refactoringSelector: vscode.DocumentSelector = refactorCapabilities.supported['file-types']
+      .map(fileTypeToLanguageId)
+      .filter(isDefined)
+      .map((language) => ({
+        language,
+        scheme: 'file',
+      }));
+    const supportedCodeSmells = refactorCapabilities.supported['code-smells'];
+
+    const codeLensProvider = new CsRefactorCodeLensProvider(supportedCodeSmells);
+    const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider);
+    context.subscriptions.push(codeLensProviderDisposable);
+
+    Reviewer.instance.setSupportedRefactoringSmells(supportedCodeSmells);
+    csDiagnostics.setSupportedCodeSmells(supportedCodeSmells);
 
     // Force update diagnosticCollection to show the supported code smells indication
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    new CsRefactoringCommand(context, csRestApi, cliPath).register();
-    addRefactoringCodeAction(context, refactorCapabilities);
+    new CsRefactoringCommand(context, csRestApi, cliPath, codeLensProvider).register();
+    addRefactoringCodeAction(context, refactoringSelector, supportedCodeSmells);
 
     // Use this scheme for the virtual documents when diffing the refactoring
     const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {

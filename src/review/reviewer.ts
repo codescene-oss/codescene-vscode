@@ -6,7 +6,7 @@ import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
-import { produceDiagnostic, reviewIssueToDiagnostics } from './review-utils';
+import { reviewIssueToDiagnostics } from './review-utils';
 
 export default class Reviewer {
   private static _instance: IReviewer;
@@ -65,10 +65,10 @@ class SimpleReviewer implements IReviewer {
 
       if (data.score > 0) {
         const roundedScore = +data.score.toFixed(2);
-        const scoreDiagnostic = produceDiagnostic(
-          'info',
+        const scoreDiagnostic = new vscode.Diagnostic(
           new vscode.Range(0, 0, 0, 0),
-          `Code health score: ${roundedScore}`
+          `Code health score: ${roundedScore}`,
+          vscode.DiagnosticSeverity.Information
         );
         return [scoreDiagnostic, ...diagnostics];
       } else {

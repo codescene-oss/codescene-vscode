@@ -27,59 +27,45 @@ export function reviewIssueToDiagnostics(
   supportedCodeSmells?: string[]
 ) {
   if (!reviewIssue.functions) {
-    return [produceDiagnostic('info', new vscode.Range(0, 0, 0, 0), reviewIssue.category, reviewIssue)];
+    const diagnostic = new vscode.Diagnostic(
+      new vscode.Range(0, 0, 0, 0),
+      reviewIssue.category,
+      vscode.DiagnosticSeverity.Information
+    );
+    diagnostic.code = createDiagnosticCode(reviewIssue.category);
+    return [diagnostic];
   }
 
   return reviewIssue.functions.map((func: IssueDetails) => {
+    const category = reviewIssue.category;
     const range = issueToRange(reviewIssue.category, func, document);
 
-    let description;
+    let message;
     if (func.details) {
-      description = `${reviewIssue.category} (${func.details})`;
+      message = `${category} (${func.details})`;
     } else {
-      description = reviewIssue.category;
+      message = category;
     }
-
-    if (supportedCodeSmells && supportedCodeSmells.includes(reviewIssue.category)) {
-      description = `✨ ${description}`;
-    }
-
-    return produceDiagnostic('warning', range, description, reviewIssue);
+    const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+    diagnostic.source = 'cs'; // Shown in the Problems view
+    diagnostic.code = createDiagnosticCode(category);
+    return diagnostic;
   });
 }
 
-export function produceDiagnostic(severity: string, range: vscode.Range, message: string, issue?: ReviewIssue) {
-  let diagnosticSeverity: vscode.DiagnosticSeverity;
-  switch (severity) {
-    case 'info':
-      diagnosticSeverity = vscode.DiagnosticSeverity.Information;
-      break;
-    case 'warning':
-      diagnosticSeverity = vscode.DiagnosticSeverity.Warning;
-      break;
-    case 'error':
-      diagnosticSeverity = vscode.DiagnosticSeverity.Error;
-      break;
-    default:
-      diagnosticSeverity = vscode.DiagnosticSeverity.Error;
-  }
-
-  const diagnostic = new vscode.Diagnostic(range, message, diagnosticSeverity);
-  diagnostic.source = 'CodeScene';
-
-  // We don't want to add diagnostics for the "file level" issues, because it looks a bit ugly.
-  // Instead, they are only shown as code lenses.
-  if (issue?.category) {
-    const docsCode = categoryToDocsCode(issue.category);
-    const args = [vscode.Uri.parse(`csdoc:${docsCode}.md`)];
-    const openDocCommandUri = vscode.Uri.parse(
-      `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
-    );
-    diagnostic.code = {
-      value: issue.category,
-      target: openDocCommandUri,
-    };
-  }
-
-  return diagnostic;
+/**
+ * Creates a diagnostic code with a target that opens documentation for the issue category
+ * @param category
+ * @returns
+ */
+function createDiagnosticCode(category: string) {
+  const docsCode = categoryToDocsCode(category);
+  const args = [vscode.Uri.parse(`csdoc:${docsCode}.md`)];
+  const openDocCommandUri = vscode.Uri.parse(
+    `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
+  );
+  return {
+    value: category,
+    target: openDocCommandUri,
+  };
 }

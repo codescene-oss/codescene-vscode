@@ -4,6 +4,9 @@ import CsRefactoringRequests, { CsRefactoringRequest } from './refactoring/cs-re
 import Reviewer, { ReviewOpts } from './review/reviewer';
 import { isDefined } from './utils';
 
+export const csSource = 'CodeScene';
+export const csRefactorableSource = 'CodeScene AutoRefactor';
+
 export default class CsDiagnosticsCollection {
   private static _instance: vscode.DiagnosticCollection;
 
@@ -51,9 +54,10 @@ export class CsDiagnostics {
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
     if (!isDefined(this.supportedCodeSmells)) return;
-    
-    // sparcle emoji implies that the diagnostic is a candidate for refactoring - see reviewIssueToDiagnostics() in review-utils.ts
-    const refactorableDiagnostics = diagnostics.filter((d) => d.message.startsWith('✨'));
+
+    const refactorableDiagnostics = diagnostics.filter(
+      (d) => d.code instanceof Object && this.supportedCodeSmells?.includes(d.code.value.toString())
+    );
     refactorableDiagnostics.forEach(async (d) => {
       // Return object with some diagnostic key and the promise?
       const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(

@@ -1,7 +1,7 @@
 import vscode, { CodeActionKind } from 'vscode';
 import { RefactorResponse } from '../cs-rest-api';
 import { isDefined } from '../utils';
-import { FnToRefactor, showRefactoringCmdName } from './command';
+import { FnToRefactor, commandFromLevel, showRefactoringCmdName } from './command';
 import CsRefactoringRequests from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
@@ -24,7 +24,6 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
     const supportedCsDiagnostics = context.diagnostics
-      .filter((d: vscode.Diagnostic) => d.source === 'CodeScene')
       .filter((d: vscode.Diagnostic) => {
         if (typeof d.code === 'object') {
           return this.supportedCodeSmells.includes(d.code.value.toString());
@@ -60,43 +59,34 @@ function toCodeAction(
     confidence: { level },
   } = response;
 
-  const diagCodeToString = (code: string | number | { value: string | number; target: vscode.Uri } | undefined) => {
+/*   const diagCodeToString = (code: string | number | { value: string | number; target: vscode.Uri } | undefined) => {
     if (typeof code === 'object') {
       return code.value.toString();
     }
     return code?.toString() || 'unknown issue';
   };
-  const issue = diagCodeToString(diagnostic.code);
+  const issue = diagCodeToString(diagnostic.code); */
 
-  let title = '';
   let codeActionKind;
-  let command;
-  let args: any[];
+  let command = commandFromLevel(level, {document, fnToRefactor, refactorResponse: response});
+
   switch (level) {
     case 3:
-      title = `✨ Refactoring recommendation for ${issue} in '${fnToRefactor.name}'`;
+      // `🧑‍🚀 Refactoring recommendation for ${issue} in '${fnToRefactor.name}'`;
       codeActionKind = CodeActionKind.QuickFix;
-      command = showRefactoringCmdName;
-      args = [document, fnToRefactor, response];
       break;
     case 2:
-      title = `✨ Refactoring suggestion for ${issue} in '${fnToRefactor.name}'`;
       codeActionKind = CodeActionKind.RefactorRewrite;
-      command = showRefactoringCmdName;
-      args = [document, fnToRefactor, response];
       break;
     case 1:
-      title = `Code improvement guide for ${issue} in '${fnToRefactor.name}'`;
       codeActionKind = CodeActionKind.Empty;
-      command = '';
-      args = [];
       break;
     default:
       // No code action!
       return;
   }
 
-  const codeAction = new vscode.CodeAction(title, codeActionKind);
-  codeAction.command = { command, title, arguments: args };
+  const codeAction = new vscode.CodeAction(command.title, codeActionKind);
+  codeAction.command = command;
   return codeAction;
 }
