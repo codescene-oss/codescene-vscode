@@ -7,12 +7,12 @@ import CsRefactoringRequests, { CsRefactoringRequest } from './cs-refactoring-re
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
   readonly document: vscode.TextDocument;
-  readonly csRefactoringRequest: CsRefactoringRequest[];
+  readonly csRefactoringRequest: CsRefactoringRequest | CsRefactoringRequest[];
 
   constructor(
     range: vscode.Range,
     document: vscode.TextDocument,
-    csRefactoringRequest: CsRefactoringRequest[],
+    csRefactoringRequest: CsRefactoringRequest | CsRefactoringRequest[],
     command?: vscode.Command
   ) {
     super(range, command);
@@ -46,7 +46,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
         if (request && !request.error) {
           // Create RefactorCodeLenses for non-error requests (only show errors in the log)
           requests.push(request);
-          return new CsRefactorCodeLens(csDiag.range, document, [request]);
+          return new CsRefactorCodeLens(csDiag.range, document, request);
         }
       })
       .filter(isDefined);
@@ -63,31 +63,29 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     codeLens: CsRefactorCodeLens,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsRefactorCodeLens> {
-    if (codeLens.csRefactoringRequest.length > 1) {
+    if (codeLens.csRefactoringRequest instanceof Array) {
       logOutputChannel.debug(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
-      let title = `Auto-refactor: ${this.summaryString(codeLens)}`;
+      let title = `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`;
       let command = 'noop';
       codeLens.command = { title, command };
       return codeLens;
     }
 
-    const request = codeLens.csRefactoringRequest[0];
+    const request = codeLens.csRefactoringRequest;
     logOutputChannel.debug(
-      `Resolving Auto-refactor CodeLens ${codeLens.document.fileName.split('/').pop()}:${request.fnToRefactor.name} [${
+      `Resolving Auto-refactor CodeLens ${codeLens.document.fileName.split('/').pop()}:"${request.fnToRefactor.name}" ${
         codeLens.csRefactoringRequest && rangeStr(request.fnToRefactor.range)
-      }]`
+      }`
     );
 
     const { resolvedResponse } = request; // error requests should not have been provided (see above)
     if (!resolvedResponse) {
-      logOutputChannel.debug('   🛠️ response unresolved.');
       let title = '🛠️ Auto-refactor pending...';
       let command = 'noop';
       codeLens.command = { title, command };
       return codeLens;
     }
 
-    logOutputChannel.debug(`   🎉 response resolved (confidence ${resolvedResponse.confidence.level})`);
     codeLens.command = commandFromLevel(resolvedResponse.confidence.level, {
       document: codeLens.document,
       fnToRefactor: request.fnToRefactor,
@@ -97,9 +95,9 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     return codeLens;
   }
 
-  private summaryString(codeLens: CsRefactorCodeLens) {
-    const nPending = codeLens.csRefactoringRequest.filter((r) => !r.resolvedResponse && !r.error).length;
-    const doneResponses = codeLens.csRefactoringRequest.map((r) => r.resolvedResponse).filter(isDefined);
+  private summaryString(csRefactoringRequest: CsRefactoringRequest[]) {
+    const nPending = csRefactoringRequest.filter((r) => !r.resolvedResponse && !r.error).length;
+    const doneResponses = csRefactoringRequest.map((r) => r.resolvedResponse).filter(isDefined);
     const nRefactorings = doneResponses.filter((r) => r.confidence.level >= 2).length;
     const nCodeReviews = doneResponses.filter((r) => r.confidence.level === 1).length;
     const pendingString = nPending > 0 ? `${nPending} pending` : undefined;

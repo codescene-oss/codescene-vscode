@@ -5,10 +5,7 @@ import { FnToRefactor, commandFromLevel } from './command';
 import CsRefactoringRequests from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
-  public static readonly providedCodeActionKinds = [
-    CodeActionKind.QuickFix,
-    CodeActionKind.Empty,
-  ];
+  public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
 
   public constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {}
 
@@ -55,6 +52,8 @@ function toCodeAction(document: vscode.TextDocument, response: RefactorResponse,
       // No code action!
       return;
   }
+
+  if (!isDefined(command) || !isDefined(codeActionKind)) return;
 
   const codeAction = new vscode.CodeAction(command.title, codeActionKind);
   codeAction.command = command;

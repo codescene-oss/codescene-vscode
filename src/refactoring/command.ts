@@ -124,6 +124,9 @@ export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringA
       title = `🧐 Improvement guide`;
       command = showRefactoringCmdName;
       break;
+    default:
+      logOutputChannel.error(`Confidence level ${confidenceLevel} => no command`);
+      return;
   }
   return { title, command, arguments: [args.document, args.fnToRefactor, args.refactorResponse] };
 }
