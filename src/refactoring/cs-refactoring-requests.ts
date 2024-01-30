@@ -13,7 +13,12 @@ export class CsRefactoringRequest {
   fnToRefactor: FnToRefactor;
   private abortController: AbortController;
 
-  constructor(csRestApi: CsRestApi, codeLensProvider: CsRefactorCodeLensProvider, diagnostic: Diagnostic, fnToRefactor: FnToRefactor) {
+  constructor(
+    csRestApi: CsRestApi,
+    codeLensProvider: CsRefactorCodeLensProvider,
+    diagnostic: Diagnostic,
+    fnToRefactor: FnToRefactor
+  ) {
     this.fnToRefactor = fnToRefactor;
     this.abortController = new AbortController();
     this.refactorResponse = csRestApi
@@ -24,6 +29,13 @@ export class CsRefactoringRequest {
             response.confidence
           )}`
         );
+        if (!this.validConfidenceLevel(response.confidence.level)) { 
+          this.error = `Invalid confidence level: ${response.confidence.level}`;
+          logOutputChannel.error(
+            `Refactor response error: ${this.error} for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`
+          );
+          return this.error;
+        }
         this.resolvedResponse = response;
         return response;
       })
@@ -32,7 +44,9 @@ export class CsRefactoringRequest {
         if (err instanceof AxiosError) {
           msg = `[${err.code}] ${err.message}`;
         }
-        logOutputChannel.error(`Refactor response error: ${msg} for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`);
+        logOutputChannel.error(
+          `Refactor response error: ${msg} for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`
+        );
         this.error = msg;
         return msg;
       })
@@ -43,6 +57,10 @@ export class CsRefactoringRequest {
 
   abort() {
     this.abortController.abort();
+  }
+
+  private validConfidenceLevel(level: number) {
+    return level > 0 && level <= 3;
   }
 }
 
