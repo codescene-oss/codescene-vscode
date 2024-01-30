@@ -121,6 +121,7 @@ export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringA
       command = showRefactoringCmdName;
       break;
     case 1:
+    case 0:
       title = `🧐 Improvement guide`;
       command = showRefactoringCmdName;
       break;
