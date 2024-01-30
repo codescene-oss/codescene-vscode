@@ -24,7 +24,7 @@ export class CsRefactorCodeLens extends vscode.CodeLens {
 export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRefactorCodeLens> {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
 
-  constructor(private supportedCodeSmells: string[]) {
+  constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
     outputChannel.appendLine('Creating Auto Refactor CodeLens provider');
   }
 
@@ -37,12 +37,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       return [];
     }
 
-    const supportedDiagnostics = vscode.languages.getDiagnostics(document.uri).filter((d: vscode.Diagnostic) => {
-      if (typeof d.code === 'object') {
-        return this.supportedCodeSmells.includes(d.code.value.toString());
-      }
-      return false;
-    });
+    const supportedDiagnostics = vscode.languages.getDiagnostics(document.uri).filter(this.codeSmellFilter);
 
     const lenses = supportedDiagnostics
       .map((csDiag) => {

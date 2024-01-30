@@ -209,10 +209,10 @@ function fileTypeToLanguageId(fileType: string) {
 function addRefactoringCodeAction(
   context: vscode.ExtensionContext,
   documentSelector: vscode.DocumentSelector,
-  supportedCodeSmells: string[]
+  codeSmellFilter: (d: vscode.Diagnostic) => boolean
 ) {
   context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(documentSelector, new CsRefactorCodeAction(supportedCodeSmells), {
+    vscode.languages.registerCodeActionsProvider(documentSelector, new CsRefactorCodeAction(codeSmellFilter), {
       providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
     })
   );
@@ -267,22 +267,22 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
         language,
         scheme: 'file',
       }));
-    const supportedCodeSmells = refactorCapabilities.supported['code-smells'];
 
-    const codeLensProvider = new CsRefactorCodeLensProvider(supportedCodeSmells);
+    const codeSmellFilter = (d: vscode.Diagnostic) =>
+      d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
+
+    const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
     const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider);
     context.subscriptions.push(codeLensProviderDisposable);
-
-    Reviewer.instance.setSupportedRefactoringSmells(supportedCodeSmells);
-    csDiagnostics.setSupportedCodeSmells(supportedCodeSmells);
+    csDiagnostics.setCodeSmellFilter(codeSmellFilter);
 
     // Force update diagnosticCollection to show the supported code smells indication
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    new CsRefactoringCommand(context, csRestApi, cliPath, codeLensProvider).register();
-    addRefactoringCodeAction(context, refactoringSelector, supportedCodeSmells);
+    new CsRefactoringCommand(context, csRestApi, cliPath, codeLensProvider, refactorCapabilities['max-input-loc']).register();
+    addRefactoringCodeAction(context, refactoringSelector, codeSmellFilter);
 
     // Use this scheme for the virtual documents when diffing the refactoring
     const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {

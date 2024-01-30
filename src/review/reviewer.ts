@@ -27,12 +27,10 @@ export interface ReviewOpts {
 
 export interface IReviewer {
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
-  setSupportedRefactoringSmells(codeSmells?: string[]): void;
 }
 
 class SimpleReviewer implements IReviewer {
   private readonly executor: LimitingExecutor = new LimitingExecutor();
-  private supportedCodeSmells?: string[];
 
   constructor(private cliPath: string) {}
 
@@ -60,7 +58,7 @@ class SimpleReviewer implements IReviewer {
 
       const data = JSON.parse(stdout) as ReviewResult;
       let diagnostics = data.review.flatMap((reviewIssue) =>
-        reviewIssueToDiagnostics(reviewIssue, document, this.supportedCodeSmells)
+        reviewIssueToDiagnostics(reviewIssue, document)
       );
 
       if (data.score > 0) {
@@ -77,10 +75,6 @@ class SimpleReviewer implements IReviewer {
     });
 
     return diagnostics;
-  }
-
-  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
-    this.supportedCodeSmells = codeSmells;
   }
 }
 
@@ -114,10 +108,6 @@ class CachingReviewer implements IReviewer {
     this.reviewCache.set(document.fileName, { documentVersion: document.version, diagnostics });
 
     return diagnostics;
-  }
-
-  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
-    this.reviewer.setSupportedRefactoringSmells(codeSmells);
   }
 }
 
@@ -179,9 +169,5 @@ class FilteringReviewer implements IReviewer {
     }
 
     return this.reviewer.review(document, reviewOpts);
-  }
-
-  setSupportedRefactoringSmells(codeSmells?: string[] | undefined): void {
-    this.reviewer.setSupportedRefactoringSmells(codeSmells);
   }
 }

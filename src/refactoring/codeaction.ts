@@ -1,21 +1,17 @@
 import vscode, { CodeActionKind } from 'vscode';
 import { RefactorResponse } from '../cs-rest-api';
 import { isDefined } from '../utils';
-import { FnToRefactor, commandFromLevel, showRefactoringCmdName } from './command';
+import { FnToRefactor, commandFromLevel } from './command';
 import CsRefactoringRequests from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
-  private supportedCodeSmells: string[];
-
   public static readonly providedCodeActionKinds = [
     CodeActionKind.QuickFix,
     CodeActionKind.RefactorRewrite,
     CodeActionKind.Empty,
   ];
 
-  public constructor(supportedCodeSmells: string[]) {
-    this.supportedCodeSmells = supportedCodeSmells;
-  }
+  public constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {}
 
   provideCodeActions(
     document: vscode.TextDocument,
@@ -23,17 +19,8 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const supportedCsDiagnostics = context.diagnostics
-      .filter((d: vscode.Diagnostic) => {
-        if (typeof d.code === 'object') {
-          return this.supportedCodeSmells.includes(d.code.value.toString());
-        }
-        return false;
-      });
-
-    if (supportedCsDiagnostics.length <= 0) return;
-
-    const codeActions = supportedCsDiagnostics
+    const codeActions = context.diagnostics
+      .filter(this.codeSmellFilter)
       .map((diagnostic) => {
         const refacRequest = CsRefactoringRequests.get(diagnostic);
         if (!refacRequest?.resolvedResponse) {
@@ -41,7 +28,7 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
         }
         const response = refacRequest.resolvedResponse;
         const fnToRefactor = refacRequest.fnToRefactor;
-        return toCodeAction(document, response, diagnostic, fnToRefactor);
+        return toCodeAction(document, response, fnToRefactor);
       })
       .filter(isDefined);
 
@@ -49,17 +36,12 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   }
 }
 
-function toCodeAction(
-  document: vscode.TextDocument,
-  response: RefactorResponse,
-  diagnostic: vscode.Diagnostic,
-  fnToRefactor: FnToRefactor
-) {
+function toCodeAction(document: vscode.TextDocument, response: RefactorResponse, fnToRefactor: FnToRefactor) {
   const {
     confidence: { level },
   } = response;
 
-/*   const diagCodeToString = (code: string | number | { value: string | number; target: vscode.Uri } | undefined) => {
+  /*   const diagCodeToString = (code: string | number | { value: string | number; target: vscode.Uri } | undefined) => {
     if (typeof code === 'object') {
       return code.value.toString();
     }
@@ -68,7 +50,7 @@ function toCodeAction(
   const issue = diagCodeToString(diagnostic.code); */
 
   let codeActionKind;
-  let command = commandFromLevel(level, {document, fnToRefactor, refactorResponse: response});
+  let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: response });
 
   switch (level) {
     case 3:

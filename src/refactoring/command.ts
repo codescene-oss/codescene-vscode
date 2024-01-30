@@ -19,22 +19,13 @@ export interface FnToRefactor {
 }
 
 export class CsRefactoringCommand {
-  private readonly csRestApi: CsRestApi;
-  private readonly cliPath: string;
-  private readonly context: vscode.ExtensionContext;
-  private readonly codeLensProvider: CsRefactorCodeLensProvider;
-
   constructor(
-    context: vscode.ExtensionContext,
-    csRestApi: CsRestApi,
-    cliPath: string,
-    codeLensProvider: CsRefactorCodeLensProvider
-  ) {
-    this.context = context;
-    this.csRestApi = csRestApi;
-    this.cliPath = cliPath;
-    this.codeLensProvider = codeLensProvider;
-  }
+    private context: vscode.ExtensionContext,
+    private csRestApi: CsRestApi,
+    private cliPath: string,
+    private codeLensProvider: CsRefactorCodeLensProvider,
+    private maxInputLoc: number
+  ) {}
 
   register() {
     const requestRefactoringCmd = vscode.commands.registerCommand(
@@ -72,6 +63,12 @@ export class CsRefactoringCommand {
     if (!fnToRefactor) {
       logOutputChannel.error('Could not find a suitable function to refactor.');
       window.showErrorMessage('Could not find a suitable function to refactor.');
+      return;
+    }
+
+    const loc = fnToRefactor.range.end.line - fnToRefactor.range.start.line;
+    if (loc > this.maxInputLoc) {
+      logOutputChannel.warn(`Function "${fnToRefactor.name}" exceeds max-input-loc (${loc} > ${this.maxInputLoc})`);
       return;
     }
 

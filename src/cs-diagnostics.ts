@@ -26,12 +26,12 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  private supportedCodeSmells: string[] | undefined;
+  private codeSmellFilter: ((d: vscode.Diagnostic) => boolean) | undefined;
 
   constructor(private supportedLanguages: string[]) {}
 
-  setSupportedCodeSmells(supportedCodeSmells?: string[]) {
-    this.supportedCodeSmells = supportedCodeSmells;
+  setCodeSmellFilter(codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
+    this.codeSmellFilter = codeSmellFilter;
   }
 
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
@@ -53,12 +53,9 @@ export class CsDiagnostics {
   }
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (!isDefined(this.supportedCodeSmells)) return;
+    if (!isDefined(this.codeSmellFilter)) return;
 
-    const refactorableDiagnostics = diagnostics.filter(
-      (d) => d.code instanceof Object && this.supportedCodeSmells?.includes(d.code.value.toString())
-    );
-    refactorableDiagnostics.forEach(async (d) => {
+    diagnostics.filter(this.codeSmellFilter).forEach(async (d) => {
       // Return object with some diagnostic key and the promise?
       const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(
         requestRefactoringCmdName,
