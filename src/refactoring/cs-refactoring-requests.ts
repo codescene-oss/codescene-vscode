@@ -1,10 +1,11 @@
-import vscode, { Diagnostic, Uri, workspace } from 'vscode';
-import { CsRestApi, RefactorResponse } from '../cs-rest-api';
-import { keyStr, rangeStr } from '../utils';
-import { FnToRefactor } from './command';
 import { AxiosError } from 'axios';
+import { v4 as uuidv4 } from 'uuid';
+import { Diagnostic } from 'vscode';
+import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
+import { keyStr, rangeStr } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
+import { FnToRefactor } from './command';
 
 export class CsRefactoringRequest {
   resolvedResponse?: RefactorResponse;
@@ -13,28 +14,37 @@ export class CsRefactoringRequest {
   fnToRefactor: FnToRefactor;
   private abortController: AbortController;
 
-  constructor(csRestApi: CsRestApi, codeLensProvider: CsRefactorCodeLensProvider, diagnostic: Diagnostic, fnToRefactor: FnToRefactor) {
+  constructor(
+    csRestApi: CsRestApi,
+    codeLensProvider: CsRefactorCodeLensProvider,
+    diagnostic: Diagnostic,
+    fnToRefactor: FnToRefactor
+  ) {
     this.fnToRefactor = fnToRefactor;
     this.abortController = new AbortController();
+    const traceId = uuidv4();
+    logOutputChannel.info(`Refactor request for ${this.logIdString(traceId, fnToRefactor)}`);
     this.refactorResponse = csRestApi
-      .fetchRefactoring(diagnostic, fnToRefactor, this.abortController.signal)
+      .fetchRefactoring(diagnostic, fnToRefactor, traceId, this.abortController.signal)
       .then((response) => {
         logOutputChannel.info(
-          `Refactor response for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}: ${JSON.stringify(
-            response.confidence
-          )}`
+          `Refactor response for ${this.logIdString(traceId, fnToRefactor)}: ${this.confidenceString(response.confidence)}`
         );
+        if (!this.validConfidenceLevel(response.confidence.level)) {
+          this.error = `Invalid confidence level: ${this.confidenceString(response.confidence)}`;
+          logOutputChannel.error(`Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`);
+          return this.error;
+        }
         this.resolvedResponse = response;
         return response;
       })
       .catch((err: Error | AxiosError) => {
-        let msg = err.message;
+        this.error = err.message;
         if (err instanceof AxiosError) {
-          msg = `[${err.code}] ${err.message}`;
+          this.error = `[${err.code}] ${err.message}`;
         }
-        logOutputChannel.error(`Refactor response error: ${msg} for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`);
-        this.error = msg;
-        return msg;
+        logOutputChannel.error(`Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`);
+        return this.error;
       })
       .finally(() => {
         codeLensProvider.update();
@@ -43,6 +53,18 @@ export class CsRefactoringRequest {
 
   abort() {
     this.abortController.abort();
+  }
+
+  private logIdString(traceId: string, fnToRefactor: FnToRefactor) {
+    return `[traceId ${traceId}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`;
+  }
+
+  private confidenceString(confidence: RefactorConfidence) {
+    return `${confidence.description} (${confidence.level})`;
+  }
+
+  private validConfidenceLevel(level: number) {
+    return level > 0 && level <= 3;
   }
 }
 
