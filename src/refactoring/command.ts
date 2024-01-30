@@ -116,15 +116,12 @@ export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringA
   let command = '';
   switch (confidenceLevel) {
     case 3:
-      title = `✨ Auto Refactor recommendation`;
-      command = showRefactoringCmdName;
-      break;
     case 2:
-      title = `🤨 Auto Refactor suggestion`;
+      title = `✨ Auto-refactor`;
       command = showRefactoringCmdName;
       break;
     case 1:
-      title = `🧐 Code improvement guide`;
+      title = `🧐 Improvement guide`;
       command = showRefactoringCmdName;
       break;
   }

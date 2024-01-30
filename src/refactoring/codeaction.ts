@@ -7,7 +7,6 @@ import CsRefactoringRequests from './cs-refactoring-requests';
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [
     CodeActionKind.QuickFix,
-    CodeActionKind.RefactorRewrite,
     CodeActionKind.Empty,
   ];
 
@@ -41,24 +40,13 @@ function toCodeAction(document: vscode.TextDocument, response: RefactorResponse,
     confidence: { level },
   } = response;
 
-  /*   const diagCodeToString = (code: string | number | { value: string | number; target: vscode.Uri } | undefined) => {
-    if (typeof code === 'object') {
-      return code.value.toString();
-    }
-    return code?.toString() || 'unknown issue';
-  };
-  const issue = diagCodeToString(diagnostic.code); */
-
   let codeActionKind;
   let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: response });
 
   switch (level) {
     case 3:
-      // `🧑‍🚀 Refactoring recommendation for ${issue} in '${fnToRefactor.name}'`;
-      codeActionKind = CodeActionKind.QuickFix;
-      break;
     case 2:
-      codeActionKind = CodeActionKind.RefactorRewrite;
+      codeActionKind = CodeActionKind.QuickFix;
       break;
     case 1:
       codeActionKind = CodeActionKind.Empty;

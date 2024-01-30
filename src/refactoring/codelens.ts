@@ -65,14 +65,11 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     const { resolvedResponse, error } = codeLens.csRefactoringRequest;
     if (error) {
       logOutputChannel.debug(`   🤬 resolved with error ${error}!`);
-      let title = '🤬 Auto Refactor error';
-      let command = 'noop';
-      codeLens.command = { title, command };
       return codeLens;
     }
     if (!resolvedResponse) {
       logOutputChannel.debug('   🛠️ response unresolved.');
-      let title = '🛠️ Auto Refactor pending...';
+      let title = '🛠️ Auto-refactor pending...';
       let command = 'noop';
       codeLens.command = { title, command };
       return codeLens;
