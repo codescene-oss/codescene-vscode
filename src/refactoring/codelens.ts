@@ -4,7 +4,6 @@ import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import { commandFromLevel } from './command';
 import CsRefactoringRequests, { CsRefactoringRequest } from './cs-refactoring-requests';
-import { RefactorRequest } from '../cs-rest-api';
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
   readonly document: vscode.TextDocument;
@@ -74,21 +73,19 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     const request = codeLens.csRefactoringRequest;
     logOutputChannel.debug(
-      `Resolving Auto-refactor CodeLens ${codeLens.document.fileName.split('/').pop()}:${request.fnToRefactor.name} [${
+      `Resolving Auto-refactor CodeLens ${codeLens.document.fileName.split('/').pop()}:"${request.fnToRefactor.name}" ${
         codeLens.csRefactoringRequest && rangeStr(request.fnToRefactor.range)
-      }]`
+      }`
     );
 
     const { resolvedResponse } = request; // error requests should not have been provided (see above)
     if (!resolvedResponse) {
-      logOutputChannel.debug(' 🛠️ response unresolved.');
       let title = '🛠️ Auto-refactor pending...';
       let command = 'noop';
       codeLens.command = { title, command };
       return codeLens;
     }
 
-    logOutputChannel.debug(` 🎉 response resolved (confidence ${resolvedResponse.confidence.level})`);
     codeLens.command = commandFromLevel(resolvedResponse.confidence.level, {
       document: codeLens.document,
       fnToRefactor: request.fnToRefactor,

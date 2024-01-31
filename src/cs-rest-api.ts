@@ -1,12 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import { v4 as uuidv4 } from 'uuid';
 import * as vscode from 'vscode';
 import { AUTH_TYPE } from './auth/auth-provider';
 import { getServerApiUrl } from './configuration';
 import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/command';
-import { rangeStr } from './utils';
 
 interface Coupling {
   entity: string;
@@ -136,8 +134,7 @@ export class CsRestApi {
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
   }
 
-  async fetchRefactoring(diagnostic: vscode.Diagnostic, fnToRefactor: FnToRefactor, signal?: AbortSignal) {
-    const traceId = uuidv4();
+  async fetchRefactoring(diagnostic: vscode.Diagnostic, fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
@@ -166,9 +163,6 @@ export class CsRestApi {
       body: fnToRefactor.content,
     };
     const request: RefactorRequest = { review: [review], 'source-snippet': sourceSnippet };
-    logOutputChannel.info(
-      `Refactor request: [traceId ${traceId}] for "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`
-    );
     return await this.refactoringPostJson<RefactorResponse>(refactorUrl, request, config);
   }
 
