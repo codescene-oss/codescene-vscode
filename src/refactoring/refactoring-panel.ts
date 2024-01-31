@@ -241,7 +241,6 @@ export class RefactoringPanel {
       level,
       'recommended-action': { details: actionDetails, description: action },
     } = confidence;
-    const acceptDefault = level === 3;
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
       'markdown.api.render',
@@ -280,27 +279,22 @@ export class RefactoringPanel {
       </p>  
       ${reasonsContent}
       <h4>Proposed refactoring</h4>
-      <div class="top-controls">
-        <vscode-button id="diff-button" aria-label="Show diff">
-          Show diff
-          <span slot="start" class="codicon codicon-diff"></span>
-        </vscode-button>
-        <vscode-checkbox id="toggle-apply">Toggle preview</vscode-checkbox>
-      </div>
       <div class="code-container">
         <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
           <span class="codicon codicon-clippy"></span>
         </vscode-button>
         ${mdRenderedCode}
       </div>
-      <div class="buttons">
-        <vscode-button id="reject-button" appearance="${
-          acceptDefault ? 'secondary' : 'primary'
-        }" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
-        <vscode-button id="apply-button" appearance="${
-          acceptDefault ? 'primary' : 'secondary'
-        }" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
-      </div>`;
+      <div class="bottom-controls">
+        <div class="buttons-right">
+          <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
+          <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
+          <span> </span>
+          <vscode-button id="reject-button" appearance="secondary" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
+          <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
+        </div>
+      </div>
+`;
     return { content, title };
   }
 
