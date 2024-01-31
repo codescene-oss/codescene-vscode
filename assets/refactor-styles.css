@@ -16,15 +16,23 @@ h2 {
   right: 0.5em;
 }
 
-.top-controls {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 0.8em;
+.bottom-controls {
+  position: fixed;
+  width: 100%;
+  bottom: 0;
+  right: 0;
+  background-color: var(--background);
 }
 
-.buttons {
-  display: inline;
+.buttons-right {
+  display: flex;
   float: right;
+  gap: 8px;
+  margin: 8px 12px;
+}
+
+span.spacer{
+  flex-grow: 2;
 }
 
 .action-badge {
