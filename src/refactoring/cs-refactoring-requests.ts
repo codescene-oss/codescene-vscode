@@ -1,9 +1,9 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic, Range, TextDocument, Uri } from 'vscode';
+import { Diagnostic, TextDocument, Uri } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { keyStr, rangeStr } from '../utils';
+import { rangeStr } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
 import { FnToRefactor } from './command';
 
