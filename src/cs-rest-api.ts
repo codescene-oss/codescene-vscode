@@ -134,7 +134,12 @@ export class CsRestApi {
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
   }
 
-  async fetchRefactoring(diagnostic: vscode.Diagnostic, fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
+  async fetchRefactoring(
+    diagnostics: vscode.Diagnostic[],
+    fnToRefactor: FnToRefactor,
+    traceId: string,
+    signal?: AbortSignal
+  ) {
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
@@ -152,17 +157,18 @@ export class CsRestApi {
       return 'unknown category';
     };
 
-    const review: Review = {
+    const reviews = diagnostics.map((diagnostic) => ({
       category: codeToCategory(diagnostic.code),
       'start-line': diagnostic.range.start.line - fnToRefactor.range.start.line,
-    };
+      'end-line': diagnostic.range.end.line - fnToRefactor.range.start.line,
+    }));
 
     const sourceSnippet: SourceSnippet = {
       'file-type': fnToRefactor['file-type'],
       'function-type': fnToRefactor.functionType,
       body: fnToRefactor.content,
     };
-    const request: RefactorRequest = { review: [review], 'source-snippet': sourceSnippet };
+    const request: RefactorRequest = { review: reviews, 'source-snippet': sourceSnippet };
     return await this.refactoringPostJson<RefactorResponse>(refactorUrl, request, config);
   }
 

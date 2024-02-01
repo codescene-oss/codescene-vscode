@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
-import { requestRefactoringCmdName } from './refactoring/command';
-import CsRefactoringRequests, { CsRefactoringRequest } from './refactoring/cs-refactoring-requests';
+import { CsRestApi } from './cs-rest-api';
+import { requestRefactoringsCmdName } from './refactoring/command';
 import Reviewer, { ReviewOpts } from './review/reviewer';
-import { isDefined } from './utils';
 
 export const csSource = 'CodeScene';
 export const csRefactorableSource = 'CodeScene AutoRefactor';
@@ -26,13 +25,7 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  private codeSmellFilter: ((d: vscode.Diagnostic) => boolean) | undefined;
-
   constructor(private supportedLanguages: string[]) {}
-
-  setCodeSmellFilter(codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
-    this.codeSmellFilter = codeSmellFilter;
-  }
 
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
     // Diagnostics will be updated when a file is opened or when it is changed.
@@ -53,16 +46,15 @@ export class CsDiagnostics {
   }
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (!isDefined(this.codeSmellFilter)) return;
-
-    diagnostics.filter(this.codeSmellFilter).forEach(async (d) => {
-      // Return object with some diagnostic key and the promise?
-      const cmdResult = await vscode.commands.executeCommand<CsRefactoringRequest | undefined>(
-        requestRefactoringCmdName,
-        document,
-        d
-      );
-      CsRefactoringRequests.add(d, cmdResult);
-    });
+    vscode.commands.executeCommand(requestRefactoringsCmdName, document, diagnostics).then(
+      () => {},
+      (err) => {
+        /**
+         * Command might not be registered. It only exists when extension.enableRefactoringCommand() has been run.
+         * If it doesn't exist we don't want to initiate any refactoring requests anyway, and if left unhandled
+         * we get "rejected promise not handled"-errors.
+         */
+      }
+    );
   }
 }
