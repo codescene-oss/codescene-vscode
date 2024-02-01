@@ -2,7 +2,7 @@ import vscode, { CodeActionKind } from 'vscode';
 import { RefactorResponse } from '../cs-rest-api';
 import { isDefined } from '../utils';
 import { FnToRefactor, commandFromLevel } from './command';
-import CsRefactoringRequests from './cs-refactoring-requests';
+import { CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
@@ -18,7 +18,7 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     const codeActions = context.diagnostics
       .filter(this.codeSmellFilter)
       .map((diagnostic) => {
-        const refacRequest = CsRefactoringRequests.get(diagnostic);
+        const refacRequest = CsRefactoringRequests.get(document, diagnostic);
         if (!refacRequest?.resolvedResponse) {
           return;
         }

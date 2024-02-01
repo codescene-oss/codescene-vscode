@@ -274,15 +274,21 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
     const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
     const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider);
     context.subscriptions.push(codeLensProviderDisposable);
-    csDiagnostics.setCodeSmellFilter(codeSmellFilter);
+
+    new CsRefactoringCommand(
+      context,
+      csRestApi,
+      cliPath,
+      codeLensProvider,
+      codeSmellFilter,
+      refactorCapabilities['max-input-loc']
+    ).register();
+    addRefactoringCodeAction(context, refactoringSelector, codeSmellFilter);
 
     // Force update diagnosticCollection to show the supported code smells indication
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
-
-    new CsRefactoringCommand(context, csRestApi, cliPath, codeLensProvider, refactorCapabilities['max-input-loc']).register();
-    addRefactoringCodeAction(context, refactoringSelector, codeSmellFilter);
 
     // Use this scheme for the virtual documents when diffing the refactoring
     const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {

@@ -1,12 +1,13 @@
 import vscode, { TextDocument, window } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
 import { CsRestApi, RefactorResponse } from '../cs-rest-api';
-import { CsRefactoringRequest } from './cs-refactoring-requests';
-import { RefactoringPanel } from './refactoring-panel';
-import { CsRefactorCodeLensProvider } from './codelens';
 import { logOutputChannel } from '../log';
+import { isDefined } from '../utils';
+import { CsRefactorCodeLensProvider } from './codelens';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { RefactoringPanel } from './refactoring-panel';
 
-export const requestRefactoringCmdName = 'codescene.requestRefactoring';
+export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const showRefactoringCmdName = 'codescene.showRefactoring';
 
 export interface FnToRefactor {
@@ -24,13 +25,14 @@ export class CsRefactoringCommand {
     private csRestApi: CsRestApi,
     private cliPath: string,
     private codeLensProvider: CsRefactorCodeLensProvider,
+    private codeSmellFilter: (d: vscode.Diagnostic) => boolean,
     private maxInputLoc: number
   ) {}
 
   register() {
     const requestRefactoringCmd = vscode.commands.registerCommand(
-      requestRefactoringCmdName,
-      this.requestRefactoring,
+      requestRefactoringsCmdName,
+      this.requestRefactorings,
       this
     );
     this.context.subscriptions.push(requestRefactoringCmd);
@@ -55,29 +57,31 @@ export class CsRefactoringCommand {
     });
   }
 
-  async requestRefactoring(
-    document: vscode.TextDocument,
-    diagnostic: vscode.Diagnostic
-  ): Promise<CsRefactoringRequest | undefined> {
-    const fnToRefactor = await findFunctionToRefactor(this.cliPath, document, diagnostic.range);
-    if (!fnToRefactor) {
-      logOutputChannel.error('Could not find a suitable function to refactor.');
-      window.showErrorMessage('Could not find a suitable function to refactor.');
-      return;
-    }
+  async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const fnsToRefactor = await Promise.all(
+      diagnostics
+        .filter(this.codeSmellFilter)
+        .map((d) => findFunctionToRefactor(this.cliPath, document, d.range, this.maxInputLoc))
+    ).then((fns) => fns.filter(isDefined));
 
-    const loc = fnToRefactor.range.end.line - fnToRefactor.range.start.line;
-    if (loc > this.maxInputLoc) {
-      logOutputChannel.warn(`Function "${fnToRefactor.name}" exceeds max-input-loc (${loc} > ${this.maxInputLoc})`);
-      return;
-    }
-
-    const req = new CsRefactoringRequest(this.csRestApi, this.codeLensProvider, diagnostic, fnToRefactor);
-    return req;
+    const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
+    distinctFns.forEach(async (fn) => {
+      const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
+      const req = new CsRefactoringRequest(this.csRestApi, this.codeLensProvider, diagnosticsForFn, fn);
+      diagnosticsForFn.forEach((d) => {
+        // Save the request for each diagnostic for easy access in codelens and codeaction providers
+        CsRefactoringRequests.set(document, d, req);
+      });
+    });
   }
 }
 
-async function findFunctionToRefactor(cliPath: string, document: TextDocument, range: vscode.Range) {
+async function findFunctionToRefactor(
+  cliPath: string,
+  document: TextDocument,
+  range: vscode.Range,
+  maxInputLoc: number
+) {
   const extension = document.fileName.split('.').pop() || '';
   const enclosingFn = await findEnclosingFunction(
     cliPath,
@@ -95,6 +99,12 @@ async function findFunctionToRefactor(cliPath: string, document: TextDocument, r
     enclosingFn['end-line'] - 1,
     enclosingFn['end-column']
   );
+
+  const loc = enclosingFnRange.end.line - enclosingFnRange.start.line;
+  if (loc > maxInputLoc) {
+    logOutputChannel.warn(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc})`);
+    return;
+  }
 
   return {
     name: enclosingFn.name,
