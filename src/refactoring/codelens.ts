@@ -3,7 +3,7 @@ import { getConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import { commandFromLevel } from './command';
-import CsRefactoringRequests, { CsRefactoringRequest } from './cs-refactoring-requests';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
   readonly document: vscode.TextDocument;
@@ -39,24 +39,49 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     const supportedDiagnostics = vscode.languages.getDiagnostics(document.uri).filter(this.codeSmellFilter);
 
-    const requests: CsRefactoringRequest[] = [];
-    const lenses = supportedDiagnostics
-      .map((csDiag) => {
-        const request = CsRefactoringRequests.get(csDiag);
-        if (request && !request.error) {
-          // Create RefactorCodeLenses for non-error requests (only show errors in the log)
-          requests.push(request);
-          return new CsRefactorCodeLens(csDiag.range, document, request);
-        }
-      })
-      .filter(isDefined);
+    /**
+     * One codelens per FnToRefactor or diagnostic that does NOT start at the same line
+     */
 
+    // Put one codelens per unique start position.. is this sane?
+    const positionToCodeLens: Map<string, CsRefactorCodeLens> = new Map();
+    const positionKey = (pos: vscode.Position) => `${pos.line}`;
+
+    supportedDiagnostics.forEach((diagnostic) => {
+      const request = CsRefactoringRequests.get(document, diagnostic);
+      // No code-lens provided for errors (or missing requests)
+      if (request && !request.error) {
+        // Add a lens at the start of the function targeted for refactoring
+        positionToCodeLens.set(
+          positionKey(request.fnToRefactor.range.start),
+          new CsRefactorCodeLens(request.fnToRefactor.range, document, request)
+        );
+
+        // Add a lens at the start of the diagnostic as well, if it's not at the same line as the function
+        if (request.fnToRefactor.range.start.line !== diagnostic.range.start.line) {
+          positionToCodeLens.set(
+            positionKey(diagnostic.range.start),
+            new CsRefactorCodeLens(diagnostic.range, document, request)
+          );
+        }
+      }
+    });
+
+    const lenses = Array.from(positionToCodeLens.values());
+    this.addSummaryLens(document, lenses);
+    return lenses;
+  }
+
+  private addSummaryLens(document: vscode.TextDocument, lenses: CsRefactorCodeLens[]) {
     if (lenses.length > 0) {
+      const requests = lenses
+        .map((lens) =>
+          lens.csRefactoringRequest instanceof CsRefactoringRequest ? lens.csRefactoringRequest : undefined
+        )
+        .filter(isDefined);
       const summaryLens = new CsRefactorCodeLens(new vscode.Range(0, 0, 0, 0), document, requests);
       lenses.unshift(summaryLens);
     }
-
-    return lenses;
   }
 
   resolveCodeLens?(

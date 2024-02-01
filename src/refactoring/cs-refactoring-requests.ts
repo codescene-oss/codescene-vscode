@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic } from 'vscode';
+import { Diagnostic, Range, TextDocument, Uri } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { keyStr, rangeStr } from '../utils';
@@ -17,7 +17,7 @@ export class CsRefactoringRequest {
   constructor(
     csRestApi: CsRestApi,
     codeLensProvider: CsRefactorCodeLensProvider,
-    diagnostic: Diagnostic,
+    diagnostics: Diagnostic[],
     fnToRefactor: FnToRefactor
   ) {
     this.fnToRefactor = fnToRefactor;
@@ -25,14 +25,18 @@ export class CsRefactoringRequest {
     const traceId = uuidv4();
     logOutputChannel.info(`Refactor request for ${this.logIdString(traceId, fnToRefactor)}`);
     this.refactorResponse = csRestApi
-      .fetchRefactoring(diagnostic, fnToRefactor, traceId, this.abortController.signal)
+      .fetchRefactoring(diagnostics, fnToRefactor, traceId, this.abortController.signal)
       .then((response) => {
         logOutputChannel.info(
-          `Refactor response for ${this.logIdString(traceId, fnToRefactor)}: ${this.confidenceString(response.confidence)}`
+          `Refactor response for ${this.logIdString(traceId, fnToRefactor)}: ${this.confidenceString(
+            response.confidence
+          )}`
         );
         if (!this.validConfidenceLevel(response.confidence.level)) {
           this.error = `Invalid confidence level: ${this.confidenceString(response.confidence)}`;
-          logOutputChannel.error(`Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`);
+          logOutputChannel.error(
+            `Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`
+          );
           return this.error;
         }
         this.resolvedResponse = response;
@@ -68,35 +72,27 @@ export class CsRefactoringRequest {
   }
 }
 
-export default class CsRefactoringRequests {
-  private static map: Record<string, CsRefactoringRequest | undefined> = {};
+/**
+ * Map of diagnostics to refactoring requests - per document.
+ * Used to get the proper requests when presenting the refactoring codelenses and codeactions.
+ */
+export class CsRefactoringRequests {
+  private static readonly map: Map<Uri, Map<Diagnostic, CsRefactoringRequest>> = new Map();
 
-  private static interalAbort(key: string) {
-    const request = CsRefactoringRequests.map[key];
-    if (request) {
-      request.abort();
+  static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
+    let map = CsRefactoringRequests.map.get(document.uri);
+    if (!map) {
+      map = new Map();
+      CsRefactoringRequests.map.set(document.uri, map);
     }
+    map.set(diagnostic, request);
   }
 
-  static clearAll() {
-    for (const key in CsRefactoringRequests.map) {
-      CsRefactoringRequests.interalAbort(key);
+  static get(document: TextDocument, diagnostic: Diagnostic) {
+    const map = CsRefactoringRequests.map.get(document.uri);
+    if (!map) {
+      return;
     }
-    CsRefactoringRequests.map = {};
-  }
-
-  static abort(diagnostic: Diagnostic) {
-    const key = keyStr(diagnostic);
-    CsRefactoringRequests.interalAbort(key);
-  }
-
-  static add(diagnostic: Diagnostic, request?: CsRefactoringRequest) {
-    const key = keyStr(diagnostic);
-    CsRefactoringRequests.map[key] = request;
-  }
-
-  static get(diagnostic: Diagnostic) {
-    const key = keyStr(diagnostic);
-    return CsRefactoringRequests.map[key];
+    return map.get(diagnostic);
   }
 }
