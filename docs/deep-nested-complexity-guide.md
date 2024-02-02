@@ -1,4 +1,4 @@
-**Problem**: Deep nested complexity is `if`-statements inside other `if`-statements and/or loops like `for`/`while`. 
+**Problem**: Deep nested complexity is `if`-statements inside other `if`-statements and/or loops, increasing the cognitive load on the programmer.
 
 ## Solution
 
