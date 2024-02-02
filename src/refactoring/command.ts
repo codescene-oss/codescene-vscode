@@ -51,7 +51,6 @@ export class CsRefactoringCommand {
     const editor = window.activeTextEditor;
     if (editor) {
       editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
-      editor.revealRange(fnToRefactor.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
     const initiatorViewColumn = editor?.viewColumn;
 
@@ -65,12 +64,7 @@ export class CsRefactoringCommand {
   }
 
   showCodeImprovementGuide(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
-    const editor = window.activeTextEditor;
-    if (editor) {
-      editor.revealRange(fnToRefactor.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-    }
-    const initiatorViewColumn = editor?.viewColumn;
-
+    const initiatorViewColumn = window.activeTextEditor?.viewColumn;
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
       document,
