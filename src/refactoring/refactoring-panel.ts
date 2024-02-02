@@ -64,6 +64,7 @@ export class RefactoringPanel {
             this.dispose();
             return;
           case 'reject':
+          case 'close':
             await this.rejectRefactoring(refactoringState);
             await this.deselectRefactoring(refactoringState);
             this.dispose();
@@ -197,10 +198,11 @@ export class RefactoringPanel {
         title = 'Refactoring error';
         break;
       case 'object':
-        let { code, reasons, confidence } = response;
-        code = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
-        this.currentRefactorState = { document, code, range, initiatorViewColumn };
-        ({ content, title } = await this.refactoringSuggestionContent(confidence, reasons, code, document.languageId));
+        let { code } = response;
+        title = response.confidence.title;
+        let trimmedCode = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
+        this.currentRefactorState = { document, code: trimmedCode, range, initiatorViewColumn };
+        content = await this.autoRefactorOrCodeImprovementContent(response, trimmedCode, document.languageId);
         break;
     }
 
@@ -231,71 +233,89 @@ export class RefactoringPanel {
     return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
 
-  private async refactoringSuggestionContent(
-    confidence: RefactorConfidence,
-    reasons: string[],
-    code: string,
-    languageId: string
-  ) {
-    const {
-      level,
-      'recommended-action': { details: actionDetails, description: action },
-    } = confidence;
+  private async autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: string, languageId: string) {
+    const { level } = response.confidence;
+    if (level >= 2) {
+      return this.autoRefactorContent(response, code, languageId);
+    }
+    return this.codeImprovementContent(response, code, languageId);
+  }
+
+  private async codeContainerContent(code: string, languageId: string) {
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
       'markdown.api.render',
       '```' + languageId + '\n' + code + '\n```'
     );
+    return /*html*/ `
+    <div class="code-container">
+      <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
+        <span class="codicon codicon-clippy"></span>
+      </vscode-button>
+      ${mdRenderedCode}
+    </div>`;
+  }
 
+  private async autoRefactorContent(response: RefactorResponse, code: string, languageId: string) {
+    const { confidence, reasons } = response;
+    const {
+      level,
+      'recommended-action': { details: actionDetails, description: action },
+    } = confidence;
     const actionBadgeClass = `action-badge level-${level}`;
 
     let reasonsContent = '';
     if (reasons && reasons.length > 0) {
       const reasonText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
       reasonsContent = /*html*/ `
-        <h4>Reasons for detailed review</h4>
-        <ul>${reasonText}</ul>
-      `;
-    }
-    let title; // Maybe provide these from the service?
-    switch (level) {
-      case 3:
-        title = 'Refactoring recommendation';
-        break;
-      case 2:
-        title = 'Refactoring suggestion';
-        break;
-      case 1:
-        title = 'Code Improvement Guide';
-        break;
-      default:
-        title = 'Refactoring';
-        break;
+          <h4>Reasons for detailed review</h4>
+          <ul>${reasonText}</ul>
+        `;
     }
 
     const content = /*html*/ `
-      <p> 
-        <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
-      </p>  
-      ${reasonsContent}
-      <h4>Proposed refactoring</h4>
-      <div class="code-container">
-        <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
-          <span class="codicon codicon-clippy"></span>
-        </vscode-button>
-        ${mdRenderedCode}
-      </div>
-      <div class="bottom-controls">
-        <div class="buttons-right">
-          <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
-          <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
-          <span> </span>
-          <vscode-button id="reject-button" appearance="secondary" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
-          <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
+        <p> 
+          <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
+        </p>  
+        ${reasonsContent}
+        ${await this.codeContainerContent(code, languageId)}
+        <div class="bottom-controls">
+          <div class="buttons-right">
+            <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
+            <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
+            <span> </span>
+            <vscode-button id="reject-button" appearance="secondary" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
+            <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
+          </div>
         </div>
-      </div>
-`;
-    return { content, title };
+  `;
+    return content;
+  }
+
+  private async codeImprovementContent(response: RefactorResponse, code: string, languageId: string) {
+    const { reasons } = response;
+    let solutionContent = '';
+    if (reasons && reasons.length > 0) {
+      const solutionText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
+      solutionContent = /*html*/ `
+          <h4>Solution</h4>
+          <ul>${solutionText}</ul>
+        `;
+    }
+    const content = /*html*/ `
+        ${solutionContent}
+        <h4>Example refactoring</h4>
+        ${await this.codeContainerContent(code, languageId)}
+        <div class="bottom-controls">
+          <div class="buttons-right">
+            <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
+            <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
+            <span> </span>
+            <vscode-button id="close-button" appearance="primary" aria-label="Close" title="Close">Close</vscode-button>
+          </div>
+        </div>
+  `;
+    return content;
   }
 
   private loadingContent() {

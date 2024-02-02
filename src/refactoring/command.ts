@@ -8,7 +8,8 @@ import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-re
 import { RefactoringPanel } from './refactoring-panel';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
-export const showRefactoringCmdName = 'codescene.showRefactoring';
+export const showAutoRefactoringCmdName = 'codescene.showAutoRefactoring';
+export const showCodeImprovementCmdName = 'codescene.showCodeImprovement';
 
 export interface FnToRefactor {
   name: string;
@@ -36,7 +37,13 @@ export class CsRefactoringCommand {
       this
     );
     this.context.subscriptions.push(requestRefactoringCmd);
-    const showRefactoringCmd = vscode.commands.registerCommand(showRefactoringCmdName, this.showRefactoring, this);
+    const showCodeImprovementCmd = vscode.commands.registerCommand(
+      showCodeImprovementCmdName,
+      this.showCodeImprovementGuide,
+      this
+    );
+    this.context.subscriptions.push(showCodeImprovementCmd);
+    const showRefactoringCmd = vscode.commands.registerCommand(showAutoRefactoringCmdName, this.showRefactoring, this);
     this.context.subscriptions.push(showRefactoringCmd);
   }
 
@@ -44,6 +51,23 @@ export class CsRefactoringCommand {
     const editor = window.activeTextEditor;
     if (editor) {
       editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+      editor.revealRange(fnToRefactor.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    }
+    const initiatorViewColumn = editor?.viewColumn;
+
+    RefactoringPanel.createOrShow({
+      extensionUri: this.context.extensionUri,
+      document,
+      initiatorViewColumn,
+      fnToRefactor,
+      response: refactorResponse,
+    });
+  }
+
+  // TODO - not sure if this needs to be a separate command yet. The logic for controlling the content is in the RefactoringPanel
+  showCodeImprovementGuide(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
+    const editor = window.activeTextEditor;
+    if (editor) {
       editor.revealRange(fnToRefactor.range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
     }
     const initiatorViewColumn = editor?.viewColumn;
@@ -128,11 +152,11 @@ export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringA
     case 3:
     case 2:
       title = `✨ Auto-refactor`;
-      command = showRefactoringCmdName;
+      command = showAutoRefactoringCmdName;
       break;
     case 1:
       title = `🧐 Improvement guide`;
-      command = showRefactoringCmdName;
+      command = showCodeImprovementCmdName;
       break;
     default:
       logOutputChannel.error(`Confidence level ${confidenceLevel} => no command`);
