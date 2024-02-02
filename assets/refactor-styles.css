@@ -8,6 +8,7 @@ h2 {
 
 .code-container {
   position: relative;
+  margin-bottom: 54px;
 }
 
 #copy-to-clipboard {
@@ -17,22 +18,19 @@ h2 {
 }
 
 .bottom-controls {
+  display: flex;
   position: fixed;
+  justify-content: space-between;
   width: 100%;
   bottom: 0;
-  right: 0;
+  left: 0;
   background-color: var(--background);
 }
 
-.buttons-right {
-  display: flex;
-  float: right;
-  gap: 8px;
+.button-group {
+  display: inline-flex;
+  gap: 12px;
   margin: 8px 12px;
-}
-
-span.spacer{
-  flex-grow: 2;
 }
 
 .action-badge {
