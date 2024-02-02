@@ -1,8 +1,7 @@
 import vscode, { CodeActionKind } from 'vscode';
-import { RefactorResponse } from '../cs-rest-api';
 import { isDefined } from '../utils';
-import { FnToRefactor, commandFromLevel } from './command';
-import { CsRefactoringRequests } from './cs-refactoring-requests';
+import { commandFromLevel } from './command';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
@@ -15,30 +14,34 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const codeActions = context.diagnostics
-      .filter(this.codeSmellFilter)
-      .map((diagnostic) => {
-        const refacRequest = CsRefactoringRequests.get(document, diagnostic);
-        if (!refacRequest?.resolvedResponse) {
-          return;
-        }
-        const response = refacRequest.resolvedResponse;
-        const fnToRefactor = refacRequest.fnToRefactor;
-        return toCodeAction(document, response, fnToRefactor);
-      })
-      .filter(isDefined);
+    const uniqueRequests = new Set<CsRefactoringRequest>();
+
+    context.diagnostics.filter(this.codeSmellFilter).forEach((diagnostic) => {
+      const refacRequest = CsRefactoringRequests.get(document, diagnostic);
+      if (!refacRequest?.resolvedResponse) return;
+      uniqueRequests.add(refacRequest);
+    });
+
+    const codeActions: vscode.CodeAction[] = [];
+    uniqueRequests.forEach((request) => {
+      const action = toCodeAction(document, request);
+      isDefined(action) && codeActions.push(action);
+    });
 
     return codeActions;
   }
 }
 
-function toCodeAction(document: vscode.TextDocument, response: RefactorResponse, fnToRefactor: FnToRefactor) {
+function toCodeAction(document: vscode.TextDocument, refactoringRequest: CsRefactoringRequest) {
+  const { resolvedResponse, fnToRefactor } = refactoringRequest;
+  if (!isDefined(resolvedResponse)) return;
+
   const {
     confidence: { level },
-  } = response;
+  } = resolvedResponse;
 
   let codeActionKind;
-  let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: response });
+  let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: resolvedResponse });
 
   switch (level) {
     case 3:
