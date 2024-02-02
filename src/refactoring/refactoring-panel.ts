@@ -1,3 +1,5 @@
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import vscode, {
   Disposable,
   Range,
@@ -9,7 +11,8 @@ import vscode, {
   WebviewPanel,
   WorkspaceEdit,
 } from 'vscode';
-import { RefactorConfidence, RefactorResponse } from '../cs-rest-api';
+import { RefactorResponse } from '../cs-rest-api';
+import { categoryToDocsCode } from '../csdoc';
 import { logOutputChannel } from '../log';
 import { getLogoUrl } from '../utils';
 import { FnToRefactor } from './command';
@@ -64,9 +67,12 @@ export class RefactoringPanel {
             this.dispose();
             return;
           case 'reject':
-          case 'close':
             await this.rejectRefactoring(refactoringState);
             await this.deselectRefactoring(refactoringState);
+            this.dispose();
+            return;
+          case 'close':
+            await this.rejectRefactoring(refactoringState);
             this.dispose();
             return;
           case 'copy-code':
@@ -292,19 +298,28 @@ export class RefactoringPanel {
     return content;
   }
 
+  private async codeSmellsGuide(codeSmell: string) {
+    const docsPath = categoryToDocsCode(codeSmell) + '-guide.md';
+    const path = join(this.extensionUri.path, 'docs', docsPath);
+    const docsGuide = await readFile(path);
+    return vscode.commands.executeCommand<string>('markdown.api.render', docsGuide.toString());
+  }
+
   private async codeImprovementContent(response: RefactorResponse, code: string, languageId: string) {
-    const { reasons } = response;
-    let solutionContent = '';
-    if (reasons && reasons.length > 0) {
-      const solutionText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
-      solutionContent = /*html*/ `
-          <h4>Solution</h4>
-          <ul>${solutionText}</ul>
-        `;
+    const {
+      'refactoring-properties': { 'removed-code-smells': removedCodeSmells },
+    } = response;
+
+    let solutionContent;
+    if (removedCodeSmells.length > 0) {
+      solutionContent = await this.codeSmellsGuide(removedCodeSmells[0]);
+    } else {
+      solutionContent = await this.codeSmellsGuide('general-code-improvements');
     }
+
     const content = /*html*/ `
         ${solutionContent}
-        <h4>Example refactoring</h4>
+        <h4>Example from your code</h4>
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
           <div class="buttons-right">
