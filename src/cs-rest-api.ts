@@ -46,10 +46,14 @@ export interface RefactorConfidence {
   level: number;
   'recommended-action': { description: string; details: string };
 }
-
+interface RefactorProperties {
+  'added-code-smells': string[];
+  'removed-code-smells': string[];
+}
 export interface RefactorResponse {
   confidence: RefactorConfidence;
   reasons: string[];
+  'refactoring-properties': RefactorProperties;
   code: string;
 }
 

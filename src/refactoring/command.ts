@@ -64,7 +64,6 @@ export class CsRefactoringCommand {
     });
   }
 
-  // TODO - not sure if this needs to be a separate command yet. The logic for controlling the content is in the RefactoringPanel
   showCodeImprovementGuide(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
     const editor = window.activeTextEditor;
     if (editor) {
