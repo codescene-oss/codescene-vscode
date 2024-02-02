@@ -42,6 +42,7 @@ export interface RefactorRequest {
 
 export interface RefactorConfidence {
   description: string;
+  title: string;
   level: number;
   'recommended-action': { description: string; details: string };
 }
