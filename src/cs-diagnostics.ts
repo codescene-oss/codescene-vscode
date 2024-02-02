@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { CsRestApi } from './cs-rest-api';
 import { requestRefactoringsCmdName } from './refactoring/command';
 import Reviewer, { ReviewOpts } from './review/reviewer';
 

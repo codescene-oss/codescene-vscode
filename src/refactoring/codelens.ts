@@ -39,13 +39,17 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     const supportedDiagnostics = vscode.languages.getDiagnostics(document.uri).filter(this.codeSmellFilter);
 
-    /**
-     * One codelens per FnToRefactor or diagnostic that does NOT start at the same line
-     */
-
-    // Put one codelens per unique start position.. is this sane?
+    // Map unique positions in the code to a CodeLens
     const positionToCodeLens: Map<string, CsRefactorCodeLens> = new Map();
     const positionKey = (pos: vscode.Position) => `${pos.line}`;
+
+    const conditionalCodeLens = (request: CsRefactoringRequest, diagnostic: vscode.Diagnostic) => {
+      const differentLine = request.fnToRefactor.range.start.line !== diagnostic.range.start.line;
+      if (isDefined(request.resolvedResponse)) {
+        return request.resolvedResponse.confidence.level >= 2 && differentLine;
+      }
+      return differentLine;
+    };
 
     supportedDiagnostics.forEach((diagnostic) => {
       const request = CsRefactoringRequests.get(document, diagnostic);
@@ -57,8 +61,13 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
           new CsRefactorCodeLens(request.fnToRefactor.range, document, request)
         );
 
-        // Add a lens at the start of the diagnostic as well, if it's not at the same line as the function
-        if (request.fnToRefactor.range.start.line !== diagnostic.range.start.line) {
+        /**
+         * Conditionally add a lens not only at the start of the function, but at the start of the diagnostic as well.
+         * For example complex conditionals will be inside a function.
+         * If the refactoring is resolved we show it only if it's a mid-high confidence refactoring. (otherwise it's
+         * a Code improvement guide)
+         **/
+        if (conditionalCodeLens(request, diagnostic)) {
           positionToCodeLens.set(
             positionKey(diagnostic.range.start),
             new CsRefactorCodeLens(diagnostic.range, document, request)
@@ -72,6 +81,9 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     return lenses;
   }
 
+  /**
+   * The summary lens summarizes the number of actual code lenses shown to the user - not the number of unique refactorings.
+   */
   private addSummaryLens(document: vscode.TextDocument, lenses: CsRefactorCodeLens[]) {
     if (lenses.length > 0) {
       const requests = lenses
