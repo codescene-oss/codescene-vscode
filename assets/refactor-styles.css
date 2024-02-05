@@ -30,7 +30,13 @@ h2 {
 .button-group {
   display: inline-flex;
   gap: 12px;
-  margin: 8px 12px;
+  margin: 12px 0;
+}
+.button-group.left {
+  margin-left: 52px;
+}
+.button-group.right {
+  margin-right: 52px;
 }
 
 .action-badge {

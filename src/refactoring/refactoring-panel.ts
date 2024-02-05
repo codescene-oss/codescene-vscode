@@ -286,11 +286,11 @@ export class RefactoringPanel {
         ${reasonsContent}
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
-          <div class="button-group">
+          <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
             <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
           </div>
-          <div class="button-group">
+          <div class="button-group right">
             <vscode-button id="reject-button" appearance="secondary" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
             <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
           </div>
@@ -317,18 +317,18 @@ export class RefactoringPanel {
     } else {
       solutionContent = await this.codeSmellsGuide('general-code-improvements');
     }
-/* 
- */
+    /*
+     */
     const content = /*html*/ `
         ${solutionContent}
         <h4>Example from your code</h4>
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
-          <div class="button-group">
+          <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
             <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
           </div>
-          <div class="button-group">
+          <div class="button-group right">
             <vscode-button id="close-button" appearance="primary" aria-label="Close" title="Close">Close</vscode-button>
           </div>
         </div>
@@ -347,7 +347,7 @@ export class RefactoringPanel {
     <p>${errorMessage}</p>
     <div class="bottom-controls">
       <div></div> <!-- Spacer, making sure close button is right aligned -->
-      <div class="button-group">
+      <div class="button-group right">
         <vscode-button id="close-button" appearance="primary">Close</vscode-button>
       </div>
     </div>
