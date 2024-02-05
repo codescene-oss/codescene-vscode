@@ -3,9 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { Diagnostic, TextDocument, Uri } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { rangeStr } from '../utils';
+import { isDefined, rangeStr } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
 import { FnToRefactor } from './command';
+import { defaultMaxListeners } from 'events';
 
 export class CsRefactoringRequest {
   resolvedResponse?: RefactorResponse;
@@ -45,7 +46,7 @@ export class CsRefactoringRequest {
       .catch((err: Error | AxiosError) => {
         this.error = err.message;
         if (err instanceof AxiosError) {
-          this.error = `[${err.code}] ${err.message}`;
+          this.error = this.getErrorString(err);
         }
         logOutputChannel.error(`Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`);
         return this.error;
@@ -57,6 +58,14 @@ export class CsRefactoringRequest {
 
   abort() {
     this.abortController.abort();
+  }
+
+  private getErrorString(err: AxiosError) {
+    let defaultMsg = `[${err.code}] ${err.message}`;
+    if (!isDefined(err.response)) return defaultMsg;
+
+    const data = err.response?.data as { error?: string };
+    return data.error ? `[${err.code}] ${data.error}` : defaultMsg;
   }
 
   private logIdString(traceId: string, fnToRefactor: FnToRefactor) {
