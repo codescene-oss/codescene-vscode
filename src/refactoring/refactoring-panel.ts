@@ -56,7 +56,7 @@ export class RefactoringPanel {
     this.webViewPanel.webview.onDidReceiveMessage(
       async (message) => {
         if (!this.currentRefactorState) {
-          logOutputChannel.info('No current refactoring state');
+          logOutputChannel.debug('No current refactoring state');
           return;
         }
         const refactoringState = this.currentRefactorState;

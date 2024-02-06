@@ -24,11 +24,11 @@ export class CsRefactoringRequest {
     this.fnToRefactor = fnToRefactor;
     this.abortController = new AbortController();
     const traceId = uuidv4();
-    logOutputChannel.info(`Refactor request for ${this.logIdString(traceId, fnToRefactor)}`);
+    logOutputChannel.debug(`Refactor request for ${this.logIdString(traceId, fnToRefactor)}`);
     this.refactorResponse = csRestApi
       .fetchRefactoring(diagnostics, fnToRefactor, traceId, this.abortController.signal)
       .then((response) => {
-        logOutputChannel.info(
+        logOutputChannel.debug(
           `Refactor response for ${this.logIdString(traceId, fnToRefactor)}: ${this.confidenceString(
             response.confidence
           )}`
