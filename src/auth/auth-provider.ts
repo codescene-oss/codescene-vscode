@@ -52,13 +52,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
     return this.sessionChangeEmitter.event;
   }
 
-  get redirectUri() {
-    const publisher = this.context.extension.packageJSON.publisher;
-    const name = this.context.extension.packageJSON.name;
-    // E.g. vscode://codescene.codescene-vscode
-    return `${env.uriScheme}://${publisher}.${name}`;
-  }
-
   /**
    * Get the existing sessions.
    * @param scopes
@@ -160,13 +153,10 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         cancellable: true,
       },
       async (_, cancel) => {
-        const searchParams = new URLSearchParams({
-          'redirect-url': this.redirectUri,
+        const tokenParams = new URLSearchParams({
+          next: `configuration/devtools-tokens/add/vscode`,
         });
-
-        const tokenPath = `/configuration/devtools-tokens/add?${searchParams.toString()}`;
-        const loginUrl = Uri.parse(`${getServerUrl()}/login?next=${tokenPath}`);
-
+        const loginUrl = Uri.parse(`${getServerUrl()}/login?${tokenParams.toString()}`);
         outputChannel.appendLine(`Opening ${loginUrl.toString()}`);
 
         await env.openExternal(loginUrl);
