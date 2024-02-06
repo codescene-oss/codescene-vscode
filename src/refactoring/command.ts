@@ -119,7 +119,7 @@ async function findFunctionToRefactor(
 
   const loc = enclosingFnRange.end.line - enclosingFnRange.start.line;
   if (loc > maxInputLoc) {
-    logOutputChannel.warn(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc})`);
+    logOutputChannel.info(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc}) - ignoring`);
     return;
   }
 
