@@ -3,7 +3,7 @@
 
 This extension analyses your code, and warns you if there are issues that makes it more difficult to maintain. This is a free, standalone version of [CodeScene's](http://www.codescene.com) code health analysis. It very likely supports your language. See the full list of supported languages below.
 
-It performs the analysis in the background automatically and reports any issues right next to your code. See the screenshots to see how it's presented.
+It performs the analysis in the background automatically and reports any issues right next to your code. See screenshots below to see how it's presented.
 
 ## Code Health
 Aside from reporting individual issues, we also display a Code Health score of 1-10 for each file. Code Health is an aggregated metric based on 25+ factors scanned from the source code. The Code Health factors correlate with increased maintenance costs and an increased risk for defects.
@@ -26,9 +26,23 @@ You can find more detailed information for each Code Health issue by drilling do
 
 You may also look at our main CodeScene [docs](https://codescene.io/docs/guides/technical/code-health.html) on code health for more info.
 
-## Change Coupling
+## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Automated Code Engineering (ACE) 
 
-Connect to your CodeScene subscription to enable the Change Coupling analysis. Looking at the Change Coupling will help you understand how files change together over time. It can be useful for navigating between related files, and can also make it easier to pinpoint other files that might need updating when working on a certain file. See more about Change Coupling on [codescene.com](https://codescene.com/ide-extension).
+CodeScene has always been great at identifying code smells and prioritizing them. With our AI-based Auto-Refactor capability we make those insights actionable, too. Better: we also fact-check the AI code to ensure it makes the right thing, saving you a lot of time and guaranteeing that your refactorings are both correct and impactful.
+
+This feature extends CodeScene's capabilities to not only identify code health issues but also automatically suggest and perform code refactoring to improve the overall maintainability of your codebase. CodeScene's ACE is designed to enhance your development experience by proactively addressing issues in your code. By leveraging advanced analysis techniques with help of AI, it can help identify areas of improvement within your code and provide automated suggestions for refactoring.
+
+CodeScene Automated Code Engineering requires signing in to a CodeScene instance. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
+
+### Current Language Support for ACE
+- ✅ JavaScript
+- ✅ TypeScript
+- ✅ React (jsx/tsx)
+
+
+## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Change Coupling
+
+Sign in to your CodeScene account to enable the Change Coupling analysis. Looking at the Change Coupling will help you understand how files change together over time. It can be useful for navigating between related files, and can also make it easier to pinpoint other files that might need updating when working on a certain file. See more about Change Coupling on [codescene.com](https://codescene.com/ide-extension).
 
 ## Example screenshots
 
@@ -80,10 +94,11 @@ CodeScene supports most popular languages. Here is the full list:
 
 ## Features
 
-- Diagnostics for functions with code health issues
-- Optionally show code issues as code lenses for the affected function
+- Diagnostics for functions with code health issues.
+- Optionally show code issues as code lenses for the affected function.
 - Customizable code health rules via `.codescene/code-health-rules.json` ([format description](https://codescene.io/docs/guides/technical/code-health.html#advanced-override-the-low-level-code-health-thresholds)). You can create a template with the command `codescene.createRulesTemplate`.
 - Use an active CodeScene account to enable monitoring of Change Coupling.
+- Get automated refactoring suggestions with Automated Code Engineering.
 
 Note on custom code health rules: this is the same mechanism as the full CodeScene product.
 Adding this file to your repo affects analyses by CodeScene as well.
