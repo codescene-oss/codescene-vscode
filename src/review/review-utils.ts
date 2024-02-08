@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ReviewIssue, IssueDetails } from './model';
 import { getFunctionNameRange } from '../utils';
 import { categoryToDocsCode } from '../csdoc';
+import { csSource } from '../cs-diagnostics';
 
 function issueToRange(category: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
   const startLine = issue['start-line'] - 1;
@@ -46,7 +47,7 @@ export function reviewIssueToDiagnostics(
       message = category;
     }
     const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
-    diagnostic.source = 'cs'; // Shown in the Problems view
+    diagnostic.source = csSource;
     diagnostic.code = createDiagnosticCode(category);
     return diagnostic;
   });

@@ -3,7 +3,6 @@ import { requestRefactoringsCmdName } from './refactoring/command';
 import Reviewer, { ReviewOpts } from './review/reviewer';
 
 export const csSource = 'CodeScene';
-export const csRefactorableSource = 'CodeScene AutoRefactor';
 
 export default class CsDiagnosticsCollection {
   private static _instance: vscode.DiagnosticCollection;
