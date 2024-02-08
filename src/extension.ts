@@ -100,7 +100,7 @@ function getSupportedDocumentSelector(supportedLanguages: string[]) {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { cliPath, csWorkspace } = csContext;
+  const { cliPath } = csContext;
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
@@ -218,6 +218,15 @@ function addRefactoringCodeAction(
   );
 }
 
+function requireReloadWindowFn(message: string) {
+  return async () => {
+    const result = await vscode.window.showInformationMessage(message, 'Reload');
+    if (result === 'Reload') {
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    }
+  };
+}
+
 /**
  * Active functionality that requires a connection to a CodeScene server.
  */
@@ -245,15 +254,10 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
-  onDidChangeConfiguration('enableAiRefactoring', async (e) => {
-    const result = await vscode.window.showInformationMessage(
-      'CodeScene: VS Code needs to be reloaded to enable/disable this feature.',
-      'Reload'
-    );
-    if (result === 'Reload') {
-      vscode.commands.executeCommand('workbench.action.reloadWindow');
-    }
-  });
+  onDidChangeConfiguration(
+    'enableAiRefactoring',
+    requireReloadWindowFn('VS Code needs to be reloaded to enable/disable this feature.')
+  );
 }
 
 async function enableRefactoringCommand(context: vscode.ExtensionContext, csContext: CsContext) {
@@ -325,8 +329,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
       csWorkspace.updateIsLoggedInContext(false);
-
-      // TODO - disable/unload the remote features
+      
+      requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
+      // TODO - Instead rewrite all online functionality to be easily toggled...
     }
   });
   context.subscriptions.push(authProvider);
