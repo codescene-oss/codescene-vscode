@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.0...v0.6.1) (2024-02-12)
+
+
+### Bug fixes
+
+* Sign-in url adapted to updated service ([d089585](https://github.com/codescene-oss/codescene-vscode/commit/d08958519f2ac27234a36dbf2ecaa7e39e7d00a2))
+
 ## [0.6.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.5.1...v0.6.0) (2023-11-13)
 
 
