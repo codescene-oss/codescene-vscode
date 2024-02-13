@@ -21,15 +21,25 @@ export class CsRefactorCodeLens extends vscode.CodeLens {
   }
 }
 
-export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRefactorCodeLens> {
+export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRefactorCodeLens>, vscode.Disposable {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
+  private disposables: vscode.Disposable[] = [];
 
   constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
     outputChannel.appendLine('Creating Auto-refactor CodeLens provider');
+    this.disposables.push(
+      CsRefactoringRequests.onDidChangeRequests(() => {
+        this.onDidChangeCodeLensesEmitter.fire();
+      })
+    );
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
     return this.onDidChangeCodeLensesEmitter.event;
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
@@ -103,7 +113,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     if (codeLens.csRefactoringRequest instanceof Array) {
       logOutputChannel.debug(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
       let title = `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`;
-      let command = 'noop';
+      let command = 'codescene.explorerACEView.focus';
       codeLens.command = { title, command };
       return codeLens;
     }
@@ -118,7 +128,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     const { resolvedResponse } = request; // error requests should not have been provided (see above)
     if (!resolvedResponse) {
       let title = '🛠️ Auto-refactor pending...';
-      let command = 'noop';
+      let command = 'codescene.explorerACEView.focus';
       codeLens.command = { title, command };
       return codeLens;
     }
@@ -147,9 +157,5 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
   private pluralize(word: string, n: number) {
     return n === 1 ? word : `${word}s`;
-  }
-
-  update() {
-    this.onDidChangeCodeLensesEmitter.fire();
   }
 }

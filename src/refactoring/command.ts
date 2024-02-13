@@ -10,6 +10,7 @@ import { RefactoringPanel } from './refactoring-panel';
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const showAutoRefactoringCmdName = 'codescene.showAutoRefactoring';
 export const showCodeImprovementCmdName = 'codescene.showCodeImprovement';
+export const showACEContextView = 'codescene.showRefactoringContext';
 
 export interface FnToRefactor {
   name: string;
@@ -45,6 +46,23 @@ export class CsRefactoringCommand {
     this.context.subscriptions.push(showCodeImprovementCmd);
     const showRefactoringCmd = vscode.commands.registerCommand(showAutoRefactoringCmdName, this.showRefactoring, this);
     this.context.subscriptions.push(showRefactoringCmd);
+    const showACEContextViewCmd = vscode.commands.registerCommand(showACEContextView, this.showACEContextView, this);
+    this.context.subscriptions.push(showACEContextViewCmd);
+  }
+
+  showACEContextView(refactoringRequest: CsRefactoringRequest) {
+    if (!refactoringRequest.resolvedResponse) return;
+    const activeDoc = window.activeTextEditor?.document;
+    if (!activeDoc) return;
+
+    const response = refactoringRequest.resolvedResponse;
+    const cmd = commandFromLevel(response.confidence.level, {
+      document: activeDoc,
+      fnToRefactor: refactoringRequest.fnToRefactor,
+      refactorResponse: response,
+    });
+    if (!cmd) return;
+    vscode.commands.executeCommand(cmd.command, ...cmd.arguments);
   }
 
   showRefactoring(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
@@ -63,7 +81,11 @@ export class CsRefactoringCommand {
     });
   }
 
-  showCodeImprovementGuide(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
+  showCodeImprovementGuide(
+    document: vscode.TextDocument,
+    fnToRefactor: FnToRefactor,
+    refactorResponse: RefactorResponse
+  ) {
     const initiatorViewColumn = window.activeTextEditor?.viewColumn;
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
@@ -82,14 +104,11 @@ export class CsRefactoringCommand {
     ).then((fns) => fns.filter(isDefined));
 
     const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
-    distinctFns.forEach(async (fn) => {
-      const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
-      const req = new CsRefactoringRequest(this.csRestApi, this.codeLensProvider, diagnosticsForFn, fn);
-      diagnosticsForFn.forEach((d) => {
-        // Save the request for each diagnostic for easy access in codelens and codeaction providers
-        CsRefactoringRequests.set(document, d, req);
-      });
-    });
+    CsRefactoringRequests.initiate(
+      { codeLensProvider: this.codeLensProvider, csRestApi: this.csRestApi, document: document },
+      distinctFns,
+      diagnostics
+    );
   }
 }
 
@@ -138,17 +157,30 @@ interface ShowRefactoringArgs {
   refactorResponse: RefactorResponse;
 }
 
-export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringArgs) {
-  let title = '';
-  let command = '';
+export function toConfidenceSymbol(confidenceLevel?: number) {
   switch (confidenceLevel) {
     case 3:
     case 2:
-      title = `✨ Auto-refactor`;
+      return '✨';
+    case 1:
+      return '🧐';
+    default:
+      return '🛠️';
+  }
+}
+
+export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringArgs) {
+  let title = '';
+  let command = '';
+  const symbol = toConfidenceSymbol(confidenceLevel);
+  switch (confidenceLevel) {
+    case 3:
+    case 2:
+      title = `${symbol} Auto-refactor`;
       command = showAutoRefactoringCmdName;
       break;
     case 1:
-      title = `🧐 Improvement guide`;
+      title = `${symbol} Improvement guide`;
       command = showCodeImprovementCmdName;
       break;
     default:
