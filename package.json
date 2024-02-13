@@ -102,6 +102,10 @@
       {
         "command": "codescene.openXRay",
         "title": "CodeScene: Open X-Ray"
+      },
+      {
+        "command": "codescene.showRefactoringContext",
+        "title": "Show Automated Code Engineering view"
       }
     ],
     "viewsContainers": {
@@ -124,6 +128,10 @@
         {
           "id": "codescene.explorerCouplingsView",
           "name": "Change coupling"
+        },
+        {
+          "id": "codescene.explorerACEView",
+          "name": "Automated Code Engineering"
         }
       ],
       "codescene-activity-bar": [
@@ -163,6 +171,11 @@
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
         "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+      },
+      {
+        "view": "codescene.explorerACEView",
+        "contents": "To see Automated Code Engineering suggestions, you need to be logged in to the CodeScene server",
+        "when": "!codescene.isLoggedIn"
       }
     ],
     "menus": {
@@ -186,6 +199,10 @@
         {
           "command": "codescene.openCodeReview",
           "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
+        },
+        {
+          "command": "codescene.showRefactoringContext",
+          "when": "view == codescene.explorerACEView"
         }
       ],
       "commandPalette": [

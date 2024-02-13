@@ -12,7 +12,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import { CsWorkspace } from './workspace';
 import { Links } from './links';
-import { CsRestApi } from './cs-rest-api';
+import { CsRestApi, PreFlightResponse } from './cs-rest-api';
 import { Git } from './git';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
@@ -22,6 +22,7 @@ import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { isDefined } from './utils';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
+import { RefactoringsView } from './refactoring/refactorings-view';
 
 interface CsContext {
   cliPath: string;
@@ -250,7 +251,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   // Refactoring features
   const enableAiRefactoring = getConfiguration('enableAiRefactoring');
   if (enableAiRefactoring) {
-    await enableRefactoringCommand(context, csContext);
+    await enableAiRefactoringCapabilities(context, csContext);
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
@@ -260,7 +261,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   );
 }
 
-async function enableRefactoringCommand(context: vscode.ExtensionContext, csContext: CsContext) {
+async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
@@ -276,6 +277,7 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
       d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 
     const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
+    context.subscriptions.push(codeLensProvider);
     const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider);
     context.subscriptions.push(codeLensProviderDisposable);
 
@@ -303,6 +305,10 @@ async function enableRefactoringCommand(context: vscode.ExtensionContext, csCont
     context.subscriptions.push(
       vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider)
     );
+
+    const refactoringsView = new RefactoringsView();
+    context.subscriptions.push(refactoringsView);
+
     outputChannel.appendLine('AI refactoring features enabled');
   }
 }
@@ -329,7 +335,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
       csWorkspace.updateIsLoggedInContext(false);
-      
+
       requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
       // TODO - Instead rewrite all online functionality to be easily toggled...
     }

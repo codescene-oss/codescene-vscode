@@ -1,45 +1,43 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic, TextDocument, Uri } from 'vscode';
+import { EventEmitter, Diagnostic, TextDocument, Uri } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
 import { FnToRefactor } from './command';
-import { defaultMaxListeners } from 'events';
 
 export class CsRefactoringRequest {
   resolvedResponse?: RefactorResponse;
   error?: string;
   refactorResponse?: Promise<RefactorResponse | string>;
   fnToRefactor: FnToRefactor;
+  traceId: string;
   private abortController: AbortController;
 
-  constructor(
-    csRestApi: CsRestApi,
-    codeLensProvider: CsRefactorCodeLensProvider,
-    diagnostics: Diagnostic[],
-    fnToRefactor: FnToRefactor
-  ) {
+  constructor(fnToRefactor: FnToRefactor) {
     this.fnToRefactor = fnToRefactor;
+    this.traceId = uuidv4();
     this.abortController = new AbortController();
-    const traceId = uuidv4();
-    logOutputChannel.debug(`Refactor request for ${this.logIdString(traceId, fnToRefactor)}`);
+  }
+
+  post(csRestApi: CsRestApi, diagnostics: Diagnostic[]) {
+    logOutputChannel.debug(`Refactor request for ${this.logIdString(this.traceId, this.fnToRefactor)}`);
     this.refactorResponse = csRestApi
-      .fetchRefactoring(diagnostics, fnToRefactor, traceId, this.abortController.signal)
+      .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
       .then((response) => {
-        logOutputChannel.debug(
-          `Refactor response for ${this.logIdString(traceId, fnToRefactor)}: ${this.confidenceString(
-            response.confidence
-          )}`
-        );
         if (!this.validConfidenceLevel(response.confidence.level)) {
           this.error = `Invalid confidence level: ${this.confidenceString(response.confidence)}`;
           logOutputChannel.error(
-            `Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`
+            `Refactor response error for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.error}`
           );
           return this.error;
         }
+        logOutputChannel.debug(
+          `Refactor response for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.confidenceString(
+            response.confidence
+          )}`
+        );
         this.resolvedResponse = response;
         return response;
       })
@@ -48,12 +46,12 @@ export class CsRefactoringRequest {
         if (err instanceof AxiosError) {
           this.error = this.getErrorString(err);
         }
-        logOutputChannel.error(`Refactor response error for ${this.logIdString(traceId, fnToRefactor)}: ${this.error}`);
+        logOutputChannel.error(
+          `Refactor response error for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.error}`
+        );
         return this.error;
-      })
-      .finally(() => {
-        codeLensProvider.update();
       });
+    return this.refactorResponse;
   }
 
   abort() {
@@ -88,6 +86,28 @@ export class CsRefactoringRequest {
 export class CsRefactoringRequests {
   private static readonly map: Map<Uri, Map<Diagnostic, CsRefactoringRequest>> = new Map();
 
+  private static readonly requestsEmitter = new EventEmitter<void>();
+  static readonly onDidChangeRequests = CsRefactoringRequests.requestsEmitter.event;
+
+  static initiate(
+    context: { csRestApi: CsRestApi; document: TextDocument; codeLensProvider: CsRefactorCodeLensProvider },
+    fnsToRefactor: FnToRefactor[],
+    diagnostics: Diagnostic[]
+  ) {
+    fnsToRefactor.forEach(async (fn) => {
+      const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
+      const req = new CsRefactoringRequest(fn);
+      req.post(context.csRestApi, diagnosticsForFn).finally(() => {
+        CsRefactoringRequests.requestsEmitter.fire(); // Fire updates for all finished requests
+      });
+      // Put the request for each diagnostic in a map for access in codelens and codeaction providers
+      diagnosticsForFn.forEach((d) => {
+        CsRefactoringRequests.set(context.document, d, req);
+      });
+    });
+    CsRefactoringRequests.requestsEmitter.fire();
+  }
+
   static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
     let map = CsRefactoringRequests.map.get(document.uri);
     if (!map) {
@@ -103,5 +123,13 @@ export class CsRefactoringRequests {
       return;
     }
     return map.get(diagnostic);
+  }
+
+  static getAll(document: TextDocument) {
+    const map = CsRefactoringRequests.map.get(document.uri);
+    if (!map) {
+      return [];
+    }
+    return [...map.values()];
   }
 }
