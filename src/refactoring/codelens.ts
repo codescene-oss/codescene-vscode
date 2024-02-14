@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
-import { commandFromLevel } from './command';
+import { commandFromLevel, pendingSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
@@ -112,9 +112,10 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
   ): vscode.ProviderResult<CsRefactorCodeLens> {
     if (codeLens.csRefactoringRequest instanceof Array) {
       logOutputChannel.debug(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
-      let title = `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`;
-      let command = 'codescene.explorerACEView.focus';
-      codeLens.command = { title, command };
+      codeLens.command = {
+        title: `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`,
+        command: 'codescene.explorerACEView.focus',
+      };
       return codeLens;
     }
 
@@ -127,17 +128,14 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     const { resolvedResponse } = request; // error requests should not have been provided (see above)
     if (!resolvedResponse) {
-      let title = '🛠️ Auto-refactor pending...';
-      let command = 'codescene.explorerACEView.focus';
-      codeLens.command = { title, command };
+      codeLens.command = {
+        title: `${pendingSymbol} Auto-refactor pending...`,
+        command: 'codescene.explorerACEView.focus',
+      };
       return codeLens;
     }
 
-    codeLens.command = commandFromLevel(resolvedResponse.confidence.level, {
-      document: codeLens.document,
-      fnToRefactor: request.fnToRefactor,
-      refactorResponse: resolvedResponse,
-    });
+    codeLens.command = commandFromLevel(resolvedResponse.confidence.level, request);
 
     return codeLens;
   }
@@ -151,7 +149,9 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     const nRefacString =
       nRefactorings > 0 ? `${nRefactorings} ${this.pluralize('refactoring', nRefactorings)}` : undefined;
     const nCodeImprovementString =
-      nImprovementGuides > 0 ? `${nImprovementGuides} ${this.pluralize('improvement guide', nImprovementGuides)}` : undefined;
+      nImprovementGuides > 0
+        ? `${nImprovementGuides} ${this.pluralize('improvement guide', nImprovementGuides)}`
+        : undefined;
     return [pendingString, nRefacString, nCodeImprovementString].filter(isDefined).join(', ');
   }
 

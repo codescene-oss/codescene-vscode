@@ -5,9 +5,9 @@
  * currently active in the editor. The user can jump to these files by clicking on them.
  */
 import * as vscode from 'vscode';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { isDefined } from '../utils';
-import { toConfidenceSymbol } from './command';
+import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './command';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -29,6 +29,36 @@ export class RefactoringsView implements vscode.Disposable {
         view.description = entityFilename;
       })
     );
+
+    const gotoAndPresentRefactoringCmd = vscode.commands.registerCommand(
+      'codescene.gotoAndPresentRefactoring',
+      this.gotoAndPresentRefactoring,
+      this
+    );
+    this.disposables.push(gotoAndPresentRefactoringCmd);
+  }
+
+  private rangeOutsideAllVisibleRanges(target: vscode.Range, visibleRanges: readonly vscode.Range[]) {
+    return visibleRanges.every((r) => !r.intersection(target));
+  }
+
+  /**
+   * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
+   * targeted refactoring. This is necessary because the refactored function might not be in current view.
+   * @param refactoringRequest
+   */
+  gotoAndPresentRefactoring(refactoringRequest: CsRefactoringRequest) {
+    const editorForDoc = vscode.window.visibleTextEditors.find((e) => e.document === refactoringRequest.document);
+    if (
+      isDefined(editorForDoc) &&
+      this.rangeOutsideAllVisibleRanges(refactoringRequest.fnToRefactor.range, editorForDoc.visibleRanges)
+    ) {
+      editorForDoc.revealRange(
+        refactoringRequest.fnToRefactor.range,
+        vscode.TextEditorRevealType.Default
+      );
+    }
+    vscode.commands.executeCommand(presentRefactoringCmdName, refactoringRequest);
   }
 
   dispose() {
@@ -77,9 +107,8 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   getTreeItem(request: CsRefactoringRequest): vscode.TreeItem | Thenable<vscode.TreeItem> {
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
-      return `${toConfidenceSymbol(request.resolvedResponse?.confidence.level)} "${request.fnToRefactor.name}" [${
-        range.start.line
-      }:${range.start.character}]`;
+      const symbol = toConfidenceSymbol(request.resolvedResponse?.confidence.level);
+      return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [${range.start.line}:${range.start.character}]`;
     };
 
     const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
