@@ -1,6 +1,6 @@
-import vscode, { TextDocument, window } from 'vscode';
+import vscode, { TextDocument } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { CsRestApi, RefactorResponse } from '../cs-rest-api';
+import { CsRestApi } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
@@ -8,9 +8,7 @@ import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-re
 import { RefactoringPanel } from './refactoring-panel';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
-export const showAutoRefactoringCmdName = 'codescene.showAutoRefactoring';
-export const showCodeImprovementCmdName = 'codescene.showCodeImprovement';
-export const showACEContextView = 'codescene.showRefactoringContext';
+export const presentRefactoringCmdName = 'codescene.presentRefactoring';
 
 export interface FnToRefactor {
   name: string;
@@ -38,53 +36,23 @@ export class CsRefactoringCommand {
       this
     );
     this.context.subscriptions.push(requestRefactoringCmd);
-    const showCodeImprovementCmd = vscode.commands.registerCommand(
-      showCodeImprovementCmdName,
-      this.showCodeImprovementGuide,
+    const presentRefactoringCmd = vscode.commands.registerCommand(
+      presentRefactoringCmdName,
+      this.presentRefactoringRequest,
       this
     );
-    this.context.subscriptions.push(showCodeImprovementCmd);
-    const showRefactoringCmd = vscode.commands.registerCommand(showAutoRefactoringCmdName, this.showRefactoring, this);
-    this.context.subscriptions.push(showRefactoringCmd);
-    const showACEContextViewCmd = vscode.commands.registerCommand(showACEContextView, this.showACEContextView, this);
-    this.context.subscriptions.push(showACEContextViewCmd);
+    this.context.subscriptions.push(presentRefactoringCmd);
   }
 
-  showACEContextView(refactoringRequest: CsRefactoringRequest) {
-    if (!refactoringRequest.resolvedResponse) return;
-    const activeDoc = window.activeTextEditor?.document;
-    if (!activeDoc) return;
+  presentRefactoringRequest(refactoringRequest: CsRefactoringRequest) {
+    if (!refactoringRequest.resolvedResponse) {
+      logOutputChannel.warn('No refactoring response for this refactoring yet.');
+      return;
+    }
 
-    const response = refactoringRequest.resolvedResponse;
-    const cmd = commandFromLevel(response.confidence.level, {
-      document: activeDoc,
-      fnToRefactor: refactoringRequest.fnToRefactor,
-      refactorResponse: response,
-    });
-    if (!cmd) return;
-    vscode.commands.executeCommand(cmd.command, ...cmd.arguments);
-  }
-
-  showRefactoring(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
-      document,
-      highlightCode: true,
-      fnToRefactor,
-      response: refactorResponse,
-    });
-  }
-
-  showCodeImprovementGuide(
-    document: vscode.TextDocument,
-    fnToRefactor: FnToRefactor,
-    refactorResponse: RefactorResponse
-  ) {
-    RefactoringPanel.createOrShow({
-      extensionUri: this.context.extensionUri,
-      document,
-      fnToRefactor,
-      response: refactorResponse,
+      refactoringRequest,
     });
   }
 
@@ -142,42 +110,37 @@ async function findFunctionToRefactor(
     content: document.getText(enclosingFnRange),
   } as FnToRefactor;
 }
-
-interface ShowRefactoringArgs {
-  document: vscode.TextDocument;
-  fnToRefactor: FnToRefactor;
-  refactorResponse: RefactorResponse;
-}
+export const refactoringSymbol = '✨';
+const codeImprovementGuideSymbol = '🧐';
+export const pendingSymbol = '⏳';
 
 export function toConfidenceSymbol(confidenceLevel?: number) {
   switch (confidenceLevel) {
     case 3:
     case 2:
-      return '✨';
+      return refactoringSymbol;
     case 1:
-      return '🧐';
+      return codeImprovementGuideSymbol;
     default:
-      return '🛠️';
+      return; // Missing confidence level can indicate that we don't have the response, or that an error has occurred.
   }
 }
 
-export function commandFromLevel(confidenceLevel: number, args: ShowRefactoringArgs) {
+export function commandFromLevel(confidenceLevel: number, request: CsRefactoringRequest) {
   let title = '';
-  let command = '';
+  let command = presentRefactoringCmdName;
   const symbol = toConfidenceSymbol(confidenceLevel);
   switch (confidenceLevel) {
     case 3:
     case 2:
       title = `${symbol} Auto-refactor`;
-      command = showAutoRefactoringCmdName;
       break;
     case 1:
       title = `${symbol} Improvement guide`;
-      command = showCodeImprovementCmdName;
       break;
     default:
       logOutputChannel.error(`Confidence level ${confidenceLevel} => no command`);
       return;
   }
-  return { title, command, arguments: [args.document, args.fnToRefactor, args.refactorResponse] };
+  return { title, command, arguments: [request] };
 }

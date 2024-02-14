@@ -104,7 +104,7 @@
         "title": "CodeScene: Open X-Ray"
       },
       {
-        "command": "codescene.showRefactoringContext",
+        "command": "codescene.gotoAndPresentRefactoring",
         "title": "Show Automated Code Engineering view"
       }
     ],
@@ -201,7 +201,7 @@
           "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
         },
         {
-          "command": "codescene.showRefactoringContext",
+          "command": "codescene.gotoAndPresentRefactoring",
           "when": "view == codescene.explorerACEView"
         }
       ],
@@ -229,7 +229,12 @@
         {
           "command": "codescene.openCodeReview",
           "when": "false"
+        },
+        {
+          "command": "codescene.gotoAndPresentRefactoring",
+          "when": "false"
         }
+
       ],
       "explorer/context": [
         {

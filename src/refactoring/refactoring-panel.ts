@@ -15,7 +15,8 @@ import { RefactorResponse } from '../cs-rest-api';
 import { categoryToDocsCode } from '../csdoc';
 import { logOutputChannel } from '../log';
 import { getLogoUrl } from '../utils';
-import { FnToRefactor } from './command';
+import { refactoringSymbol, toConfidenceSymbol } from './command';
+import { CsRefactoringRequest } from './cs-refactoring-requests';
 
 interface CurrentRefactorState {
   range: Range; // Range of code to be refactored
@@ -26,11 +27,8 @@ interface CurrentRefactorState {
 }
 
 interface RefactorPanelParams {
-  document: TextDocument;
   initiatorViewColumn?: ViewColumn;
-  highlightCode?: boolean;
-  fnToRefactor: FnToRefactor;
-  response?: RefactorResponse | string;
+  refactoringRequest: CsRefactoringRequest;
 }
 
 export class RefactoringPanel {
@@ -150,7 +148,7 @@ export class RefactoringPanel {
     const { document, range, initiatorViewColumn, highlightCode } = refactoringState;
     // Don't show original doc or try deselecting if the code wasn't highlighted
     // This indicates that we're just showing a code improvement guide
-    if (!highlightCode) return; 
+    if (!highlightCode) return;
 
     const editor = await vscode.window.showTextDocument(document.uri, {
       preview: false,
@@ -159,25 +157,15 @@ export class RefactoringPanel {
     editor.selection = new Selection(range.start, range.start);
   }
 
-  private async updateWebView({
-    document,
-    initiatorViewColumn,
-    highlightCode,
-    fnToRefactor,
-    response,
-  }: RefactorPanelParams) {
+  private async updateWebView({ initiatorViewColumn, refactoringRequest }: RefactorPanelParams) {
+    const { fnToRefactor, error, resolvedResponse, document } = refactoringRequest;
+    const response = resolvedResponse || error;
+    const highlightCode = toConfidenceSymbol(resolvedResponse?.confidence.level) === refactoringSymbol;
     if (highlightCode && vscode.window.activeTextEditor) {
       vscode.window.activeTextEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
     }
-    const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
-    const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
-    const highlightCss = this.getUri('assets', 'highlight.css');
-    const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
-    const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
-    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
     const range = fnToRefactor.range;
     this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn, highlightCode };
-
     let content = this.loadingContent();
     let title = 'Refactoring...';
     switch (typeof response) {
@@ -194,6 +182,12 @@ export class RefactoringPanel {
         break;
     }
 
+    const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
+    const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
+    const highlightCss = this.getUri('assets', 'highlight.css');
+    const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
+    const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
+    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
     const webView = this.webViewPanel.webview;
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
     webView.html = /*html*/ `
@@ -353,40 +347,20 @@ export class RefactoringPanel {
   /**
    *
    * @param extensionUri Used to resolve resource paths for the webview content
-   * @param document Ref to document to apply refactoring to
-   * @param request
-   * @param response
+   * @param refactoringRequest Current refac request to present
    * @returns
    */
-  public static createOrShow({
-    extensionUri,
-    document,
-    highlightCode,
-    fnToRefactor,
-    response,
-  }: RefactorPanelParams & { extensionUri: Uri }) {
+  public static createOrShow({ extensionUri, refactoringRequest }: RefactorPanelParams & { extensionUri: Uri }) {
     const initiatorViewColumn = vscode.window.activeTextEditor?.viewColumn;
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView({
-        document,
-        initiatorViewColumn,
-        highlightCode,
-        fnToRefactor,
-        response,
-      });
+      RefactoringPanel.currentPanel.updateWebView({ initiatorViewColumn, refactoringRequest });
       RefactoringPanel.currentPanel.webViewPanel.reveal(initiatorViewColumn ? ViewColumn.Beside : ViewColumn.Active);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView({
-      document,
-      initiatorViewColumn,
-      highlightCode,
-      fnToRefactor,
-      response,
-    });
+    RefactoringPanel.currentPanel.updateWebView({ initiatorViewColumn, refactoringRequest });
   }
 }
 

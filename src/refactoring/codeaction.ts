@@ -24,7 +24,7 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
 
     const codeActions: vscode.CodeAction[] = [];
     uniqueRequests.forEach((request) => {
-      const action = toCodeAction(document, request);
+      const action = toCodeAction(request);
       isDefined(action) && codeActions.push(action);
     });
 
@@ -32,8 +32,8 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   }
 }
 
-function toCodeAction(document: vscode.TextDocument, refactoringRequest: CsRefactoringRequest) {
-  const { resolvedResponse, fnToRefactor } = refactoringRequest;
+function toCodeAction(refactoringRequest: CsRefactoringRequest) {
+  const { resolvedResponse } = refactoringRequest;
   if (!isDefined(resolvedResponse)) return;
 
   const {
@@ -41,7 +41,7 @@ function toCodeAction(document: vscode.TextDocument, refactoringRequest: CsRefac
   } = resolvedResponse;
 
   let codeActionKind;
-  let command = commandFromLevel(level, { document, fnToRefactor, refactorResponse: resolvedResponse });
+  let command = commandFromLevel(level, refactoringRequest);
 
   switch (level) {
     case 3:

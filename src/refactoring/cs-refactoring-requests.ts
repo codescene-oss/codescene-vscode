@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { EventEmitter, Diagnostic, TextDocument, Uri } from 'vscode';
+import { Diagnostic, EventEmitter, TextDocument, Uri } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
@@ -8,15 +8,17 @@ import { CsRefactorCodeLensProvider } from './codelens';
 import { FnToRefactor } from './command';
 
 export class CsRefactoringRequest {
+  fnToRefactor: FnToRefactor;
+  document: TextDocument;
+  traceId: string;
   resolvedResponse?: RefactorResponse;
   error?: string;
   refactorResponse?: Promise<RefactorResponse | string>;
-  fnToRefactor: FnToRefactor;
-  traceId: string;
   private abortController: AbortController;
 
-  constructor(fnToRefactor: FnToRefactor) {
+  constructor(fnToRefactor: FnToRefactor, document: TextDocument) {
     this.fnToRefactor = fnToRefactor;
+    this.document = document;
     this.traceId = uuidv4();
     this.abortController = new AbortController();
   }
@@ -96,7 +98,7 @@ export class CsRefactoringRequests {
   ) {
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
-      const req = new CsRefactoringRequest(fn);
+      const req = new CsRefactoringRequest(fn, context.document);
       req.post(context.csRestApi, diagnosticsForFn).finally(() => {
         CsRefactoringRequests.requestsEmitter.fire(); // Fire updates for all finished requests
       });
