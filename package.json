@@ -144,7 +144,7 @@
     "viewsWelcome": [
       {
         "view": "codescene.remoteFeaturesView",
-        "contents": "In order to fully utilize the CodeScene extension, you need to be logged in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Sign in with CodeScene](command:codescene.signInWithCodeScene)",
+        "contents": "In order to fully utilize the CodeScene extension, you need to sign in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Sign in with CodeScene](command:codescene.signInWithCodeScene)",
         "when": "!codescene.isLoggedIn"
       },
       {
@@ -154,7 +154,7 @@
       },
       {
         "view": "codescene.scmCouplingsView",
-        "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
+        "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
         "when": "!codescene.isLoggedIn"
       },
       {
@@ -164,7 +164,7 @@
       },
       {
         "view": "codescene.explorerCouplingsView",
-        "contents": "In order to see coupling data, you need to be logged in to the CodeScene server",
+        "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
         "when": "!codescene.isLoggedIn"
       },
       {
@@ -174,7 +174,7 @@
       },
       {
         "view": "codescene.explorerACEView",
-        "contents": "To see Automated Code Engineering suggestions, you need to be logged in to the CodeScene server",
+        "contents": "To see Automated Code Engineering suggestions, you need to sign in to a CodeScene server",
         "when": "!codescene.isLoggedIn"
       }
     ],
