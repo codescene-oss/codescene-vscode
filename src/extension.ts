@@ -190,23 +190,6 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   context.subscriptions.push(fileSystemWatcher);
 }
 
-/**
- * Maps the preflight response file extensions to langauge identifiers supported by vscode.
- * https://code.visualstudio.com/docs/languages/identifiers#_known-language-identifiers
- */
-function fileTypeToLanguageId(fileType: string) {
-  switch (fileType) {
-    case 'js':
-      return 'javascript';
-    case 'jsx':
-      return 'javascriptreact';
-    case 'ts':
-      return 'typescript';
-    case 'tsx':
-      return 'typescriptreact';
-  }
-}
-
 function addRefactoringCodeAction(
   context: vscode.ExtensionContext,
   documentSelector: vscode.DocumentSelector,
@@ -261,18 +244,42 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   );
 }
 
+/**
+ * Maps the preflight response file extensions to langauge identifiers supported by vscode.
+ * https://code.visualstudio.com/docs/languages/identifiers#_known-language-identifiers
+ */
+function fileTypeToLanguageId(fileType: string) {
+  switch (fileType) {
+    case 'js':
+    case 'mjs':
+      return 'javascript';
+    case 'jsx':
+      return 'javascriptreact';
+    case 'ts':
+      return 'typescript';
+    case 'tsx':
+      return 'typescriptreact';
+  }
+}
+
+/**
+ *
+ * @param supportedFileTypes As defined by CodeScene preflight response
+ * @returns A list of distinct DocumentSelectors for the supported file types
+ */
+function getRefactoringSelector(supportedFileTypes: string[]): vscode.DocumentSelector {
+  const definedLangIds = supportedFileTypes.map(fileTypeToLanguageId).filter(isDefined);
+  return [...new Set(definedLangIds)].map((language) => ({
+    language,
+    scheme: 'file',
+  }));
+}
+
 async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
-    const refactoringSelector: vscode.DocumentSelector = refactorCapabilities.supported['file-types']
-      .map(fileTypeToLanguageId)
-      .filter(isDefined)
-      .map((language) => ({
-        language,
-        scheme: 'file',
-      }));
-
+    const refactoringSelector = getRefactoringSelector(refactorCapabilities.supported['file-types']);
     const codeSmellFilter = (d: vscode.Diagnostic) =>
       d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 
