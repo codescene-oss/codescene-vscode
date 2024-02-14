@@ -1,34 +1,36 @@
 import * as vscode from 'vscode';
-import debounce = require('lodash.debounce');
-import { ensureLatestCompatibleCliExists } from './download';
-import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
-import { CsReviewCodeLensProvider } from './review/codelens';
-import { createRulesTemplate } from './rules-template';
-import { outputChannel } from './log';
-import Telemetry from './telemetry';
-import Reviewer from './review/reviewer';
-import { StatsCollector } from './stats';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { ScmCouplingsView } from './coupling/scm-couplings-view';
-import { CsWorkspace } from './workspace';
-import { Links } from './links';
-import { CsRestApi, PreFlightResponse } from './cs-rest-api';
-import { Git } from './git';
+import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import { CouplingDataProvider } from './coupling/coupling-data-provider';
 import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
-import { CsRefactorCodeAction } from './refactoring/codeaction';
-import { CsRefactoringCommand } from './refactoring/command';
-import { getConfiguration, onDidChangeConfiguration } from './configuration';
+import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
-import { isDefined } from './utils';
+import { CsRestApi } from './cs-rest-api';
+import { CsStatusBar } from './cs-statusbar';
+import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
+import { ensureLatestCompatibleCliExists } from './download';
+import { Git } from './git';
+import { Links } from './links';
+import { outputChannel } from './log';
+import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
+import { CsRefactoringCommand } from './refactoring/command';
 import { RefactoringsView } from './refactoring/refactorings-view';
+import { CsReviewCodeLensProvider } from './review/codelens';
+import Reviewer from './review/reviewer';
+import { createRulesTemplate } from './rules-template';
+import { StatsCollector } from './stats';
+import Telemetry from './telemetry';
+import { isDefined } from './utils';
+import { CsWorkspace } from './workspace';
+import debounce = require('lodash.debounce');
 
 interface CsContext {
   cliPath: string;
   csWorkspace: CsWorkspace;
   csDiagnostics: CsDiagnostics;
   csRestApi: CsRestApi;
+  csStatusBar: CsStatusBar;
 }
 
 /**
@@ -44,12 +46,14 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(csWorkspace);
   const supportedLanguages = getSupportedLanguages(context.extension);
   const csDiagnostics = new CsDiagnostics(supportedLanguages);
+  const csStatusBar = new CsStatusBar();
 
   const csContext: CsContext = {
     cliPath,
     csRestApi,
     csWorkspace,
     csDiagnostics,
+    csStatusBar,
   };
 
   Reviewer.init(cliPath);
@@ -321,13 +325,14 @@ async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext,
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace } = csContext;
+  const { csWorkspace, csStatusBar } = csContext;
   const authProvider = new CsAuthenticationProvider(context, csWorkspace);
 
   // Provides the initial session - will enable remote features and update workspace state
   vscode.authentication.getSession(AUTH_TYPE, []).then((session) => {
     if (session) {
       csWorkspace.updateIsLoggedInContext(true);
+      csStatusBar.setOnline(true);
       enableRemoteFeatures(context, csContext);
     }
   });
@@ -336,12 +341,14 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   authProvider.onDidChangeSessions((e) => {
     if (e.added && e.added.length > 0) {
       csWorkspace.updateIsLoggedInContext(true);
+      csStatusBar.setOnline(true);
       enableRemoteFeatures(context, csContext);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
       csWorkspace.updateIsLoggedInContext(false);
+      csStatusBar.setOnline(false);
 
       requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
       // TODO - Instead rewrite all online functionality to be easily toggled...
