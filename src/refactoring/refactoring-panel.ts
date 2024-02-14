@@ -22,12 +22,13 @@ interface CurrentRefactorState {
   code: string; // The code to replace the range with
   document: TextDocument; // The document to apply the refactoring to
   initiatorViewColumn?: ViewColumn; // ViewColumn of the initiating editor
-  applied?: boolean; // Whether the refactoring has been applied
+  highlightCode?: boolean; // If the code was highlighted when the refactoring was initiated
 }
 
 interface RefactorPanelParams {
   document: TextDocument;
   initiatorViewColumn?: ViewColumn;
+  highlightCode?: boolean;
   fnToRefactor: FnToRefactor;
   response?: RefactorResponse | string;
 }
@@ -66,24 +67,16 @@ export class RefactoringPanel {
             vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
             this.dispose();
             return;
-          case 'reject':
-            await this.rejectRefactoring(refactoringState);
-            await this.deselectRefactoring(refactoringState);
-            this.dispose();
-            return;
           case 'close':
-            await this.rejectRefactoring(refactoringState);
+            await this.deselectRefactoring(refactoringState);
             this.dispose();
             return;
           case 'copy-code':
             vscode.window.setStatusBarMessage(`$(clippy) Copied refactoring suggestion to clipboard`, 3000);
-            vscode.env.clipboard.writeText(refactoringState.code || '');
+            vscode.env.clipboard.writeText(refactoringState.code);
             return;
           case 'show-diff':
             await this.showDiff(refactoringState);
-            return;
-          case 'toggle-apply':
-            await this.toggleApply(refactoringState);
             return;
         }
       },
@@ -111,10 +104,8 @@ export class RefactoringPanel {
 
     // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
     // imposes a save dialog on the user when closing the diff.
-    const originalCode = refactoringState.applied ? code : document.getText(range);
-    const refactoringSuggestion = refactoringState.applied ? document.getText(range) : code;
-    const originalCodeTmpDoc = await this.createTempDocument('original', originalCode, document.languageId);
-    const refactoringTmpDoc = await this.createTempDocument('refactoring', refactoringSuggestion, document.languageId);
+    const originalCodeTmpDoc = await this.createTempDocument('original', document.getText(range), document.languageId);
+    const refactoringTmpDoc = await this.createTempDocument('refactoring', code, document.languageId);
 
     // Make sure the initiator view is active, otherwise the diff might replace the entire Refactoring webview!
     await vscode.window.showTextDocument(document.uri, { viewColumn: refactoringState.initiatorViewColumn });
@@ -122,28 +113,12 @@ export class RefactoringPanel {
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
   }
 
-  private async toggleApply(refactoringState: CurrentRefactorState) {
+  private async applyRefactoring(refactoringState: CurrentRefactorState) {
     const { document, range, code } = refactoringState;
-
-    // Save previous code before applying
-    const previousCode = document.getText(range);
-    // Range of the applied refactoring
-    const newRange = this.relativeRangeFromCode(range, code);
-
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
     await vscode.workspace.applyEdit(workSpaceEdit);
     await this.selectCurrentRefactoring(refactoringState);
-
-    refactoringState.applied = !refactoringState.applied;
-    refactoringState.code = previousCode;
-    refactoringState.range = newRange;
-  }
-
-  private async applyRefactoring(refactoringState: CurrentRefactorState) {
-    if (!refactoringState.applied) {
-      await this.toggleApply(refactoringState);
-    }
   }
 
   /**
@@ -170,15 +145,13 @@ export class RefactoringPanel {
     editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
   }
 
-  private async rejectRefactoring(refactoringState: CurrentRefactorState) {
-    if (refactoringState.applied) {
-      await this.toggleApply(refactoringState);
-    }
-  }
-
   private async deselectRefactoring(refactoringState: CurrentRefactorState) {
     // Get original document and deselect the function to refactor.
-    const { document, range, initiatorViewColumn } = refactoringState;
+    const { document, range, initiatorViewColumn, highlightCode } = refactoringState;
+    // Don't show original doc or try deselecting if the code wasn't highlighted
+    // This indicates that we're just showing a code improvement guide
+    if (!highlightCode) return; 
+
     const editor = await vscode.window.showTextDocument(document.uri, {
       preview: false,
       viewColumn: initiatorViewColumn,
@@ -186,20 +159,29 @@ export class RefactoringPanel {
     editor.selection = new Selection(range.start, range.start);
   }
 
-  private async updateWebView({ document, initiatorViewColumn, fnToRefactor, response }: RefactorPanelParams) {
+  private async updateWebView({
+    document,
+    initiatorViewColumn,
+    highlightCode,
+    fnToRefactor,
+    response,
+  }: RefactorPanelParams) {
+    if (highlightCode && vscode.window.activeTextEditor) {
+      vscode.window.activeTextEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+    }
     const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
     const highlightCss = this.getUri('assets', 'highlight.css');
     const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
     const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
-
     const range = fnToRefactor.range;
+    this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn, highlightCode };
+
     let content = this.loadingContent();
     let title = 'Refactoring...';
     switch (typeof response) {
       case 'string':
-        this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn };
         content = this.errorContent(response);
         title = 'Refactoring error';
         break;
@@ -207,7 +189,7 @@ export class RefactoringPanel {
         let { code } = response;
         title = response.confidence.title;
         let trimmedCode = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
-        this.currentRefactorState = { document, code: trimmedCode, range, initiatorViewColumn };
+        this.currentRefactorState.code = trimmedCode;
         content = await this.autoRefactorOrCodeImprovementContent(response, trimmedCode, document.languageId);
         break;
     }
@@ -288,10 +270,9 @@ export class RefactoringPanel {
         <div class="bottom-controls">
           <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
-            <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
           </div>
           <div class="button-group right">
-            <vscode-button id="reject-button" appearance="secondary" aria-label="Reject Refactoring" title="Reject refactoring">Reject</vscode-button>
+            <vscode-button id="close-button" appearance="secondary" aria-label="Close" title="Close">Close</vscode-button>
             <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
           </div>
         </div>
@@ -326,7 +307,6 @@ export class RefactoringPanel {
         <div class="bottom-controls">
           <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
-            <vscode-checkbox id="toggle-apply">Preview</vscode-checkbox>
           </div>
           <div class="button-group right">
             <vscode-button id="close-button" appearance="primary" aria-label="Close" title="Close">Close</vscode-button>
@@ -376,19 +356,32 @@ export class RefactoringPanel {
   public static createOrShow({
     extensionUri,
     document,
-    initiatorViewColumn,
+    highlightCode,
     fnToRefactor,
     response,
   }: RefactorPanelParams & { extensionUri: Uri }) {
+    const initiatorViewColumn = vscode.window.activeTextEditor?.viewColumn;
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
+      RefactoringPanel.currentPanel.updateWebView({
+        document,
+        initiatorViewColumn,
+        highlightCode,
+        fnToRefactor,
+        response,
+      });
       RefactoringPanel.currentPanel.webViewPanel.reveal(initiatorViewColumn ? ViewColumn.Beside : ViewColumn.Active);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView({ document, initiatorViewColumn, fnToRefactor, response });
+    RefactoringPanel.currentPanel.updateWebView({
+      document,
+      initiatorViewColumn,
+      highlightCode,
+      fnToRefactor,
+      response,
+    });
   }
 }
 
