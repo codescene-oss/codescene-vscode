@@ -234,7 +234,6 @@
           "command": "codescene.gotoAndPresentRefactoring",
           "when": "false"
         }
-
       ],
       "explorer/context": [
         {
@@ -289,6 +288,15 @@
           "default": "https://api.codescene.io",
           "description": "The API URL of the CodeScene Cloud service",
           "order": 5
+        }
+      }
+    },
+    "icons": {
+      "cs-logo": {
+        "description": "CodeScene logo",
+        "default": {
+          "fontPath": "assets/cs.woff",
+          "fontCharacter": "\\e900"
         }
       }
     }
