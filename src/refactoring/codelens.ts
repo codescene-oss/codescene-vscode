@@ -100,7 +100,8 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
         .map((lens) =>
           lens.csRefactoringRequest instanceof CsRefactoringRequest ? lens.csRefactoringRequest : undefined
         )
-        .filter(isDefined);
+        .filter(isDefined)
+        .filter((req, i, reqs) => reqs.findIndex((r) => r.fnToRefactor.content === req.fnToRefactor.content) === i);
       const summaryLens = new CsRefactorCodeLens(new vscode.Range(0, 0, 0, 0), document, requests);
       lenses.unshift(summaryLens);
     }
