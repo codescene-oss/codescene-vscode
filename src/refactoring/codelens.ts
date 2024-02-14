@@ -146,13 +146,13 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     const nPending = csRefactoringRequest.filter((r) => !r.resolvedResponse && !r.error).length;
     const doneResponses = csRefactoringRequest.map((r) => r.resolvedResponse).filter(isDefined);
     const nRefactorings = doneResponses.filter((r) => r.confidence.level >= 2).length;
-    const nCodeReviews = doneResponses.filter((r) => r.confidence.level === 1).length;
+    const nImprovementGuides = doneResponses.filter((r) => r.confidence.level === 1).length;
     const pendingString = nPending > 0 ? `${nPending} pending` : undefined;
     const nRefacString =
       nRefactorings > 0 ? `${nRefactorings} ${this.pluralize('refactoring', nRefactorings)}` : undefined;
-    const nCodeReviewsString =
-      nCodeReviews > 0 ? `${nCodeReviews} ${this.pluralize('code review', nCodeReviews)}` : undefined;
-    return [pendingString, nRefacString, nCodeReviewsString].filter(isDefined).join(', ');
+    const nCodeImprovementString =
+      nImprovementGuides > 0 ? `${nImprovementGuides} ${this.pluralize('improvement guide', nImprovementGuides)}` : undefined;
+    return [pendingString, nRefacString, nCodeImprovementString].filter(isDefined).join(', ');
   }
 
   private pluralize(word: string, n: number) {
