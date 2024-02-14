@@ -194,13 +194,18 @@ export class RefactoringPanel {
         break;
     }
 
+    const webView = this.webViewPanel.webview;
     // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
-    this.webViewPanel.webview.html = /*html*/ `
+    webView.html = /*html*/ `
     <!DOCTYPE html>
     <html lang="en">
 
     <head>
         <meta charset="UTF-8">
+        <meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; style-src ${webView.cspSource};"
+        />
         <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
         <link href="${highlightCss}" type="text/css" rel="stylesheet" />
         <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
