@@ -2,12 +2,11 @@ import {
   provideVSCodeDesignSystem,
   vsCodeButton,
   vsCodeDivider,
-  vsCodeProgressRing,
-  vsCodeCheckbox,
+  vsCodeProgressRing
 } from '@vscode/webview-ui-toolkit';
 import loadingMessages from './loading-messages';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeProgressRing(), vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeProgressRing());
 
 window.addEventListener('load', main);
 
@@ -19,10 +18,8 @@ function sendMessage(command: string) {
 
 function main() {
   document.getElementById('diff-button')?.addEventListener('click', () => sendMessage('show-diff'));
-  document.getElementById('reject-button')?.addEventListener('click', () => sendMessage('reject'));
   document.getElementById('close-button')?.addEventListener('click', () => sendMessage('close'));
   document.getElementById('apply-button')?.addEventListener('click', () => sendMessage('apply'));
-  document.getElementById('toggle-apply')?.addEventListener('click', () => sendMessage('toggle-apply'));
   document.getElementById('copy-to-clipboard')?.addEventListener('click', () => sendMessage('copy-code'));
 
   const loadingEl = document.getElementById('loading-span');

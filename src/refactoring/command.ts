@@ -66,16 +66,10 @@ export class CsRefactoringCommand {
   }
 
   showRefactoring(document: vscode.TextDocument, fnToRefactor: FnToRefactor, refactorResponse: RefactorResponse) {
-    const editor = window.activeTextEditor;
-    if (editor) {
-      editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
-    }
-    const initiatorViewColumn = editor?.viewColumn;
-
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
       document,
-      initiatorViewColumn,
+      highlightCode: true,
       fnToRefactor,
       response: refactorResponse,
     });
@@ -86,11 +80,9 @@ export class CsRefactoringCommand {
     fnToRefactor: FnToRefactor,
     refactorResponse: RefactorResponse
   ) {
-    const initiatorViewColumn = window.activeTextEditor?.viewColumn;
     RefactoringPanel.createOrShow({
       extensionUri: this.context.extensionUri,
       document,
-      initiatorViewColumn,
       fnToRefactor,
       response: refactorResponse,
     });
