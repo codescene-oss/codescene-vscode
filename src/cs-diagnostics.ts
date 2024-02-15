@@ -23,11 +23,10 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  constructor(private supportedLanguages: string[]) {}
+  constructor(private documentSelector: vscode.DocumentSelector) {}
 
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
-    // Diagnostics will be updated when a file is opened or when it is changed.
-    if (document.uri.scheme !== 'file' || !this.supportedLanguages.includes(document.languageId)) {
+    if (vscode.languages.match(this.documentSelector, document) === 0) {
       return;
     }
     Reviewer.instance

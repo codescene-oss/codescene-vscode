@@ -13,12 +13,13 @@ export interface Coupling {
   averageRevs: number;
 }
 
+export interface RefactoringSupport {
+  'file-types': string[];
+  'code-smells': string[];
+}
+
 export interface PreFlightResponse {
-  supported: {
-    languages: string[];
-    'file-types': string[];
-    'code-smells': string[];
-  };
+  supported: RefactoringSupport;
   'max-input-tokens': number;
   'max-input-loc': number;
 }

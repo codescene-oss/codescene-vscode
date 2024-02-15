@@ -10,6 +10,7 @@ import { CsStatusBar } from './cs-statusbar';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
 import { Git } from './git';
+import { toRefactoringDocumentSelector, toReviewDocumentSelector } from './language-support';
 import { Links } from './links';
 import { outputChannel } from './log';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
@@ -21,7 +22,6 @@ import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
-import { isDefined } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
@@ -44,8 +44,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const csRestApi = new CsRestApi();
   const csWorkspace = new CsWorkspace(context, csRestApi);
   context.subscriptions.push(csWorkspace);
-  const supportedLanguages = getSupportedLanguages(context.extension);
-  const csDiagnostics = new CsDiagnostics(supportedLanguages);
+  const reviewDocSelector = toReviewDocumentSelector(context.extension);
+  const csDiagnostics = new CsDiagnostics(reviewDocSelector);
   const csStatusBar = new CsStatusBar();
 
   const csContext: CsContext = {
@@ -72,9 +72,8 @@ export async function activate(context: vscode.ExtensionContext) {
   addReviewListeners(context, csDiagnostics);
 
   // Add Review CodeLens support
-  const codeLensDocSelector = getSupportedDocumentSelector(supportedLanguages);
   const codeLensProvider = new CsReviewCodeLensProvider();
-  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(codeLensDocSelector, codeLensProvider);
+  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(reviewDocSelector, codeLensProvider);
   context.subscriptions.push(codeLensProviderDisposable);
 
   // Setup a scheduled event for sending statistics
@@ -92,16 +91,6 @@ export async function activate(context: vscode.ExtensionContext) {
   }, 1800 * 1000);
 
   outputChannel.appendLine('Extension is now active!');
-}
-
-function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
-  return extension.packageJSON.activationEvents
-    .filter((event: string) => event.startsWith('onLanguage:'))
-    .map((event: string) => event.substring(11));
-}
-
-function getSupportedDocumentSelector(supportedLanguages: string[]) {
-  return supportedLanguages.map((language) => ({ language, scheme: 'file' }));
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
@@ -248,42 +237,11 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   );
 }
 
-/**
- * Maps the preflight response file extensions to langauge identifiers supported by vscode.
- * https://code.visualstudio.com/docs/languages/identifiers#_known-language-identifiers
- */
-function fileTypeToLanguageId(fileType: string) {
-  switch (fileType) {
-    case 'js':
-    case 'mjs':
-      return 'javascript';
-    case 'jsx':
-      return 'javascriptreact';
-    case 'ts':
-      return 'typescript';
-    case 'tsx':
-      return 'typescriptreact';
-  }
-}
-
-/**
- *
- * @param supportedFileTypes As defined by CodeScene preflight response
- * @returns A list of distinct DocumentSelectors for the supported file types
- */
-function getRefactoringSelector(supportedFileTypes: string[]): vscode.DocumentSelector {
-  const definedLangIds = supportedFileTypes.map(fileTypeToLanguageId).filter(isDefined);
-  return [...new Set(definedLangIds)].map((language) => ({
-    language,
-    scheme: 'file',
-  }));
-}
-
 async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
-    const refactoringSelector = getRefactoringSelector(refactorCapabilities.supported['file-types']);
+    const refactoringSelector = toRefactoringDocumentSelector(refactorCapabilities.supported);
     const codeSmellFilter = (d: vscode.Diagnostic) =>
       d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 
