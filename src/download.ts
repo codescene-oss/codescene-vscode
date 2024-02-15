@@ -136,7 +136,8 @@ function download(url: URL, filePath: string) {
             .pipe(writeStream);
         } else {
           response.resume(); // Consume response to free up memory
-          reject(new Error(`Error downloading codescene cli: ${response.statusMessage}`));
+          outputChannel.appendLine(`Error downloading ${url}: ${response.statusMessage}`);
+          reject(new Error(`Error downloading codescene CLI: ${response.statusMessage}`));
         }
       })
       .on('error', reject)
