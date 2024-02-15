@@ -46,7 +46,7 @@ export class CsRefactoringCommand {
 
   presentRefactoringRequest(refactoringRequest: CsRefactoringRequest) {
     if (!refactoringRequest.resolvedResponse) {
-      logOutputChannel.warn('No refactoring response for this refactoring yet.');
+      logOutputChannel.warn('No response for this refactoring yet.');
       return;
     }
 
