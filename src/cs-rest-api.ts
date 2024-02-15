@@ -51,9 +51,21 @@ interface RefactorProperties {
   'added-code-smells': string[];
   'removed-code-smells': string[];
 }
+
+interface ReasonDetails {
+  message: string;
+  lines: number[];
+  columns: number[];
+}
+
+interface ReasonsWithDetails {
+  summary: string;
+  details?: ReasonDetails[];
+}
+
 export interface RefactorResponse {
   confidence: RefactorConfidence;
-  reasons: string[];
+  'reasons-with-details': ReasonsWithDetails[];
   'refactoring-properties': RefactorProperties;
   code: string;
 }

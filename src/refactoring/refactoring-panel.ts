@@ -244,7 +244,7 @@ export class RefactoringPanel {
   }
 
   private async autoRefactorContent(response: RefactorResponse, code: string, languageId: string) {
-    const { confidence, reasons } = response;
+    const { confidence, 'reasons-with-details': reasonsWithDetails } = response;
     const {
       level,
       'recommended-action': { details: actionDetails, description: action },
@@ -252,8 +252,8 @@ export class RefactoringPanel {
     const actionBadgeClass = `action-badge level-${level}`;
 
     let reasonsContent = '';
-    if (reasons && reasons.length > 0) {
-      const reasonText = reasons.map((reason) => `<li>${reason}</li>`).join('\n');
+    if (reasonsWithDetails && reasonsWithDetails.length > 0) {
+      const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
       reasonsContent = /*html*/ `
           <h4>Reasons for detailed review</h4>
           <ul>${reasonText}</ul>

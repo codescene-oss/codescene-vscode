@@ -86,7 +86,6 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
       if (isDefined(newActiveDoc)) {
         this.activeDocument = newActiveDoc;
         this.treeDataChangedEmitter.fire();
-        vscode.window.onDidChangeVisibleTextEditors((editors) => {});
       }
     });
     this.disposables.push(changeTextEditorDisposable);
@@ -112,7 +111,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     };
 
     const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
-    item.tooltip = `Click to go to location in the ${this.activeFileName}`;
+    item.tooltip = `Click to go to location in ${this.activeFileName}`;
     item.command = {
       title: 'Show in file',
       command: 'editor.action.goToLocations',
