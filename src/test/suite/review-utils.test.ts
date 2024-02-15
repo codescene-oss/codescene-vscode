@@ -18,7 +18,7 @@ suite('reviewIssueToDiagnostics', () => {
 
     const diagnostics = reviewIssueToDiagnostics(reviewIssue, document);
     assert.strictEqual(diagnostics.length, 1);
-    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Information);
+    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning);
     assert.strictEqual(diagnostics[0].message, 'Primitive Obsession');
     assert.strictEqual(diagnostics[0].range.start.line, 0);
     assert.strictEqual(diagnostics[0].range.end.line, 0);

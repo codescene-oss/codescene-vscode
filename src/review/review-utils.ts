@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { ReviewIssue, IssueDetails } from './model';
-import { getFunctionNameRange } from '../utils';
-import { categoryToDocsCode } from '../csdoc';
 import { csSource } from '../cs-diagnostics';
+import { categoryToDocsCode } from '../csdoc';
+import { getFunctionNameRange } from '../utils';
+import { IssueDetails, ReviewIssue } from './model';
 
 function issueToRange(category: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
   const startLine = issue['start-line'] - 1;
@@ -22,20 +22,19 @@ function issueToRange(category: string, issue: IssueDetails, document: vscode.Te
   return new vscode.Range(startLine, startColumn, startLine, endColumn);
 }
 
-export function reviewIssueToDiagnostics(
-  reviewIssue: ReviewIssue,
-  document: vscode.TextDocument,
-) {
+export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
+  // File level issues
   if (!reviewIssue.functions) {
     const diagnostic = new vscode.Diagnostic(
       new vscode.Range(0, 0, 0, 0),
       reviewIssue.category,
-      vscode.DiagnosticSeverity.Information
+      vscode.DiagnosticSeverity.Warning
     );
     diagnostic.code = createDiagnosticCode(reviewIssue.category);
     return [diagnostic];
   }
 
+  // Function level issues
   return reviewIssue.functions.map((func: IssueDetails) => {
     const category = reviewIssue.category;
     const range = issueToRange(reviewIssue.category, func, document);

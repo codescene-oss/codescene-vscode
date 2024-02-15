@@ -8,6 +8,8 @@ import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { reviewIssueToDiagnostics } from './review-utils';
 
+export const chScorePrefix = 'Code health score';
+
 export default class Reviewer {
   private static _instance: IReviewer;
 
@@ -65,7 +67,7 @@ class SimpleReviewer implements IReviewer {
         const roundedScore = +data.score.toFixed(2);
         const scoreDiagnostic = new vscode.Diagnostic(
           new vscode.Range(0, 0, 0, 0),
-          `Code health score: ${roundedScore}`,
+          `${chScorePrefix}: ${roundedScore}`,
           vscode.DiagnosticSeverity.Information
         );
         return [scoreDiagnostic, ...diagnostics];

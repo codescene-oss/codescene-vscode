@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { requestRefactoringsCmdName } from './refactoring/command';
-import Reviewer, { ReviewOpts } from './review/reviewer';
+import Reviewer, { ReviewOpts, chScorePrefix } from './review/reviewer';
 
 export const csSource = 'CodeScene';
 
@@ -34,7 +34,7 @@ export class CsDiagnostics {
       .review(document, reviewOpts)
       .then((diagnostics) => {
         // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-        const importantDiagnostics = diagnostics.filter((d) => !d.range.isEmpty);
+        const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
         CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
         this.preInitiateRefactoringRequests(document, importantDiagnostics);
       })
