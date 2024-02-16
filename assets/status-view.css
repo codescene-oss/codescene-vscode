@@ -1,0 +1,16 @@
+p {
+    line-height: 1.3em;
+}
+
+h3 {
+    margin-block-start: 2em;
+}
+
+.codicon {
+    vertical-align: text-bottom;
+}
+
+.features-list {
+    list-style-type: none;
+    padding-inline-start: 4px;
+}

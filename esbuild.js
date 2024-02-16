@@ -21,13 +21,13 @@ const webviewConfig = {
   ...baseConfig,
   target: 'es2020',
   format: 'esm',
-  entryPoints: ['./src/refactoring/webview-script.ts'],
-  outfile: './out/refactoring-webview-script.js',
+  entryPoints: ['./src/refactoring/webview-script.ts', './src/webviews/status-webview-script.ts'],
+  outdir: './out',
   plugins: [
     copy({
       resolveFrom: 'cwd',
       assets: {
-        from: ['./node_modules/@vscode/codicons/dist/**'],
+        from: ['./node_modules/@vscode/codicons/dist/codicon.css', './node_modules/@vscode/codicons/dist/codicon.ttf'],
         to: ['./out/codicons'],
       },
       watch: true,
