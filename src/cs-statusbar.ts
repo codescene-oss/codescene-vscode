@@ -11,7 +11,7 @@ export class CsStatusBar {
     );
     this.statusBarItem.name = 'CodeScene status bar';
     this.statusBarItem.text = '$(cs-logo)';
-    this.statusBarItem.command = 'codescene.remoteFeaturesView.focus';
+    this.statusBarItem.command = 'codescene.statusView.focus';
     this.statusBarItem.show();
   }
 

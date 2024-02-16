@@ -22,6 +22,7 @@ import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
+import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
@@ -31,6 +32,7 @@ interface CsContext {
   csDiagnostics: CsDiagnostics;
   csRestApi: CsRestApi;
   csStatusBar: CsStatusBar;
+  statusViewProvider: StatusViewProvider;
 }
 
 /**
@@ -47,6 +49,14 @@ export async function activate(context: vscode.ExtensionContext) {
   const reviewDocSelector = toReviewDocumentSelector(context.extension);
   const csDiagnostics = new CsDiagnostics(reviewDocSelector);
   const csStatusBar = new CsStatusBar();
+  const statusViewProvider = registerStatusViewProvider(context, csWorkspace.extensionState);
+
+  context.subscriptions.push(
+    csWorkspace.onDidExtensionStateChange((extensionState) => {
+      csStatusBar.setOnline(extensionState.signedIn);
+      statusViewProvider.update(extensionState);
+    })
+  );
 
   const csContext: CsContext = {
     cliPath,
@@ -54,8 +64,8 @@ export async function activate(context: vscode.ExtensionContext) {
     csWorkspace,
     csDiagnostics,
     csStatusBar,
+    statusViewProvider,
   };
-
   Reviewer.init(cliPath);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
@@ -129,7 +139,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(openDocsForDiagnostic);
 
   // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
-  // asking the user to log in. Should only be called/available when codescene.isLoggedIn is false.
+  // asking the user to log in. Should only be called/available when codescene.isSignedIn is false.
   // (see package.json)
   const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {
     vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: true });
@@ -223,6 +233,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
   context.subscriptions.push(explorerCouplingsView);
   outputChannel.appendLine('Change Coupling enabled');
+  csWorkspace.setChangeCouplingEnabled(true);
 
   // Refactoring features
   const enableAiRefactoring = getConfiguration('enableAiRefactoring');
@@ -238,7 +249,7 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
 }
 
 async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csRestApi, csDiagnostics, cliPath } = csContext;
+  const { csRestApi, csDiagnostics, cliPath, csWorkspace } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     const refactoringSelector = toRefactoringDocumentSelector(refactorCapabilities.supported);
@@ -278,36 +289,33 @@ async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext,
     const refactoringsView = new RefactoringsView();
     context.subscriptions.push(refactoringsView);
 
+    csWorkspace.setACEEnabled(refactorCapabilities);
     outputChannel.appendLine('AI refactoring features enabled');
   }
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace, csStatusBar } = csContext;
+  const { csWorkspace, csStatusBar, statusViewProvider } = csContext;
   const authProvider = new CsAuthenticationProvider(context, csWorkspace);
 
   // Provides the initial session - will enable remote features and update workspace state
   vscode.authentication.getSession(AUTH_TYPE, []).then((session) => {
     if (session) {
-      csWorkspace.updateIsLoggedInContext(true);
-      csStatusBar.setOnline(true);
       enableRemoteFeatures(context, csContext);
+      csWorkspace.setSignInStatus(true);
     }
   });
 
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
     if (e.added && e.added.length > 0) {
-      csWorkspace.updateIsLoggedInContext(true);
-      csStatusBar.setOnline(true);
       enableRemoteFeatures(context, csContext);
+      csWorkspace.setSignInStatus(true);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
-      csWorkspace.updateIsLoggedInContext(false);
-      csStatusBar.setOnline(false);
-
+      csWorkspace.setSignInStatus(false);
       requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
       // TODO - Instead rewrite all online functionality to be easily toggled...
     }

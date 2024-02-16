@@ -82,14 +82,18 @@ function fileTypeToLanguageId(fileType: string) {
   return map.get(fileType);
 }
 
+export function toDistinctLanguageIds(refactoringSupport: RefactoringSupport): string[] {
+  const definedLangIds = refactoringSupport['file-types'].flatMap(fileTypeToLanguageId).filter(isDefined);
+  return [...new Set(definedLangIds)];
+}
+
 /**
  *
  * @param refactoringSupport
  * @returns A list of distinct DocumentSelectors for the supported file types
  */
 export function toRefactoringDocumentSelector(refactoringSupport: RefactoringSupport): vscode.DocumentSelector {
-  const definedLangIds = refactoringSupport['file-types'].flatMap(fileTypeToLanguageId).filter(isDefined);
-  return [...new Set(definedLangIds)].map((language) => ({
+  return toDistinctLanguageIds(refactoringSupport).map((language) => ({
     language,
     scheme: 'file',
   }));

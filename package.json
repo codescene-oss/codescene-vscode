@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.7.0-beta-1",
+  "version": "0.7.0-beta-6ec9b1d",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -136,46 +136,38 @@
       ],
       "codescene-activity-bar": [
         {
-          "id": "codescene.remoteFeaturesView",
-          "name": "Remote Features"
+          "id": "codescene.statusView",
+          "name": "Status",
+          "type": "webview",
+          "icon": "assets/cs-logo.svg"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "codescene.remoteFeaturesView",
-        "contents": "In order to fully utilize the CodeScene extension, you need to sign in to a CodeScene server ☁️\nCheck the extension settings for URL configuration.\n\n[Sign in with CodeScene](command:codescene.signInWithCodeScene)",
-        "when": "!codescene.isLoggedIn"
-      },
-      {
-        "view": "codescene.remoteFeaturesView",
-        "contents": "Congratulations, you're logged in. You can now use the CodeScene extension to its full potential.",
-        "when": "codescene.isLoggedIn"
-      },
-      {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
-        "when": "!codescene.isLoggedIn"
+        "when": "!codescene.isSignedIn"
       },
       {
         "view": "codescene.scmCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "!codescene.isWorkspaceAssociated && codescene.isSignedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
-        "when": "!codescene.isLoggedIn"
+        "when": "!codescene.isSignedIn"
       },
       {
         "view": "codescene.explorerCouplingsView",
         "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+        "when": "!codescene.isWorkspaceAssociated && codescene.isSignedIn"
       },
       {
         "view": "codescene.explorerACEView",
         "contents": "To see Automated Code Engineering suggestions, you need to sign in to a CodeScene server",
-        "when": "!codescene.isLoggedIn"
+        "when": "!codescene.isSignedIn"
       }
     ],
     "menus": {
@@ -208,19 +200,19 @@
       "commandPalette": [
         {
           "command": "codescene.openDashboard",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         },
         {
           "command": "codescene.openHotspots",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         },
         {
           "command": "codescene.openChangeCoupling",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         },
         {
           "command": "codescene.associateWithProject",
-          "when": "codescene.isLoggedIn"
+          "when": "codescene.isSignedIn"
         },
         {
           "command": "codescene.openXRay",
@@ -238,21 +230,21 @@
       "explorer/context": [
         {
           "command": "codescene.openCodeReview",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         },
         {
           "command": "codescene.openXRay",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         }
       ],
       "editor/title/context": [
         {
           "command": "codescene.openCodeReview",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         },
         {
           "command": "codescene.openXRay",
-          "when": "codescene.isWorkspaceAssociated && codescene.isLoggedIn"
+          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         }
       ]
     },

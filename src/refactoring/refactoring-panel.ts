@@ -1,3 +1,4 @@
+// @CodeScene(disable:"Primitive Obsession", disable:"Bumpy Road Ahead")
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, {
@@ -15,6 +16,7 @@ import { RefactorResponse } from '../cs-rest-api';
 import { categoryToDocsCode } from '../csdoc';
 import { logOutputChannel } from '../log';
 import { getLogoUrl } from '../utils';
+import { nonce } from '../webviews/utils';
 import { refactoringSymbol, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest } from './cs-refactoring-requests';
 
@@ -185,7 +187,7 @@ export class RefactoringPanel {
     const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
     const highlightCss = this.getUri('assets', 'highlight.css');
-    const webviewScript = this.getUri('out', 'refactoring-webview-script.js');
+    const webviewScript = this.getUri('out', 'refactoring', 'webview-script.js');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
     const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
     const webView = this.webViewPanel.webview;
@@ -198,7 +200,9 @@ export class RefactoringPanel {
         <meta charset="UTF-8">
         <meta
           http-equiv="Content-Security-Policy"
-          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; style-src ${webView.cspSource};"
+          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; style-src ${
+      webView.cspSource
+    };"
         />
         <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
         <link href="${highlightCss}" type="text/css" rel="stylesheet" />
@@ -207,7 +211,7 @@ export class RefactoringPanel {
     </head>
 
     <body>
-        <script type="module" nonce="${nonce}" src="${webviewScript}"></script>
+        <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
         <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
         ${content}
     </body>
@@ -362,13 +366,4 @@ export class RefactoringPanel {
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
     RefactoringPanel.currentPanel.updateWebView({ initiatorViewColumn, refactoringRequest });
   }
-}
-
-function nonce() {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }
