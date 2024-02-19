@@ -105,7 +105,7 @@
       },
       {
         "command": "codescene.gotoAndPresentRefactoring",
-        "title": "Show Automated Code Engineering view"
+        "title": "Show ACE view"
       }
     ],
     "viewsContainers": {
@@ -130,8 +130,8 @@
           "name": "Change coupling"
         },
         {
-          "id": "codescene.explorerACEView",
-          "name": "Automated Code Engineering"
+          "id": "codescene.explorerAutoRefactorView",
+          "name": "Auto-refactor"
         }
       ],
       "codescene-activity-bar": [
@@ -165,8 +165,8 @@
         "when": "!codescene.isWorkspaceAssociated && codescene.isSignedIn"
       },
       {
-        "view": "codescene.explorerACEView",
-        "contents": "To see Automated Code Engineering suggestions, you need to sign in to a CodeScene server",
+        "view": "codescene.explorerAutoRefactorView",
+        "contents": "To see Auto-refactoring suggestions, you need to sign in to a CodeScene server",
         "when": "!codescene.isSignedIn"
       }
     ],
@@ -194,7 +194,7 @@
         },
         {
           "command": "codescene.gotoAndPresentRefactoring",
-          "when": "view == codescene.explorerACEView"
+          "when": "view == codescene.explorerAutoRefactorView"
         }
       ],
       "commandPalette": [

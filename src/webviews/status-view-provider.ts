@@ -130,7 +130,7 @@ export class StatusViewProvider implements WebviewViewProvider {
 
       aceContent = /*html*/ `
         <h3>Automated Code Engineering (ACE)</h3>
-        <p>ACE is active and available in the Explorer view.</p>
+        <p>The ACE Auto-refactor view is active and available in the Explorer activity bar.</p>
         <p>
         Supported languages:
         <ul>${languageIdList}</ul>
