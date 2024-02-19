@@ -44,7 +44,9 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
+          if (error.code !== 'ABORT_ERR') { // Don't log these, they are expected from the LimitingExecutor
+            logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
+          }
           reject(error);
           return;
         }
@@ -63,7 +65,6 @@ export class SimpleExecutor implements Executor {
     return completedPromise;
   }
 }
-
 
 export interface Task extends Command {
   taskId: string;
@@ -94,14 +95,16 @@ export class LimitingExecutor implements Executor {
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    const completedPromise = this.executor.execute(command, {...options, signal: abortController.signal}, input).finally(() => {
-      // Remove the abortController from the map.
-      // The process has exited, and we don't want to risk calling abort() on
-      // a process that has already exited (what if the pid has been reused?)
-      if (this.runningCommands.get(taskId) === abortController) {
-        this.runningCommands.delete(taskId);
-      }
-    });
+    const completedPromise = this.executor
+      .execute(command, { ...options, signal: abortController.signal }, input)
+      .finally(() => {
+        // Remove the abortController from the map.
+        // The process has exited, and we don't want to risk calling abort() on
+        // a process that has already exited (what if the pid has been reused?)
+        if (this.runningCommands.get(taskId) === abortController) {
+          this.runningCommands.delete(taskId);
+        }
+      });
 
     return completedPromise;
   }
