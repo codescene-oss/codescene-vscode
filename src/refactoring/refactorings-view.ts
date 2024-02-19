@@ -17,7 +17,7 @@ export class RefactoringsView implements vscode.Disposable {
     this.treeDataProvider = new RefactoringsTreeProvider();
     this.disposables.push(this.treeDataProvider);
 
-    const view = vscode.window.createTreeView('codescene.explorerACEView', {
+    const view = vscode.window.createTreeView('codescene.explorerAutoRefactorView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
     });
@@ -107,7 +107,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
       const symbol = toConfidenceSymbol(request.resolvedResponse?.confidence.level);
-      return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [${range.start.line}:${range.start.character}]`;
+      return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [Ln ${range.start.line}, Col ${range.start.character}]`;
     };
 
     const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
@@ -129,6 +129,6 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     const distinctPerFn = pendingOrSuccessful.filter(
       (r, i, rs) => rs.findIndex((rr) => rr.fnToRefactor.range.isEqual(r.fnToRefactor.range)) === i
     );
-    return distinctPerFn;
+    return distinctPerFn.sort((a, b) => a.fnToRefactor.range.start.line - b.fnToRefactor.range.start.line);
   }
 }

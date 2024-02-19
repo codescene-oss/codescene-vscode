@@ -115,7 +115,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       logOutputChannel.debug(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
       codeLens.command = {
         title: `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`,
-        command: 'codescene.explorerACEView.focus',
+        command: 'codescene.explorerAutoRefactorView.focus',
       };
       return codeLens;
     }
@@ -131,7 +131,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     if (!resolvedResponse) {
       codeLens.command = {
         title: `${pendingSymbol} Auto-refactor pending...`,
-        command: 'codescene.explorerACEView.focus',
+        command: 'codescene.explorerAutoRefactorView.focus',
       };
       return codeLens;
     }

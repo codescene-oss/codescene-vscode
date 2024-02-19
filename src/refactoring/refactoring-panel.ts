@@ -45,7 +45,7 @@ export class RefactoringPanel {
   public constructor(private extensionUri: Uri) {
     this.webViewPanel = vscode.window.createWebviewPanel(
       RefactoringPanel.viewType,
-      'CodeScene AI Refactor',
+      'CodeScene ACE',
       ViewColumn.Beside,
       {
         enableScripts: true,
