@@ -2,9 +2,6 @@
 .vscode-test/**
 .idea/
 src/**
-out/**
-!out/main.js
-!out/refactoring-webview-script.js
 .gitignore
 .yarnrc
 esbuild.js

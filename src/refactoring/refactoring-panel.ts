@@ -200,9 +200,10 @@ export class RefactoringPanel {
         <meta charset="UTF-8">
         <meta
           http-equiv="Content-Security-Policy"
-          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; style-src ${
+          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; font-src ${
       webView.cspSource
-    };"
+    };
+          style-src 'unsafe-inline' ${webView.cspSource};"
         />
         <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
         <link href="${highlightCss}" type="text/css" rel="stylesheet" />
