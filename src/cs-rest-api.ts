@@ -220,7 +220,7 @@ export function logAxiosError(error: any) {
     logOutputChannel.error(`[${config.method}] ${config.url} [${status}] ${statusText}`);
   } else if (error.request) {
     // The request was made but no response was received
-    logOutputChannel.error(`Error in request ${JSON.stringify(error.request)} - no response received`);
+    logOutputChannel.error(`Error in request - no response received: ${error}`);
   } else {
     // Something happened in setting up the request that triggered an Error
     logOutputChannel.error(`Request error: ${error.message}`);
