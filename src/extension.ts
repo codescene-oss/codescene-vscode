@@ -239,19 +239,21 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
   csWorkspace.setChangeCouplingEnabled(true);
 
   // Refactoring features
-  const enableAiRefactoring = getConfiguration('enableAiRefactoring');
-  if (enableAiRefactoring) {
-    await enableAiRefactoringCapabilities(context, csContext);
+  const enableACE = getConfiguration('enableAutomatedCodeEngineering');
+  if (enableACE) {
+    await enableACECapabilities(context, csContext);
   }
 
   // If the feature flag is changed, alert the user that a reload is needed
-  onDidChangeConfiguration(
-    'enableAiRefactoring',
-    requireReloadWindowFn('VS Code needs to be reloaded to enable/disable this feature.')
+  context.subscriptions.push(
+    onDidChangeConfiguration(
+      'enableAutomatedCodeEngineering',
+      requireReloadWindowFn('VS Code needs to be reloaded to enable/disable this feature.')
+    )
   );
 }
 
-async function enableAiRefactoringCapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+async function enableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { csRestApi, csDiagnostics, cliPath, csWorkspace } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {

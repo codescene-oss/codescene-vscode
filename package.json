@@ -257,10 +257,10 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.enableAiRefactoring": {
+        "codescene.enableAutomatedCodeEngineering": {
           "type": "boolean",
           "default": false,
-          "description": "Enable AI Refactoring (alpha feature)",
+          "description": "Enable CodeScene ACE (opt-in beta feature)",
           "order": 2
         },
         "codescene.gitignore": {
@@ -272,7 +272,6 @@
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://codescene.io",
-          "description": "CodeScene Cloud URL",
           "order": 4
         },
         "codescene.cloudApiUrl": {

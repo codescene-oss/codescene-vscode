@@ -28,16 +28,12 @@ You may also look at our main CodeScene [docs](https://codescene.io/docs/guides/
 
 ## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Automated Code Engineering (ACE) 
 
-CodeScene has always been great at identifying code smells and prioritizing them. With our AI-based Auto-Refactor capability we make those insights actionable, too. Better: we also fact-check the AI code to ensure it makes the right thing, saving you a lot of time and guaranteeing that your refactorings are both correct and impactful.
+CodeScene has always been great at identifying code smells and prioritizing them. With our AI-based Auto-refactor capability we make those insights actionable, too. Better: we also fact-check the AI code to ensure it makes the right thing, saving you a lot of time and guaranteeing that your refactorings are both correct and impactful.
 
 This feature extends CodeScene's capabilities to not only identify code health issues but also automatically suggest and perform code refactoring to improve the overall maintainability of your codebase. CodeScene's ACE is designed to enhance your development experience by proactively addressing issues in your code. By leveraging advanced analysis techniques with help of AI, it can help identify areas of improvement within your code and provide automated suggestions for refactoring.
 
 CodeScene Automated Code Engineering requires signing in to a CodeScene instance. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
 
-### Current Language Support for ACE
-- ✅ JavaScript
-- ✅ TypeScript
-- ✅ React (jsx/tsx)
 
 
 ## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Change Coupling

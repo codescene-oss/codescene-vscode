@@ -5,7 +5,7 @@ export function getConfiguration<T>(section: string): T | undefined {
 }
 
 export function onDidChangeConfiguration(section: string, listener: (e: vscode.ConfigurationChangeEvent) => any) {
-  vscode.workspace.onDidChangeConfiguration((e) => {
+  return vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration('codescene.' + section)) {
       listener(e);
     }
