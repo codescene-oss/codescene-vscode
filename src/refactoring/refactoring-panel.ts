@@ -18,7 +18,7 @@ import { logOutputChannel } from '../log';
 import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
 import { refactoringSymbol, toConfidenceSymbol } from './command';
-import { CsRefactoringRequest } from './cs-refactoring-requests';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 interface CurrentRefactorState {
   range: Range; // Range of code to be refactored
@@ -118,6 +118,7 @@ export class RefactoringPanel {
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
     await vscode.workspace.applyEdit(workSpaceEdit);
+    CsRefactoringRequests.deleteByFnRange(document, range);
     await this.selectCurrentRefactoring(refactoringState);
   }
 
