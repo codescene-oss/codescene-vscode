@@ -16,6 +16,7 @@ import { outputChannel } from './log';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
 import { CsRefactoringCommand } from './refactoring/command';
+import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { RefactoringsView } from './refactoring/refactorings-view';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -172,6 +173,8 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid debouncing 'output' documents etc.
       if (e.document.uri.scheme === 'file') {
+        // Immediately clear request list on code changes
+        CsRefactoringRequests.delete(e.document);
         debouncedRun(e.document);
       }
     })

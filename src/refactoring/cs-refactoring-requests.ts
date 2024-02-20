@@ -96,9 +96,6 @@ export class CsRefactoringRequests {
     fnsToRefactor: FnToRefactor[],
     diagnostics: Diagnostic[]
   ) {
-    // Clear request list when re-initiating
-    CsRefactoringRequests.map.delete(context.document.uri.toString());
-
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, context.document);
@@ -121,6 +118,11 @@ export class CsRefactoringRequests {
       CsRefactoringRequests.map.set(uriString, map);
     }
     map.set(diagKey(diagnostic), request);
+  }
+
+  static delete(document: TextDocument) {
+    CsRefactoringRequests.map.delete(document.uri.toString());
+    CsRefactoringRequests.requestsEmitter.fire();
   }
 
   static deleteByFnRange(document: TextDocument, functionRange: Range) {
