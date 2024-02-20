@@ -93,5 +93,5 @@ export function keyStr(diagnostic: Diagnostic) {
 }
 
 export function rangeStr(range: Range) {
-  return `[${range.start.line}:${range.start.character}->${range.end.line}:${range.end.character}]`;
+  return `[${range.start.line + 1}:${range.start.character}->${range.end.line + 1}:${range.end.character}]`;
 }

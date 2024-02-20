@@ -53,10 +53,7 @@ export class RefactoringsView implements vscode.Disposable {
       isDefined(editorForDoc) &&
       this.rangeOutsideAllVisibleRanges(refactoringRequest.fnToRefactor.range, editorForDoc.visibleRanges)
     ) {
-      editorForDoc.revealRange(
-        refactoringRequest.fnToRefactor.range,
-        vscode.TextEditorRevealType.Default
-      );
+      editorForDoc.revealRange(refactoringRequest.fnToRefactor.range, vscode.TextEditorRevealType.Default);
     }
     vscode.commands.executeCommand(presentRefactoringCmdName, refactoringRequest);
   }
@@ -107,7 +104,9 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
       const symbol = toConfidenceSymbol(request.resolvedResponse?.confidence.level);
-      return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [Ln ${range.start.line}, Col ${range.start.character}]`;
+      return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [Ln ${range.start.line + 1}, Col ${
+        range.start.character
+      }]`;
     };
 
     const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
