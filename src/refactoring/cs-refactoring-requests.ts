@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic, EventEmitter, TextDocument, Uri } from 'vscode';
+import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
@@ -86,7 +86,7 @@ export class CsRefactoringRequest {
  * Used to get the proper requests when presenting the refactoring codelenses and codeactions.
  */
 export class CsRefactoringRequests {
-  private static readonly map: Map<Uri, Map<Diagnostic, CsRefactoringRequest>> = new Map();
+  private static readonly map: Map<string, Map<string, CsRefactoringRequest>> = new Map();
 
   private static readonly requestsEmitter = new EventEmitter<void>();
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsEmitter.event;
@@ -96,6 +96,9 @@ export class CsRefactoringRequests {
     fnsToRefactor: FnToRefactor[],
     diagnostics: Diagnostic[]
   ) {
+    // Clear request list when re-initiating
+    CsRefactoringRequests.map.delete(context.document.uri.toString());
+
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, context.document);
@@ -110,28 +113,57 @@ export class CsRefactoringRequests {
     CsRefactoringRequests.requestsEmitter.fire();
   }
 
-  static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
-    let map = CsRefactoringRequests.map.get(document.uri);
+  private static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
+    const uriString = document.uri.toString();
+    let map = CsRefactoringRequests.map.get(uriString);
     if (!map) {
       map = new Map();
-      CsRefactoringRequests.map.set(document.uri, map);
+      CsRefactoringRequests.map.set(uriString, map);
     }
-    map.set(diagnostic, request);
+    map.set(diagKey(diagnostic), request);
   }
 
-  static get(document: TextDocument, diagnostic: Diagnostic) {
-    const map = CsRefactoringRequests.map.get(document.uri);
+  static deleteByFnRange(document: TextDocument, functionRange: Range) {
+    const map = CsRefactoringRequests.map.get(document.uri.toString());
     if (!map) {
       return;
     }
-    return map.get(diagnostic);
+    const matchedKeys: string[] = [];
+    map.forEach((req, key) => {
+      if (req.fnToRefactor.range.isEqual(functionRange)) {
+        matchedKeys.push(key);
+      }
+    });
+    let deleted = false;
+    matchedKeys.forEach((key) => {
+      deleted = deleted || map.delete(key);
+    });
+    deleted && CsRefactoringRequests.requestsEmitter.fire();
+  }
+
+  static get(document: TextDocument, diagnostic: Diagnostic) {
+    const map = CsRefactoringRequests.map.get(document.uri.toString());
+    if (!map) {
+      return;
+    }
+    return map.get(diagKey(diagnostic));
   }
 
   static getAll(document: TextDocument) {
-    const map = CsRefactoringRequests.map.get(document.uri);
+    const map = CsRefactoringRequests.map.get(document.uri.toString());
     if (!map) {
       return [];
     }
     return [...map.values()];
   }
+}
+
+function diagKey(diagnostic: Diagnostic) {
+  if (!isDefined(diagnostic.code)) {
+    return `${diagnostic.message}-${rangeStr(diagnostic.range)}`;
+  }
+  if (typeof diagnostic.code === 'object') {
+    return `${diagnostic.code.value}-${rangeStr(diagnostic.range)}`;
+  }
+  return `${diagnostic.code}-${rangeStr(diagnostic.range)}`;
 }
