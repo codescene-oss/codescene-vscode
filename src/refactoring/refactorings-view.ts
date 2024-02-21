@@ -103,7 +103,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   getTreeItem(request: CsRefactoringRequest): vscode.TreeItem | Thenable<vscode.TreeItem> {
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
-      const symbol = toConfidenceSymbol(request.resolvedResponse?.confidence.level);
+      const symbol = toConfidenceSymbol(request);
       return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [Ln ${range.start.line + 1}, Col ${
         range.start.character
       }]`;
@@ -124,8 +124,8 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
       return [];
     }
     const requestsForActiveDoc = CsRefactoringRequests.getAll(this.activeDocument);
-    const pendingOrSuccessful = requestsForActiveDoc.filter((r) => !isDefined(r.error));
-    const distinctPerFn = pendingOrSuccessful.filter(
+    const presentableRefactoring = requestsForActiveDoc.filter((r) => r.shouldPresent());
+    const distinctPerFn = presentableRefactoring.filter(
       (r, i, rs) => rs.findIndex((rr) => rr.fnToRefactor.range.isEqual(r.fnToRefactor.range)) === i
     );
     return distinctPerFn.sort((a, b) => a.fnToRefactor.range.start.line - b.fnToRefactor.range.start.line);

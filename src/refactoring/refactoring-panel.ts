@@ -163,7 +163,7 @@ export class RefactoringPanel {
   private async updateWebView({ initiatorViewColumn, refactoringRequest }: RefactorPanelParams) {
     const { fnToRefactor, error, resolvedResponse, document } = refactoringRequest;
     const response = resolvedResponse || error;
-    const highlightCode = toConfidenceSymbol(resolvedResponse?.confidence.level) === refactoringSymbol;
+    const highlightCode = toConfidenceSymbol(refactoringRequest) === refactoringSymbol;
     if (highlightCode && vscode.window.activeTextEditor) {
       vscode.window.activeTextEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
     }
@@ -174,7 +174,7 @@ export class RefactoringPanel {
     switch (typeof response) {
       case 'string':
         content = this.errorContent(response);
-        title = 'Refactoring error';
+        title = 'Auto-refactor error';
         break;
       case 'object':
         let { code } = response;
@@ -329,7 +329,8 @@ export class RefactoringPanel {
 
   private errorContent(errorMessage: string) {
     return /*html*/ `<h2>Refactoring failed</h2>
-    <p>${errorMessage}</p>
+    <p>There was an error when performing this refactoring. Here's the response from the refactoring service:</p>
+    <pre>${errorMessage}</pre>
     <div class="bottom-controls">
       <div></div> <!-- Spacer, making sure close button is right aligned -->
       <div class="button-group right">

@@ -28,13 +28,6 @@ export class CsRefactoringRequest {
     this.refactorResponse = csRestApi
       .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
       .then((response) => {
-        if (!this.validConfidenceLevel(response.confidence.level)) {
-          this.error = `Invalid confidence level: ${this.confidenceString(response.confidence)}`;
-          logOutputChannel.error(
-            `Refactor response error for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.error}`
-          );
-          return this.error;
-        }
         logOutputChannel.debug(
           `Refactor response for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.confidenceString(
             response.confidence
@@ -58,6 +51,26 @@ export class CsRefactoringRequest {
 
   abort() {
     this.abortController.abort();
+  }
+
+  isPending() {
+    return !isDefined(this.resolvedResponse) && !isDefined(this.error);
+  }
+
+  /**
+   * Indicate that we should present the refactoring state in the UI
+   * Rules at the moment is to basically always present it, unless the 
+   * confidence level is invalid.
+   * 
+   * @param request
+   * @returns 
+   */
+  shouldPresent() {
+    const level = this.resolvedResponse?.confidence.level;
+    if (isDefined(level)) {
+      return this.validConfidenceLevel(level);
+    }
+    return true;
   }
 
   private getErrorString(err: AxiosError) {

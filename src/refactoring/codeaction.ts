@@ -1,6 +1,6 @@
 import vscode, { CodeActionKind } from 'vscode';
 import { isDefined } from '../utils';
-import { commandFromLevel } from './command';
+import { commandFromRequest, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
@@ -18,7 +18,7 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
 
     context.diagnostics.filter(this.codeSmellFilter).forEach((diagnostic) => {
       const refacRequest = CsRefactoringRequests.get(document, diagnostic);
-      if (!refacRequest?.resolvedResponse) return;
+      if (!refacRequest?.shouldPresent()) return;
       uniqueRequests.add(refacRequest);
     });
 
@@ -32,32 +32,33 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   }
 }
 
-function toCodeAction(refactoringRequest: CsRefactoringRequest) {
-  const { resolvedResponse } = refactoringRequest;
-  if (!isDefined(resolvedResponse)) return;
-
-  const {
-    confidence: { level },
-  } = resolvedResponse;
+function toCodeAction(request: CsRefactoringRequest) {
+  if (request.isPending()) return;
 
   let codeActionKind;
-  let command = commandFromLevel(level, refactoringRequest);
+  let command = commandFromRequest(request);
+  if (!isDefined(command)) return;
 
-  switch (level) {
+  const symbol = toConfidenceSymbol(request);
+  switch (request.resolvedResponse?.confidence.level) {
     case 3:
     case 2:
       codeActionKind = CodeActionKind.QuickFix;
       break;
     case 1:
       codeActionKind = CodeActionKind.Empty;
+      // Override title, worded as an action instead of a noun
+      command.title = `${symbol} View code improvement guide`;
       break;
     default:
-      // No code action!
-      return;
+      codeActionKind = CodeActionKind.Empty;
+      // Override title here as well
+      command.title = `${symbol} View Auto-refactor error`;
+      break;
   }
-
-  if (!isDefined(command) || !isDefined(codeActionKind)) return;
-
+  
+  // Note that CodeActionKind.Empty does not appear in the problems context menu, only in the
+  // light bulb/editor context menu under "More actions..."
   const codeAction = new vscode.CodeAction(command.title, codeActionKind);
   codeAction.command = command;
   return codeAction;

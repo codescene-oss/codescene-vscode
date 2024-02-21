@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
-import { commandFromLevel, pendingSymbol } from './command';
+import { commandFromRequest, pendingSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
@@ -63,8 +63,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     supportedDiagnostics.forEach((diagnostic) => {
       const request = CsRefactoringRequests.get(document, diagnostic);
-      // No code-lens provided for errors (or missing requests)
-      if (request && !request.error) {
+      if (request && request.shouldPresent()) {
         // Add a lens at the start of the function targeted for refactoring
         positionToCodeLens.set(
           positionKey(request.fnToRefactor.range.start),
@@ -127,8 +126,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       }`
     );
 
-    const { resolvedResponse } = request; // error requests should not have been provided (see above)
-    if (!resolvedResponse) {
+    if (request.isPending()) {
       codeLens.command = {
         title: `${pendingSymbol} Auto-refactor pending...`,
         command: 'codescene.explorerAutoRefactorView.focus',
@@ -136,8 +134,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       return codeLens;
     }
 
-    codeLens.command = commandFromLevel(resolvedResponse.confidence.level, request);
-
+    codeLens.command = commandFromRequest(request);
     return codeLens;
   }
 

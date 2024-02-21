@@ -45,7 +45,7 @@ export class CsRefactoringCommand {
   }
 
   presentRefactoringRequest(refactoringRequest: CsRefactoringRequest) {
-    if (!refactoringRequest.resolvedResponse) {
+    if (refactoringRequest.isPending()) {
       logOutputChannel.warn('No response for this refactoring yet.');
       return;
     }
@@ -113,24 +113,32 @@ async function findFunctionToRefactor(
 export const refactoringSymbol = '✨';
 const codeImprovementGuideSymbol = '🧐';
 export const pendingSymbol = '⏳';
+const errorSymbol = '❌';
 
-export function toConfidenceSymbol(confidenceLevel?: number) {
-  switch (confidenceLevel) {
+export function toConfidenceSymbol(request: CsRefactoringRequest) {
+  if (isDefined(request.error)) return errorSymbol;
+
+  switch (request.resolvedResponse?.confidence.level) {
     case 3:
     case 2:
       return refactoringSymbol;
     case 1:
       return codeImprovementGuideSymbol;
     default:
-      return; // Missing confidence level can indicate that we don't have the response, or that an error has occurred.
+      return pendingSymbol;
   }
 }
 
-export function commandFromLevel(confidenceLevel: number, request: CsRefactoringRequest) {
+export function commandFromRequest(request: CsRefactoringRequest) {
+  if (request.isPending() || !request.shouldPresent()) {
+    return; // No command for pending requests or invalid confidence levels
+  }
+
   let title = '';
   let command = presentRefactoringCmdName;
-  const symbol = toConfidenceSymbol(confidenceLevel);
-  switch (confidenceLevel) {
+  const symbol = toConfidenceSymbol(request);
+  const level = request.resolvedResponse?.confidence.level;
+  switch (level) {
     case 3:
     case 2:
       title = `${symbol} Auto-refactor`;
@@ -139,8 +147,8 @@ export function commandFromLevel(confidenceLevel: number, request: CsRefactoring
       title = `${symbol} Improvement guide`;
       break;
     default:
-      logOutputChannel.error(`Confidence level ${confidenceLevel} => no command`);
-      return;
+      title = `${symbol} Auto-refactor`; // errors
+      break;
   }
   return { title, command, arguments: [request] };
 }
