@@ -1,10 +1,9 @@
 import {
   provideVSCodeDesignSystem,
   vsCodeButton,
-  vsCodeDivider,
 } from '@vscode/webview-ui-toolkit';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
+provideVSCodeDesignSystem().register(vsCodeButton());
 
 window.addEventListener('load', main);
 
@@ -15,5 +14,7 @@ function sendMessage(command: string) {
 }
 
 function main() {
-  document.getElementById('sign-in-button')?.addEventListener('click', () => sendMessage('sign-in'));
+  document.getElementById('open-settings-button')?.addEventListener('click', () => sendMessage('open-settings'));
+  document.getElementById('change-coupling-link')?.addEventListener('click', () => sendMessage('focus-change-coupling-explorer-view'));
+  document.getElementById('auto-refactor-link')?.addEventListener('click', () => sendMessage('focus-explorer-ace-view'));
 }

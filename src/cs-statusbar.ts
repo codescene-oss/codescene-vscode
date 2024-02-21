@@ -16,6 +16,6 @@ export class CsStatusBar {
   }
 
   setOnline(online?: boolean) {
-    this.statusBarItem.text = `$(cs-logo) ${online ? 'Online' : ''}`;
+    this.statusBarItem.text = `$(cs-logo) ${online ? 'Signed in' : ''}`;
   }
 }

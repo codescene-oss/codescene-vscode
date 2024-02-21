@@ -259,8 +259,8 @@
         },
         "codescene.enableAutomatedCodeEngineering": {
           "type": "boolean",
-          "default": false,
-          "description": "Enable CodeScene ACE (opt-in beta feature)",
+          "default": true,
+          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
           "order": 2
         },
         "codescene.gitignore": {
