@@ -312,10 +312,8 @@ export class RefactoringPanel {
     if (removedCodeSmells.length > 0) {
       solutionContent = await this.codeSmellsGuide(removedCodeSmells[0]);
     } else {
-      solutionContent = await this.codeSmellsGuide('general-code-improvements');
+      solutionContent = await this.codeSmellsGuide('modularity-improvement');
     }
-    /*
-     */
     const content = /*html*/ `
         ${solutionContent}
         <h4>Example from your code</h4>
