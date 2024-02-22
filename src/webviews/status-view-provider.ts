@@ -102,8 +102,8 @@ export class StatusViewProvider implements WebviewViewProvider {
       <h2>Not signed in</h2>
       ${this.featuresContent(features)}
       
-      <p>In order to fully utilize the CodeScene extension, you need to sign in with CodeScene. Sign in using 
-      the accounts menu <span class="codicon codicon-account"></span>.
+      <p>In order to fully utilize the CodeScene extension, you need to sign in with CodeScene.
+      <p><strong>Sign in using the accounts menu</strong> <span class="codicon codicon-account"></span>.</p>
       <p></p>
       <p>If you're part of the beta program for ACE, the refactoring features will be available as soon as you sign in.
       Make sure that the Automated Code Engineering feature is enabled in settings as well (it's enabled by default).</p>
