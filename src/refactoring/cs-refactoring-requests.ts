@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
+import vscode, { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
@@ -71,6 +71,24 @@ export class CsRefactoringRequest {
       return this.validConfidenceLevel(level);
     }
     return true;
+  }
+
+  /**
+   * Finds the editor associated with the request document.
+   *
+   * Primarily this is the activeTextEditor, but that might be out of focus. If so, we will
+   * target the first editor in the list of visibleTextEditors matching the request document.
+   */
+  targetEditor() {
+    if (vscode.window.activeTextEditor?.document === this.document) {
+      return vscode.window.activeTextEditor;
+    } else {
+      for (const e of vscode.window.visibleTextEditors) {
+        if (e.document === this.document) {
+          return e;
+        }
+      }
+    }
   }
 
   private getErrorString(err: AxiosError) {

@@ -5,7 +5,6 @@ import vscode, {
   Disposable,
   Range,
   Selection,
-  TextDocument,
   TextEditorRevealType,
   Uri,
   ViewColumn,
@@ -21,15 +20,12 @@ import { refactoringSymbol, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 interface CurrentRefactorState {
+  request: CsRefactoringRequest;
   range: Range; // Range of code to be refactored
   code: string; // The code to replace the range with
-  document: TextDocument; // The document to apply the refactoring to
-  initiatorViewColumn?: ViewColumn; // ViewColumn of the initiating editor
-  highlightCode?: boolean; // If the code was highlighted when the refactoring was initiated
 }
 
 interface RefactorPanelParams {
-  initiatorViewColumn?: ViewColumn;
   refactoringRequest: CsRefactoringRequest;
 }
 
@@ -46,7 +42,7 @@ export class RefactoringPanel {
     this.webViewPanel = vscode.window.createWebviewPanel(
       RefactoringPanel.viewType,
       'CodeScene ACE',
-      ViewColumn.Beside,
+      { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
         localResourceRoots: [Uri.joinPath(extensionUri, 'out'), Uri.joinPath(extensionUri, 'assets')],
@@ -100,21 +96,30 @@ export class RefactoringPanel {
   }
 
   private async showDiff(refactoringState: CurrentRefactorState) {
-    const { document, range, code } = refactoringState;
+    const {
+      request,
+      request: { document },
+      range,
+      code,
+    } = refactoringState;
 
     // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
     // imposes a save dialog on the user when closing the diff.
-    const originalCodeTmpDoc = await this.createTempDocument('original', document.getText(range), document.languageId);
-    const refactoringTmpDoc = await this.createTempDocument('refactoring', code, document.languageId);
+    const originalCodeTmpDoc = await this.createTempDocument('Original', document.getText(range), document.languageId);
+    const refactoringTmpDoc = await this.createTempDocument('Refactoring', code, document.languageId);
 
-    // Make sure the initiator view is active, otherwise the diff might replace the entire Refactoring webview!
-    await vscode.window.showTextDocument(document.uri, { viewColumn: refactoringState.initiatorViewColumn });
-
+    // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
+    // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
+    await vscode.window.showTextDocument(originalCodeTmpDoc, request.targetEditor()?.viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
   }
 
   private async applyRefactoring(refactoringState: CurrentRefactorState) {
-    const { document, range, code } = refactoringState;
+    const {
+      request: { document },
+      range,
+      code,
+    } = refactoringState;
     const workSpaceEdit = new WorkspaceEdit();
     workSpaceEdit.replace(document.uri, range, code);
     await vscode.workspace.applyEdit(workSpaceEdit);
@@ -134,41 +139,47 @@ export class RefactoringPanel {
     return new Range(range.start, range.start.translate({ lineDelta, characterDelta }));
   }
 
+  /**
+   * Selects the current refactoring in the target editor. If no target editor is found
+   * (manually closed), a new editor is opened for showing the applied refactoring.
+   */
   private async selectCurrentRefactoring(refactoringState: CurrentRefactorState) {
-    const { document, range, code, initiatorViewColumn } = refactoringState;
+    const { range, code, request } = refactoringState;
     const newRange = this.relativeRangeFromCode(range, code);
 
-    const editor = await vscode.window.showTextDocument(document.uri, {
-      preview: false,
-      viewColumn: initiatorViewColumn,
-    });
+    const editor =
+      request.targetEditor() ||
+      (await vscode.window.showTextDocument(request.document.uri, {
+        preview: false,
+        viewColumn: ViewColumn.One,
+      }));
     editor.selection = new Selection(newRange.start, newRange.end);
     editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
   }
 
   private async deselectRefactoring(refactoringState: CurrentRefactorState) {
     // Get original document and deselect the function to refactor.
-    const { document, range, initiatorViewColumn, highlightCode } = refactoringState;
-    // Don't show original doc or try deselecting if the code wasn't highlighted
-    // This indicates that we're just showing a code improvement guide
-    if (!highlightCode) return;
-
-    const editor = await vscode.window.showTextDocument(document.uri, {
-      preview: false,
-      viewColumn: initiatorViewColumn,
-    });
-    editor.selection = new Selection(range.start, range.start);
+    const { range, request } = refactoringState;
+     const editor = request.targetEditor();
+    if (editor) {
+      editor.selection = new Selection(range.start, range.start);
+    }
   }
 
-  private async updateWebView({ initiatorViewColumn, refactoringRequest }: RefactorPanelParams) {
+  private async updateWebView({ refactoringRequest }: RefactorPanelParams) {
     const { fnToRefactor, error, resolvedResponse, document } = refactoringRequest;
     const response = resolvedResponse || error;
     const highlightCode = toConfidenceSymbol(refactoringRequest) === refactoringSymbol;
-    if (highlightCode && vscode.window.activeTextEditor) {
-      vscode.window.activeTextEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+    const targetEditor = refactoringRequest.targetEditor();
+    if (highlightCode && targetEditor) {
+      targetEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
     }
     const range = fnToRefactor.range;
-    this.currentRefactorState = { document, code: 'n/a', range, initiatorViewColumn, highlightCode };
+    this.currentRefactorState = {
+      request: refactoringRequest,
+      code: 'n/a',
+      range,
+    };
     let content = this.loadingContent();
     let title = 'Refactoring...';
     switch (typeof response) {
@@ -358,15 +369,14 @@ export class RefactoringPanel {
    * @returns
    */
   public static createOrShow({ extensionUri, refactoringRequest }: RefactorPanelParams & { extensionUri: Uri }) {
-    const initiatorViewColumn = vscode.window.activeTextEditor?.viewColumn;
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView({ initiatorViewColumn, refactoringRequest });
-      RefactoringPanel.currentPanel.webViewPanel.reveal(initiatorViewColumn ? ViewColumn.Beside : ViewColumn.Active);
+      RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
+      RefactoringPanel.currentPanel.webViewPanel.reveal(undefined, true);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView({ initiatorViewColumn, refactoringRequest });
+    RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
   }
 }

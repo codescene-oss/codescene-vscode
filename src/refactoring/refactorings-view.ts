@@ -30,12 +30,13 @@ export class RefactoringsView implements vscode.Disposable {
       })
     );
 
-    const gotoAndPresentRefactoringCmd = vscode.commands.registerCommand(
-      'codescene.gotoAndPresentRefactoring',
-      this.gotoAndPresentRefactoring,
-      this
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.gotoAndPresentRefactoring', this.gotoAndPresentRefactoring, this)
     );
-    this.disposables.push(gotoAndPresentRefactoringCmd);
+
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.revealFunctionInDocument', this.revealFunctionInDocument, this)
+    );
   }
 
   private rangeOutsideAllVisibleRanges(target: vscode.Range, visibleRanges: readonly vscode.Range[]) {
@@ -45,17 +46,18 @@ export class RefactoringsView implements vscode.Disposable {
   /**
    * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
    * targeted refactoring. This is necessary because the refactored function might not be in current view.
-   * @param refactoringRequest
+   * @param request
    */
-  gotoAndPresentRefactoring(refactoringRequest: CsRefactoringRequest) {
-    const editorForDoc = vscode.window.visibleTextEditors.find((e) => e.document === refactoringRequest.document);
-    if (
-      isDefined(editorForDoc) &&
-      this.rangeOutsideAllVisibleRanges(refactoringRequest.fnToRefactor.range, editorForDoc.visibleRanges)
-    ) {
-      editorForDoc.revealRange(refactoringRequest.fnToRefactor.range, vscode.TextEditorRevealType.Default);
+  private gotoAndPresentRefactoring(request: CsRefactoringRequest) {
+    this.revealFunctionInDocument(request);
+    vscode.commands.executeCommand(presentRefactoringCmdName, request);
+  }
+
+  private revealFunctionInDocument(request: CsRefactoringRequest) {
+    const editor = request.targetEditor();
+    if (editor) {
+      editor.revealRange(request.fnToRefactor.range, vscode.TextEditorRevealType.Default);
     }
-    vscode.commands.executeCommand(presentRefactoringCmdName, refactoringRequest);
   }
 
   dispose() {
@@ -110,11 +112,11 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     };
 
     const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
-    item.tooltip = `Click to go to location in ${this.activeFileName}`;
+    item.tooltip = `Click to go to location in ${request.document.fileName.split('/').pop()}`;
     item.command = {
       title: 'Show in file',
-      command: 'editor.action.goToLocations',
-      arguments: [this.activeDocument?.uri, request.fnToRefactor.range.start, [], 'goto', ''],
+      command: 'codescene.revealFunctionInDocument',
+      arguments: [request],
     };
     return item;
   }
