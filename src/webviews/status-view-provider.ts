@@ -154,8 +154,9 @@ export class StatusViewProvider implements WebviewViewProvider {
         <ul>${codeSmellList}</ul>
         Also, only functions under ${preflight['max-input-loc']} lines of code will be considered for refactoring.
         </p>
-        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a></p>
-`;
+        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
+        <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
+        `;
     }
 
     const html = /*html*/ `
