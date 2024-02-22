@@ -128,7 +128,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     if (request.isPending()) {
       codeLens.command = {
-        title: `${pendingSymbol} Auto-refactor pending...`,
+        title: `${pendingSymbol} Auto-refactoring...`,
         command: 'codescene.explorerAutoRefactorView.focus',
       };
       return codeLens;
