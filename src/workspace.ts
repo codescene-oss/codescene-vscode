@@ -7,12 +7,19 @@
 import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { CsRestApi, PreFlightResponse } from './cs-rest-api';
+import { CliStatus } from './download';
 import { SimpleExecutor } from './executor';
 import { rankNamesBy } from './utils';
 
+export interface CsFeatures {
+  codeHealthAnalysis: CliStatus;
+  automatedCodeEngineering?: PreFlightResponse;
+  changeCoupling?: boolean;
+}
+
 export interface CsExtensionState {
   signedIn: boolean;
-  features: { codeHealthAnalysis?: boolean; automatedCodeEngineering?: PreFlightResponse; changeCoupling?: boolean };
+  features: CsFeatures;
 }
 
 export class CsWorkspace implements vscode.Disposable {
@@ -24,8 +31,8 @@ export class CsWorkspace implements vscode.Disposable {
 
   extensionState: CsExtensionState;
 
-  constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi) {
-    this.extensionState = { signedIn: false, features: { codeHealthAnalysis: true } };
+  constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi, chStatus: CliStatus) {
+    this.extensionState = { signedIn: false, features: { codeHealthAnalysis: chStatus } };
     const associateCmd = vscode.commands.registerCommand('codescene.associateWithProject', async () => {
       await this.associateWithProject();
     });

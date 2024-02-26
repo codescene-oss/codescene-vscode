@@ -6,11 +6,11 @@ import vscode, {
   WebviewViewProvider,
   WebviewViewResolveContext,
 } from 'vscode';
-import { PreFlightResponse } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
 import { isDefined } from '../utils';
-import { CsExtensionState } from '../workspace';
+import { CsExtensionState, CsFeatures } from '../workspace';
 import { nonce } from './utils';
+import { PreFlightResponse } from '../cs-rest-api';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext, initialState: CsExtensionState) {
   const provider = new StatusViewProvider(context.extensionUri, initialState);
@@ -59,26 +59,26 @@ export class StatusViewProvider implements WebviewViewProvider {
     const codiconsUri = this.getUri(webView, 'out', 'codicons', 'codicon.css');
 
     return /*html*/ `
-<!DOCTYPE html>
-<html lang="en">
+      <!DOCTYPE html>
+      <html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${webView.cspSource}; font-src ${
-      webView.cspSource
-    }; style-src 'unsafe-inline' ${webView.cspSource};">
+      <head>
+          <meta charset="UTF-8">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${
+            webView.cspSource
+          }; font-src ${webView.cspSource}; style-src 'unsafe-inline' ${webView.cspSource};">
 
-    <link href="${codiconsUri}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
-    <link href="${statusViewStyle}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
-</head>
+          <link href="${codiconsUri}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
+          <link href="${statusViewStyle}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
+      </head>
 
-<body>
-    ${htmlContent}
-    <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
-</body>
+      <body>
+          ${htmlContent}
+          <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
+      </body>
 
-</html>
-`;
+      </html>
+    `;
   }
 
   update(csExtensionState: CsExtensionState) {
@@ -88,55 +88,49 @@ export class StatusViewProvider implements WebviewViewProvider {
     const webView: Webview = this.view.webview;
     if (!signedIn) {
       this.view.badge = { tooltip: 'Not signed in', value: 1 };
-      webView.html = this.notSignedInContent(webView, csExtensionState);
-      return;
+    } else {
+      this.view.badge = { tooltip: 'Signed in', value: 0 };
     }
 
-    this.view.badge = { tooltip: 'Signed in', value: 0 };
-    webView.html = this.signedInContent(webView, csExtensionState);
+    webView.html = this.getContent(webView, this.extensionStatusContent(csExtensionState));
   }
 
-  private notSignedInContent(webView: Webview, csExtensionState: CsExtensionState) {
-    const { features } = csExtensionState;
-    const html = /*html*/ `
-      <h2>Not signed in</h2>
-      ${this.featuresContent(features)}
-      
-      <p>In order to fully utilize the CodeScene extension, you need to sign in with CodeScene.
-      <p><strong>Sign in using the accounts menu</strong> <span class="codicon codicon-account"></span>.</p>
-      <p></p>
-      <p>If you're part of the beta program for ACE, the refactoring features will be available as soon as you sign in.
-      Make sure that the Automated Code Engineering feature is enabled in settings as well (it's enabled by default).</p>
-      <vscode-button id="open-settings-button">Open settings</vscode-button>`;
-
-    return this.getContent(webView, html);
+  private cliStatusContent(features: CsFeatures) {
+    if (features.codeHealthAnalysis.cliPath) {
+      return /*html*/ `
+        <h3>Code Health Analysis</h3>
+        <p>Live <a href="https://codescene.io/docs/terminology/codescene-terminology.html#code-health">Code Health</a> 
+        Analysis is enabled. Code health metrics and issues are available as a CodeLenses and in the Problems panel.
+        </p>
+      `;
+    }
+    return /*html*/ `
+      <h3><span class="codicon codicon-warning"></span> Extension error</h3>
+      <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.error}</p>
+    `;
   }
 
-  private signedInContent(webView: Webview, csExtensionState: CsExtensionState) {
-    const { features } = csExtensionState;
-
-    let ccContent = /*html*/ `
-      <h3>Change Coupling</h3>
-      <p>Change coupling is enabled by signing in with CodeScene.</p>
-      <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/guides/technical/change-coupling.html">Documentation on codescene.io</a></p>`;
-    if (csExtensionState.features.changeCoupling) {
-      ccContent = /*html*/ `
-        <h3>Change Coupling</h3>
+  private changeCouplingContent(enabled?: boolean) {
+    let content = /*html*/ `<h3>Change Coupling</h3>`;
+    if (enabled) {
+      content += /*html*/ `
         <p>Change coupling is enabled and available in the Explorer and Source Control views. If your workspace 
         is associated with a CodeScene project, you will see which files are often changed together in the 
         <a href="" id="change-coupling-link">Change Coupling</a> view.</p>
         <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/guides/technical/change-coupling.html">Documentation on codescene.io</a></p>
-  `;
+    `;
+    } else {
+      content += /*html*/ `
+        <p>Change coupling is enabled by signing in with CodeScene.</p>
+        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/guides/technical/change-coupling.html">Documentation on codescene.io</a></p>
+      `;
     }
+    return content;
+  }
 
-    let aceContent = /*html*/ `
-      <h3>Automated Code Engineering (ACE)</h3>
-      <p>Automated Code Engineering is currently only available for customers part of the beta program. If you are, but still can't see the feature, 
-      make sure that the feature is enabled in your settings.</p>
-      <vscode-button id="open-settings-button">Open settings</vscode-button>
-      <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a></p>`;
-    if (isDefined(csExtensionState.features.automatedCodeEngineering)) {
-      const preflight = csExtensionState.features.automatedCodeEngineering;
+  private aceContent(preflight?: PreFlightResponse) {
+    let content = /*html*/ `<h3>Automated Code Engineering (ACE)</h3>`;
+    if (isDefined(preflight)) {
       const languageIdList = toDistinctLanguageIds(preflight.supported)
         .map((langIds) => `<li>${langIds}</li>`)
         .join('\n');
@@ -144,8 +138,7 @@ export class StatusViewProvider implements WebviewViewProvider {
         .map((codeSmells) => `<li>${codeSmells}</li>`)
         .join('\n');
 
-      aceContent = /*html*/ `
-        <h3>Automated Code Engineering (ACE)</h3>
+      content += /*html*/ `
         <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
         <p>
         Supported languages:
@@ -156,36 +149,69 @@ export class StatusViewProvider implements WebviewViewProvider {
         </p>
         <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
         <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
-        `;
+      `;
+    } else {
+      content += /*html*/ `
+        <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
+        in using the accounts menu <span class="codicon codicon-account"></span></strong></p>
+        <p>The Auto-refactor capability is available by invitation for all paid CodeScene subscriptions. Sign up <a href="https://codescene.com/ai">here</a>
+        to join the waiting list.</p>
+        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a></p>
+      `;
     }
-
-    const html = /*html*/ `
-  <h2>Signed in</h2>
-  ${this.featuresContent(features)}
-  ${aceContent}
-  ${ccContent}
-`;
-    return this.getContent(webView, html);
+    return content;
   }
 
-  private featuresContent(features: {
-    codeHealthAnalysis?: boolean;
-    automatedCodeEngineering?: PreFlightResponse;
-    changeCoupling?: boolean;
-  }) {
+  private signInContent(signedIn: boolean) {
+    return signedIn
+      ? ''
+      : /*html*/ `
+        <h3>Sign in</h3>
+        <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
+        in using the accounts menu <span class="codicon codicon-account"></span></strong></p>
+        <p>The Auto-refactor capability is available by invitation for all paid CodeScene subscriptions. Sign up <a href="https://codescene.com/ai">here</a>
+        to join the waiting list.</p>
+      `;
+  }
+
+  private extensionStatusContent(extensionState: CsExtensionState) {
+    const { signedIn, features } = extensionState;
     const featureNames = {
-      'Code health analysis': features.codeHealthAnalysis,
-      'Change Coupling': features.changeCoupling,
+      'Code health analysis': features.codeHealthAnalysis.cliPath,
       'Automated Code Engineering (ACE)': features.automatedCodeEngineering,
+      'Change Coupling': features.changeCoupling,
     };
 
+    const signedInListItem = `<li><span class="codicon codicon-shield ${signedIn ? 'codicon-active' : ''}"></span> ${
+      signedIn ? 'Signed in' : 'Not signed in'
+    }</li>`;
     let featureListItems = '';
     Object.entries(featureNames).forEach(([featureName, value]) => {
       const iconType = value ? 'pass' : 'error';
       const state = value ? 'activated' : 'inactive';
-      featureListItems += /*html*/ `<li><span class="codicon codicon-${iconType}"></span> ${featureName} ${state}</li>`;
+      const colorClass = value ? 'active' : 'inactive';
+      featureListItems += /*html*/ `<li><span class="codicon codicon-${iconType} codicon-${colorClass}"></span> ${featureName} ${state}</li>`;
     });
-    return /*html*/ `<ul class="features-list">${featureListItems}</ul>`;
+
+    return /*html*/ `
+      <h2>CodeScene extension status</h2>
+      <vscode-button id="open-settings-button" appearance="icon" aria-label="Extension settings" title="Extension settings">
+        <span class="codicon codicon-settings-gear"></span>
+      </vscode-button>
+      <ul class="features-list">
+        ${signedInListItem}
+        ${featureListItems}
+      </ul>
+
+      <!-- ${this.signInContent(signedIn)} -->
+
+      <hr>
+
+      ${this.cliStatusContent(features)}
+      ${this.aceContent(features.automatedCodeEngineering)}
+      ${this.changeCouplingContent(features.changeCoupling)}
+
+    `;
   }
 
   private getUri(webView: Webview, ...pathSegments: string[]) {

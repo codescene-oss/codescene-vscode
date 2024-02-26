@@ -59,21 +59,22 @@ function checkRemoteLastModifiedDate(url: URL) {
   logOutputChannel.debug(`Checking last-modified header of ${url.href}`);
 
   return new Promise<Date | null>((resolve) => {
-    https.request(url, {method: 'HEAD'}, (response) => {
-      if (response.statusCode === 200) {
-        const lastModified = response.headers['last-modified'];
-        if (lastModified ) {
-          resolve(new Date(lastModified));
-          return;
+    https
+      .request(url, { method: 'HEAD' }, (response) => {
+        if (response.statusCode === 200) {
+          const lastModified = response.headers['last-modified'];
+          if (lastModified) {
+            resolve(new Date(lastModified));
+            return;
+          }
         }
-      }
-      resolve(null);
-    })
-    .on('error', e => {
-      logOutputChannel.debug('Error while checking last-modified header:', e);
-      resolve(null);
-    })
-    .end();
+        resolve(null);
+      })
+      .on('error', (e) => {
+        logOutputChannel.debug('Error while checking last-modified header:', e);
+        resolve(null);
+      })
+      .end();
   });
 }
 
@@ -98,13 +99,17 @@ async function isUpToDate(cliPath: string, lastModifiedPath: string, url: URL) {
 
   if (remoteDate === null) {
     // We can't trust the remote, so we'll just assume the local version is up to date.
-    logOutputChannel.debug('Could not check last-modified header of remote artifact, assuming local copy is up to date');
+    logOutputChannel.debug(
+      'Could not check last-modified header of remote artifact, assuming local copy is up to date'
+    );
     return true;
   }
 
   if (localDate === null) {
     // We don't have a local date, so the local copy can't be up to date.
-    logOutputChannel.debug('Could not check last-modified date of local artifact, assuming local copy is not up to date');
+    logOutputChannel.debug(
+      'Could not check last-modified date of local artifact, assuming local copy is not up to date'
+    );
     return false;
   }
 
@@ -120,7 +125,7 @@ function download(url: URL, filePath: string) {
 
   return new Promise<Date | null>((resolve, reject) => {
     https
-      .get(url, {headers: {"cache-control": "max-age=0"}}, (response) => {
+      .get(url, { headers: { 'cache-control': 'max-age=0' } }, (response) => {
         if (response.statusCode === 200) {
           const writeStream = fs.createWriteStream(filePath);
           response
@@ -145,10 +150,15 @@ function download(url: URL, filePath: string) {
   });
 }
 
+export interface CliStatus {
+  cliPath?: string;
+  error?: string;
+}
+
 /**
  * Download the CodeScene CLI artifact for the current platform and architecture.
  */
-export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
+export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<CliStatus> {
   outputChannel.appendLine('Ensuring we have the latest CodeScene CLI version...');
 
   const executableName = getExecutableName(process.platform, process.arch);
@@ -158,14 +168,14 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   const artifactName = getArtifactDownloadName(process.platform, process.arch);
 
   if (!artifactName) {
-    throw new Error(`Unsupported platform: ${process.platform}-${process.arch}`);
+    return { error: `Unsupported platform: ${process.platform}-${process.arch}` };
   }
 
   const downloadUrl = getArtifactDownloadUrl(artifactName);
 
   if (await isUpToDate(cliPath, lastModifiedPath, downloadUrl)) {
     outputChannel.appendLine('CodeScene CLI already exists and is up to date');
-    return cliPath;
+    return { cliPath };
   }
 
   outputChannel.appendLine('CodeScene CLI is not up to date, downloading latest version');
@@ -181,8 +191,8 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
 
   if (fs.existsSync(cliPath)) {
     outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
-    return cliPath;
+    return { cliPath };
   } else {
-    throw new Error('Failed to download codescene cli');
+    return { error: 'Failed to download codescene cli' };
   }
 }

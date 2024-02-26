@@ -1,16 +1,34 @@
 p {
-    line-height: 1.3em;
+  line-height: 1.3em;
 }
 
 h3 {
-    margin-block-start: 2em;
+  margin-block-start: 2em;
+}
+
+hr {
+  margin-block-start: 2em;
 }
 
 .codicon {
-    vertical-align: text-bottom;
+  vertical-align: text-bottom;
+}
+
+.codicon-active {
+  color: rgb(29, 139, 29);
+}
+
+.codicon-inactive {
+  color: rgb(215, 25, 25);
 }
 
 .features-list {
-    list-style-type: none;
-    padding-inline-start: 4px;
+  list-style-type: none;
+  padding-inline-start: 4px;
+}
+
+#open-settings-button {
+  position: fixed;
+  top: 16px;
+  right: 20px;
 }

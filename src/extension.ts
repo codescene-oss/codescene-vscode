@@ -43,9 +43,9 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
-  const cliPath = await ensureLatestCompatibleCliExists(context.extensionPath);
+  const cliStatus = await ensureLatestCompatibleCliExists(context.extensionPath);
   const csRestApi = new CsRestApi();
-  const csWorkspace = new CsWorkspace(context, csRestApi);
+  const csWorkspace = new CsWorkspace(context, csRestApi, cliStatus);
   context.subscriptions.push(csWorkspace);
   const reviewDocSelector = toReviewDocumentSelector(context.extension);
   const csDiagnostics = new CsDiagnostics(reviewDocSelector);
@@ -59,6 +59,9 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  if (!cliStatus.cliPath) throw new Error(cliStatus.error || 'Unknown error starting extension');
+
+  const cliPath = cliStatus.cliPath;
   const csContext: CsContext = {
     cliPath,
     csRestApi,
@@ -300,7 +303,7 @@ async function enableACECapabilities(context: vscode.ExtensionContext, csContext
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace, csStatusBar, statusViewProvider } = csContext;
+  const { csWorkspace } = csContext;
   const authProvider = new CsAuthenticationProvider(context, csWorkspace);
 
   // Provides the initial session - will enable remote features and update workspace state
