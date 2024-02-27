@@ -141,18 +141,6 @@ export class StatusViewProvider implements WebviewViewProvider {
     return content;
   }
 
-  private signInContent(signedIn: boolean) {
-    return signedIn
-      ? ''
-      : /*html*/ `
-        <h3>Sign in</h3>
-        <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
-        in using the accounts menu <span class="codicon codicon-account"></span></strong></p>
-        <p>The Auto-refactor capability is available by invitation for all paid CodeScene subscriptions. Sign up <a href="https://codescene.com/ai">here</a>
-        to join the waiting list.</p>
-      `;
-  }
-
   private extensionStatusContent(extensionState: CsExtensionState) {
     const { signedIn, features } = extensionState;
     const featureNames = {
@@ -180,8 +168,6 @@ export class StatusViewProvider implements WebviewViewProvider {
         ${signedInListItem}
         ${featureListItems}
       </ul>
-
-      <!-- ${this.signInContent(signedIn)} -->
 
       <hr>
 
