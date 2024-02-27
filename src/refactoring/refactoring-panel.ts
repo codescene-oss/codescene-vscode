@@ -61,7 +61,7 @@ export class RefactoringPanel {
         switch (message.command) {
           case 'apply':
             await this.applyRefactoring(refactoringState);
-            Telemetry.instance.logUsage('codescene.vscode.refactor/applied', {'trace-id': refactoringState.request.traceId});
+            Telemetry.instance.logUsage('refactor/applied', {'trace-id': refactoringState.request.traceId});
             vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
             this.dispose();
             return;
@@ -75,7 +75,7 @@ export class RefactoringPanel {
             return;
           case 'show-diff':
             await this.showDiff(refactoringState);
-            Telemetry.instance.logUsage('codescene.vscode.refactor/diff-shown', {'trace-id': refactoringState.request.traceId});
+            Telemetry.instance.logUsage('refactor/diff-shown', {'trace-id': refactoringState.request.traceId});
             return;
         }
       },

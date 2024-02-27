@@ -25,7 +25,7 @@ export class CsRefactoringRequest {
   }
 
   post(csRestApi: CsRestApi, diagnostics: Diagnostic[]) {
-    Telemetry.instance.logUsage('codescene.vscode.refactor/request', { 'trace-id': this.traceId });
+    Telemetry.instance.logUsage('refactor/requested', { 'trace-id': this.traceId });
     logOutputChannel.debug(`Refactor request for ${this.logIdString(this.traceId, this.fnToRefactor)}`);
     this.refactorResponse = csRestApi
       .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
