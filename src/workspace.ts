@@ -14,7 +14,6 @@ import { rankNamesBy } from './utils';
 export interface CsFeatures {
   codeHealthAnalysis: CliStatus;
   automatedCodeEngineering?: PreFlightResponse;
-  changeCoupling?: boolean;
 }
 
 export interface CsExtensionState {
@@ -106,10 +105,7 @@ export class CsWorkspace implements vscode.Disposable {
     vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
 
     this.extensionState.signedIn = signedIn;
-    if (signedIn) {
-      this.extensionState.features.changeCoupling = true;
-    } else {
-      this.extensionState.features.changeCoupling = false;
+    if (!signedIn) {
       this.extensionState.features.automatedCodeEngineering = undefined;
     }
     this.extensionStateChangedEmitter.fire(this.extensionState);
@@ -117,11 +113,6 @@ export class CsWorkspace implements vscode.Disposable {
 
   setCliStatus(cliStatus: CliStatus) {
     this.extensionState.features.codeHealthAnalysis = cliStatus;
-    this.extensionStateChangedEmitter.fire(this.extensionState);
-  }
-
-  setChangeCouplingEnabled(enabled: boolean) {
-    this.extensionState.features.changeCoupling = enabled;
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 

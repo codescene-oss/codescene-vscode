@@ -1,17 +1,12 @@
 import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
-import { CouplingDataProvider } from './coupling/coupling-data-provider';
-import { ExplorerCouplingsView } from './coupling/explorer-couplings-view';
-import { ScmCouplingsView } from './coupling/scm-couplings-view';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
-import { Git } from './git';
 import { toRefactoringDocumentSelector, toReviewDocumentSelector } from './language-support';
-import { Links } from './links';
 import { outputChannel } from './log';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
@@ -225,23 +220,6 @@ function requireReloadWindowFn(message: string) {
  * Active functionality that requires a connection to a CodeScene server.
  */
 async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace, csRestApi } = csContext;
-  const links = new Links(csWorkspace);
-  context.subscriptions.push(links);
-
-  const git = new Git();
-  const couplingDataProvider = new CouplingDataProvider(git, csRestApi, csWorkspace);
-
-  // Init tree view in scm container
-  const couplingView = new ScmCouplingsView(git, couplingDataProvider);
-  context.subscriptions.push(couplingView);
-
-  // Init tree view in explorer container
-  const explorerCouplingsView = new ExplorerCouplingsView(couplingDataProvider);
-  context.subscriptions.push(explorerCouplingsView);
-  outputChannel.appendLine('Change Coupling enabled');
-  csWorkspace.setChangeCouplingEnabled(true);
-
   // Refactoring features
   const enableACE = getConfiguration('enableAutomatedCodeEngineering');
   if (enableACE) {

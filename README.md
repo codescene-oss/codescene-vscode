@@ -35,11 +35,6 @@ This feature extends CodeScene's capabilities to not only identify code health i
 CodeScene Automated Code Engineering requires signing in to a CodeScene instance. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
 
 
-
-## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Change Coupling
-
-Sign in to your CodeScene account to enable the Change Coupling analysis. Looking at the Change Coupling will help you understand how files change together over time. It can be useful for navigating between related files, and can also make it easier to pinpoint other files that might need updating when working on a certain file. See more about Change Coupling on [codescene.com](https://codescene.com/ide-extension).
-
 ## Example screenshots
 
 *Issues are displayed above the affected functions. Clicking on them shows an explanation.*
@@ -93,7 +88,6 @@ CodeScene supports most popular languages. Here is the full list:
 - Diagnostics for functions with code health issues.
 - Optionally show code issues as code lenses for the affected function.
 - Customizable code health rules via `.codescene/code-health-rules.json` ([format description](https://codescene.io/docs/guides/technical/code-health.html#advanced-override-the-low-level-code-health-thresholds)). You can create a template with the command `codescene.createRulesTemplate`.
-- Use an active CodeScene account to enable monitoring of Change Coupling.
 - Get automated refactoring suggestions with Automated Code Engineering.
 
 Note on custom code health rules: this is the same mechanism as the full CodeScene product.

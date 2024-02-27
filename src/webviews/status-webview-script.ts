@@ -16,6 +16,5 @@ function sendMessage(command: string) {
 function main() {
   document.getElementById('open-settings-button')?.addEventListener('click', () => sendMessage('open-settings'));
   document.getElementById('open-settings-link')?.addEventListener('click', () => sendMessage('open-settings'));
-  document.getElementById('change-coupling-link')?.addEventListener('click', () => sendMessage('focus-change-coupling-explorer-view'));
   document.getElementById('auto-refactor-link')?.addEventListener('click', () => sendMessage('focus-explorer-ace-view'));
 }
