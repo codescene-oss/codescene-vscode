@@ -42,9 +42,6 @@ export class StatusViewProvider implements WebviewViewProvider {
         case 'open-settings':
           vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
           return;
-        case 'focus-change-coupling-explorer-view':
-          vscode.commands.executeCommand('codescene.explorerCouplingsView.focus');
-          return;
         case 'focus-explorer-ace-view':
           vscode.commands.executeCommand('codescene.explorerAutoRefactorView.focus');
           return;
@@ -110,24 +107,6 @@ export class StatusViewProvider implements WebviewViewProvider {
     `;
   }
 
-  private changeCouplingContent(enabled?: boolean) {
-    let content = /*html*/ `<h3>Change Coupling</h3>`;
-    if (enabled) {
-      content += /*html*/ `
-        <p>Change coupling is enabled and available in the Explorer and Source Control views. If your workspace 
-        is associated with a CodeScene project, you will see which files are often changed together in the 
-        <a href="" id="change-coupling-link">Change Coupling</a> view.</p>
-        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/guides/technical/change-coupling.html">Documentation on codescene.io</a></p>
-    `;
-    } else {
-      content += /*html*/ `
-        <p>Change coupling is enabled by signing in with CodeScene.</p>
-        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/guides/technical/change-coupling.html">Documentation on codescene.io</a></p>
-      `;
-    }
-    return content;
-  }
-
   private aceContent(preflight?: PreFlightResponse) {
     let content = /*html*/ `<h3>Automated Code Engineering (ACE)</h3>`;
     if (isDefined(preflight)) {
@@ -179,7 +158,6 @@ export class StatusViewProvider implements WebviewViewProvider {
     const featureNames = {
       'Code health analysis': features.codeHealthAnalysis.cliPath,
       'Automated Code Engineering (ACE)': features.automatedCodeEngineering,
-      'Change Coupling': features.changeCoupling,
     };
 
     const signedInListItem = `<li><span class="codicon codicon-shield ${signedIn ? 'codicon-active' : ''}"></span> ${
@@ -209,7 +187,6 @@ export class StatusViewProvider implements WebviewViewProvider {
 
       ${this.cliStatusContent(features)}
       ${this.aceContent(features.automatedCodeEngineering)}
-      ${this.changeCouplingContent(features.changeCoupling)}
 
     `;
   }

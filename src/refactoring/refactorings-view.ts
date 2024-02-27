@@ -1,9 +1,3 @@
-/**
- * Shows couplings in the Explorer panel.
- *
- * The purpose of this view is to show the user which files are related to the one that is
- * currently active in the editor. The user can jump to these files by clicking on them.
- */
 import * as vscode from 'vscode';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './command';

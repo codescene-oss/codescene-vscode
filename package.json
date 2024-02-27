@@ -70,40 +70,6 @@
         "title": "CodeScene: Open Code Health Documentation"
       },
       {
-        "command": "codescene.associateWithProject",
-        "title": "CodeScene: Associate Workspace with CodeScene Project"
-      },
-      {
-        "command": "codescene.scmCouplingsView.open",
-        "title": "Open File",
-        "icon": "$(preferences-open-settings)"
-      },
-      {
-        "command": "codescene.scmCouplingsView.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "codescene.openDashboard",
-        "title": "CodeScene: Open Project Dashboard"
-      },
-      {
-        "command": "codescene.openHotspots",
-        "title": "CodeScene: Open Hotspots Map"
-      },
-      {
-        "command": "codescene.openChangeCoupling",
-        "title": "CodeScene: Open Change Coupling"
-      },
-      {
-        "command": "codescene.openCodeReview",
-        "title": "CodeScene: Open Code Review"
-      },
-      {
-        "command": "codescene.openXRay",
-        "title": "CodeScene: Open X-Ray"
-      },
-      {
         "command": "codescene.gotoAndPresentRefactoring",
         "title": "View in ACE panel"
       }
@@ -118,17 +84,7 @@
       ]
     },
     "views": {
-      "scm": [
-        {
-          "id": "codescene.scmCouplingsView",
-          "name": "Change coupling"
-        }
-      ],
       "explorer": [
-        {
-          "id": "codescene.explorerCouplingsView",
-          "name": "Change coupling"
-        },
         {
           "id": "codescene.explorerAutoRefactorView",
           "name": "Auto-refactor"
@@ -145,53 +101,13 @@
     },
     "viewsWelcome": [
       {
-        "view": "codescene.scmCouplingsView",
-        "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
-        "when": "!codescene.isSignedIn"
-      },
-      {
-        "view": "codescene.scmCouplingsView",
-        "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isSignedIn"
-      },
-      {
-        "view": "codescene.explorerCouplingsView",
-        "contents": "In order to see coupling data, you need to sign in to a CodeScene server",
-        "when": "!codescene.isSignedIn"
-      },
-      {
-        "view": "codescene.explorerCouplingsView",
-        "contents": "In order to see coupling data, you need to have associated your workspace with a CodeScene project.\n[Associate workspace](command:codescene.associateWithProject)",
-        "when": "!codescene.isWorkspaceAssociated && codescene.isSignedIn"
-      },
-      {
         "view": "codescene.explorerAutoRefactorView",
         "contents": "To see Auto-refactoring suggestions, you need to sign in to a CodeScene server",
         "when": "!codescene.isSignedIn"
       }
     ],
     "menus": {
-      "view/title": [
-        {
-          "command": "codescene.scmCouplingsView.refresh",
-          "when": "view == codescene.scmCouplingsView",
-          "group": "navigation"
-        }
-      ],
       "view/item/context": [
-        {
-          "command": "codescene.scmCouplingsView.open",
-          "when": "view == codescene.scmCouplingsView && viewItem == rootItem",
-          "group": "inline"
-        },
-        {
-          "command": "codescene.openXRay",
-          "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
-        },
-        {
-          "command": "codescene.openCodeReview",
-          "when": "view == codescene.scmCouplingsView || view == codescene.explorerCouplingsView"
-        },
         {
           "command": "codescene.gotoAndPresentRefactoring",
           "when": "view == codescene.explorerAutoRefactorView"
@@ -199,52 +115,8 @@
       ],
       "commandPalette": [
         {
-          "command": "codescene.openDashboard",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.openHotspots",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.openChangeCoupling",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.associateWithProject",
-          "when": "codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.openXRay",
-          "when": "false"
-        },
-        {
-          "command": "codescene.openCodeReview",
-          "when": "false"
-        },
-        {
           "command": "codescene.gotoAndPresentRefactoring",
           "when": "false"
-        }
-      ],
-      "explorer/context": [
-        {
-          "command": "codescene.openCodeReview",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.openXRay",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        }
-      ],
-      "editor/title/context": [
-        {
-          "command": "codescene.openCodeReview",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
-        },
-        {
-          "command": "codescene.openXRay",
-          "when": "codescene.isWorkspaceAssociated && codescene.isSignedIn"
         }
       ]
     },

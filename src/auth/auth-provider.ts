@@ -96,20 +96,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
       outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
 
-      if (this.csWorkspace.getProjectId() === undefined) {
-        window
-          .showInformationMessage(
-            `Signed in to CodeScene as ${session.account.label}`,
-            'Associate workspace with project'
-          )
-          .then((result) => {
-            if (result === 'Associate workspace with project') {
-              this.csWorkspace.associateWithProject();
-            }
-          });
-      } else {
-        window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
-      }
+      window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
 
       return session;
     } catch (e) {
