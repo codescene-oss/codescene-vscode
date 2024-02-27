@@ -168,7 +168,9 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   const artifactName = getArtifactDownloadName(process.platform, process.arch);
 
   if (!artifactName) {
-    return { error: `Unsupported platform: ${process.platform}-${process.arch}` };
+    const error = `Unsupported platform: ${process.platform}-${process.arch}`;
+    outputChannel.appendLine(error);
+    return { error };
   }
 
   const downloadUrl = getArtifactDownloadUrl(artifactName);
@@ -193,6 +195,8 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
     outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
     return { cliPath };
   } else {
-    return { error: 'Failed to download codescene cli' };
+    const error = 'Failed to download codescene cli';
+    outputChannel.appendLine(error);
+    return { error };
   }
 }

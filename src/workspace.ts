@@ -31,8 +31,8 @@ export class CsWorkspace implements vscode.Disposable {
 
   extensionState: CsExtensionState;
 
-  constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi, chStatus: CliStatus) {
-    this.extensionState = { signedIn: false, features: { codeHealthAnalysis: chStatus } };
+  constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi) {
+    this.extensionState = { signedIn: false, features: { codeHealthAnalysis: {} } };
     const associateCmd = vscode.commands.registerCommand('codescene.associateWithProject', async () => {
       await this.associateWithProject();
     });
@@ -112,6 +112,11 @@ export class CsWorkspace implements vscode.Disposable {
       this.extensionState.features.changeCoupling = false;
       this.extensionState.features.automatedCodeEngineering = undefined;
     }
+    this.extensionStateChangedEmitter.fire(this.extensionState);
+  }
+
+  setCliStatus(cliStatus: CliStatus) {
+    this.extensionState.features.codeHealthAnalysis = cliStatus;
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 

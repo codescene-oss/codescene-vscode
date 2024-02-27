@@ -43,21 +43,22 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
-  const cliStatus = await ensureLatestCompatibleCliExists(context.extensionPath);
   const csRestApi = new CsRestApi();
-  const csWorkspace = new CsWorkspace(context, csRestApi, cliStatus);
+  const csWorkspace = new CsWorkspace(context, csRestApi);
   context.subscriptions.push(csWorkspace);
-  const reviewDocSelector = toReviewDocumentSelector(context.extension);
-  const csDiagnostics = new CsDiagnostics(reviewDocSelector);
   const csStatusBar = new CsStatusBar();
   const statusViewProvider = registerStatusViewProvider(context, csWorkspace.extensionState);
-
   context.subscriptions.push(
     csWorkspace.onDidExtensionStateChange((extensionState) => {
       csStatusBar.setOnline(extensionState.signedIn);
       statusViewProvider.update(extensionState);
     })
   );
+  const reviewDocSelector = toReviewDocumentSelector(context.extension);
+  const csDiagnostics = new CsDiagnostics(reviewDocSelector);
+
+  const cliStatus = await ensureLatestCompatibleCliExists(context.extensionPath);
+  csWorkspace.setCliStatus(cliStatus);
 
   if (!cliStatus.cliPath) throw new Error(cliStatus.error || 'Unknown error starting extension');
 
