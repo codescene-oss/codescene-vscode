@@ -6,6 +6,7 @@ import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import { CsRefactorCodeLensProvider } from './codelens';
 import { FnToRefactor } from './command';
+import Telemetry from '../telemetry';
 
 export class CsRefactoringRequest {
   fnToRefactor: FnToRefactor;
@@ -24,6 +25,7 @@ export class CsRefactoringRequest {
   }
 
   post(csRestApi: CsRestApi, diagnostics: Diagnostic[]) {
+    Telemetry.instance.logUsage('codescene.vscode.refactor/request', { 'trace-id': this.traceId });
     logOutputChannel.debug(`Refactor request for ${this.logIdString(this.traceId, this.fnToRefactor)}`);
     this.refactorResponse = csRestApi
       .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
