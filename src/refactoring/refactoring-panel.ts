@@ -230,6 +230,7 @@ export class RefactoringPanel {
     <body>
         <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
         <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
+        ${this.functionInfoContent(fnToRefactor)}
         ${content}
     </body>
 
@@ -247,6 +248,16 @@ export class RefactoringPanel {
       return this.autoRefactorContent(response, code, languageId);
     }
     return this.codeImprovementContent(response, code, languageId);
+  }
+
+  private functionInfoContent(fnToRefactor: FnToRefactor) {
+    const { range } = fnToRefactor;
+    return /*html*/ `
+    <div class="function-info">
+      <strong>Target function:</strong> <code>${fnToRefactor.name} [Ln ${range.start.line + 1}, Col ${
+      range.start.character
+    }]</code>
+    </div>`;
   }
 
   private async codeContainerContent(code: string, languageId: string) {
