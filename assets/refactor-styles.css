@@ -76,3 +76,7 @@ h2 {
 .progress-ring {
   width: 100%;
 }
+
+.function-info {
+  margin: 1.3em 0;
+}
