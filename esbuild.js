@@ -31,7 +31,7 @@ const webviewConfig = {
         to: ['./out/codicons'],
       },
       watch: true,
-      verbose: true,
+      verbose: false,
     }),
   ],
 };
