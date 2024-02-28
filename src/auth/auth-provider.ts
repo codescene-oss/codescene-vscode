@@ -144,7 +144,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       },
       async (_, cancel) => {
         const tokenParams = new URLSearchParams({
-          next: `configuration/devtools-tokens/add/vscode`,
+          next: `/configuration/devtools-tokens/add/vscode`,
         });
         const loginUrl = Uri.parse(`${getServerUrl()}/login?${tokenParams.toString()}`);
         outputChannel.appendLine(`Opening ${loginUrl.toString()}`);
