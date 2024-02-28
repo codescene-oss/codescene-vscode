@@ -6,11 +6,11 @@ import vscode, {
   WebviewViewProvider,
   WebviewViewResolveContext,
 } from 'vscode';
+import { PreFlightResponse } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
 import { isDefined } from '../utils';
 import { CsExtensionState, CsFeatures } from '../workspace';
 import { nonce } from './utils';
-import { PreFlightResponse } from '../cs-rest-api';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext, initialState: CsExtensionState) {
   const provider = new StatusViewProvider(context.extensionUri, initialState);
@@ -21,9 +21,12 @@ export function registerStatusViewProvider(context: vscode.ExtensionContext, ini
 export class StatusViewProvider implements WebviewViewProvider {
   public static readonly viewId = 'codescene.statusView';
 
+  private extensionState: CsExtensionState;
   private view?: vscode.WebviewView;
 
-  constructor(private readonly extensionUri: vscode.Uri, private readonly initialState: CsExtensionState) {}
+  constructor(private readonly extensionUri: vscode.Uri, initialState: CsExtensionState) {
+    this.extensionState = initialState;
+  }
 
   resolveWebviewView(
     webviewView: WebviewView,
@@ -32,6 +35,7 @@ export class StatusViewProvider implements WebviewViewProvider {
   ): void | Thenable<void> {
     this.view = webviewView;
     const webView = this.view.webview;
+
     webView.options = {
       enableScripts: true,
       localResourceRoots: [Uri.joinPath(this.extensionUri, 'out'), Uri.joinPath(this.extensionUri, 'assets')],
@@ -47,7 +51,21 @@ export class StatusViewProvider implements WebviewViewProvider {
           return;
       }
     });
-    this.update(this.initialState);
+    this.update(this.extensionState);
+  }
+
+  update(csExtensionState: CsExtensionState) {
+    this.extensionState = csExtensionState;
+    if (!this.view) return;
+
+    const webView: Webview = this.view.webview;
+    if (!this.extensionState.signedIn) {
+      this.view.badge = { tooltip: 'Not signed in', value: 1 };
+    } else {
+      this.view.badge = { tooltip: 'Signed in', value: 0 };
+    }
+
+    webView.html = this.getContent(webView, this.extensionStatusContent());
   }
 
   private getContent(webView: Webview, htmlContent: string) {
@@ -76,20 +94,6 @@ export class StatusViewProvider implements WebviewViewProvider {
 
       </html>
     `;
-  }
-
-  update(csExtensionState: CsExtensionState) {
-    const { signedIn } = csExtensionState;
-    if (!this.view) return;
-
-    const webView: Webview = this.view.webview;
-    if (!signedIn) {
-      this.view.badge = { tooltip: 'Not signed in', value: 1 };
-    } else {
-      this.view.badge = { tooltip: 'Signed in', value: 0 };
-    }
-
-    webView.html = this.getContent(webView, this.extensionStatusContent(csExtensionState));
   }
 
   private cliStatusContent(features: CsFeatures) {
@@ -141,8 +145,8 @@ export class StatusViewProvider implements WebviewViewProvider {
     return content;
   }
 
-  private extensionStatusContent(extensionState: CsExtensionState) {
-    const { signedIn, features } = extensionState;
+  private extensionStatusContent() {
+    const { signedIn, features } = this.extensionState;
     const featureNames = {
       'Code health analysis': features.codeHealthAnalysis.cliPath,
       'Automated Code Engineering (ACE)': features.automatedCodeEngineering,

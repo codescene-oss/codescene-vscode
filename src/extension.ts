@@ -18,7 +18,7 @@ import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
-import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
+import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
@@ -27,8 +27,6 @@ interface CsContext {
   csWorkspace: CsWorkspace;
   csDiagnostics: CsDiagnostics;
   csRestApi: CsRestApi;
-  csStatusBar: CsStatusBar;
-  statusViewProvider: StatusViewProvider;
 }
 
 /**
@@ -63,8 +61,6 @@ export async function activate(context: vscode.ExtensionContext) {
     csRestApi,
     csWorkspace,
     csDiagnostics,
-    csStatusBar,
-    statusViewProvider,
   };
   Reviewer.init(cliPath);
 
