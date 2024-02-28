@@ -58,7 +58,7 @@ interface ReasonDetails {
   columns: number[];
 }
 
-interface ReasonsWithDetails {
+export interface ReasonsWithDetails {
   summary: string;
   details?: ReasonDetails[];
 }

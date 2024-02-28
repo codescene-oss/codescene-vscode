@@ -14,11 +14,12 @@ import vscode, {
 import { RefactorResponse } from '../cs-rest-api';
 import { categoryToDocsCode } from '../csdoc';
 import { logOutputChannel } from '../log';
+import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
-import { refactoringSymbol, toConfidenceSymbol } from './command';
+import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
-import Telemetry from '../telemetry';
+import { decorateCode } from './utils';
 
 interface CurrentRefactorState {
   request: CsRefactoringRequest;
@@ -61,7 +62,7 @@ export class RefactoringPanel {
         switch (message.command) {
           case 'apply':
             await this.applyRefactoring(refactoringState);
-            Telemetry.instance.logUsage('refactor/applied', {'trace-id': refactoringState.request.traceId});
+            Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoringState.request.traceId });
             vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
             this.dispose();
             return;
@@ -75,7 +76,7 @@ export class RefactoringPanel {
             return;
           case 'show-diff':
             await this.showDiff(refactoringState);
-            Telemetry.instance.logUsage('refactor/diff-shown', {'trace-id': refactoringState.request.traceId});
+            Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoringState.request.traceId });
             return;
         }
       },
@@ -163,7 +164,7 @@ export class RefactoringPanel {
   private async deselectRefactoring(refactoringState: CurrentRefactorState) {
     // Get original document and deselect the function to refactor.
     const { range, request } = refactoringState;
-     const editor = request.targetEditor();
+    const editor = request.targetEditor();
     if (editor) {
       editor.selection = new Selection(range.start, range.start);
     }
@@ -193,9 +194,9 @@ export class RefactoringPanel {
       case 'object':
         let { code } = response;
         title = response.confidence.title;
-        let trimmedCode = code.trim(); // Service might have returned code with extra whitespace. Trim to make it match startLine when replacing
-        this.currentRefactorState.code = trimmedCode;
-        content = await this.autoRefactorOrCodeImprovementContent(response, trimmedCode, document.languageId);
+        const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
+        this.currentRefactorState.code = decoratedCode;
+        content = await this.autoRefactorOrCodeImprovementContent(response, decoratedCode, document.languageId);
         break;
     }
 
@@ -271,20 +272,14 @@ export class RefactoringPanel {
     } = confidence;
     const actionBadgeClass = `action-badge level-${level}`;
 
-    let reasonsContent = '';
-    if (reasonsWithDetails && reasonsWithDetails.length > 0) {
-      const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
-      reasonsContent = /*html*/ `
-          <h4>Reasons for detailed review</h4>
-          <ul>${reasonText}</ul>
-        `;
-    }
+    const reasonsList = this.getReasonsList(response);
+    const reasonsText = reasonsList ? `<h4>Reasons for detailed review</h4>\n${reasonsList}` : '';
 
     const content = /*html*/ `
         <p> 
           <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
         </p>  
-        ${reasonsContent}
+        ${reasonsText}
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
           <div class="button-group left">
@@ -317,9 +312,14 @@ export class RefactoringPanel {
     } else {
       solutionContent = await this.codeSmellsGuide('modularity-improvement');
     }
+
+    const reasonsList = this.getReasonsList(response);
+    const notesText = reasonsList ? `<p>Notes:</p>\n${reasonsList}` : '';
+
     const content = /*html*/ `
         ${solutionContent}
         <h4>Example from your code</h4>
+        ${notesText}
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
           <div class="button-group left">
@@ -331,6 +331,16 @@ export class RefactoringPanel {
         </div>
   `;
     return content;
+  }
+
+  private getReasonsList(response: RefactorResponse) {
+    const { 'reasons-with-details': reasonsWithDetails } = response;
+    if (reasonsWithDetails && reasonsWithDetails.length > 0) {
+      const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
+      return /*html*/ `
+          <ul>${reasonText}</ul>
+        `;
+    }
   }
 
   private loadingContent() {
