@@ -12,6 +12,7 @@ import extractZip from 'extract-zip';
 import { https } from 'follow-redirects';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SimpleExecutor } from './executor';
 import { logOutputChannel, outputChannel } from './log';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
@@ -150,6 +151,26 @@ function download(url: URL, filePath: string) {
   });
 }
 
+/**
+ * Simple sanity check using the version command to see if the binary actually runs
+ *
+ * @param cliPath
+ * @returns
+ */
+async function ensureBinaryRuns(cliPath: string): Promise<CliStatus> {
+  const signResult = await new SimpleExecutor().execute({ command: cliPath, args: ['version'], ignoreError: true }, {});
+
+  if (signResult.exitCode === 0) {
+    outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
+    return { cliPath };
+  } else {
+    const msg = `There was an error invoking the downloaded CLI binary: ${signResult.stderr}`;
+    outputChannel.appendLine(msg);
+    logOutputChannel.error(msg);
+    return { error: signResult.stderr };
+  }
+}
+
 export interface CliStatus {
   cliPath?: string;
   error?: string;
@@ -192,8 +213,7 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   }
 
   if (fs.existsSync(cliPath)) {
-    outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
-    return { cliPath };
+    return await ensureBinaryRuns(cliPath);
   } else {
     const error = 'Failed to download codescene cli';
     outputChannel.appendLine(error);
