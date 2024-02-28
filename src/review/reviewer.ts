@@ -67,7 +67,7 @@ class SimpleReviewer implements IReviewer {
         const roundedScore = +data.score.toFixed(2);
         const scoreDiagnostic = new vscode.Diagnostic(
           new vscode.Range(0, 0, 0, 0),
-          `${chScorePrefix}: ${roundedScore}`,
+          `${chScorePrefix}: ${roundedScore}/10`,
           vscode.DiagnosticSeverity.Information
         );
         return [scoreDiagnostic, ...diagnostics];
