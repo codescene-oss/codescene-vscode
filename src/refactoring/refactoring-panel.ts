@@ -391,6 +391,8 @@ export class RefactoringPanel {
    * @returns
    */
   public static createOrShow({ extensionUri, refactoringRequest }: RefactorPanelParams & { extensionUri: Uri }) {
+    Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoringRequest.traceId });
+
     if (RefactoringPanel.currentPanel) {
       RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
       RefactoringPanel.currentPanel.webViewPanel.reveal(undefined, true);
