@@ -59,7 +59,7 @@ export class StatusViewProvider implements WebviewViewProvider {
     if (!this.view) return;
 
     const webView: Webview = this.view.webview;
-    if (!this.extensionState.signedIn) {
+    if (!this.extensionState.session) {
       this.view.badge = { tooltip: 'Not signed in', value: 1 };
     } else {
       this.view.badge = { tooltip: 'Signed in', value: 0 };
@@ -146,14 +146,14 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 
   private extensionStatusContent() {
-    const { signedIn, features } = this.extensionState;
+    const { session, features } = this.extensionState;
     const featureNames = {
       'Code health analysis': features.codeHealthAnalysis.cliPath,
       'Automated Code Engineering (ACE)': features.automatedCodeEngineering,
     };
 
-    const signedInListItem = `<li><span class="codicon codicon-shield ${signedIn ? 'codicon-active' : ''}"></span> ${
-      signedIn ? 'Signed in' : 'Not signed in'
+    const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'codicon-active' : ''}"></span> ${
+      session ? 'Signed in' : 'Not signed in'
     }</li>`;
     let featureListItems = '';
     Object.entries(featureNames).forEach(([featureName, value]) => {

@@ -21,6 +21,7 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { isDefined } from './utils';
 
 interface CsContext {
   cliPath: string;
@@ -43,8 +44,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const statusViewProvider = registerStatusViewProvider(context, csWorkspace.extensionState);
   context.subscriptions.push(
     csWorkspace.onDidExtensionStateChange((extensionState) => {
-      csStatusBar.setOnline(extensionState.signedIn);
+      csStatusBar.setOnline(isDefined(extensionState.session));
       statusViewProvider.update(extensionState);
+      Telemetry.instance.setSession(extensionState.session);
     })
   );
   const reviewDocSelector = toReviewDocumentSelector(context.extension);
@@ -285,7 +287,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   vscode.authentication.getSession(AUTH_TYPE, []).then((session) => {
     if (session) {
       enableRemoteFeatures(context, csContext);
-      csWorkspace.setSignInStatus(true);
+      csWorkspace.setSession(session);
     }
   });
 
@@ -293,12 +295,13 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   authProvider.onDidChangeSessions((e) => {
     if (e.added && e.added.length > 0) {
       enableRemoteFeatures(context, csContext);
-      csWorkspace.setSignInStatus(true);
+      // We only have one session in this extension currently, so grabbing the first one is ok.
+      csWorkspace.setSession(e.added[0]);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
-      csWorkspace.setSignInStatus(false);
+      csWorkspace.unsetSession();
       requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
       // TODO - Instead rewrite all online functionality to be easily toggled...
     }

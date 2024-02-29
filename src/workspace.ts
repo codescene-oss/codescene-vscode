@@ -17,7 +17,7 @@ export interface CsFeatures {
 }
 
 export interface CsExtensionState {
-  signedIn: boolean;
+  session?: vscode.AuthenticationSession;
   features: CsFeatures;
 }
 
@@ -31,7 +31,7 @@ export class CsWorkspace implements vscode.Disposable {
   extensionState: CsExtensionState;
 
   constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi) {
-    this.extensionState = { signedIn: false, features: { codeHealthAnalysis: {} } };
+    this.extensionState = { features: { codeHealthAnalysis: {} } };
     const associateCmd = vscode.commands.registerCommand('codescene.associateWithProject', async () => {
       await this.associateWithProject();
     });
@@ -98,16 +98,24 @@ export class CsWorkspace implements vscode.Disposable {
   }
 
   /**
-   * Updates the codescene.isSignedIn context variable. This can be used in package.json to conditionally enable/disable views.
-   * Changes feature availability state and fires an event to notify listeners.
+   * Sets session state and updates the codescene.isSignedIn context variable. 
+   * This can be used in package.json to conditionally enable/disable views.
    */
-  setSignInStatus(signedIn: boolean) {
-    vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
+  setSession(session: vscode.AuthenticationSession) {
+    vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', true);
+    this.extensionState.session = session;
+    this.extensionStateChangedEmitter.fire(this.extensionState);
+  }
 
-    this.extensionState.signedIn = signedIn;
-    if (!signedIn) {
-      this.extensionState.features.automatedCodeEngineering = undefined;
-    }
+  /**
+   * Unsets session state and updates the codescene.isSignedIn context variable. 
+   * Also updates feature availability state (ACE) and fires an event to notify listeners.
+   * (ACE cannot be available when signed out)
+   */
+  unsetSession() {
+    vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', false);
+    delete this.extensionState['session'];
+    delete this.extensionState.features.automatedCodeEngineering;
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 

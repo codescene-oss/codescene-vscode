@@ -32,6 +32,7 @@ class UriEventHandler extends EventEmitter<Uri> implements UriHandler {
 interface LoginResponse {
   name: string;
   token: string;
+  userId: string;
 }
 
 export class CsAuthenticationProvider implements AuthenticationProvider, Disposable {
@@ -85,7 +86,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         accessToken: loginResponse.token,
         account: {
           label: loginResponse.name,
-          id: uuid(), // Do we need a "static" id here?
+          id: loginResponse.userId || uuid(), // Do we need a "static" id here?
         },
         scopes: [],
       };
@@ -176,6 +177,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
       const name = query.get('name');
       const token = query.get('token');
+      const userId = query.get('user-id');
 
       if (token === null) {
         reject('No token found in redirect');
@@ -187,7 +189,12 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         return;
       }
 
-      resolve({ name, token });
+      if (userId === null) {
+        reject('No user-id found in redirect');
+        return;
+      }
+
+      resolve({ name, token, userId });
     };
   }
 }
