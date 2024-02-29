@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { logOutputChannel } from '../log';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -40,9 +41,16 @@ export class RefactoringsView implements vscode.Disposable {
   /**
    * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
    * targeted refactoring. This is necessary because the refactored function might not be in current view.
-   * @param request
+   *
+   * @param request - can apparently be undefined when coming from codescene.explorerAutoRefactorView -> view/item/context
    */
-  private gotoAndPresentRefactoring(request: CsRefactoringRequest) {
+  private gotoAndPresentRefactoring(request?: CsRefactoringRequest) {
+    if (!isDefined(request)) {
+      const msg = 'Got undefined request from context menu, please try again.';
+      logOutputChannel.warn(msg);
+      vscode.window.showWarningMessage(msg);
+      return;
+    }
     this.revealFunctionInDocument(request);
     vscode.commands.executeCommand(presentRefactoringCmdName, request);
   }
