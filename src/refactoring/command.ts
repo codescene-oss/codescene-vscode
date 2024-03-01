@@ -57,17 +57,16 @@ export class CsRefactoringCommand {
   }
 
   async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const supportedDiagnostics = diagnostics.filter(this.codeSmellFilter);
     const fnsToRefactor = await Promise.all(
-      diagnostics
-        .filter(this.codeSmellFilter)
-        .map((d) => findFunctionToRefactor(this.cliPath, document, d.range, this.maxInputLoc))
+      supportedDiagnostics.map((d) => findFunctionToRefactor(this.cliPath, document, d.range, this.maxInputLoc))
     ).then((fns) => fns.filter(isDefined));
 
     const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
     CsRefactoringRequests.initiate(
       { codeLensProvider: this.codeLensProvider, csRestApi: this.csRestApi, document: document },
       distinctFns,
-      diagnostics
+      supportedDiagnostics
     );
   }
 }
