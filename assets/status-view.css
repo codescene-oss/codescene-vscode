@@ -32,3 +32,10 @@ hr {
   top: 16px;
   right: 20px;
 }
+
+.progress-ring {
+  width: auto;
+  height: calc(var(--design-unit) * 4px);
+  margin-right: 0.6em;
+  display: inline-block;
+}

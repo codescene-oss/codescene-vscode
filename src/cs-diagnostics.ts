@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { requestRefactoringsCmdName } from './refactoring/command';
 import Reviewer, { ReviewOpts, chScorePrefix } from './review/reviewer';
+import { reviewDocumentSelector } from './language-support';
 
 export const csSource = 'CodeScene';
 
@@ -23,7 +24,11 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  constructor(private documentSelector: vscode.DocumentSelector) {}
+  private documentSelector: vscode.DocumentSelector;
+  
+  constructor() {
+    this.documentSelector = reviewDocumentSelector();
+  }
 
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
     if (vscode.languages.match(this.documentSelector, document) === 0) {

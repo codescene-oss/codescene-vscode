@@ -12,8 +12,8 @@ import { isDefined } from '../utils';
 import { CsExtensionState, CsFeatures } from '../workspace';
 import { nonce } from './utils';
 
-export function registerStatusViewProvider(context: vscode.ExtensionContext, initialState: CsExtensionState) {
-  const provider = new StatusViewProvider(context.extensionUri, initialState);
+export function registerStatusViewProvider(context: vscode.ExtensionContext) {
+  const provider = new StatusViewProvider(context.extensionUri);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(StatusViewProvider.viewId, provider));
   return provider;
 }
@@ -24,8 +24,8 @@ export class StatusViewProvider implements WebviewViewProvider {
   private extensionState: CsExtensionState;
   private view?: vscode.WebviewView;
 
-  constructor(private readonly extensionUri: vscode.Uri, initialState: CsExtensionState) {
-    this.extensionState = initialState;
+  constructor(private readonly extensionUri: vscode.Uri) {
+    this.extensionState = {};
   }
 
   resolveWebviewView(
@@ -96,8 +96,8 @@ export class StatusViewProvider implements WebviewViewProvider {
     `;
   }
 
-  private cliStatusContent(features: CsFeatures) {
-    if (features.codeHealthAnalysis.cliPath) {
+  private cliStatusContent(features?: CsFeatures) {
+    if (features?.codeHealthAnalysis?.cliPath) {
       return /*html*/ `
         <h3>Code Health Analysis</h3>
         <p>Live <a href="https://codescene.io/docs/terminology/codescene-terminology.html#code-health">Code Health</a> 
@@ -105,9 +105,16 @@ export class StatusViewProvider implements WebviewViewProvider {
         </p>
       `;
     }
-    return /*html*/ `
+    if (features?.codeHealthAnalysis?.error) {
+      return /*html*/ `
       <h3><span class="codicon codicon-warning"></span> Extension error</h3>
       <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.error}</p>
+    `;
+    }
+
+    return /*html*/ `
+    <h3><vscode-progress-ring class="progress-ring"></vscode-progress-ring>Initializing CodeScene CLI</h3>
+    <p>Ensuring we have the latest CodeScene CLI version working on your system...</p>
     `;
   }
 
@@ -148,8 +155,8 @@ export class StatusViewProvider implements WebviewViewProvider {
   private extensionStatusContent() {
     const { session, features } = this.extensionState;
     const featureNames = {
-      'Code health analysis': features.codeHealthAnalysis.cliPath,
-      'Automated Code Engineering (ACE)': features.automatedCodeEngineering,
+      'Code health analysis': features?.codeHealthAnalysis?.cliPath,
+      'Automated Code Engineering (ACE)': features?.automatedCodeEngineering,
     };
 
     const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'codicon-active' : ''}"></span> ${
@@ -176,7 +183,8 @@ export class StatusViewProvider implements WebviewViewProvider {
       <hr>
 
       ${this.cliStatusContent(features)}
-      ${this.aceContent(features.automatedCodeEngineering)}
+      <!-- Don't show the ace info while cli is initializating -->
+      ${features?.codeHealthAnalysis ? this.aceContent(features.automatedCodeEngineering) : ''}
 
     `;
   }

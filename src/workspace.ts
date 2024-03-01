@@ -10,15 +10,16 @@ import { CsRestApi, PreFlightResponse } from './cs-rest-api';
 import { CliStatus } from './download';
 import { SimpleExecutor } from './executor';
 import { rankNamesBy } from './utils';
+import Telemetry from './telemetry';
 
 export interface CsFeatures {
-  codeHealthAnalysis: CliStatus;
+  codeHealthAnalysis?: CliStatus;
   automatedCodeEngineering?: PreFlightResponse;
 }
 
 export interface CsExtensionState {
   session?: vscode.AuthenticationSession;
-  features: CsFeatures;
+  features?: CsFeatures;
 }
 
 export class CsWorkspace implements vscode.Disposable {
@@ -28,15 +29,9 @@ export class CsWorkspace implements vscode.Disposable {
   private extensionStateChangedEmitter = new vscode.EventEmitter<CsExtensionState>();
   readonly onDidExtensionStateChange = this.extensionStateChangedEmitter.event;
 
-  extensionState: CsExtensionState;
+  extensionState: CsExtensionState = {};
 
-  constructor(private context: vscode.ExtensionContext, private csRestApi: CsRestApi) {
-    this.extensionState = { features: { codeHealthAnalysis: {} } };
-    const associateCmd = vscode.commands.registerCommand('codescene.associateWithProject', async () => {
-      await this.associateWithProject();
-    });
-    this.disposables.push(associateCmd);
-
+  constructor(private context: vscode.ExtensionContext) {
     const projectId = this.getProjectId();
     this.updateIsWorkspaceAssociatedContext(projectId);
   }
@@ -56,38 +51,10 @@ export class CsWorkspace implements vscode.Disposable {
     return this.context.workspaceState.get('codescene.projectId');
   }
 
-  async associateWithProject() {
-    const projects = await this.csRestApi.fetchProjects();
-
-    const quickPickList = projects.map((p) => p.name);
-
-    const workspaceName = vscode.workspace.name;
-    if (workspaceName) {
-      rankNamesBy(workspaceName, quickPickList);
-    }
-
-    const picked = await vscode.window.showQuickPick(quickPickList, {
-      placeHolder: 'Select a project to associate with',
-    });
-
-    if (!picked) {
-      return;
-    }
-
-    const project = projects.find((p) => p.name === picked);
-
-    if (!project) {
-      return;
-    }
-
-    // Store the project id in the workspace state (makes it retreivable via getProjectId())
-    this.updateIsWorkspaceAssociatedContext(project.id);
-  }
-
   /**
    * Updates the codescene.isWorkspaceAssociated context variable. This can be used in package.json to conditionally enable/disable views.
    */
-  private updateIsWorkspaceAssociatedContext(projectId: number | undefined) {
+  updateIsWorkspaceAssociatedContext(projectId: number | undefined) {
     this.context.workspaceState.update('codescene.projectId', projectId);
     vscode.commands.executeCommand('setContext', 'codescene.isWorkspaceAssociated', projectId !== undefined);
     this.projectAssociationChangedEmitter.fire(undefined);
@@ -98,34 +65,36 @@ export class CsWorkspace implements vscode.Disposable {
   }
 
   /**
-   * Sets session state and updates the codescene.isSignedIn context variable. 
+   * Sets session state and updates the codescene.isSignedIn context variable.
    * This can be used in package.json to conditionally enable/disable views.
    */
   setSession(session: vscode.AuthenticationSession) {
     vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', true);
+    Telemetry.instance.setSession(session);
     this.extensionState.session = session;
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 
   /**
-   * Unsets session state and updates the codescene.isSignedIn context variable. 
+   * Unsets session state and updates the codescene.isSignedIn context variable.
    * Also updates feature availability state (ACE) and fires an event to notify listeners.
    * (ACE cannot be available when signed out)
    */
   unsetSession() {
     vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', false);
+    Telemetry.instance.setSession();
     delete this.extensionState['session'];
-    delete this.extensionState.features.automatedCodeEngineering;
+    delete this.extensionState.features?.automatedCodeEngineering;
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 
   setCliStatus(cliStatus: CliStatus) {
-    this.extensionState.features.codeHealthAnalysis = cliStatus;
+    this.extensionState.features = { ...this.extensionState.features, codeHealthAnalysis: cliStatus };
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 
   setACEEnabled(preflight: PreFlightResponse | undefined) {
-    this.extensionState.features.automatedCodeEngineering = preflight;
+    this.extensionState.features = { ...this.extensionState.features, automatedCodeEngineering: preflight };
     this.extensionStateChangedEmitter.fire(this.extensionState);
   }
 

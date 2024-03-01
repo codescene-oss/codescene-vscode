@@ -2,19 +2,78 @@ import vscode from 'vscode';
 import { RefactoringSupport } from './cs-rest-api';
 import { isDefined } from './utils';
 
-function getSupportedLanguages(extension: vscode.Extension<any>): string[] {
-  return extension.packageJSON.activationEvents
-    .filter((event: string) => event.startsWith('onLanguage:'))
-    .map((event: string) => event.substring(11));
-}
+const extToLanguageId = new Map<string, string | string[]>([
+  ['js', 'javascript'],
+  ['mjs', 'javascript'],
+  ['sj', 'javascript'],
+
+  ['jsx', 'javascriptreact'],
+
+  ['ts', 'typescript'],
+  ['tsx', 'typescriptreact'],
+
+  ['cls', 'apex'],
+  ['tgr', 'apex'],
+  ['trigger', 'apex'],
+
+  ['c', 'c'],
+
+  ['clj', 'clojure'],
+  ['cljc', 'clojure'],
+  ['cljs', 'clojure'],
+
+  ['cc', 'cpp'],
+  ['cpp', 'cpp'],
+  ['cxx', 'cpp'],
+  ['h', 'cpp'],
+  ['hh', 'cpp'],
+  ['hpp', 'cpp'],
+  ['hxx', 'cpp'],
+  ['ipp', 'cpp'],
+
+  ['m', 'objective-c'],
+  ['mm', ['objective-c', 'objective-cpp']],
+
+  ['cs', 'csharp'],
+  ['erl', 'erlang'],
+  ['go', 'go'],
+  ['groovy', 'groovy'],
+  ['java', 'java'],
+  ['kt', 'kotlin'],
+  ['php', 'php'],
+
+  ['pm', ['perl', 'perl6']],
+  ['pl', ['perl', 'perl6']],
+
+  ['ps1', 'powershell'],
+  ['psd1', 'powershell'],
+  ['psm1', 'powershell'],
+
+  ['py', 'python'],
+  ['rb', 'ruby'],
+  ['rs', 'rust'],
+  ['swift', 'swift'],
+  ['vb', 'vb'],
+  ['vue', 'vue'],
+
+  ['dart', 'dart'],
+  ['scala', 'scala'],
+]);
 
 /**
- *
- * @param supportedLanguages
  * @returns List of DocumentFilters for scheme 'file' for all cs supported languages
  */
-export function toReviewDocumentSelector(extension: vscode.Extension<any>): vscode.DocumentSelector {
-  return getSupportedLanguages(extension).map((language) => ({ language, scheme: 'file' }));
+export function reviewDocumentSelector(): vscode.DocumentSelector {
+  const distinctLangIds = new Set<string>();
+  for (let langId of extToLanguageId.values()) {
+    if (Array.isArray(langId)) {
+      langId.forEach((id) => distinctLangIds.add(id));
+    } else {
+      distinctLangIds.add(langId);
+    }
+  }
+
+  return Array.from(distinctLangIds).map((langId) => ({ language: langId, scheme: 'file' }));
 }
 
 /**
@@ -25,61 +84,7 @@ export function toReviewDocumentSelector(extension: vscode.Extension<any>): vsco
  * This is used in determining what files to enable refactoring features for.
  */
 function fileTypeToLanguageId(fileType: string) {
-  const map = new Map<string, string | string[]>();
-  map.set('js', 'javascript');
-  map.set('mjs', 'javascript');
-  map.set('sj', 'javascript');
-
-  map.set('jsx', 'javascriptreact');
-
-  map.set('ts', 'typescript');
-  map.set('tsx', 'typescriptreact');
-
-  map.set('cls', 'apex');
-  map.set('tgr', 'apex');
-  map.set('trigger', 'apex');
-
-  map.set('c', 'c');
-
-  map.set('clj', 'clojure');
-  map.set('cljc', 'clojure');
-  map.set('cljs', 'clojure');
-
-  map.set('cc', 'cpp');
-  map.set('cpp', 'cpp');
-  map.set('cxx', 'cpp');
-  map.set('h', 'cpp');
-  map.set('hh', 'cpp');
-  map.set('hpp', 'cpp');
-  map.set('hxx', 'cpp');
-  map.set('ipp', 'cpp');
-
-  map.set('m', 'objective-c');
-  map.set('mm', ['objective-c', 'objective-cpp']);
-
-  map.set('cs', 'csharp');
-  map.set('erl', 'erlang');
-  map.set('go', 'go');
-  map.set('groovy', 'groovy');
-  map.set('java', 'java');
-  map.set('kt', 'kotlin');
-  map.set('php', 'php');
-
-  map.set('pm', ['perl', 'perl6']);
-  map.set('pl', ['perl', 'perl6']);
-
-  map.set('ps1', 'powershell');
-  map.set('psd1', 'powershell');
-  map.set('psm1', 'powershell');
-
-  map.set('py', 'python');
-  map.set('rb', 'ruby');
-  map.set('rs', 'rust');
-  map.set('swift', 'swift');
-  map.set('vb', 'vb');
-  map.set('vue', 'vue');
-
-  return map.get(fileType);
+  return extToLanguageId.get(fileType);
 }
 
 export function toDistinctLanguageIds(refactoringSupport: RefactoringSupport): string[] {

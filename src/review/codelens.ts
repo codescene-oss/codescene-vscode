@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import Reviewer from './reviewer';
-import { keyStr } from '../utils';
+import { isDefined, keyStr } from '../utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -29,7 +29,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
     // Return empty set if code lenses are disabled.
-    if (!getConfiguration('enableCodeLenses')) {
+    if (!getConfiguration('enableCodeLenses') || !isDefined(Reviewer.instance)) {
       return [];
     }
 

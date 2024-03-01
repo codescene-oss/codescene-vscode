@@ -6,7 +6,7 @@ import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
-import { toRefactoringDocumentSelector, toReviewDocumentSelector } from './language-support';
+import { toRefactoringDocumentSelector, reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
@@ -21,7 +21,7 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { isDefined } from './utils';
+import { isDefined, rankNamesBy } from './utils';
 
 interface CsContext {
   cliPath: string;
@@ -37,54 +37,69 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
-  const csRestApi = new CsRestApi();
-  const csWorkspace = new CsWorkspace(context, csRestApi);
+  const csWorkspace = setupStatusViewsAndWorkspace(context);
+
+  ensureLatestCompatibleCliExists(context.extensionPath).then((cliStatus) => {
+    csWorkspace.setCliStatus(cliStatus);
+    if (!cliStatus.cliPath) {
+      vscode.window.showErrorMessage(
+        `Error initiating the CodeScene CLI: ${cliStatus.error || 'Unknown error starting extension'}`
+      );
+      return;
+    }
+    startExtension(context, cliStatus.cliPath, csWorkspace);
+  });
+
+  setupStatsCollector();
+}
+
+function setupStatusViewsAndWorkspace(context: vscode.ExtensionContext) {
+  const csWorkspace = new CsWorkspace(context);
   context.subscriptions.push(csWorkspace);
   const csStatusBar = new CsStatusBar();
-  const statusViewProvider = registerStatusViewProvider(context, csWorkspace.extensionState);
+  const statusViewProvider = registerStatusViewProvider(context);
   context.subscriptions.push(
     csWorkspace.onDidExtensionStateChange((extensionState) => {
       csStatusBar.setOnline(isDefined(extensionState.session));
       statusViewProvider.update(extensionState);
-      Telemetry.instance.setSession(extensionState.session);
     })
   );
-  const reviewDocSelector = toReviewDocumentSelector(context.extension);
-  const csDiagnostics = new CsDiagnostics(reviewDocSelector);
+  return csWorkspace;
+}
 
-  const cliStatus = await ensureLatestCompatibleCliExists(context.extensionPath);
-  csWorkspace.setCliStatus(cliStatus);
-
-  if (!cliStatus.cliPath) throw new Error(cliStatus.error || 'Unknown error starting extension');
-
-  const cliPath = cliStatus.cliPath;
+function startExtension(context: vscode.ExtensionContext, cliPath: string, csWorkspace: CsWorkspace) {
+  const csDiagnostics = new CsDiagnostics();
   const csContext: CsContext = {
     cliPath,
-    csRestApi,
-    csWorkspace,
     csDiagnostics,
+    csWorkspace,
+    csRestApi: new CsRestApi(),
   };
   Reviewer.init(cliPath);
-
+  setupTelemetry(cliPath);
+  
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnosticsCollection.init(context);
-
   createAuthProvider(context, csContext);
-
-  setupTelemetry(cliPath);
-
   registerCommands(context, csContext);
-
   registerCsDocProvider(context);
-
   addReviewListeners(context, csDiagnostics);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
-  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(reviewDocSelector, codeLensProvider);
+  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(
+    reviewDocumentSelector(),
+    codeLensProvider
+  );
   context.subscriptions.push(codeLensProviderDisposable);
 
-  // Setup a scheduled event for sending statistics
+  outputChannel.appendLine('Extension is now active!');
+}
+
+/**
+ * Setup a scheduled event for sending usage statistics
+ */
+function setupStatsCollector() {
   setInterval(() => {
     const stats = StatsCollector.instance.stats;
 
@@ -97,8 +112,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
     StatsCollector.instance.clear();
   }, 1800 * 1000);
-
-  outputChannel.appendLine('Extension is now active!');
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
