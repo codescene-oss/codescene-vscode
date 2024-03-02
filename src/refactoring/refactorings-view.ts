@@ -3,6 +3,7 @@ import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './command';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { logOutputChannel } from '../log';
+import Reviewer, { chScorePrefix } from '../review/reviewer';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -19,9 +20,17 @@ export class RefactoringsView implements vscode.Disposable {
     this.disposables.push(view);
 
     this.disposables.push(
-      this.treeDataProvider.onDidChangeTreeData((e) => {
-        const entityFilename = this.treeDataProvider.activeFileName;
-        view.description = entityFilename;
+      this.treeDataProvider.onDidChangeTreeData(async (e) => {
+        const fileName = this.treeDataProvider.activeFileName;
+        view.description = fileName;
+        if (isDefined(this.treeDataProvider.activeDocument)) {
+          const diagnosticsForDoc = await Reviewer.instance.review(this.treeDataProvider.activeDocument);
+          const score = diagnosticsForDoc.find((d) => d.message.startsWith(chScorePrefix));
+          if (score) {
+            // Add short code health score to the view description
+            view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score')})`;
+          }
+        }
       })
     );
 
@@ -34,9 +43,6 @@ export class RefactoringsView implements vscode.Disposable {
     );
   }
 
-  private rangeOutsideAllVisibleRanges(target: vscode.Range, visibleRanges: readonly vscode.Range[]) {
-    return visibleRanges.every((r) => !r.intersection(target));
-  }
 
   /**
    * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
@@ -72,7 +78,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | void>();
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
 
-  private activeDocument: vscode.TextDocument | undefined;
+  activeDocument: vscode.TextDocument | undefined;
 
   constructor() {
     this.activeDocument = this.validEditorDoc(vscode.window.activeTextEditor);
