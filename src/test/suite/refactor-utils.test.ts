@@ -21,4 +21,12 @@ suite('Refactor utils Test Suite', () => {
     ]);
     assert.equal(code, '// ⚠️ Issue 1\nconst a = 1;\nconst b = 2;\n// ⚠️ Issue 2\nconst c = 3;\n');
   });
+
+  test('Handle reason-with-details with multiline messages', async () => {
+    let code = decorateCode(originalCode, 'javascript', [
+      { summary: 'Issue 1', details: [{ message: 'Issue 1\nThis is weird', lines: [1], columns: [1] }] },
+      { summary: 'Issue 2', details: [{ message: 'Issue 2', lines: [2], columns: [1] }] },
+    ]);
+    assert.equal(code, 'const a = 1;\n// ⚠️ Issue 1\n// This is weird\nconst b = 2;\n// ⚠️ Issue 2\nconst c = 3;\n');
+  });
 });

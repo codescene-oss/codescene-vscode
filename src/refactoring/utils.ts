@@ -20,12 +20,12 @@ export function decorateCode(code: string, languageId: string, reasonsWithDetail
   const codeLines = code.split('\n');
   let commentsAdded = 0;
   allDetails.forEach((detail) => {
-    codeLines.splice(
-      detail.lines[0] + commentsAdded,
-      0,
-      `${singleLineCommentSeparator(languageId)} ⚠️ ${detail.message}`
-    );
-    commentsAdded++;
+    const commentLines = detail.message.split('\n').map((msgLine, i) => {
+      if (i === 0) return `${singleLineCommentSeparator(languageId)} ⚠️ ${msgLine}`;
+      return `${singleLineCommentSeparator(languageId)} ${msgLine}`;
+    });
+    codeLines.splice(detail.lines[0] + commentsAdded, 0, ...commentLines);
+    commentsAdded += commentLines.length;
   });
   return codeLines.join('\n');
 }
