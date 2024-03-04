@@ -40,7 +40,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   private disposable: Disposable;
   private uriHandler = new UriEventHandler();
 
-  constructor(private context: ExtensionContext, private csWorkspace: CsWorkspace) {
+  constructor(private context: ExtensionContext) {
     this.disposable = Disposable.from(
       authentication.registerAuthenticationProvider(AUTH_TYPE, 'CodeScene Cloud', this, {
         supportsMultipleAccounts: false,
@@ -118,7 +118,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       if (session) {
         await this.context.secrets.store(SESSIONS_STORAGE_KEY, '[]');
         this.sessionChangeEmitter.fire({ added: [], removed: [session], changed: [] });
-        this.csWorkspace.clearProjectAssociation();
       }
     }
   }

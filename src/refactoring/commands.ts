@@ -1,11 +1,11 @@
 import vscode, { TextDocument } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { CsRestApi } from '../cs-rest-api';
+import { CsRestApi, PreFlightResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { isDefined } from '../utils';
-import { CsRefactorCodeLensProvider } from './codelens';
+import { DiagnosticFilter, isDefined } from '../utils';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
+import { createCodeSmellsFilter } from './utils';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const presentRefactoringCmdName = 'codescene.presentRefactoring';
@@ -19,29 +19,36 @@ export interface FnToRefactor {
   functionType: string;
 }
 
-export class CsRefactoringCommand {
+export interface CsRefactoringCommandParams {
+  context: vscode.ExtensionContext;
+  csRestApi: CsRestApi;
+  cliPath: string;
+  codeSmellFilter: DiagnosticFilter;
+  maxInputLoc: number;
+}
+
+export class CsRefactoringCommands {
+  private extensionUri: vscode.Uri;
   constructor(
-    private context: vscode.ExtensionContext,
+    context: vscode.ExtensionContext,
     private csRestApi: CsRestApi,
     private cliPath: string,
-    private codeLensProvider: CsRefactorCodeLensProvider,
-    private codeSmellFilter: (d: vscode.Diagnostic) => boolean,
-    private maxInputLoc: number
-  ) {}
-
-  register() {
+    private codeSmellFilter?: DiagnosticFilter,
+    private maxInputLoc?: number
+  ) {
+    this.extensionUri = context.extensionUri;
     const requestRefactoringCmd = vscode.commands.registerCommand(
       requestRefactoringsCmdName,
       this.requestRefactorings,
       this
     );
-    this.context.subscriptions.push(requestRefactoringCmd);
+    context.subscriptions.push(requestRefactoringCmd);
     const presentRefactoringCmd = vscode.commands.registerCommand(
       presentRefactoringCmdName,
       this.presentRefactoringRequest,
       this
     );
-    this.context.subscriptions.push(presentRefactoringCmd);
+    context.subscriptions.push(presentRefactoringCmd);
   }
 
   presentRefactoringRequest(refactoringRequest: CsRefactoringRequest) {
@@ -51,20 +58,39 @@ export class CsRefactoringCommand {
     }
 
     RefactoringPanel.createOrShow({
-      extensionUri: this.context.extensionUri,
+      extensionUri: this.extensionUri,
       refactoringRequest,
     });
   }
 
+  private isRequestRefactoringCmdEnabled() {
+    return isDefined(this.codeSmellFilter) && isDefined(this.maxInputLoc);
+  }
+
+  enableRequestRefactoringsCmd(preflightResponse: PreFlightResponse) {
+    this.codeSmellFilter = createCodeSmellsFilter(preflightResponse);
+    this.maxInputLoc = preflightResponse['max-input-loc'];
+  }
+
+  disableRequestRefactoringsCmd() {
+    this.codeSmellFilter = undefined;
+    this.maxInputLoc = undefined;
+  }
+
   async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    const supportedDiagnostics = diagnostics.filter(this.codeSmellFilter);
+    if (!this.isRequestRefactoringCmdEnabled()) return;
+
+    const codeSmellFilter: DiagnosticFilter = this.codeSmellFilter as DiagnosticFilter;
+    const maxInputLoc: number = this.maxInputLoc as number;
+
+    const supportedDiagnostics = diagnostics.filter(codeSmellFilter);
     const fnsToRefactor = await Promise.all(
-      supportedDiagnostics.map((d) => findFunctionToRefactor(this.cliPath, document, d.range, this.maxInputLoc))
+      supportedDiagnostics.map((d) => findFunctionToRefactor(this.cliPath, document, d.range, maxInputLoc))
     ).then((fns) => fns.filter(isDefined));
 
     const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
     CsRefactoringRequests.initiate(
-      { codeLensProvider: this.codeLensProvider, csRestApi: this.csRestApi, document: document },
+      { csRestApi: this.csRestApi, document: document },
       distinctFns,
       supportedDiagnostics
     );

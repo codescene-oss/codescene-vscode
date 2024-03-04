@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { AUTH_TYPE } from './auth/auth-provider';
 import { getServerApiUrl } from './configuration';
 import { logOutputChannel, outputChannel } from './log';
-import { FnToRefactor } from './refactoring/command';
+import { FnToRefactor } from './refactoring/commands';
 
 export interface Coupling {
   entity: string;

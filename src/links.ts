@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 
-import { CsWorkspace } from './workspace';
+import { dirname } from 'path';
 import { getServerUrl } from './configuration';
 import { CoupledEntity } from './coupling/model';
+import { CsWorkspace } from './workspace';
+import { SimpleExecutor } from './executor';
 
 /**
  * Registers commands for opening CodeScene links in the browser.
@@ -25,7 +27,7 @@ export class Links implements vscode.Disposable {
         let uri = file instanceof vscode.Uri ? file : file.resourceUri;
         if (!uri) return;
 
-        const csFilePath = await this.codeSceneWorkspace.getCsFilePath(uri);
+        const csFilePath = await getCsFilePath(uri);
         if (!csFilePath) return;
 
         this.openCodeReview(csFilePath);
@@ -34,7 +36,7 @@ export class Links implements vscode.Disposable {
         let uri = file instanceof vscode.Uri ? file : file.resourceUri;
         if (!uri) return;
 
-        const csFilePath = await this.codeSceneWorkspace.getCsFilePath(uri);
+        const csFilePath = await getCsFilePath(uri);
         if (!csFilePath) return;
 
         this.openXRay(csFilePath);
@@ -90,4 +92,38 @@ export class Links implements vscode.Disposable {
       vscode.env.openExternal(vscode.Uri.parse(xrayUrl));
     });
   }
+}
+
+/**
+   * Project path here means the path used by the codescene server to denote the file.
+   *
+   * This is a relative file path with the repo name as the root. E.g. codescene-vscode/src/extension.ts.
+   */
+async function getCsFilePath(absoluteFilePath: vscode.Uri) {
+  const fileDir = dirname(absoluteFilePath.fsPath);
+  const executor = new SimpleExecutor();
+
+  const repoRoot = await executor.execute(
+    { command: 'git', args: ['rev-parse', '--show-toplevel'] },
+    { cwd: fileDir }
+  );
+
+  if (repoRoot.exitCode !== 0) {
+    return;
+  }
+
+  const repoRelativePath = await executor.execute(
+    { command: 'git', args: ['ls-files', '--full-name', '--', absoluteFilePath.fsPath] },
+    { cwd: fileDir }
+  );
+
+  if (repoRelativePath.exitCode !== 0) {
+    return;
+  }
+
+  const repoRootName = repoRoot.stdout.trim().split('/').pop();
+  const relativePath = repoRelativePath.stdout.trim();
+
+  return `${repoRootName}/${relativePath}`;
+
 }

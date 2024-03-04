@@ -1,5 +1,6 @@
-import { ReasonsWithDetails } from '../cs-rest-api';
-import { isDefined } from '../utils';
+import { Diagnostic } from 'vscode';
+import { PreFlightResponse, ReasonsWithDetails } from '../cs-rest-api';
+import { DiagnosticFilter, isDefined } from '../utils';
 
 function singleLineCommentSeparator(languageId: string) {
   switch (languageId) {
@@ -28,4 +29,9 @@ export function decorateCode(code: string, languageId: string, reasonsWithDetail
     commentsAdded += commentLines.length;
   });
   return codeLines.join('\n');
+}
+
+export function createCodeSmellsFilter(refactorCapabilities: PreFlightResponse): DiagnosticFilter {
+  return (d: Diagnostic) =>
+    d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 }

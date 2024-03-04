@@ -6,10 +6,10 @@ import vscode, {
   WebviewViewProvider,
   WebviewViewResolveContext,
 } from 'vscode';
+import { CsFeatures, CsStateProperties } from '../cs-extension-state';
 import { PreFlightResponse } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
 import { isDefined } from '../utils';
-import { CsExtensionState, CsFeatures } from '../workspace';
 import { nonce } from './utils';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
@@ -21,11 +21,11 @@ export function registerStatusViewProvider(context: vscode.ExtensionContext) {
 export class StatusViewProvider implements WebviewViewProvider {
   public static readonly viewId = 'codescene.statusView';
 
-  private extensionState: CsExtensionState;
+  private stateProperties: CsStateProperties;
   private view?: vscode.WebviewView;
 
   constructor(private readonly extensionUri: vscode.Uri) {
-    this.extensionState = {};
+    this.stateProperties = {};
   }
 
   resolveWebviewView(
@@ -51,15 +51,15 @@ export class StatusViewProvider implements WebviewViewProvider {
           return;
       }
     });
-    this.update(this.extensionState);
+    this.update(this.stateProperties);
   }
 
-  update(csExtensionState: CsExtensionState) {
-    this.extensionState = csExtensionState;
+  update(stateProperties: CsStateProperties) {
+    this.stateProperties = stateProperties;
     if (!this.view) return;
 
     const webView: Webview = this.view.webview;
-    if (!this.extensionState.session) {
+    if (!this.stateProperties.session) {
       this.view.badge = { tooltip: 'Not signed in', value: 1 };
     } else {
       this.view.badge = { tooltip: 'Signed in', value: 0 };
@@ -153,7 +153,7 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 
   private extensionStatusContent() {
-    const { session, features } = this.extensionState;
+    const { session, features } = this.stateProperties;
     const featureNames = {
       'Code health analysis': features?.codeHealthAnalysis?.cliPath,
       'Automated Code Engineering (ACE)': features?.automatedCodeEngineering,

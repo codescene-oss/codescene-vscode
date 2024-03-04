@@ -17,7 +17,7 @@ import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
-import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './command';
+import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { decorateCode } from './utils';
 
