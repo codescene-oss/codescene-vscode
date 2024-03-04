@@ -2,6 +2,8 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { Diagnostic, Range } from 'vscode';
 
+export type DiagnosticFilter = (d: Diagnostic) => boolean;
+
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }

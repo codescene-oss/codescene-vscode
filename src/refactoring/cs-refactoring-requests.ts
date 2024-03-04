@@ -3,10 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import vscode, { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { isDefined, rangeStr } from '../utils';
-import { CsRefactorCodeLensProvider } from './codelens';
-import { FnToRefactor } from './command';
 import Telemetry from '../telemetry';
+import { isDefined, rangeStr } from '../utils';
+import { FnToRefactor } from './commands';
 
 export class CsRefactoringRequest {
   fnToRefactor: FnToRefactor;
@@ -61,11 +60,11 @@ export class CsRefactoringRequest {
 
   /**
    * Indicate that we should present the refactoring state in the UI
-   * Rules at the moment is to basically always present it, unless the 
+   * Rules at the moment is to basically always present it, unless the
    * confidence level is invalid.
-   * 
+   *
    * @param request
-   * @returns 
+   * @returns
    */
   shouldPresent() {
     const level = this.resolvedResponse?.confidence.level;
@@ -125,7 +124,7 @@ export class CsRefactoringRequests {
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsEmitter.event;
 
   static initiate(
-    context: { csRestApi: CsRestApi; document: TextDocument; codeLensProvider: CsRefactorCodeLensProvider },
+    context: { csRestApi: CsRestApi; document: TextDocument },
     fnsToRefactor: FnToRefactor[],
     diagnostics: Diagnostic[]
   ) {

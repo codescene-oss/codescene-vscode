@@ -1,34 +1,34 @@
 import * as vscode from 'vscode';
-import { isDefined } from '../utils';
-import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './command';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { logOutputChannel } from '../log';
 import Reviewer, { chScorePrefix } from '../review/reviewer';
+import { isDefined } from '../utils';
+import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: RefactoringsTreeProvider;
+  private view: vscode.TreeView<CsRefactoringRequest>;
 
   constructor() {
     this.treeDataProvider = new RefactoringsTreeProvider();
-    this.disposables.push(this.treeDataProvider);
 
-    const view = vscode.window.createTreeView('codescene.explorerAutoRefactorView', {
+    this.view = vscode.window.createTreeView('codescene.explorerAutoRefactorView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
     });
-    this.disposables.push(view);
+    this.disposables.push(this.view);
 
     this.disposables.push(
       this.treeDataProvider.onDidChangeTreeData(async (e) => {
         const fileName = this.treeDataProvider.activeFileName;
-        view.description = fileName;
+        this.view.description = fileName;
         if (isDefined(this.treeDataProvider.activeDocument)) {
           const diagnosticsForDoc = await Reviewer.instance.review(this.treeDataProvider.activeDocument);
           const score = diagnosticsForDoc.find((d) => d.message.startsWith(chScorePrefix));
           if (score) {
             // Add short code health score to the view description
-            view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score')})`;
+            this.view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score')})`;
           }
         }
       })
@@ -42,7 +42,6 @@ export class RefactoringsView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.revealFunctionInDocument', this.revealFunctionInDocument, this)
     );
   }
-
 
   /**
    * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
@@ -69,7 +68,13 @@ export class RefactoringsView implements vscode.Disposable {
   }
 
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
+    this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
+    this.view.description = ''; // Don't leave a trailling description when disposing the view
+
+    setTimeout(() => {
+      // Delay to allow the view to update before disposing the rest
+      this.disposables.forEach((d) => d.dispose());
+    }, 250);
   }
 }
 
@@ -107,6 +112,9 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   }
 
   dispose() {
+    // Force clear the tree by setting the activeDocument to undefined
+    this.activeDocument = undefined;
+
     this.disposables.forEach((d) => d.dispose());
   }
 

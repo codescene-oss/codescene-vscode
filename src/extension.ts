@@ -2,15 +2,15 @@ import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
+import { CsExtensionState } from './cs-extension-state';
 import { CsRestApi } from './cs-rest-api';
-import { CsStatusBar } from './cs-statusbar';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
-import { toRefactoringDocumentSelector, reviewDocumentSelector } from './language-support';
+import { reviewDocumentSelector, toRefactoringDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { CsRefactorCodeAction } from './refactoring/codeaction';
 import { CsRefactorCodeLensProvider } from './refactoring/codelens';
-import { CsRefactoringCommand } from './refactoring/command';
+import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { RefactoringsView } from './refactoring/refactorings-view';
 import { CsReviewCodeLensProvider } from './review/codelens';
@@ -21,11 +21,12 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { isDefined, rankNamesBy } from './utils';
+import { createCodeSmellsFilter } from './refactoring/utils';
 
 interface CsContext {
   cliPath: string;
   csWorkspace: CsWorkspace;
+  csExtensionState: CsExtensionState;
   csDiagnostics: CsDiagnostics;
   csRestApi: CsRestApi;
 }
@@ -37,53 +38,41 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
-  const csWorkspace = setupStatusViewsAndWorkspace(context);
+  const csExtensionState = new CsExtensionState(registerStatusViewProvider(context));
 
   ensureLatestCompatibleCliExists(context.extensionPath).then((cliStatus) => {
-    csWorkspace.setCliStatus(cliStatus);
+    csExtensionState.setCliStatus(cliStatus);
     if (!cliStatus.cliPath) {
       vscode.window.showErrorMessage(
         `Error initiating the CodeScene CLI: ${cliStatus.error || 'Unknown error starting extension'}`
       );
       return;
     }
-    startExtension(context, cliStatus.cliPath, csWorkspace);
+    startExtension(context, cliStatus.cliPath, csExtensionState);
   });
 
   setupStatsCollector();
 }
 
-function setupStatusViewsAndWorkspace(context: vscode.ExtensionContext) {
-  const csWorkspace = new CsWorkspace(context);
-  context.subscriptions.push(csWorkspace);
-  const csStatusBar = new CsStatusBar();
-  const statusViewProvider = registerStatusViewProvider(context);
-  context.subscriptions.push(
-    csWorkspace.onDidExtensionStateChange((extensionState) => {
-      csStatusBar.setOnline(isDefined(extensionState.session));
-      statusViewProvider.update(extensionState);
-    })
-  );
-  return csWorkspace;
-}
-
-function startExtension(context: vscode.ExtensionContext, cliPath: string, csWorkspace: CsWorkspace) {
+function startExtension(context: vscode.ExtensionContext, cliPath: string, csExtensionState: CsExtensionState) {
   const csDiagnostics = new CsDiagnostics();
   const csContext: CsContext = {
     cliPath,
     csDiagnostics,
-    csWorkspace,
+    csWorkspace: new CsWorkspace(context),
+    csExtensionState,
     csRestApi: new CsRestApi(),
   };
   Reviewer.init(cliPath);
   setupTelemetry(cliPath);
-  
+
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnosticsCollection.init(context);
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context, csDiagnostics);
+  addTmpDiffUriScheme(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
@@ -93,9 +82,25 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csWor
   );
   context.subscriptions.push(codeLensProviderDisposable);
 
+  // If the feature flag is changed, en/disable ACE capabilities accordingly
+  context.subscriptions.push(
+    onDidChangeConfiguration('enableAutoRefactor', (e) => {
+      enableOrDisableACECapabilities(context, csContext);
+    })
+  );
+
   outputChannel.appendLine('Extension is now active!');
 }
 
+// Use this scheme for the virtual documents when diffing the refactoring
+function addTmpDiffUriScheme(context: vscode.ExtensionContext) {
+  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
+    provideTextDocumentContent(uri: vscode.Uri): string {
+      return uri.query;
+    }
+  })();
+  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider));
+}
 /**
  * Setup a scheduled event for sending usage statistics
  */
@@ -115,7 +120,7 @@ function setupStatsCollector() {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { cliPath } = csContext;
+  const { cliPath, csRestApi, csExtensionState } = csContext;
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
@@ -150,12 +155,15 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(openDocsForDiagnostic);
 
   // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
-  // asking the user to log in. Should only be called/available when codescene.isSignedIn is false.
-  // (see package.json)
+  // asking the user to log in. (Currently unused)
   const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {
     vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: true });
   });
   context.subscriptions.push(loginCommand);
+
+  // This command is registered here, but acting as a noop until it gets an appropriate preflight response
+  const refactoringCommand = new CsRefactoringCommands(context, csRestApi, cliPath);
+  csExtensionState.setRefactoringCommand(refactoringCommand);
 }
 
 function setupTelemetry(cliPath: string) {
@@ -206,101 +214,74 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   context.subscriptions.push(fileSystemWatcher);
 }
 
-function addRefactoringCodeAction(
-  context: vscode.ExtensionContext,
-  documentSelector: vscode.DocumentSelector,
-  codeSmellFilter: (d: vscode.Diagnostic) => boolean
-) {
-  context.subscriptions.push(
-    vscode.languages.registerCodeActionsProvider(documentSelector, new CsRefactorCodeAction(codeSmellFilter), {
-      providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-    })
-  );
-}
-
-function requireReloadWindowFn(message: string) {
-  return async () => {
-    const result = await vscode.window.showInformationMessage(message, 'Reload');
-    if (result === 'Reload') {
-      vscode.commands.executeCommand('workbench.action.reloadWindow');
-    }
-  };
+/**
+ * Activate functionality that requires signing in to a CodeScene server.
+ */
+async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
+  await enableOrDisableACECapabilities(context, csContext);
 }
 
 /**
- * Active functionality that requires a connection to a CodeScene server.
+ * If config is enabled, try to enable ACE capabilities by getting a preflight response.
+ * If disabled manually by the config option, the capabilities are set to undefined, thus disabling the feature.
+ *
+ * @param context
+ * @param csContext
+ * @returns
  */
-async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
-  // Refactoring features
-  const enableACE = getConfiguration('enableAutomatedCodeEngineering');
-  if (enableACE) {
-    await enableACECapabilities(context, csContext);
+async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+  const enableACE = getConfiguration('enableAutoRefactor');
+  if (!enableACE) {
+    csContext.csExtensionState.setACEEnabled(undefined);
+    return;
   }
 
-  // If the feature flag is changed, alert the user that a reload is needed
-  context.subscriptions.push(
-    onDidChangeConfiguration(
-      'enableAutomatedCodeEngineering',
-      requireReloadWindowFn('VS Code needs to be reloaded to enable/disable this feature.')
-    )
-  );
-}
-
-async function enableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csRestApi, csDiagnostics, cliPath, csWorkspace } = csContext;
+  const { csRestApi, csDiagnostics, csExtensionState } = csContext;
   const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
   if (refactorCapabilities) {
     const refactoringSelector = toRefactoringDocumentSelector(refactorCapabilities.supported);
-    const codeSmellFilter = (d: vscode.Diagnostic) =>
-      d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
+    const codeSmellFilter = createCodeSmellsFilter(refactorCapabilities);
 
+    // Collect all disposables used by the refactoring features
+    const disposables: vscode.Disposable[] = [];
     const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
-    context.subscriptions.push(codeLensProvider);
-    const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider);
-    context.subscriptions.push(codeLensProviderDisposable);
+    disposables.push(codeLensProvider);
+    disposables.push(vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider));
 
-    new CsRefactoringCommand(
-      context,
-      csRestApi,
-      cliPath,
-      codeLensProvider,
-      codeSmellFilter,
-      refactorCapabilities['max-input-loc']
-    ).register();
-    addRefactoringCodeAction(context, refactoringSelector, codeSmellFilter);
+    disposables.push(
+      vscode.languages.registerCodeActionsProvider(refactoringSelector, new CsRefactorCodeAction(codeSmellFilter), {
+        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+      })
+    );
 
-    // Force update diagnosticCollection to show the supported code smells indication
+    disposables.push(new RefactoringsView());
+
+    /* Add disposables to both subscription context and the extension state list
+     * of disposables. This is to ensure they're disposed either when the extension
+     * is deactivated or if the online features are disabled */
+    context.subscriptions.push(...disposables);
+    csExtensionState.addOnlineFeatureDisposable(...disposables);
+
+    csExtensionState.setACEEnabled(refactorCapabilities);
+
+    // Force update diagnosticCollection to request initial refactorings
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    // Use this scheme for the virtual documents when diffing the refactoring
-    const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
-      provideTextDocumentContent(uri: vscode.Uri): string {
-        return uri.query;
-      }
-    })();
-    context.subscriptions.push(
-      vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider)
-    );
-
-    const refactoringsView = new RefactoringsView();
-    context.subscriptions.push(refactoringsView);
-
-    csWorkspace.setACEEnabled(refactorCapabilities);
     outputChannel.appendLine('AI refactoring features enabled');
   }
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csWorkspace } = csContext;
-  const authProvider = new CsAuthenticationProvider(context, csWorkspace);
+  const { csExtensionState } = csContext;
+  const authProvider = new CsAuthenticationProvider(context);
 
   // Provides the initial session - will enable remote features and update workspace state
   vscode.authentication.getSession(AUTH_TYPE, []).then((session) => {
     if (session) {
       enableRemoteFeatures(context, csContext);
-      csWorkspace.setSession(session);
+      csExtensionState.setSession(session);
     }
   });
 
@@ -309,14 +290,12 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     if (e.added && e.added.length > 0) {
       enableRemoteFeatures(context, csContext);
       // We only have one session in this extension currently, so grabbing the first one is ok.
-      csWorkspace.setSession(e.added[0]);
+      csExtensionState.setSession(e.added[0]);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       vscode.authentication.getSession(AUTH_TYPE, []);
-      csWorkspace.unsetSession();
-      requireReloadWindowFn('VS Code needs to be reloaded after signing out.')();
-      // TODO - Instead rewrite all online functionality to be easily toggled...
+      csExtensionState.setSession(undefined);
     }
   });
   context.subscriptions.push(authProvider);

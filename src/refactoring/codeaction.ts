@@ -1,12 +1,12 @@
 import vscode, { CodeActionKind } from 'vscode';
-import { isDefined } from '../utils';
-import { commandFromRequest, toConfidenceSymbol } from './command';
+import { DiagnosticFilter, isDefined } from '../utils';
+import { commandFromRequest, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
 
-  public constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {}
+  public constructor(private codeSmellFilter: DiagnosticFilter) {}
 
   provideCodeActions(
     document: vscode.TextDocument,

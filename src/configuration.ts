@@ -4,10 +4,13 @@ export function getConfiguration<T>(section: string): T | undefined {
   return vscode.workspace.getConfiguration('codescene').get<T>(section);
 }
 
-export function onDidChangeConfiguration(section: string, listener: (e: vscode.ConfigurationChangeEvent) => any) {
+export function onDidChangeConfiguration(
+  section: string,
+  listener: (e: { event: vscode.ConfigurationChangeEvent; value: any }) => any
+) {
   return vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration('codescene.' + section)) {
-      listener(e);
+      listener({ event: e, value: getConfiguration(section) });
     }
   });
 }

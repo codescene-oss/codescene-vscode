@@ -102,7 +102,7 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.enableAutomatedCodeEngineering": {
+        "codescene.enableAutoRefactor": {
           "type": "boolean",
           "default": true,
           "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
-import { isDefined, rangeStr } from '../utils';
-import { commandFromRequest, pendingSymbol } from './command';
+import { DiagnosticFilter, isDefined, rangeStr } from '../utils';
+import { commandFromRequest, pendingSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class CsRefactorCodeLens extends vscode.CodeLens {
@@ -25,7 +25,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private codeSmellFilter: (d: vscode.Diagnostic) => boolean) {
+  constructor(private codeSmellFilter: DiagnosticFilter) {
     outputChannel.appendLine('Creating Auto-refactor CodeLens provider');
     this.disposables.push(
       CsRefactoringRequests.onDidChangeRequests(() => {

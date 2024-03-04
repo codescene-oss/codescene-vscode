@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { requestRefactoringsCmdName } from './refactoring/command';
+import { requestRefactoringsCmdName } from './refactoring/commands';
 import Reviewer, { ReviewOpts, chScorePrefix } from './review/reviewer';
 import { reviewDocumentSelector } from './language-support';
 
@@ -25,7 +25,7 @@ export default class CsDiagnosticsCollection {
  */
 export class CsDiagnostics {
   private documentSelector: vscode.DocumentSelector;
-  
+
   constructor() {
     this.documentSelector = reviewDocumentSelector();
   }
@@ -48,15 +48,6 @@ export class CsDiagnostics {
   }
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    vscode.commands.executeCommand(requestRefactoringsCmdName, document, diagnostics).then(
-      () => {},
-      (err) => {
-        /**
-         * Command might not be registered. It only exists when extension.enableRefactoringCommand() has been run.
-         * If it doesn't exist we don't want to initiate any refactoring requests anyway, and if left unhandled
-         * we get "rejected promise not handled"-errors.
-         */
-      }
-    );
+    vscode.commands.executeCommand(requestRefactoringsCmdName, document, diagnostics);
   }
 }
