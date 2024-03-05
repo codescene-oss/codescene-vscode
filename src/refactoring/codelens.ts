@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getConfiguration } from '../configuration';
+import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import { DiagnosticFilter, isDefined, rangeStr } from '../utils';
 import { commandFromRequest, pendingSymbol } from './commands';
@@ -32,6 +32,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
         this.onDidChangeCodeLensesEmitter.fire();
       })
     );
+    this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {

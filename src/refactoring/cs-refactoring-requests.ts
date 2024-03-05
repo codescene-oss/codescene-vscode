@@ -152,8 +152,14 @@ export class CsRefactoringRequests {
     map.set(diagKey(diagnostic), request);
   }
 
+  // TODO call abort() while deleting requests (deletaAll, deleteByFnRange as well)
   static delete(document: TextDocument) {
     CsRefactoringRequests.map.delete(document.uri.toString());
+    CsRefactoringRequests.requestsEmitter.fire();
+  }
+
+  static deleteAll() {
+    CsRefactoringRequests.map.clear();
     CsRefactoringRequests.requestsEmitter.fire();
   }
 

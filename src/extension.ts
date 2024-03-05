@@ -13,6 +13,7 @@ import { CsRefactorCodeLensProvider } from './refactoring/codelens';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { RefactoringsView } from './refactoring/refactorings-view';
+import { createCodeSmellsFilter } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
@@ -21,7 +22,6 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { createCodeSmellsFilter } from './refactoring/utils';
 
 interface CsContext {
   cliPath: string;
@@ -76,16 +76,14 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
-  const codeLensProviderDisposable = vscode.languages.registerCodeLensProvider(
-    reviewDocumentSelector(),
-    codeLensProvider
-  );
-  context.subscriptions.push(codeLensProviderDisposable);
+  context.subscriptions.push(codeLensProvider);
+  context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
 
-  // If the feature flag is changed, en/disable ACE capabilities accordingly
+  // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
+  const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      enableOrDisableACECapabilities(context, csContext);
+      debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
 
@@ -230,9 +228,11 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
  * @returns
  */
 async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+  // Make sure to clear the capabilities first, disposing components so we don't accidentally get multiple codelenses etc.
+  csContext.csExtensionState.disableACE();
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
-    csContext.csExtensionState.setACEEnabled(undefined);
+    outputChannel.appendLine('Auto-refactor disabled in configuration.');
     return;
   }
 
@@ -260,16 +260,15 @@ async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, 
      * of disposables. This is to ensure they're disposed either when the extension
      * is deactivated or if the online features are disabled */
     context.subscriptions.push(...disposables);
-    csExtensionState.addOnlineFeatureDisposable(...disposables);
 
-    csExtensionState.setACEEnabled(refactorCapabilities);
+    csExtensionState.enableACE(refactorCapabilities, disposables);
 
     // Force update diagnosticCollection to request initial refactorings
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       csDiagnostics.review(document, { skipCache: true });
     });
 
-    outputChannel.appendLine('AI refactoring features enabled');
+    outputChannel.appendLine('Auto-refactor enabled!');
   }
 }
 

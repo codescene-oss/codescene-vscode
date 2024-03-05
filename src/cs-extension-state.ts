@@ -6,6 +6,7 @@ import { CsRefactoringCommands } from './refactoring/commands';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
+import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 
 export interface CsFeatures {
   codeHealthAnalysis?: CliStatus;
@@ -28,7 +29,7 @@ export class CsExtensionState {
   private statusBar: CsStatusBar;
 
   private refactoringCommand: CsRefactoringCommands | undefined;
-  private onlineFeatureDisposables: vscode.Disposable[] = [];
+  private aceFeatureDisposables: vscode.Disposable[] = [];
 
   constructor(statusViewProvider: StatusViewProvider) {
     this.statusViewProvider = statusViewProvider;
@@ -51,7 +52,7 @@ export class CsExtensionState {
     this.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      this.setACEEnabled(undefined); // Ace cannot be active if not signed in
+      this.disableACE(); // Ace cannot be active if not signed in
       return;
     }
 
@@ -63,19 +64,21 @@ export class CsExtensionState {
     this.updateStatusViews();
   }
 
-  setACEEnabled(preflight: PreFlightResponse | undefined) {
-    this.stateProperties.features = { ...this.stateProperties.features, automatedCodeEngineering: preflight };
-    if (isDefined(preflight)) {
-      this.refactoringCommand?.enableRequestRefactoringsCmd(preflight);
-    } else {
-      this.refactoringCommand?.disableRequestRefactoringsCmd();
-      this.onlineFeatureDisposables.forEach((d) => d.dispose());
-    }
+  enableACE(preFlight: PreFlightResponse, disposables: vscode.Disposable[]) {
+    this.stateProperties.features = { ...this.stateProperties.features, automatedCodeEngineering: preFlight };
+    this.aceFeatureDisposables = disposables;
+    this.refactoringCommand?.enableRequestRefactoringsCmd(preFlight);
     this.updateStatusViews();
   }
 
-  addOnlineFeatureDisposable(...disposables: vscode.Disposable[]) {
-    this.onlineFeatureDisposables.push(...disposables);
+  disableACE() {
+    delete this.stateProperties.features?.automatedCodeEngineering;
+
+    this.refactoringCommand?.disableRequestRefactoringsCmd();
+    this.aceFeatureDisposables.forEach((d) => d.dispose());
+    this.aceFeatureDisposables = [];
+    CsRefactoringRequests.deleteAll();
+    this.updateStatusViews();
   }
 
   setRefactoringCommand(refactoringCommand: CsRefactoringCommands) {

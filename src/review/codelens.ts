@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getConfiguration } from '../configuration';
+import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import Reviewer from './reviewer';
 import { isDefined, keyStr } from '../utils';
@@ -16,15 +16,21 @@ export class CsReviewCodeLens extends vscode.CodeLens {
   }
 }
 
-export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsReviewCodeLens> {
+export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsReviewCodeLens>, vscode.Disposable {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
+  private disposables: vscode.Disposable[] = [];
 
   constructor() {
     outputChannel.appendLine('Creating Review CodeLens provider');
+    this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
     return this.onDidChangeCodeLensesEmitter.event;
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
@@ -40,10 +46,13 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    return diagnostics.map((d)=> new CsReviewCodeLens(d.range, d));
+    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d));
   }
 
-  resolveCodeLens?(codeLens: CsReviewCodeLens, token: vscode.CancellationToken): vscode.ProviderResult<CsReviewCodeLens> {
+  resolveCodeLens?(
+    codeLens: CsReviewCodeLens,
+    token: vscode.CancellationToken
+  ): vscode.ProviderResult<CsReviewCodeLens> {
     logOutputChannel.debug('Resolving Review CodeLenses for ' + keyStr(codeLens.diagnostic));
 
     codeLens.command = {

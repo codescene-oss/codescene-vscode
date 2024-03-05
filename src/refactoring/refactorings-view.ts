@@ -71,10 +71,7 @@ export class RefactoringsView implements vscode.Disposable {
     this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
     this.view.description = ''; // Don't leave a trailling description when disposing the view
 
-    setTimeout(() => {
-      // Delay to allow the view to update before disposing the rest
       this.disposables.forEach((d) => d.dispose());
-    }, 250);
   }
 }
 
@@ -114,6 +111,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   dispose() {
     // Force clear the tree by setting the activeDocument to undefined
     this.activeDocument = undefined;
+    this.treeDataChangedEmitter.fire();
 
     this.disposables.forEach((d) => d.dispose());
   }
