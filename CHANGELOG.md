@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.1...v0.6.2) (2024-03-05)
+
+
+### Bug fixes
+
+* Correct next uri param for logging in to CodeScene Cloud ([a492df3](https://github.com/codescene-oss/codescene-vscode/commit/a492df306504570a0faa18ea6d067c31a08afb9c))
+
 ### [0.6.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.0...v0.6.1) (2024-02-12)
 
 
