@@ -307,7 +307,7 @@ export class RefactoringPanel {
 
   private async codeSmellsGuide(codeSmell: string) {
     const docsPath = categoryToDocsCode(codeSmell) + '-guide.md';
-    const path = join(this.extensionUri.path, 'docs', docsPath);
+    const path = join(this.extensionUri.fsPath, 'docs', docsPath);
     const docsGuide = await readFile(path);
     return vscode.commands.executeCommand<string>('markdown.api.render', docsGuide.toString());
   }
