@@ -221,26 +221,30 @@ async function enableRemoteFeatures(context: vscode.ExtensionContext, csContext:
 
 /**
  * If config is enabled, try to enable ACE capabilities by getting a preflight response.
- * If disabled manually by the config option, the capabilities are set to undefined, thus disabling the feature.
+ * If disabled manually by the config option, the capabilities are disabled with an appropriate message.
  *
  * @param context
  * @param csContext
- * @returns
  */
 async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
-  // Make sure to clear the capabilities first, disposing components so we don't accidentally get multiple codelenses etc.
-  csContext.csExtensionState.disableACE();
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
-    outputChannel.appendLine('Auto-refactor disabled in configuration.');
+    const msg = 'Auto-refactor disabled in configuration.';
+    csContext.csExtensionState.disableACE(msg);
+    outputChannel.appendLine(msg);
     return;
   }
 
+  // Make sure to clear the capabilities first, disposing components so we don't accidentally get multiple codelenses etc.
+  csContext.csExtensionState.disableACE('Loading ACE capabilities...');
+
   const { csRestApi, csDiagnostics, csExtensionState } = csContext;
-  const refactorCapabilities = await csRestApi.fetchRefactorPreflight();
-  if (refactorCapabilities) {
-    const refactoringSelector = toRefactoringDocumentSelector(refactorCapabilities.supported);
-    const codeSmellFilter = createCodeSmellsFilter(refactorCapabilities);
+  const preflightResponse = await csRestApi.fetchRefactorPreflight();
+  if (typeof preflightResponse === 'string' || preflightResponse instanceof Error) {
+    csContext.csExtensionState.disableACE(preflightResponse);
+  } else {
+    const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported);
+    const codeSmellFilter = createCodeSmellsFilter(preflightResponse);
 
     // Collect all disposables used by the refactoring features
     const disposables: vscode.Disposable[] = [];
@@ -261,7 +265,7 @@ async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, 
      * is deactivated or if the online features are disabled */
     context.subscriptions.push(...disposables);
 
-    csExtensionState.enableACE(refactorCapabilities, disposables);
+    csExtensionState.enableACE(preflightResponse, disposables);
 
     // Force update diagnosticCollection to request initial refactorings
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {

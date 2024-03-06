@@ -204,10 +204,11 @@ export class CsRestApi {
       (response) => {
         return response.data as PreFlightResponse;
       },
-      (error) => {
+      (error: Error) => {
         const { message } = error;
         outputChannel.appendLine(`Unable to fetch refactoring capabilities. ${message}`);
         vscode.window.showErrorMessage(`Unable to fetch refactoring capabilities. ${message}`);
+        return error;
       }
     );
   }

@@ -118,28 +118,39 @@ export class StatusViewProvider implements WebviewViewProvider {
     `;
   }
 
-  private aceContent(preflight?: PreFlightResponse) {
+  private aceContent(preflight?: PreFlightResponse | Error | string) {
     let content = /*html*/ `<h3>Automated Code Engineering (ACE)</h3>`;
     if (isDefined(preflight)) {
-      const languageIdList = toDistinctLanguageIds(preflight.supported)
-        .map((langIds) => `<li>${langIds}</li>`)
-        .join('\n');
-      const codeSmellList = preflight['supported']['code-smells']
-        .map((codeSmells) => `<li>${codeSmells}</li>`)
-        .join('\n');
+      if (typeof preflight === 'string') {
+        content += /*html*/ `
+          <p>${preflight}</p>
+        `;
+      } else if (preflight instanceof Error) {
+        content += /*html*/ `
+          <p><span class="codicon codicon-error codicon-inactive"></span> There was an error requesting ACE capabilities:
+          <code class="preflight-error">${preflight.message}</code></p>
+        `;
+      } else {
+        const languageIdList = toDistinctLanguageIds(preflight.supported)
+          .map((langIds) => `<li>${langIds}</li>`)
+          .join('\n');
+        const codeSmellList = preflight['supported']['code-smells']
+          .map((codeSmells) => `<li>${codeSmells}</li>`)
+          .join('\n');
 
-      content += /*html*/ `
-        <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
-        <p>
-        Supported languages:
-        <ul>${languageIdList}</ul>
-        Supported code smells:
-        <ul>${codeSmellList}</ul>
-        Also, only functions under ${preflight['max-input-loc']} lines of code will be considered for refactoring.
-        </p>
-        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
-        <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
-      `;
+        content += /*html*/ `
+          <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
+          <p>
+          Supported languages:
+          <ul>${languageIdList}</ul>
+          Supported code smells:
+          <ul>${codeSmellList}</ul>
+          Also, only functions under ${preflight['max-input-loc']} lines of code will be considered for refactoring.
+          </p>
+          <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
+          <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
+        `;
+      }
     } else {
       content += /*html*/ `
         <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
@@ -154,9 +165,10 @@ export class StatusViewProvider implements WebviewViewProvider {
 
   private extensionStatusContent() {
     const { session, features } = this.stateProperties;
+
     const featureNames = {
-      'Code health analysis': features?.codeHealthAnalysis?.cliPath,
-      'Automated Code Engineering (ACE)': features?.automatedCodeEngineering,
+      'Code health analysis': codeHealthAnalysisEnabled(features),
+      'Automated Code Engineering (ACE)': aceEnabled(features),
     };
 
     const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'codicon-active' : ''}"></span> ${
@@ -192,4 +204,16 @@ export class StatusViewProvider implements WebviewViewProvider {
   private getUri(webView: Webview, ...pathSegments: string[]) {
     return webView.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
+}
+
+function codeHealthAnalysisEnabled(features?: CsFeatures) {
+  return isDefined(features?.codeHealthAnalysis?.cliPath);
+}
+
+function aceEnabled(features?: CsFeatures) {
+  new Boolean(
+    features?.automatedCodeEngineering &&
+      typeof features?.automatedCodeEngineering !== 'string' &&
+      !(features?.automatedCodeEngineering instanceof Error)
+  );
 }

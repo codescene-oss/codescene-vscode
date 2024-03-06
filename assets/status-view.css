@@ -10,6 +10,10 @@ hr {
   margin-block-start: 2em;
 }
 
+code.preflight-error {
+  font-family: monospace;
+}
+
 .codicon {
   vertical-align: text-bottom;
 }
@@ -19,7 +23,7 @@ hr {
 }
 
 .codicon-inactive {
-  color: rgb(215, 25, 25);
+  color: var(--vscode-notificationsErrorIcon-foreground);
 }
 
 .features-list {

@@ -3,14 +3,14 @@ import { PreFlightResponse } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { CliStatus } from './download';
 import { CsRefactoringCommands } from './refactoring/commands';
+import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
-import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 
 export interface CsFeatures {
   codeHealthAnalysis?: CliStatus;
-  automatedCodeEngineering?: PreFlightResponse;
+  automatedCodeEngineering?: PreFlightResponse | Error | string;
 }
 
 export interface CsStateProperties {
@@ -52,7 +52,7 @@ export class CsExtensionState {
     this.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      this.disableACE(); // Ace cannot be active if not signed in
+      this.disableACE('Not signed in'); // Ace cannot be active if not signed in
       return;
     }
 
@@ -71,8 +71,8 @@ export class CsExtensionState {
     this.updateStatusViews();
   }
 
-  disableACE() {
-    delete this.stateProperties.features?.automatedCodeEngineering;
+  disableACE(reason: Error | string) {
+    this.stateProperties.features = { ...this.stateProperties.features, automatedCodeEngineering: reason };
 
     this.refactoringCommand?.disableRequestRefactoringsCmd();
     this.aceFeatureDisposables.forEach((d) => d.dispose());
