@@ -206,14 +206,12 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 }
 
-function codeHealthAnalysisEnabled(features?: CsFeatures) {
+export function codeHealthAnalysisEnabled(features?: CsFeatures) {
   return isDefined(features?.codeHealthAnalysis?.cliPath);
 }
 
-function aceEnabled(features?: CsFeatures) {
-  new Boolean(
-    features?.automatedCodeEngineering &&
-      typeof features?.automatedCodeEngineering !== 'string' &&
-      !(features?.automatedCodeEngineering instanceof Error)
-  );
+export function aceEnabled(features?: CsFeatures) {
+  return isDefined(features?.automatedCodeEngineering) &&
+    typeof features?.automatedCodeEngineering !== 'string' &&
+    !(features?.automatedCodeEngineering instanceof Error);
 }
