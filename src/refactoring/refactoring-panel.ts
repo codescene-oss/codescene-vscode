@@ -324,13 +324,9 @@ export class RefactoringPanel {
       solutionContent = await this.codeSmellsGuide('modularity-improvement');
     }
 
-    const reasonsList = this.getReasonsList(response);
-    const notesText = reasonsList ? `<p>Notes:</p>\n${reasonsList}` : '';
-
     const content = /*html*/ `
         ${solutionContent}
         <h4>Example from your code</h4>
-        ${notesText}
         ${await this.codeContainerContent(code, languageId)}
         <div class="bottom-controls">
           <div class="button-group left">
