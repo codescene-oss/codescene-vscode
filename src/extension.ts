@@ -61,7 +61,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csDiagnostics,
     csWorkspace: new CsWorkspace(context),
     csExtensionState,
-    csRestApi: new CsRestApi(),
+    csRestApi: new CsRestApi(context.extension),
   };
   Reviewer.init(cliPath);
   setupTelemetry(cliPath);
@@ -239,7 +239,13 @@ async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, 
   csContext.csExtensionState.disableACE('Loading ACE capabilities...');
 
   const { csRestApi, csDiagnostics, csExtensionState } = csContext;
-  const preflightResponse = await csRestApi.fetchRefactorPreflight();
+  const preflightResponse = await csRestApi.fetchRefactorPreflight().catch((error: Error) => {
+    const { message } = error;
+    outputChannel.appendLine(`Unable to fetch refactoring capabilities. ${message}`);
+    vscode.window.showErrorMessage(`Unable to fetch refactoring capabilities. ${message}`);
+    return error;
+  });
+  
   if (typeof preflightResponse === 'string' || preflightResponse instanceof Error) {
     csContext.csExtensionState.disableACE(preflightResponse);
   } else {
