@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { reviewDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import Reviewer, { chScorePrefix } from '../review/reviewer';
 import { isDefined } from '../utils';
@@ -71,7 +72,7 @@ export class RefactoringsView implements vscode.Disposable {
     this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
     this.view.description = ''; // Don't leave a trailling description when disposing the view
 
-      this.disposables.forEach((d) => d.dispose());
+    this.disposables.forEach((d) => d.dispose());
   }
 }
 
@@ -79,10 +80,13 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   private disposables: vscode.Disposable[] = [];
   private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | void>();
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
+  private readonly documentSelector: vscode.DocumentSelector;
 
   activeDocument: vscode.TextDocument | undefined;
 
   constructor() {
+    this.documentSelector = reviewDocumentSelector();
+
     this.activeDocument = this.validEditorDoc(vscode.window.activeTextEditor);
 
     const changeRequestsDisposable = CsRefactoringRequests.onDidChangeRequests(() => {
@@ -101,7 +105,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   }
 
   private validEditorDoc(e: vscode.TextEditor | undefined) {
-    if (isDefined(e) && e.document.uri.scheme === 'file') return e.document;
+    if (isDefined(e) && vscode.languages.match(this.documentSelector, e?.document) !== 0) return e.document;
   }
 
   get activeFileName(): string | undefined {

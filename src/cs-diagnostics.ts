@@ -24,27 +24,23 @@ export default class CsDiagnosticsCollection {
  * Reviews a supported document using the Reviewer instance and updates the CodeScene diagnostic collection.
  */
 export class CsDiagnostics {
-  private documentSelector: vscode.DocumentSelector;
+  private readonly documentSelector: vscode.DocumentSelector;
 
   constructor() {
     this.documentSelector = reviewDocumentSelector();
   }
 
-  review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
+  async review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
     if (vscode.languages.match(this.documentSelector, document) === 0) {
       return;
     }
-    Reviewer.instance
-      .review(document, reviewOpts)
-      .then((diagnostics) => {
-        // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-        const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
-        CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
-        this.preInitiateRefactoringRequests(document, importantDiagnostics);
-      })
-      .catch((err) => {
-        // Empty catch to avoid unhandled promise rejection when a previous review command is aborted by the executor
-      });
+
+    const diagnostics = await Reviewer.instance.review(document, reviewOpts);
+    
+    // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+    const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
+    CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
+    this.preInitiateRefactoringRequests(document, importantDiagnostics);
   }
 
   private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
