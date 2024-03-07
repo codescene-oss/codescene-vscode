@@ -27,8 +27,8 @@ export class CsWorkspace {
    * Updates the codescene.isWorkspaceAssociated context variable. This can be used in package.json to conditionally enable/disable views.
    */
   updateIsWorkspaceAssociatedContext(projectId: number | undefined) {
-    this.context.workspaceState.update('codescene.projectId', projectId);
-    vscode.commands.executeCommand('setContext', 'codescene.isWorkspaceAssociated', projectId !== undefined);
+    void this.context.workspaceState.update('codescene.projectId', projectId);
+    void vscode.commands.executeCommand('setContext', 'codescene.isWorkspaceAssociated', projectId !== undefined);
     this.projectAssociationChangedEmitter.fire(undefined);
   }
 

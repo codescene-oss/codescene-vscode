@@ -44,10 +44,10 @@ export class StatusViewProvider implements WebviewViewProvider {
     webView.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case 'open-settings':
-          vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
+          void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
           return;
         case 'focus-explorer-ace-view':
-          vscode.commands.executeCommand('codescene.explorerAutoRefactorView.focus');
+          void vscode.commands.executeCommand('codescene.explorerAutoRefactorView.focus');
           return;
       }
     });
@@ -97,7 +97,7 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 
   private cliStatusContent(features?: CsFeatures) {
-    if (features?.codeHealthAnalysis?.cliPath) {
+    if (typeof features?.codeHealthAnalysis === 'string') {
       return /*html*/ `
         <h3>Code Health Analysis</h3>
         <p>Live <a href="https://codescene.io/docs/terminology/codescene-terminology.html#code-health">Code Health</a> 
@@ -105,10 +105,10 @@ export class StatusViewProvider implements WebviewViewProvider {
         </p>
       `;
     }
-    if (features?.codeHealthAnalysis?.error) {
+    if (features?.codeHealthAnalysis instanceof Error) {
       return /*html*/ `
       <h3><span class="codicon codicon-warning"></span> Extension error</h3>
-      <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.error}</p>
+      <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.message}</p>
     `;
     }
 
@@ -207,11 +207,13 @@ export class StatusViewProvider implements WebviewViewProvider {
 }
 
 export function codeHealthAnalysisEnabled(features?: CsFeatures) {
-  return isDefined(features?.codeHealthAnalysis?.cliPath);
+  return isDefined(features?.codeHealthAnalysis) && !(features?.codeHealthAnalysis instanceof Error);
 }
 
 export function aceEnabled(features?: CsFeatures) {
-  return isDefined(features?.automatedCodeEngineering) &&
+  return (
+    isDefined(features?.automatedCodeEngineering) &&
     typeof features?.automatedCodeEngineering !== 'string' &&
-    !(features?.automatedCodeEngineering instanceof Error);
+    !(features?.automatedCodeEngineering instanceof Error)
+  );
 }

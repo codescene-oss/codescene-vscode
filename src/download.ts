@@ -157,29 +157,21 @@ function download(url: URL, filePath: string) {
  * @param cliPath
  * @returns
  */
-async function ensureBinaryRuns(cliPath: string): Promise<CliStatus> {
+async function ensureBinaryRuns(cliPath: string): Promise<string> {
   const signResult = await new SimpleExecutor().execute({ command: cliPath, args: ['version'], ignoreError: true }, {});
 
   if (signResult.exitCode === 0) {
     outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
-    return { cliPath };
+    return cliPath;
   } else {
-    const msg = `Error invoking the downloaded CLI binary: ${signResult.stderr}`;
-    outputChannel.appendLine(msg);
-    logOutputChannel.error(msg);
-    return { error: msg };
+    throw new Error(`Error invoking the downloaded CLI binary: ${signResult.stderr}`);
   }
-}
-
-export interface CliStatus {
-  cliPath?: string;
-  error?: string;
 }
 
 /**
  * Download the CodeScene CLI artifact for the current platform and architecture.
  */
-export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<CliStatus> {
+export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
   outputChannel.appendLine('Ensuring we have the latest CodeScene CLI version working on your system...');
 
   const executableName = getExecutableName(process.platform, process.arch);
@@ -189,16 +181,14 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   const artifactName = getArtifactDownloadName(process.platform, process.arch);
 
   if (!artifactName) {
-    const error = `Unsupported platform: ${process.platform}-${process.arch}`;
-    outputChannel.appendLine(error);
-    return { error };
+    throw Error(`Unsupported platform: ${process.platform}-${process.arch}`);
   }
 
   const downloadUrl = getArtifactDownloadUrl(artifactName);
 
   if (await isUpToDate(cliPath, lastModifiedPath, downloadUrl)) {
     outputChannel.appendLine('CodeScene CLI already exists and is up to date');
-    return { cliPath };
+    return cliPath ;
   }
 
   outputChannel.appendLine('CodeScene CLI is not up to date, downloading latest version');
@@ -215,8 +205,6 @@ export async function ensureLatestCompatibleCliExists(extensionPath: string): Pr
   if (fs.existsSync(cliPath)) {
     return await ensureBinaryRuns(cliPath);
   } else {
-    const error = `The CodeScene CLI download "${cliPath}" does not exist`;
-    outputChannel.appendLine(error);
-    return { error };
+    throw new Error(`The CodeScene CLI download "${cliPath}" does not exist`);
   }
 }

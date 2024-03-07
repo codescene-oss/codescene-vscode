@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { requestRefactoringsCmdName } from './refactoring/commands';
 import Reviewer, { ReviewOpts, chScorePrefix } from './review/reviewer';
 import { reviewDocumentSelector } from './language-support';
+import { logOutputChannel } from './log';
 
 export const csSource = 'CodeScene';
 
@@ -30,20 +31,23 @@ export class CsDiagnostics {
     this.documentSelector = reviewDocumentSelector();
   }
 
-  async review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
+  review(document: vscode.TextDocument, reviewOpts?: ReviewOpts) {
     if (vscode.languages.match(this.documentSelector, document) === 0) {
       return;
     }
 
-    const diagnostics = await Reviewer.instance.review(document, reviewOpts);
-    
-    // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-    const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
-    CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
-    this.preInitiateRefactoringRequests(document, importantDiagnostics);
-  }
+    Reviewer.instance
+      .review(document, reviewOpts)
+      .then((diagnostics) => {
+        // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+        const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
+        CsDiagnosticsCollection.set(document.uri, importantDiagnostics);
 
-  private async preInitiateRefactoringRequests(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    vscode.commands.executeCommand(requestRefactoringsCmdName, document, diagnostics);
+        // Try to request refactorings for the important diagnostics
+        void vscode.commands.executeCommand(requestRefactoringsCmdName, document, importantDiagnostics);
+      })
+      .catch((e) => {
+        logOutputChannel.error(`Review error ${e}`);
+      });
   }
 }

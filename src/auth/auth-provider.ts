@@ -1,3 +1,4 @@
+import { v4 as uuid } from 'uuid';
 import {
   authentication,
   AuthenticationProvider,
@@ -12,11 +13,9 @@ import {
   UriHandler,
   window,
 } from 'vscode';
-import { v4 as uuid } from 'uuid';
-import { PromiseAdapter, promiseFromEvent } from './util';
-import { outputChannel } from '../log';
 import { getServerUrl } from '../configuration';
-import { CsWorkspace } from '../workspace';
+import { outputChannel } from '../log';
+import { PromiseAdapter, promiseFromEvent } from './util';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const AUTH_TYPE = 'codescene';
@@ -74,36 +73,31 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
    * @returns
    */
   public async createSession(scopes: string[]): Promise<AuthenticationSession> {
-    try {
-      const loginResponse = await this.login();
+    const loginResponse = await this.login();
 
-      if (!loginResponse) {
-        throw new Error('CodeScene login failure');
-      }
-
-      const session: AuthenticationSession = {
-        id: uuid(), // Do we need a "static" id here?
-        accessToken: loginResponse.token,
-        account: {
-          label: loginResponse.name,
-          id: loginResponse.userId || uuid(), // Do we need a "static" id here?
-        },
-        scopes: [],
-      };
-
-      await this.context.secrets.store(SESSIONS_STORAGE_KEY, JSON.stringify([session]));
-
-      this.sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
-
-      outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
-
-      window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
-
-      return session;
-    } catch (e) {
-      window.showErrorMessage(`Sign in failed: ${e}`);
-      throw e;
+    if (!loginResponse) {
+      throw new Error('Login failure');
     }
+
+    const session: AuthenticationSession = {
+      id: uuid(), // Do we need a "static" id here?
+      accessToken: loginResponse.token,
+      account: {
+        label: loginResponse.name,
+        id: loginResponse.userId || uuid(), // Do we need a "static" id here?
+      },
+      scopes: [],
+    };
+
+    await this.context.secrets.store(SESSIONS_STORAGE_KEY, JSON.stringify([session]));
+
+    this.sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
+
+    outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
+
+    void window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
+
+    return session;
   }
 
   /**

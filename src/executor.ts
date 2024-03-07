@@ -1,4 +1,4 @@
-import { ChildProcess, ExecOptions, execFile } from 'child_process';
+import { ChildProcess, execFile, ExecOptions } from 'child_process';
 import { logOutputChannel } from './log';
 
 export interface ExecResult {
@@ -40,7 +40,7 @@ export class SimpleExecutor implements Executor {
   execute(command: Command, options: ExecOptions = {}, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
 
-    const completedPromise = new Promise<ExecResult>((resolve, reject) => {
+    return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
@@ -61,8 +61,6 @@ export class SimpleExecutor implements Executor {
 
       logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" started`);
     });
-
-    return completedPromise;
   }
 }
 
@@ -95,7 +93,7 @@ export class LimitingExecutor implements Executor {
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    const completedPromise = this.executor
+    return this.executor
       .execute(command, { ...options, signal: abortController.signal }, input)
       .finally(() => {
         // Remove the abortController from the map.
@@ -105,7 +103,5 @@ export class LimitingExecutor implements Executor {
           this.runningCommands.delete(taskId);
         }
       });
-
-    return completedPromise;
   }
 }

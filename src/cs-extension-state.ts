@@ -1,7 +1,6 @@
 import vscode from 'vscode';
 import { PreFlightResponse } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
-import { CliStatus } from './download';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import Telemetry from './telemetry';
@@ -9,7 +8,7 @@ import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
 
 export interface CsFeatures {
-  codeHealthAnalysis?: CliStatus;
+  codeHealthAnalysis?: string | Error;
   automatedCodeEngineering?: PreFlightResponse | Error | string;
 }
 
@@ -47,7 +46,7 @@ export class CsExtensionState {
    */
   setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
-    vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
+    void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     Telemetry.instance.setSession(session);
     this.stateProperties.session = session;
     if (!signedIn) {
@@ -59,7 +58,7 @@ export class CsExtensionState {
     this.updateStatusViews();
   }
 
-  setCliStatus(cliStatus: CliStatus) {
+  setCliStatus(cliStatus: string | Error) {
     this.stateProperties.features = { ...this.stateProperties.features, codeHealthAnalysis: cliStatus };
     this.updateStatusViews();
   }

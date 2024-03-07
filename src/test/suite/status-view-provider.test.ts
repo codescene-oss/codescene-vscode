@@ -6,9 +6,9 @@ suite('Status view provider test suite', () => {
   test('Code health enabled/disabled', () => {
     assert.strictEqual(codeHealthAnalysisEnabled(), false);
     assert.strictEqual(codeHealthAnalysisEnabled({}), false);
-    assert.strictEqual(codeHealthAnalysisEnabled({ codeHealthAnalysis: { error: 'Error verifying CLI' } }), false);
+    assert.strictEqual(codeHealthAnalysisEnabled({ codeHealthAnalysis: new Error('Error verifying CLI') }), false);
 
-    assert.strictEqual(codeHealthAnalysisEnabled({ codeHealthAnalysis: { cliPath: '/opt/cs' } }), true);
+    assert.strictEqual(codeHealthAnalysisEnabled({ codeHealthAnalysis: '/opt/cs' }), true);
   });
 
   test('ACE enabled/disabled', () => {

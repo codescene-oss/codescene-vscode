@@ -3,7 +3,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosR
 import * as vscode from 'vscode';
 import { AUTH_TYPE } from './auth/auth-provider';
 import { getServerApiUrl } from './configuration';
-import { logOutputChannel, outputChannel } from './log';
+import { logOutputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 
 export interface Coupling {
@@ -129,9 +129,7 @@ export class CsRestApi {
       delete entity['average_revs'];
     });
 
-    const data = rawData as Coupling[];
-
-    return data;
+    return rawData as Coupling[];
   }
 
   async fetchProjects() {

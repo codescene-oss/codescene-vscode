@@ -72,7 +72,7 @@ export class RefactoringPanel {
             return;
           case 'copy-code':
             vscode.window.setStatusBarMessage(`$(clippy) Copied refactoring suggestion to clipboard`, 3000);
-            vscode.env.clipboard.writeText(refactoringState.code);
+            await vscode.env.clipboard.writeText(refactoringState.code);
             return;
           case 'show-diff':
             await this.showDiff(refactoringState);
@@ -390,13 +390,13 @@ export class RefactoringPanel {
     Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoringRequest.traceId });
 
     if (RefactoringPanel.currentPanel) {
-      RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
+      void RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
       RefactoringPanel.currentPanel.webViewPanel.reveal(undefined, true);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
+    void RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
   }
 }

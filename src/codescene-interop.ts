@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { window } from 'vscode';
 import { ExecResult, SimpleExecutor } from './executor';
 
 /**

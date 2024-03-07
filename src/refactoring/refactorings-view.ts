@@ -54,11 +54,11 @@ export class RefactoringsView implements vscode.Disposable {
     if (!isDefined(request)) {
       const msg = 'Got undefined request from context menu, please try again.';
       logOutputChannel.warn(msg);
-      vscode.window.showWarningMessage(msg);
+      void vscode.window.showWarningMessage(msg);
       return;
     }
     this.revealFunctionInDocument(request);
-    vscode.commands.executeCommand(presentRefactoringCmdName, request);
+    void vscode.commands.executeCommand(presentRefactoringCmdName, request);
   }
 
   private revealFunctionInDocument(request: CsRefactoringRequest) {

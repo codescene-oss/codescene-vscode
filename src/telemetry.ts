@@ -15,8 +15,8 @@ export default class Telemetry {
 
   constructor(private cliPath: string) {
     const sender: vscode.TelemetrySender = {
-      sendEventData: async (eventName, eventData) => {
-        this.postTelemetry(eventName, eventData);
+      sendEventData: (eventName, eventData) => {
+        void this.postTelemetry(eventName, eventData);
       },
       sendErrorData: (error) => {
         logOutputChannel.error(error);

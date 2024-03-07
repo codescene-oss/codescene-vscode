@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { workspace as Workspace, window as Window, WorkspaceFolder, QuickPickItem, Uri } from 'vscode';
+import { workspace , window , WorkspaceFolder, QuickPickItem, Uri } from 'vscode';
 import { codeHealthRulesJson } from './codescene-interop';
 
 const rulesPathAndFile: string = '.codescene/code-health-rules.json';
@@ -14,7 +14,7 @@ async function pickFolder(folders: ReadonlyArray<WorkspaceFolder>, placeHolder: 
     return Promise.resolve(folders[0]);
   }
 
-  const selected = await Window.showQuickPick(
+  const selected = await window.showQuickPick(
     folders.map<WorkspaceFolderItem>((folder) => { return { label: folder.name, description: folder.uri.fsPath, folder: folder }; }),
     { placeHolder: placeHolder }
   );
@@ -31,19 +31,18 @@ async function pickFolder(folders: ReadonlyArray<WorkspaceFolder>, placeHolder: 
  * @returns void
  */
 export async function createRulesTemplate(cliPath: string) {
-  const folders = Workspace.workspaceFolders;
+  const folders = workspace.workspaceFolders;
   if (!folders) {
-    Window.showErrorMessage('A CodeScene rules template can only be generated if VS Code is opened on a workspace folder.');
-    return;
+    throw new Error('A CodeScene rules template can only be generated if VS Code is opened on a workspace folder.');
   }
   const noRulesFolders = folders.filter(folder =>
     !(fs.existsSync(path.join(folder.uri.fsPath, rulesPathAndFile)))
   );
   if (noRulesFolders.length === 0) {
     if (folders.length === 1) {
-      Window.showInformationMessage('The workspace already contains a CodeScene rules file.');
+      void window.showInformationMessage('The workspace already contains a CodeScene rules file.');
     } else {
-      Window.showInformationMessage('All workspace folders already contain a CodeScene rules file.');
+      void window.showInformationMessage('All workspace folders already contain a CodeScene rules file.');
     }
     return;
   }
@@ -53,6 +52,6 @@ export async function createRulesTemplate(cliPath: string) {
   }
   const configUri: Uri = Uri.joinPath(folder.uri, rulesPathAndFile);
   const result = await codeHealthRulesJson(cliPath);
-  await Workspace.fs.writeFile(configUri, Buffer.from(result.stdout, 'utf8'));
-  Window.showInformationMessage('CodeScene rules file successfully generated.');
+  await workspace.fs.writeFile(configUri, Buffer.from(result.stdout, 'utf8'));
+  void window.showInformationMessage('CodeScene rules file successfully generated.');
 }

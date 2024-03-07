@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 
 suite('Extension Test Suite', function () {
-  vscode.window.showInformationMessage('Start all tests.');
+  void vscode.window.showInformationMessage('Start all tests.');
   this.timeout(10000);
 
   suiteSetup(async function () {

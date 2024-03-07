@@ -61,35 +61,35 @@ export class Links implements vscode.Disposable {
   openDashboard() {
     this.withProjectId((projectId) => {
       const dashboardUrl = `${getServerUrl()}/projects/${projectId}`;
-      vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
+      void vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
     });
   }
 
   openHotspots() {
     this.withProjectId((projectId) => {
       const hotspotsUrl = `${getServerUrl()}/projects/${projectId}/jobs/latest-successful/results/code/hotspots/system-map`;
-      vscode.env.openExternal(vscode.Uri.parse(hotspotsUrl));
+      void vscode.env.openExternal(vscode.Uri.parse(hotspotsUrl));
     });
   }
 
   openChangeCoupling() {
     this.withProjectId((projectId) => {
       const changeCouplingUrl = `${getServerUrl()}/projects/${projectId}/jobs/latest-successful/results/code/temporal-coupling/by-commits`;
-      vscode.env.openExternal(vscode.Uri.parse(changeCouplingUrl));
+      void vscode.env.openExternal(vscode.Uri.parse(changeCouplingUrl));
     });
   }
 
   openCodeReview(filePathInRepo: string) {
     this.withProjectId((projectId) => {
       const codeReviewUrl = `${getServerUrl()}/projects/${projectId}/jobs/latest-successful/results/code/hotspots/biomarkers?name=${filePathInRepo}`;
-      vscode.env.openExternal(vscode.Uri.parse(codeReviewUrl));
+      void vscode.env.openExternal(vscode.Uri.parse(codeReviewUrl));
     });
   }
 
   openXRay(filePathInRepo: string) {
     this.withProjectId((projectId) => {
       const xrayUrl = `${getServerUrl()}/projects/${projectId}/jobs/latest-successful/results/files/hotspots?file-name=${filePathInRepo}`;
-      vscode.env.openExternal(vscode.Uri.parse(xrayUrl));
+      void vscode.env.openExternal(vscode.Uri.parse(xrayUrl));
     });
   }
 }
