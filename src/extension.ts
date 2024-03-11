@@ -29,7 +29,6 @@ interface CsContext {
   csWorkspace: CsWorkspace;
   csExtensionState: CsExtensionState;
   csDiagnostics: CsDiagnostics;
-  csRestApi: CsRestApi;
 }
 
 /**
@@ -64,10 +63,12 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csDiagnostics,
     csWorkspace: new CsWorkspace(context),
     csExtensionState,
-    csRestApi: new CsRestApi(context.extension),
   };
+  // CsRestApi.init(context.extension);
   Reviewer.init(cliPath);
-  setupTelemetry(context, cliPath);
+  Telemetry.init(context.extension, cliPath);
+  // send telemetry on activation (gives us basic usage stats)
+  Telemetry.instance.logUsage('onActivateExtension');
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnosticsCollection.init(context);
@@ -122,7 +123,7 @@ function setupStatsCollector() {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { cliPath, csRestApi, csExtensionState } = csContext;
+  const { cliPath, csExtensionState } = csContext;
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
@@ -168,15 +169,8 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(loginCommand);
 
   // This command is registered here, but acting as a noop until it gets an appropriate preflight response
-  const refactoringCommand = new CsRefactoringCommands(context, csRestApi, cliPath);
+  const refactoringCommand = new CsRefactoringCommands(context, cliPath);
   csExtensionState.setRefactoringCommand(refactoringCommand);
-}
-
-function setupTelemetry(context: vscode.ExtensionContext, cliPath: string) {
-  Telemetry.init(context.extension, cliPath);
-
-  // send telemetry on activation (gives us basic usage stats)
-  Telemetry.instance.logUsage('onActivateExtension');
 }
 
 /**
@@ -246,8 +240,8 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple codelenses etc.
   csContext.csExtensionState.disableACE('Loading ACE capabilities...');
 
-  const { csRestApi, csDiagnostics, csExtensionState } = csContext;
-  csRestApi
+  const { csDiagnostics, csExtensionState } = csContext;
+  CsRestApi.instance
     .fetchRefactorPreflight()
     .then((preflightResponse) => {
       const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported);

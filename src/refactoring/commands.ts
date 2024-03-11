@@ -1,13 +1,12 @@
 import vscode, { TextDocument } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { CsRestApi, PreFlightResponse, RefactorResponse } from '../cs-rest-api';
+import { PreFlightResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, isDefined } from '../utils';
 import {
-  CsRefactoringRequest,
   CsRefactoringRequests,
   ResolvedRefactoring,
-  validConfidenceLevel,
+  validConfidenceLevel
 } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
 import { createCodeSmellsFilter } from './utils';
@@ -26,7 +25,6 @@ export interface FnToRefactor {
 
 export interface CsRefactoringCommandParams {
   context: vscode.ExtensionContext;
-  csRestApi: CsRestApi;
   cliPath: string;
   codeSmellFilter: DiagnosticFilter;
   maxInputLoc: number;
@@ -36,7 +34,6 @@ export class CsRefactoringCommands {
   private extensionUri: vscode.Uri;
   constructor(
     context: vscode.ExtensionContext,
-    private csRestApi: CsRestApi,
     private cliPath: string,
     private codeSmellFilter?: DiagnosticFilter,
     private maxInputLoc?: number
@@ -89,11 +86,7 @@ export class CsRefactoringCommands {
     ).then((fns) => fns.filter(isDefined));
 
     const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
-    CsRefactoringRequests.initiate(
-      { csRestApi: this.csRestApi, document: document },
-      distinctFns,
-      supportedDiagnostics
-    );
+    CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
   }
 }
 
