@@ -67,7 +67,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csRestApi: new CsRestApi(context.extension),
   };
   Reviewer.init(cliPath);
-  setupTelemetry(cliPath);
+  setupTelemetry(context, cliPath);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnosticsCollection.init(context);
@@ -172,8 +172,8 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   csExtensionState.setRefactoringCommand(refactoringCommand);
 }
 
-function setupTelemetry(cliPath: string) {
-  Telemetry.init(cliPath);
+function setupTelemetry(context: vscode.ExtensionContext, cliPath: string) {
+  Telemetry.init(context.extension, cliPath);
 
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
