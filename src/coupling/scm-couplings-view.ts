@@ -25,7 +25,7 @@ export class ScmCouplingsView implements vscode.Disposable {
     this.disposables.push(view);
 
     const openCmd = vscode.commands.registerCommand('codescene.scmCouplingsView.open', (item: CoupledEntity) => {
-      vscode.commands.executeCommand('vscode.open', item.resourceUri);
+      void vscode.commands.executeCommand('vscode.open', item.resourceUri);
     });
     this.disposables.push(openCmd);
 
@@ -35,7 +35,7 @@ export class ScmCouplingsView implements vscode.Disposable {
     // Refresh view on certain events
     this.disposables.push(
       this.git.onDidModifyChangeSet(() => {
-        this.treeDataProvider.refresh();
+        void this.treeDataProvider.refresh();
       })
     );
 

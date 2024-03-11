@@ -29,8 +29,8 @@ export class CsRefactoringRequest {
     this.abortController = new AbortController();
   }
 
-  post(csRestApi: CsRestApi, diagnostics: Diagnostic[]) {
-    this.promise = csRestApi
+  post(diagnostics: Diagnostic[]) {
+    this.promise = CsRestApi.instance
       .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
       .then((response) => {
         this.response = response;
@@ -91,24 +91,18 @@ export class CsRefactoringRequests {
   private static readonly errorEmitter = new EventEmitter<Error | AxiosError>();
   static readonly onDidRequestFail = CsRefactoringRequests.errorEmitter.event;
 
-  static initiate(
-    context: { csRestApi: CsRestApi; document: TextDocument },
-    fnsToRefactor: FnToRefactor[],
-    diagnostics: Diagnostic[]
-  ) {
+  static initiate(document: TextDocument, fnsToRefactor: FnToRefactor[], diagnostics: Diagnostic[]) {
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
-      const req = new CsRefactoringRequest(fn, context.document);
+      const req = new CsRefactoringRequest(fn, document);
       Telemetry.instance.logUsage('refactor/requested', { 'trace-id': req.traceId });
       logOutputChannel.debug(`Refactor request for ${logIdString(req.traceId, req.fnToRefactor)}`);
 
       // Put the request for each diagnostic in a map for access in codelens and codeaction providers
-      diagnosticsForFn.forEach((d) => {
-        CsRefactoringRequests.set(context.document, d, req);
-      });
+      diagnosticsForFn.forEach((d) => CsRefactoringRequests.set(document, d, req));
 
       req
-        .post(context.csRestApi, diagnosticsForFn)
+        .post(diagnosticsForFn)
         .then((response) => {
           logOutputChannel.debug(
             `Refactor response for ${logIdString(req.traceId, req.fnToRefactor)}: ${confidenceString(

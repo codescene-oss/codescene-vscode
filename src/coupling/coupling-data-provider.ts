@@ -8,10 +8,10 @@
  */
 import * as vscode from 'vscode';
 import { Coupling, CsRestApi } from '../cs-rest-api';
-import { CsWorkspace } from '../workspace';
 import { Git } from '../git';
-import { difference } from '../utils';
 import { outputChannel } from '../log';
+import { difference } from '../utils';
+import { CsWorkspace } from '../workspace';
 
 export interface CouplingWithUri extends Coupling {
   entityUri?: vscode.Uri;
@@ -23,7 +23,7 @@ export class CouplingDataProvider {
   private cachedData: CouplingWithUri[] | undefined = undefined;
   private suppressError = false;
 
-  constructor(private git: Git, private csRestApi: CsRestApi, private csWorkspace: CsWorkspace) {
+  constructor(private git: Git, private csWorkspace: CsWorkspace) {
     this.csWorkspace.onDidChangeProjectAssociation(() => this.fetch());
   }
 
@@ -44,14 +44,14 @@ export class CouplingDataProvider {
       this.cachedData = undefined;
     } else {
       try {
-        const couplings = await this.csRestApi.fetchCouplings(projectId);
+        const couplings = await CsRestApi.instance.fetchCouplings(projectId);
         const localRepoRoots = await this.localRepoRoots();
         const repoNameAgnostic = await this.validateRepoRoots(couplings, localRepoRoots);
         await this.processAndCacheData(couplings, localRepoRoots, repoNameAgnostic);
       } catch (e: any) {
         if (!this.suppressError) {
           const msg = e.message || 'Unknown error';
-          vscode.window.showErrorMessage(`CodeScene failed to fetch couplings from server: ${msg}`);
+          void vscode.window.showErrorMessage(`CodeScene failed to fetch couplings from server: ${msg}`);
           this.suppressError = true;
         }
       }
@@ -63,7 +63,7 @@ export class CouplingDataProvider {
 
   /**
    * Local repo roots are gathered from the git repos that contain the local workspace folders.
-   * @returns 
+   * @returns
    */
   private async localRepoRoots() {
     const workspaceFolders = vscode.workspace.workspaceFolders || [];
@@ -88,17 +88,17 @@ export class CouplingDataProvider {
    * Another complicating factor is that the workspace folders might
    * be sub folders of the repository root. For example, you might have opened
    * a single folder within a huge mono repo.
-   * 
-   * In the special case there's a one-to-one mapping of remote repositories in the 
-   * CodeScene project to one local repo in the workspace this function returns true. 
+   *
+   * In the special case there's a one-to-one mapping of remote repositories in the
+   * CodeScene project to one local repo in the workspace this function returns true.
    * This indicates that we can match the change coupling paths without requiring that
    * the workspace folder(s) matches the repository path(s).
    */
   private async validateRepoRoots(couplings: Coupling[], localRepoRoots: Map<string, string>) {
     // Remote repo roots are gathered from the first component of the coupling entity paths.
-    const remoteRepoRootNames = new Set(couplings
-      .map(({ entity }) => this.splitCouplingPath(entity))
-      .map(({ root }) => root));
+    const remoteRepoRootNames = new Set(
+      couplings.map(({ entity }) => this.splitCouplingPath(entity)).map(({ root }) => root)
+    );
     const localRepoRootNames = new Set(localRepoRoots.keys());
 
     const unmappedLocalRepos = difference(localRepoRootNames, remoteRepoRootNames);
@@ -113,7 +113,9 @@ export class CouplingDataProvider {
     }
 
     if (unmappedLocalRepos.size > 0 && unmappedRemoteRepos.size > 0) {
-      outputChannel.appendLine('Warning: The following local workspace folders are not mapped to a repository in the CodeScene project:');
+      outputChannel.appendLine(
+        'Warning: The following local workspace folders are not mapped to a repository in the CodeScene project:'
+      );
       unmappedLocalRepos.forEach((workspace) => outputChannel.appendLine(`  ${workspace}`));
       outputChannel.appendLine('These are the unmapped repositories in the remote CodeScene project:');
       unmappedRemoteRepos.forEach((repository) => outputChannel.appendLine(`  ${repository}`));
@@ -122,7 +124,11 @@ export class CouplingDataProvider {
     return false;
   }
 
-  private async processAndCacheData(couplings: Coupling[], localRepoRoots: Map<string, string>, repoNameAgnostic: boolean) {
+  private async processAndCacheData(
+    couplings: Coupling[],
+    localRepoRoots: Map<string, string>,
+    repoNameAgnostic: boolean
+  ) {
     const bidirectionalCouplings = this.createBidirectionalCouplings(couplings);
     if (repoNameAgnostic) {
       const repoNameAgnosticCouplings = bidirectionalCouplings.map((coupling) => {
@@ -145,8 +151,8 @@ export class CouplingDataProvider {
    * Couplings from the server are only unidirectional, but we want them to
    * be bidirectional in the UI. So we duplicate the couplings and swap the
    * entity and coupled fields.
-   * @param couplings    
-   * @returns 
+   * @param couplings
+   * @returns
    */
   private createBidirectionalCouplings(couplings: Coupling[]) {
     const swappedCouplings = couplings.map((coupling) => {
@@ -171,7 +177,9 @@ export class CouplingDataProvider {
   }
 
   private async resolveAbsolutePaths(couplings: Coupling[], localRepoRoots: Map<string, string>) {
-    if (localRepoRoots.size === 0) { return couplings; }
+    if (localRepoRoots.size === 0) {
+      return couplings;
+    }
 
     return couplings.map((coupling) => {
       const entityUri = this.resolveAbsolutePath(localRepoRoots, coupling.entity);
@@ -190,8 +198,7 @@ export class CouplingDataProvider {
   private splitCouplingPath(couplingPath: string) {
     return {
       root: couplingPath.split('/')[0],
-      path: couplingPath.split('/').slice(1).join('/')
+      path: couplingPath.split('/').slice(1).join('/'),
     };
   }
 }
-

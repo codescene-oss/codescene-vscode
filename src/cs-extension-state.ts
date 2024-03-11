@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { PreFlightResponse } from './cs-rest-api';
+import { CsRestApi, PreFlightResponse } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
@@ -58,6 +58,7 @@ export class CsExtensionState implements vscode.Disposable {
   setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
+    CsRestApi.instance.setSession(session);
     Telemetry.instance.setSession(session);
     this.stateProperties.session = session;
     if (!signedIn) {

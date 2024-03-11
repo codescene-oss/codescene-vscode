@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as vscode from 'vscode';
-import { AUTH_TYPE } from './auth/auth-provider';
 import { getServerApiUrl } from './configuration';
-import { logOutputChannel } from './log';
+import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 
 export interface Coupling {
@@ -74,7 +73,10 @@ const defaultTimeout = 10000;
 const refactoringTimeout = 60000;
 
 export class CsRestApi {
+  private static _instance: CsRestApi;
+
   private axiosInstance: AxiosInstance;
+  private session?: vscode.AuthenticationSession;
 
   constructor(extension: vscode.Extension<any>) {
     this.axiosInstance = axios.create({
@@ -84,18 +86,11 @@ export class CsRestApi {
       },
     });
 
-    // TODO - maybe do this once in constructor and resetting the header if session is removed?
-    //  -> Need to have a way to reset the header if the session is removed
-    const addAccessToken = async (config: InternalAxiosRequestConfig) => {
-      const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
-      if (session) {
-        config.headers['Authorization'] = `Bearer ${session.accessToken}`;
-      }
-    };
-
     this.axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       logOutputChannel.debug(`[${config.method}] ${config.url}`);
-      await addAccessToken(config);
+      if (this.session) {
+        config.headers['Authorization'] = `Bearer ${this.session.accessToken}`;
+      }
       return config;
     });
 
@@ -106,6 +101,24 @@ export class CsRestApi {
     };
 
     this.axiosInstance.interceptors.response.use(logResponse, logAxiosError);
+  }
+
+  static get instance() {
+    if (!CsRestApi._instance) {
+      const extension = vscode.extensions.getExtension('codescene.codescene-vscode');
+      if (!extension) {
+        const msg = 'Could not initiate Rest API!';
+        outputChannel.appendLine(msg);
+        throw new Error(msg);
+      }
+      outputChannel.appendLine('Initializing Rest API');
+      CsRestApi._instance = new CsRestApi(extension);
+    }
+    return CsRestApi._instance;
+  }
+
+  setSession(session?: vscode.AuthenticationSession) {
+    this.session = session;
   }
 
   private async fetchJson<T>(url: string, config?: AxiosRequestConfig) {
