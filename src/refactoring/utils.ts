@@ -1,4 +1,4 @@
-import { Diagnostic } from 'vscode';
+import { Diagnostic, TextDocument, window } from 'vscode';
 import { PreFlightResponse, ReasonsWithDetails } from '../cs-rest-api';
 import { DiagnosticFilter, isDefined } from '../utils';
 
@@ -34,4 +34,22 @@ export function decorateCode(code: string, languageId: string, reasonsWithDetail
 export function createCodeSmellsFilter(refactorCapabilities: PreFlightResponse): DiagnosticFilter {
   return (d: Diagnostic) =>
     d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
+}
+
+/**
+ * Finds the editor associated with the request document.
+ *
+ * Primarily this is the activeTextEditor, but that might be out of focus. If so, we will
+ * target the first editor in the list of visibleTextEditors matching the request document.
+ */
+export function targetEditor(document: TextDocument) {
+  if (window.activeTextEditor?.document === document) {
+    return window.activeTextEditor;
+  } else {
+    for (const e of window.visibleTextEditors) {
+      if (e.document === document) {
+        return e;
+      }
+    }
+  }
 }

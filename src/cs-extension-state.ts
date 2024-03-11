@@ -6,6 +6,7 @@ import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
+import { AxiosError } from 'axios';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -15,6 +16,7 @@ export interface CsFeatures {
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features?: CsFeatures;
+  serviceErrors?: Array<Error | AxiosError>;
 }
 
 /**
@@ -22,22 +24,31 @@ export interface CsStateProperties {
  * the state properties, the other part is to handle the state of components that are registered
  * when the user signs in and out of CodeScene.
  */
-export class CsExtensionState {
+export class CsExtensionState implements vscode.Disposable {
+  private disposables: vscode.Disposable[] = [];
   private stateProperties: CsStateProperties = {};
-  private statusViewProvider: StatusViewProvider;
-  private statusBar: CsStatusBar;
 
   private refactoringCommand: CsRefactoringCommands | undefined;
   private aceFeatureDisposables: vscode.Disposable[] = [];
 
-  constructor(statusViewProvider: StatusViewProvider) {
-    this.statusViewProvider = statusViewProvider;
-    this.statusBar = new CsStatusBar();
+  constructor(private readonly statusViewProvider: StatusViewProvider, private readonly statusBar: CsStatusBar) {
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
+        this.stateProperties.serviceErrors = undefined;
+        this.updateStatusViews();
+      })
+    );
+
+    CsRefactoringRequests.onDidRequestFail((error) => {
+      if (!this.stateProperties.serviceErrors) this.stateProperties.serviceErrors = [];
+      this.stateProperties.serviceErrors.push(error);
+      this.updateStatusViews();
+    });
   }
 
   updateStatusViews() {
     this.statusViewProvider.update(this.stateProperties);
-    this.statusBar.setOnline(isDefined(this.stateProperties.session));
+    this.statusBar.update(this.stateProperties);
   }
 
   /**
@@ -82,5 +93,10 @@ export class CsExtensionState {
 
   setRefactoringCommand(refactoringCommand: CsRefactoringCommands) {
     this.refactoringCommand = refactoringCommand;
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
+    // (aceFeatureDisposables are added to context.subscriptions and disposed from there)
   }
 }

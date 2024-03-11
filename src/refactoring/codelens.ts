@@ -56,15 +56,17 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
 
     const conditionalCodeLens = (request: CsRefactoringRequest, diagnostic: vscode.Diagnostic) => {
       const differentLine = request.fnToRefactor.range.start.line !== diagnostic.range.start.line;
-      if (isDefined(request.resolvedResponse)) {
-        return request.resolvedResponse.confidence.level >= 2 && differentLine;
+      if (isDefined(request.response)) {
+        return request.response.confidence.level >= 2 && differentLine;
       }
       return differentLine;
     };
 
     supportedDiagnostics.forEach((diagnostic) => {
       const request = CsRefactoringRequests.get(document, diagnostic);
-      if (request && request.shouldPresent()) {
+      if (!request) return;
+
+      if (request.isPending() || request.validConfidenceLevel()) {
         // Add a lens at the start of the function targeted for refactoring
         positionToCodeLens.set(
           positionKey(request.fnToRefactor.range.start),
@@ -127,7 +129,9 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       }`
     );
 
-    if (request.isPending()) {
+    const response = request.resolvedResponse();
+
+    if (!isDefined(response)) {
       codeLens.command = {
         title: `${pendingSymbol} Auto-refactoring...`,
         command: 'codescene.explorerAutoRefactorView.focus',
@@ -135,13 +139,13 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
       return codeLens;
     }
 
-    codeLens.command = commandFromRequest(request);
+    codeLens.command = commandFromRequest(response);
     return codeLens;
   }
 
   private summaryString(csRefactoringRequest: CsRefactoringRequest[]) {
-    const nPending = csRefactoringRequest.filter((r) => !r.resolvedResponse && !r.error).length;
-    const doneResponses = csRefactoringRequest.map((r) => r.resolvedResponse).filter(isDefined);
+    const nPending = csRefactoringRequest.filter((r) => r.isPending()).length;
+    const doneResponses = csRefactoringRequest.map((r) => r.response).filter(isDefined);
     const nRefactorings = doneResponses.filter((r) => r.confidence.level >= 2).length;
     const nImprovementGuides = doneResponses.filter((r) => r.confidence.level === 1).length;
     const pendingString = nPending > 0 ? `${nPending} pending` : undefined;

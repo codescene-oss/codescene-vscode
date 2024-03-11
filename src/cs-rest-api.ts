@@ -85,6 +85,7 @@ export class CsRestApi {
     });
 
     // TODO - maybe do this once in constructor and resetting the header if session is removed?
+    //  -> Need to have a way to reset the header if the session is removed
     const addAccessToken = async (config: InternalAxiosRequestConfig) => {
       const session = await vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: false });
       if (session) {

@@ -16,4 +16,8 @@ function main() {
   document
     .getElementById('auto-refactor-link')
     ?.addEventListener('click', () => sendMessage('focus-explorer-ace-view'));
+  document.getElementById('clear-errors-button')?.addEventListener('click', () => sendMessage('clear-errors'));
+  document
+    .getElementById('show-codescene-log-link')
+    ?.addEventListener('click', () => sendMessage('show-codescene-log-output'));
 }

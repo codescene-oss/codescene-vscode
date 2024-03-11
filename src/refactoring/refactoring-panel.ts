@@ -18,17 +18,17 @@ import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
 import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
-import { decorateCode } from './utils';
+import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
+import { decorateCode, targetEditor } from './utils';
 
 interface CurrentRefactorState {
-  request: CsRefactoringRequest;
+  refactoring: ResolvedRefactoring;
   range: Range; // Range of code to be refactored
   code: string; // The code to replace the range with
 }
 
 interface RefactorPanelParams {
-  refactoringRequest: CsRefactoringRequest;
+  refactoring: ResolvedRefactoring;
 }
 
 export class RefactoringPanel {
@@ -62,7 +62,7 @@ export class RefactoringPanel {
         switch (message.command) {
           case 'apply':
             await this.applyRefactoring(refactoringState);
-            Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoringState.request.traceId });
+            Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoringState.refactoring.traceId });
             vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
             this.dispose();
             return;
@@ -76,7 +76,7 @@ export class RefactoringPanel {
             return;
           case 'show-diff':
             await this.showDiff(refactoringState);
-            Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoringState.request.traceId });
+            Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoringState.refactoring.traceId });
             return;
         }
       },
@@ -101,8 +101,7 @@ export class RefactoringPanel {
 
   private async showDiff(refactoringState: CurrentRefactorState) {
     const {
-      request,
-      request: { document },
+      refactoring: { document },
       range,
       code,
     } = refactoringState;
@@ -114,13 +113,14 @@ export class RefactoringPanel {
 
     // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
     // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
-    await vscode.window.showTextDocument(originalCodeTmpDoc, request.targetEditor()?.viewColumn, false);
+    const editor = targetEditor(document);
+    await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
   }
 
   private async applyRefactoring(refactoringState: CurrentRefactorState) {
     const {
-      request: { document },
+      refactoring: { document },
       range,
       code,
     } = refactoringState;
@@ -148,12 +148,12 @@ export class RefactoringPanel {
    * (manually closed), a new editor is opened for showing the applied refactoring.
    */
   private async selectCurrentRefactoring(refactoringState: CurrentRefactorState) {
-    const { range, code, request } = refactoringState;
+    const { range, code, refactoring } = refactoringState;
     const newRange = this.relativeRangeFromCode(range, code);
 
     const editor =
-      request.targetEditor() ||
-      (await vscode.window.showTextDocument(request.document.uri, {
+      targetEditor(refactoring.document) ||
+      (await vscode.window.showTextDocument(refactoring.document.uri, {
         preview: false,
         viewColumn: ViewColumn.One,
       }));
@@ -163,42 +163,33 @@ export class RefactoringPanel {
 
   private async deselectRefactoring(refactoringState: CurrentRefactorState) {
     // Get original document and deselect the function to refactor.
-    const { range, request } = refactoringState;
-    const editor = request.targetEditor();
+    const { range, refactoring } = refactoringState;
+    const editor = targetEditor(refactoring.document);
     if (editor) {
       editor.selection = new Selection(range.start, range.start);
     }
   }
 
-  private async updateWebView({ refactoringRequest }: RefactorPanelParams) {
-    const { fnToRefactor, error, resolvedResponse, document } = refactoringRequest;
-    const response = resolvedResponse || error;
-    const highlightCode = toConfidenceSymbol(refactoringRequest) === refactoringSymbol;
-    const targetEditor = refactoringRequest.targetEditor();
-    if (highlightCode && targetEditor) {
-      targetEditor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+  private async updateWebView({ refactoring }: RefactorPanelParams) {
+    const { fnToRefactor, response, document } = refactoring;
+    const highlightCode = toConfidenceSymbol(response.confidence.level) === refactoringSymbol;
+    const editor = targetEditor(document);
+    if (highlightCode && editor) {
+      editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
     }
     const range = fnToRefactor.range;
     this.currentRefactorState = {
-      request: refactoringRequest,
+      refactoring,
       code: 'n/a',
       range,
     };
-    let content = this.loadingContent();
-    let title = 'Refactoring...';
-    switch (typeof response) {
-      case 'string':
-        content = this.errorContent(response);
-        title = 'Auto-refactor error';
-        break;
-      case 'object':
-        let { code } = response;
-        title = response.confidence.title;
-        const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
-        this.currentRefactorState.code = decoratedCode;
-        content = await this.autoRefactorOrCodeImprovementContent(response, decoratedCode, document.languageId);
-        break;
-    }
+
+    const { code } = response;
+    const title = response.confidence.title;
+    const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
+    this.currentRefactorState.code = decoratedCode;
+
+    const content = await this.autoRefactorOrCodeImprovementContent(response, decoratedCode, document.languageId);
 
     const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
@@ -350,25 +341,6 @@ export class RefactoringPanel {
     }
   }
 
-  private loadingContent() {
-    return /*html*/ `<div class="loading-content">
-      <vscode-progress-ring class="progress-ring"></vscode-progress-ring><span id="loading-span"></span>
-    </div>`;
-  }
-
-  private errorContent(errorMessage: string) {
-    return /*html*/ `<h2>Refactoring failed</h2>
-    <p>There was an error when performing this refactoring. Here's the response from the refactoring service:</p>
-    <pre>${errorMessage}</pre>
-    <div class="bottom-controls">
-      <div></div> <!-- Spacer, making sure close button is right aligned -->
-      <div class="button-group right">
-        <vscode-button id="close-button" appearance="primary">Close</vscode-button>
-      </div>
-    </div>
-`;
-  }
-
   public dispose() {
     RefactoringPanel.currentPanel = undefined;
     this.webViewPanel.dispose();
@@ -383,20 +355,20 @@ export class RefactoringPanel {
   /**
    *
    * @param extensionUri Used to resolve resource paths for the webview content
-   * @param refactoringRequest Current refac request to present
+   * @param resolvedRequest Current refac request to present
    * @returns
    */
-  public static createOrShow({ extensionUri, refactoringRequest }: RefactorPanelParams & { extensionUri: Uri }) {
-    Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoringRequest.traceId });
+  public static createOrShow({ extensionUri, refactoring }: RefactorPanelParams & { extensionUri: Uri }) {
+    Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId });
 
     if (RefactoringPanel.currentPanel) {
-      void RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
+      void RefactoringPanel.currentPanel.updateWebView({ refactoring });
       RefactoringPanel.currentPanel.webViewPanel.reveal(undefined, true);
       return;
     }
 
     // Otherwise, create a new web view panel.
     RefactoringPanel.currentPanel = new RefactoringPanel(extensionUri);
-    void RefactoringPanel.currentPanel.updateWebView({ refactoringRequest });
+    void RefactoringPanel.currentPanel.updateWebView({ refactoring });
   }
 }

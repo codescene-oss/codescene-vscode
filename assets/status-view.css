@@ -18,12 +18,16 @@ code.preflight-error {
   vertical-align: text-bottom;
 }
 
-.codicon-active {
+.color-active {
   color: rgb(29, 139, 29);
 }
 
-.codicon-inactive {
+.color-inactive {
   color: var(--vscode-notificationsErrorIcon-foreground);
+}
+
+.color-warning {
+  color: var(--vscode-notificationsWarningIcon-foreground);
 }
 
 .features-list {
