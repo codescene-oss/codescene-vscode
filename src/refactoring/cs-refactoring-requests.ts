@@ -1,19 +1,25 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import vscode, { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
+import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
 import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './commands';
 
+export interface ResolvedRefactoring {
+  fnToRefactor: FnToRefactor;
+  document: TextDocument;
+  traceId: string;
+  response: RefactorResponse;
+}
+
 export class CsRefactoringRequest {
   fnToRefactor: FnToRefactor;
   document: TextDocument;
   traceId: string;
-  resolvedResponse?: RefactorResponse;
-  error?: string;
-  refactorResponse?: Promise<RefactorResponse | string>;
+  response?: RefactorResponse;
+  promise?: Promise<RefactorResponse>;
   private abortController: AbortController;
 
   constructor(fnToRefactor: FnToRefactor, document: TextDocument) {
@@ -24,93 +30,52 @@ export class CsRefactoringRequest {
   }
 
   post(csRestApi: CsRestApi, diagnostics: Diagnostic[]) {
-    Telemetry.instance.logUsage('refactor/requested', { 'trace-id': this.traceId });
-    logOutputChannel.debug(`Refactor request for ${this.logIdString(this.traceId, this.fnToRefactor)}`);
-    this.refactorResponse = csRestApi
+    this.promise = csRestApi
       .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
       .then((response) => {
-        logOutputChannel.debug(
-          `Refactor response for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.confidenceString(
-            response.confidence
-          )}`
-        );
-        this.resolvedResponse = response;
+        this.response = response;
         return response;
-      })
-      .catch((err: Error | AxiosError) => {
-        this.error = err.message;
-        if (err instanceof AxiosError) {
-          this.error = this.getErrorString(err);
-        }
-        logOutputChannel.error(
-          `Refactor response error for ${this.logIdString(this.traceId, this.fnToRefactor)}: ${this.error}`
-        );
-        return this.error;
       });
-    return this.refactorResponse;
+    return this.promise;
   }
 
   abort() {
     this.abortController.abort();
   }
 
-  isPending() {
-    return !isDefined(this.resolvedResponse) && !isDefined(this.error);
+  /**
+   * @returns Object conforming to the ResolvedRefactoring interface if the response is
+   * resolved, undefined otherwise
+   */
+  resolvedResponse(): ResolvedRefactoring | undefined {
+    if (!isDefined(this.response)) return;
+    return {
+      ...this,
+      response: this.response,
+    } as ResolvedRefactoring;
   }
 
-  /**
-   * Indicate that we should present the refactoring state in the UI
-   * Rules at the moment is to basically always present it, unless the
-   * confidence level is invalid.
-   *
-   * @param request
-   * @returns
-   */
   shouldPresent() {
-    const level = this.resolvedResponse?.confidence.level;
-    if (isDefined(level)) {
-      return this.validConfidenceLevel(level);
-    }
-    return true;
+    return this.isPending() || this.validConfidenceLevel();
   }
 
-  /**
-   * Finds the editor associated with the request document.
-   *
-   * Primarily this is the activeTextEditor, but that might be out of focus. If so, we will
-   * target the first editor in the list of visibleTextEditors matching the request document.
-   */
-  targetEditor() {
-    if (vscode.window.activeTextEditor?.document === this.document) {
-      return vscode.window.activeTextEditor;
-    } else {
-      for (const e of vscode.window.visibleTextEditors) {
-        if (e.document === this.document) {
-          return e;
-        }
-      }
-    }
+  actionable() {
+    return this.validConfidenceLevel();
   }
 
-  private getErrorString(err: AxiosError) {
-    let defaultMsg = `[${err.code}] ${err.message}`;
-    if (!isDefined(err.response)) return defaultMsg;
-
-    const data = err.response?.data as { error?: string };
-    return data.error ? `[${err.code}] ${data.error}` : defaultMsg;
+  isPending() {
+    return !isDefined(this.response);
   }
 
-  private logIdString(traceId: string, fnToRefactor: FnToRefactor) {
-    return `[traceId ${traceId}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`;
+  validConfidenceLevel() {
+    const level = this.response?.confidence.level;
+    if (!isDefined(level)) return false;
+    return validConfidenceLevel(level);
   }
+}
 
-  private confidenceString(confidence: RefactorConfidence) {
-    return `${confidence.description} (${confidence.level})`;
-  }
-
-  private validConfidenceLevel(level: number) {
-    return level > 0 && level <= 3;
-  }
+export function validConfidenceLevel(level: number) {
+  return level > 0 && level <= 3;
 }
 
 /**
@@ -120,8 +85,11 @@ export class CsRefactoringRequest {
 export class CsRefactoringRequests {
   private static readonly map: Map<string, Map<string, CsRefactoringRequest>> = new Map();
 
-  private static readonly requestsEmitter = new EventEmitter<void>();
-  static readonly onDidChangeRequests = CsRefactoringRequests.requestsEmitter.event;
+  private static readonly requestsChangedEmitter = new EventEmitter<void>();
+  static readonly onDidChangeRequests = CsRefactoringRequests.requestsChangedEmitter.event;
+
+  private static readonly errorEmitter = new EventEmitter<Error | AxiosError>();
+  static readonly onDidRequestFail = CsRefactoringRequests.errorEmitter.event;
 
   static initiate(
     context: { csRestApi: CsRestApi; document: TextDocument },
@@ -131,15 +99,37 @@ export class CsRefactoringRequests {
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, context.document);
-      req.post(context.csRestApi, diagnosticsForFn).finally(() => {
-        CsRefactoringRequests.requestsEmitter.fire(); // Fire updates for all finished requests
-      });
+      Telemetry.instance.logUsage('refactor/requested', { 'trace-id': req.traceId });
+      logOutputChannel.debug(`Refactor request for ${logIdString(req.traceId, req.fnToRefactor)}`);
+
       // Put the request for each diagnostic in a map for access in codelens and codeaction providers
       diagnosticsForFn.forEach((d) => {
         CsRefactoringRequests.set(context.document, d, req);
       });
+
+      req
+        .post(context.csRestApi, diagnosticsForFn)
+        .then((response) => {
+          logOutputChannel.debug(
+            `Refactor response for ${logIdString(req.traceId, req.fnToRefactor)}: ${confidenceString(
+              response.confidence
+            )}`
+          );
+        })
+        .catch((error) => {
+          let msg = error.message;
+          if (error instanceof AxiosError) {
+            msg = getErrorString(error);
+          }
+          logOutputChannel.error(`Refactor error for ${logIdString(req.traceId, req.fnToRefactor)}: ${msg}`);
+          CsRefactoringRequests.deleteByFnRange(req.document, req.fnToRefactor.range);
+          CsRefactoringRequests.errorEmitter.fire(error);
+        })
+        .finally(() => {
+          CsRefactoringRequests.requestsChangedEmitter.fire(); // Fire updates for all finished requests
+        });
     });
-    CsRefactoringRequests.requestsEmitter.fire();
+    CsRefactoringRequests.requestsChangedEmitter.fire();
   }
 
   private static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
@@ -152,17 +142,18 @@ export class CsRefactoringRequests {
     map.set(diagKey(diagnostic), request);
   }
 
+  static deleteAll() {
+    CsRefactoringRequests.map.clear();
+    CsRefactoringRequests.requestsChangedEmitter.fire();
+  }
+
   // TODO call abort() while deleting requests (deletaAll, deleteByFnRange as well)
   static delete(document: TextDocument) {
     CsRefactoringRequests.map.delete(document.uri.toString());
-    CsRefactoringRequests.requestsEmitter.fire();
+    CsRefactoringRequests.requestsChangedEmitter.fire();
   }
 
-  static deleteAll() {
-    CsRefactoringRequests.map.clear();
-    CsRefactoringRequests.requestsEmitter.fire();
-  }
-
+  // TODO BUG - this doesn't work with complex methods or complex conditionals where functionRange != diagnostic range
   static deleteByFnRange(document: TextDocument, functionRange: Range) {
     const map = CsRefactoringRequests.map.get(document.uri.toString());
     if (!map) {
@@ -174,11 +165,8 @@ export class CsRefactoringRequests {
         matchedKeys.push(key);
       }
     });
-    let deleted = false;
-    matchedKeys.forEach((key) => {
-      deleted = deleted || map.delete(key);
-    });
-    deleted && CsRefactoringRequests.requestsEmitter.fire();
+    const anyDeleted = matchedKeys.map((key) => map.delete(key)).some((a) => a);
+    anyDeleted && CsRefactoringRequests.requestsChangedEmitter.fire();
   }
 
   static get(document: TextDocument, diagnostic: Diagnostic) {
@@ -206,4 +194,20 @@ function diagKey(diagnostic: Diagnostic) {
     return `${diagnostic.code.value}-${rangeStr(diagnostic.range)}`;
   }
   return `${diagnostic.code}-${rangeStr(diagnostic.range)}`;
+}
+
+function getErrorString(err: AxiosError) {
+  let defaultMsg = `[${err.code}] ${err.message}`;
+  if (!isDefined(err.response)) return defaultMsg;
+
+  const data = err.response?.data as { error?: string };
+  return data.error ? `[${err.code}] ${data.error}` : defaultMsg;
+}
+
+function logIdString(traceId: string, fnToRefactor: FnToRefactor) {
+  return `[traceId ${traceId}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.range)}`;
+}
+
+function confidenceString(confidence: RefactorConfidence) {
+  return `${confidence.description} (${confidence.level})`;
 }

@@ -1,9 +1,14 @@
 import vscode, { TextDocument } from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { CsRestApi, PreFlightResponse } from '../cs-rest-api';
+import { CsRestApi, PreFlightResponse, RefactorResponse } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, isDefined } from '../utils';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import {
+  CsRefactoringRequest,
+  CsRefactoringRequests,
+  ResolvedRefactoring,
+  validConfidenceLevel,
+} from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
 import { createCodeSmellsFilter } from './utils';
 
@@ -51,15 +56,10 @@ export class CsRefactoringCommands {
     context.subscriptions.push(presentRefactoringCmd);
   }
 
-  presentRefactoringRequest(refactoringRequest: CsRefactoringRequest) {
-    if (refactoringRequest.isPending()) {
-      logOutputChannel.warn('No response for this refactoring yet.');
-      return;
-    }
-
+  presentRefactoringRequest(refactoring: ResolvedRefactoring) {
     RefactoringPanel.createOrShow({
       extensionUri: this.extensionUri,
-      refactoringRequest,
+      refactoring,
     });
   }
 
@@ -138,12 +138,9 @@ async function findFunctionToRefactor(
 export const refactoringSymbol = '✨';
 const codeImprovementGuideSymbol = '🧐';
 export const pendingSymbol = '⏳';
-const errorSymbol = '❌';
 
-export function toConfidenceSymbol(request: CsRefactoringRequest) {
-  if (isDefined(request.error)) return errorSymbol;
-
-  switch (request.resolvedResponse?.confidence.level) {
+export function toConfidenceSymbol(level?: number) {
+  switch (level) {
     case 3:
     case 2:
       return refactoringSymbol;
@@ -154,15 +151,15 @@ export function toConfidenceSymbol(request: CsRefactoringRequest) {
   }
 }
 
-export function commandFromRequest(request: CsRefactoringRequest) {
-  if (request.isPending() || !request.shouldPresent()) {
-    return; // No command for pending requests or invalid confidence levels
+export function commandFromRequest(request: ResolvedRefactoring): vscode.Command | undefined {
+  if (!validConfidenceLevel(request.response.confidence.level)) {
+    return; // No command for invalid confidence levels
   }
 
   let title = '';
   let command = presentRefactoringCmdName;
-  const symbol = toConfidenceSymbol(request);
-  const level = request.resolvedResponse?.confidence.level;
+  const symbol = toConfidenceSymbol(request.response.confidence.level);
+  const level = request.response?.confidence.level;
   switch (level) {
     case 3:
     case 2:

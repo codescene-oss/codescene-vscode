@@ -4,6 +4,7 @@ import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
 import { CsRestApi } from './cs-rest-api';
+import { CsStatusBar } from './cs-statusbar';
 import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector, toRefactoringDocumentSelector } from './language-support';
@@ -38,7 +39,8 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
-  const csExtensionState = new CsExtensionState(registerStatusViewProvider(context));
+  const csExtensionState = new CsExtensionState(registerStatusViewProvider(context), new CsStatusBar());
+  context.subscriptions.push(csExtensionState);
 
   ensureLatestCompatibleCliExists(context.extensionPath)
     .then((cliPath) => {
@@ -291,7 +293,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   const { csExtensionState } = csContext;
   const authProvider = new CsAuthenticationProvider(context);
 
-  // If there's already a session we enable the remote features, otherwise a badge will appear in the 
+  // If there's already a session we enable the remote features, otherwise a badge will appear in the
   // accounts menu - see AuthenticationGetSessionOptions.createIfNone?: boolean
   vscode.authentication
     .getSession(AUTH_TYPE, [])

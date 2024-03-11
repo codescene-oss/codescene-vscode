@@ -1,7 +1,8 @@
 import vscode, { CodeActionKind } from 'vscode';
 import { DiagnosticFilter, isDefined } from '../utils';
 import { commandFromRequest, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
+import { reviewDocumentSelector } from '../language-support';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
@@ -14,17 +15,18 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const uniqueRequests = new Set<CsRefactoringRequest>();
+    const resolvedRefactorings = context.diagnostics
+      .filter(this.codeSmellFilter)
+      .map((diagnostic) => CsRefactoringRequests.get(document, diagnostic))
+      .filter(isDefined)
+      .map((request) => request.resolvedResponse())
+      .filter(isDefined);
 
-    context.diagnostics.filter(this.codeSmellFilter).forEach((diagnostic) => {
-      const refacRequest = CsRefactoringRequests.get(document, diagnostic);
-      if (!refacRequest?.shouldPresent()) return;
-      uniqueRequests.add(refacRequest);
-    });
+    const uniqueRefactorings = new Set<ResolvedRefactoring>(resolvedRefactorings);
 
     const codeActions: vscode.CodeAction[] = [];
-    uniqueRequests.forEach((request) => {
-      const action = toCodeAction(request);
+    uniqueRefactorings.forEach((refactoring) => {
+      const action = toCodeAction(refactoring);
       isDefined(action) && codeActions.push(action);
     });
 
@@ -32,15 +34,14 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   }
 }
 
-function toCodeAction(request: CsRefactoringRequest) {
-  if (request.isPending()) return;
-
+function toCodeAction(refactoring: ResolvedRefactoring) {
   let codeActionKind;
-  let command = commandFromRequest(request);
+  let command = commandFromRequest(refactoring);
   if (!isDefined(command)) return;
 
-  const symbol = toConfidenceSymbol(request);
-  switch (request.resolvedResponse?.confidence.level) {
+  const level = refactoring.response.confidence.level;
+  const symbol = toConfidenceSymbol(level);
+  switch (level) {
     case 3:
     case 2:
       codeActionKind = CodeActionKind.QuickFix;
@@ -51,12 +52,9 @@ function toCodeAction(request: CsRefactoringRequest) {
       command.title = `${symbol} View code improvement guide`;
       break;
     default:
-      codeActionKind = CodeActionKind.Empty;
-      // Override title here as well
-      command.title = `${symbol} View Auto-refactor error`;
-      break;
+      return;
   }
-  
+
   // Note that CodeActionKind.Empty does not appear in the problems context menu, only in the
   // light bulb/editor context menu under "More actions..."
   const codeAction = new vscode.CodeAction(command.title, codeActionKind);

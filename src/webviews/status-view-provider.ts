@@ -9,6 +9,7 @@ import vscode, {
 import { CsFeatures, CsStateProperties } from '../cs-extension-state';
 import { PreFlightResponse } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
+import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import { nonce } from './utils';
 
@@ -48,6 +49,13 @@ export class StatusViewProvider implements WebviewViewProvider {
           return;
         case 'focus-explorer-ace-view':
           void vscode.commands.executeCommand('codescene.explorerAutoRefactorView.focus');
+          return;
+        case 'clear-errors':
+          void vscode.commands.executeCommand('codescene.extensionState.clearErrors');
+          logOutputChannel.clear();
+          return;
+        case 'show-codescene-log-output':
+          logOutputChannel.show();
           return;
       }
     });
@@ -107,7 +115,7 @@ export class StatusViewProvider implements WebviewViewProvider {
     }
     if (features?.codeHealthAnalysis instanceof Error) {
       return /*html*/ `
-      <h3><span class="codicon codicon-warning"></span> Extension error</h3>
+      <h3><span class="codicon codicon-warning color-inactive"></span> Extension error</h3>
       <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.message}</p>
     `;
     }
@@ -127,8 +135,10 @@ export class StatusViewProvider implements WebviewViewProvider {
         `;
       } else if (preflight instanceof Error) {
         content += /*html*/ `
-          <p><span class="codicon codicon-error codicon-inactive"></span> There was an error requesting ACE capabilities:
+          <p><span class="codicon codicon-error color-inactive"></span> There was an error requesting ACE capabilities:
           <code class="preflight-error">${preflight.message}</code></p>
+          ${this.checkLogsContent()}
+          <p>If applicable, check for any network or authentication issues and then try reloading the extension.</p>
         `;
       } else {
         const languageIdList = toDistinctLanguageIds(preflight.supported)
@@ -164,14 +174,14 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 
   private extensionStatusContent() {
-    const { session, features } = this.stateProperties;
+    const { session, features, serviceErrors } = this.stateProperties;
 
     const featureNames = {
       'Code health analysis': codeHealthAnalysisEnabled(features),
       'Automated Code Engineering (ACE)': aceEnabled(features),
     };
 
-    const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'codicon-active' : ''}"></span> ${
+    const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'color-active' : ''}"></span> ${
       session ? 'Signed in' : 'Not signed in'
     }</li>`;
     let featureListItems = '';
@@ -179,7 +189,7 @@ export class StatusViewProvider implements WebviewViewProvider {
       const iconType = value ? 'pass' : 'error';
       const state = value ? 'activated' : 'inactive';
       const colorClass = value ? 'active' : 'inactive';
-      featureListItems += /*html*/ `<li><span class="codicon codicon-${iconType} codicon-${colorClass}"></span> ${featureName} ${state}</li>`;
+      featureListItems += /*html*/ `<li><span class="codicon codicon-${iconType} color-${colorClass}"></span> ${featureName} ${state}</li>`;
     });
 
     return /*html*/ `
@@ -192,14 +202,35 @@ export class StatusViewProvider implements WebviewViewProvider {
         ${featureListItems}
       </ul>
 
+      ${serviceErrors ? this.errorContent(serviceErrors) : ''}
+
       <hr>
 
       ${this.cliStatusContent(features)}
       <!-- Don't show the ace info while cli is initializating -->
       ${features?.codeHealthAnalysis ? this.aceContent(features.automatedCodeEngineering) : ''}
-
     `;
   }
+
+  private errorContent(serviceErrors: any[]) {
+    return /*html*/ `
+      <hr>
+      <h3><span class="codicon codicon-warning color-warning"></span> Service errors</h3>
+      <p>There was an error when communicating with the CodeScene service.</p>
+      ${this.checkLogsContent()}
+      <vscode-button id="clear-errors-button" aria-label="Clear errors" 
+      title="Ignore and continue using the CodeScene extension">
+        Clear errors
+      </vscode-button>
+    `;
+  }
+
+private checkLogsContent() {
+  return /*html*/ `
+    <p>Please check <a href="" id="show-codescene-log-link">the logs</a> for details, and include any details if 
+    opening a support issue.</p>  
+  `;
+}
 
   private getUri(webView: Webview, ...pathSegments: string[]) {
     return webView.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));

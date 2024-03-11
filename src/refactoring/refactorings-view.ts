@@ -4,7 +4,8 @@ import { logOutputChannel } from '../log';
 import Reviewer, { chScorePrefix } from '../review/reviewer';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
+import { targetEditor } from './utils';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -45,6 +46,7 @@ export class RefactoringsView implements vscode.Disposable {
   }
 
   /**
+   * Tries to get a resolved refactoring and present it in the refactoring panel.
    * Checks the editor for the refactor target doc and see if we need to scroll into the range of the
    * targeted refactoring. This is necessary because the refactored function might not be in current view.
    *
@@ -57,14 +59,21 @@ export class RefactoringsView implements vscode.Disposable {
       void vscode.window.showWarningMessage(msg);
       return;
     }
-    this.revealFunctionInDocument(request);
-    void vscode.commands.executeCommand(presentRefactoringCmdName, request);
+
+    const response = request.resolvedResponse();
+    if (!isDefined(response)) {
+      logOutputChannel.warn('No response for this refactoring yet.');
+      return;
+    }
+
+    this.revealFunctionInDocument(response);
+    void vscode.commands.executeCommand(presentRefactoringCmdName, response);
   }
 
-  private revealFunctionInDocument(request: CsRefactoringRequest) {
-    const editor = request.targetEditor();
+  private revealFunctionInDocument(response: ResolvedRefactoring) {
+    const editor = targetEditor(response.document);
     if (editor) {
-      editor.revealRange(request.fnToRefactor.range, vscode.TextEditorRevealType.Default);
+      editor.revealRange(response.fnToRefactor.range, vscode.TextEditorRevealType.Default);
     }
   }
 
@@ -123,7 +132,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   getTreeItem(request: CsRefactoringRequest): vscode.TreeItem | Thenable<vscode.TreeItem> {
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
-      const symbol = toConfidenceSymbol(request);
+      const symbol = toConfidenceSymbol(request.response?.confidence.level);
       return `${symbol || pendingSymbol} "${request.fnToRefactor.name}" [Ln ${range.start.line + 1}, Col ${
         range.start.character
       }]`;
@@ -146,7 +155,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     const requestsForActiveDoc = CsRefactoringRequests.getAll(this.activeDocument);
     const presentableRefactoring = requestsForActiveDoc.filter((r) => r.shouldPresent());
     const distinctPerFn = presentableRefactoring.filter(
-      (r, i, rs) => rs.findIndex((rr) => rr.fnToRefactor.range.isEqual(r.fnToRefactor.range)) === i
+      (r, i, rs) => rs.findIndex((rr) => rr.traceId === r.traceId) === i
     );
     return distinctPerFn.sort((a, b) => a.fnToRefactor.range.start.line - b.fnToRefactor.range.start.line);
   }
