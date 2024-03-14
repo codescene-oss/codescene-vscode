@@ -15,14 +15,13 @@ export class CsRefactorCodeAction implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-    const resolvedRefactorings = context.diagnostics
+    const uniqueRefactorings = context.diagnostics
       .filter(this.codeSmellFilter)
       .map((diagnostic) => CsRefactoringRequests.get(document, diagnostic))
       .filter(isDefined)
       .map((request) => request.resolvedResponse())
-      .filter(isDefined);
-
-    const uniqueRefactorings = new Set<ResolvedRefactoring>(resolvedRefactorings);
+      .filter(isDefined)
+      .filter((r, i, rs) => rs.findIndex((rr) => rr.traceId === r.traceId) === i);
 
     const codeActions: vscode.CodeAction[] = [];
     uniqueRefactorings.forEach((refactoring) => {
