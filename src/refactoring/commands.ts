@@ -1,13 +1,10 @@
-import vscode, { TextDocument } from 'vscode';
+import vscode from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
 import { PreFlightResponse } from '../cs-rest-api';
+import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, isDefined } from '../utils';
-import {
-  CsRefactoringRequests,
-  ResolvedRefactoring,
-  validConfidenceLevel
-} from './cs-refactoring-requests';
+import { CsRefactoringRequests, ResolvedRefactoring, validConfidenceLevel } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
 import { createCodeSmellsFilter } from './utils';
 
@@ -23,21 +20,17 @@ export interface FnToRefactor {
   functionType: string;
 }
 
-export interface CsRefactoringCommandParams {
-  context: vscode.ExtensionContext;
-  cliPath: string;
+interface RefactoringCommandProps {
+  documentSelector: vscode.DocumentSelector;
   codeSmellFilter: DiagnosticFilter;
   maxInputLoc: number;
 }
 
 export class CsRefactoringCommands {
   private extensionUri: vscode.Uri;
-  constructor(
-    context: vscode.ExtensionContext,
-    private cliPath: string,
-    private codeSmellFilter?: DiagnosticFilter,
-    private maxInputLoc?: number
-  ) {
+  private commandProps?: RefactoringCommandProps;
+
+  constructor(context: vscode.ExtensionContext, private cliPath: string) {
     this.extensionUri = context.extensionUri;
     const requestRefactoringCmd = vscode.commands.registerCommand(
       requestRefactoringsCmdName,
@@ -60,27 +53,24 @@ export class CsRefactoringCommands {
     });
   }
 
-  private isRequestRefactoringCmdEnabled() {
-    return isDefined(this.codeSmellFilter) && isDefined(this.maxInputLoc);
-  }
-
   enableRequestRefactoringsCmd(preflightResponse: PreFlightResponse) {
-    this.codeSmellFilter = createCodeSmellsFilter(preflightResponse);
-    this.maxInputLoc = preflightResponse['max-input-loc'];
+    this.commandProps = {
+      documentSelector: toRefactoringDocumentSelector(preflightResponse.supported),
+      codeSmellFilter: createCodeSmellsFilter(preflightResponse),
+      maxInputLoc: preflightResponse['max-input-loc'],
+    };
   }
 
   disableRequestRefactoringsCmd() {
-    this.codeSmellFilter = undefined;
-    this.maxInputLoc = undefined;
+    this.commandProps = undefined;
   }
 
   async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (!this.isRequestRefactoringCmdEnabled()) return;
+    if (!isDefined(this.commandProps)) return;
+    if (vscode.languages.match(this.commandProps.documentSelector, document) === 0) return;
 
-    const codeSmellFilter: DiagnosticFilter = this.codeSmellFilter as DiagnosticFilter;
-    const maxInputLoc: number = this.maxInputLoc as number;
-
-    const supportedDiagnostics = diagnostics.filter(codeSmellFilter);
+    const supportedDiagnostics = diagnostics.filter(this.commandProps.codeSmellFilter);
+    const maxInputLoc = this.commandProps.maxInputLoc;
     const fnsToRefactor = await Promise.all(
       supportedDiagnostics.map((d) => findFunctionToRefactor(this.cliPath, document, d.range, maxInputLoc))
     ).then((fns) => fns.filter(isDefined));
@@ -92,7 +82,7 @@ export class CsRefactoringCommands {
 
 async function findFunctionToRefactor(
   cliPath: string,
-  document: TextDocument,
+  document: vscode.TextDocument,
   range: vscode.Range,
   maxInputLoc: number
 ) {
