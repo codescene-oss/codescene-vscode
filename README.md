@@ -10,15 +10,9 @@ This extension allows you to use [CodeScene](http://www.codescene.com) - the onl
 
 - **Live Analysis of Code Smells:** Receive real-time insights into potential issues and code smells as you code.
 - **Code Smells Guide:** Explore explanations and solutions for identified code smells to level up your coding practices.
-- **Customizable Code Health rules**
+- **Custom Code Health rules:** Customize the Code Health rules to you preference.
 - **Smart Improvement Suggestions:** Get actionable suggestions to enhance your code quality and development efficiency.
 - **ACE:** Seamlessly improve your codebase with Auto-Refactoring powered by AI.
-
-
-### Sign in
-To unleash the full potential of the AI features you need to sign in to a CodeScene instance. Clicking "Sign in with CodeScene..." will open an external browser for logging in to CodeScene, then redirect you back to vscode.
-
-![screenshot3](screenshots/sign-in-accounts-menu.gif)
 
 
 ## Code Health
@@ -38,7 +32,7 @@ To customize the code analysis you can either use local [Code Comment Directives
 Note: this is the same mechanism as the full CodeScene product, and adding it to your repo affects analyses on your CodeScene instance as well.
 
 
-## Code Health Factors
+## Code Smells
 
 Here are some examples of the factors that we measure:
 
@@ -48,18 +42,20 @@ Here are some examples of the factors that we measure:
 - Functions with too many arguments
 - Functions that are too long
 
-You can find more detailed information for each Code Health issue by drilling down in the editor.
+You can find more detailed information for each code smell by drilling down in the editor.
 
 You may also look at our main CodeScene docs on [code health](https://codescene.io/docs/guides/technical/code-health.html) for more info.
 
 
-## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Automated Code Engineering (ACE) 
-
+## <img src="assets/cs-logo-small.png" align="center" title="Requires signing in to CodeScene" width="20"/> Augmented Code Engineering (ACE) 
+ACE is a Beta feature. If you want to try it out, please sign up to our waiting list [here](https://codescene.com/campaigns/ai)
 CodeScene has always been great at identifying code smells and prioritizing them. With our AI-based Auto-refactor capability we make those insights actionable, too. Better: we also fact-check the AI code to ensure it makes the right thing, saving you a lot of time and guaranteeing that your refactorings are both correct and impactful.
 
 ![screenshot3](screenshots/auto-refactor-showcase.gif)
 
 This feature extends CodeScene's capabilities to not only identify code health issues but also automatically suggest and perform code refactoring to improve the overall maintainability of your codebase. CodeScene's ACE is designed to enhance your development experience by proactively addressing issues in your code. By leveraging advanced analysis techniques with help of AI, it can help identify areas of improvement within your code and provide automated suggestions for refactoring.
 
-CodeScene Automated Code Engineering requires signing in to a CodeScene instance. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
+To unleash the full potential of the AI features you need to sign in to a CodeScene instance. Clicking "Sign in with CodeScene..." will open an external browser for logging in to CodeScene, then redirect you back to vscode. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
+
+![screenshot3](screenshots/sign-in-accounts-menu.gif)
 
