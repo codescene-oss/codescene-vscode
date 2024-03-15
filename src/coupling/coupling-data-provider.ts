@@ -7,11 +7,12 @@
  * with the fetch() method.
  */
 import * as vscode from 'vscode';
-import { Coupling, CsRestApi } from '../cs-rest-api';
+import { CsRestApi } from '../cs-rest-api';
 import { Git } from '../git';
 import { outputChannel } from '../log';
-import { difference } from '../utils';
 import { CsWorkspace } from '../workspace';
+import { Coupling } from './model';
+import { difference } from './utils';
 
 export interface CouplingWithUri extends Coupling {
   entityUri?: vscode.Uri;

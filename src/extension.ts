@@ -244,7 +244,7 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   CsRestApi.instance
     .fetchRefactorPreflight()
     .then((preflightResponse) => {
-      const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported);
+      const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
       const codeSmellFilter = createCodeSmellsFilter(preflightResponse);
 
       // Collect all disposables used by the refactoring features

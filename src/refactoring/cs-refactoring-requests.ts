@@ -1,11 +1,12 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
-import { CsRestApi, RefactorConfidence, RefactorResponse } from '../cs-rest-api';
+import { CsRestApi } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './commands';
+import { RefactorConfidence, RefactorResponse } from './model';
 
 export interface ResolvedRefactoring {
   fnToRefactor: FnToRefactor;

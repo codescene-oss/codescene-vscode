@@ -6,10 +6,10 @@
  * not be shown if the coupled file is already in the change set.
  */
 import * as vscode from 'vscode';
-import { groupByProperty } from '../utils';
 import { Git } from '../git';
 import { CouplingDataProvider, CouplingWithUri } from './coupling-data-provider';
 import { CoupledEntity } from './model';
+import { groupByProperty } from './utils';
 
 export class ScmCouplingsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];

@@ -6,7 +6,7 @@ import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
-import { reviewIssueToDiagnostics } from './review-utils';
+import { reviewIssueToDiagnostics } from './utils';
 
 export const chScorePrefix = 'Code health score';
 

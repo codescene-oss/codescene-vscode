@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { CsRestApi } from '../cs-rest-api';
-import { rankNamesBy } from '../utils';
 import { CsWorkspace } from '../workspace';
+import { rankNamesBy } from './utils';
 
 export function registerCommand(context: vscode.ExtensionContext, csWorkspace: CsWorkspace) {
   const associateCmd = vscode.commands.registerCommand('codescene.associateWithProject', async () => {

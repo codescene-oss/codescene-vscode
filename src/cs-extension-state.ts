@@ -1,12 +1,13 @@
+import { AxiosError } from 'axios';
 import vscode from 'vscode';
-import { CsRestApi, PreFlightResponse } from './cs-rest-api';
+import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
+import { PreFlightResponse } from './refactoring/model';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
-import { AxiosError } from 'axios';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;

@@ -1,12 +1,12 @@
 import vscode from 'vscode';
 import { findEnclosingFunction } from '../codescene-interop';
-import { PreFlightResponse } from '../cs-rest-api';
 import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
-import { DiagnosticFilter, isDefined } from '../utils';
+import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
 import { CsRefactoringRequests, ResolvedRefactoring, validConfidenceLevel } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
 import { createCodeSmellsFilter } from './utils';
+import { PreFlightResponse } from './model';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const presentRefactoringCmdName = 'codescene.presentRefactoring';
@@ -55,7 +55,7 @@ export class CsRefactoringCommands {
 
   enableRequestRefactoringsCmd(preflightResponse: PreFlightResponse) {
     this.commandProps = {
-      documentSelector: toRefactoringDocumentSelector(preflightResponse.supported),
+      documentSelector: toRefactoringDocumentSelector(preflightResponse.supported['file-types']),
       codeSmellFilter: createCodeSmellsFilter(preflightResponse),
       maxInputLoc: preflightResponse['max-input-loc'],
     };
@@ -86,7 +86,7 @@ async function findFunctionToRefactor(
   range: vscode.Range,
   maxInputLoc: number
 ) {
-  const extension = document.fileName.split('.').pop() || '';
+  const extension = getFileExtension(document.fileName);
   const enclosingFn = await findEnclosingFunction(
     cliPath,
     extension,

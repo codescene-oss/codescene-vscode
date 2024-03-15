@@ -21,11 +21,13 @@ export class ExplorerCouplingsView implements vscode.Disposable {
     });
     this.disposables.push(view);
 
-    this.disposables.push(this.treeDataProvider.onDidChangeTreeData(() => {
-      // Show the currently active file in the description
-      const entityFilename = this.treeDataProvider.activeFileName;
-      view.description = entityFilename;
-    }));
+    this.disposables.push(
+      this.treeDataProvider.onDidChangeTreeData(() => {
+        // Show the currently active file in the description
+        const entityFilename = this.treeDataProvider.activeFileName;
+        view.description = entityFilename;
+      })
+    );
   }
 
   dispose() {
@@ -109,7 +111,7 @@ export class CouplingTreeProvider implements vscode.TreeDataProvider<CoupledEnti
           entityName: coupling.coupled,
           resourceUri: coupling.coupledUri,
           couplings: [],
-          degree: coupling.degree
+          degree: coupling.degree,
         };
       });
     }

@@ -1,5 +1,4 @@
 import vscode from 'vscode';
-import { RefactoringSupport } from './cs-rest-api';
 import { isDefined } from './utils';
 
 const extToLanguageId = new Map<string, string | string[]>([
@@ -87,8 +86,8 @@ function fileTypeToLanguageId(fileType: string) {
   return extToLanguageId.get(fileType);
 }
 
-export function toDistinctLanguageIds(refactoringSupport: RefactoringSupport): string[] {
-  const definedLangIds = refactoringSupport['file-types'].flatMap(fileTypeToLanguageId).filter(isDefined);
+export function toDistinctLanguageIds(supportedFileTypes: string[]): string[] {
+  const definedLangIds = supportedFileTypes.flatMap(fileTypeToLanguageId).filter(isDefined);
   return [...new Set(definedLangIds)];
 }
 
@@ -97,8 +96,8 @@ export function toDistinctLanguageIds(refactoringSupport: RefactoringSupport): s
  * @param refactoringSupport
  * @returns A list of distinct DocumentSelectors for the supported file types
  */
-export function toRefactoringDocumentSelector(refactoringSupport: RefactoringSupport): vscode.DocumentSelector {
-  return toDistinctLanguageIds(refactoringSupport).map((language) => ({
+export function toRefactoringDocumentSelector(supportedFileTypes: string[]): vscode.DocumentSelector {
+  return toDistinctLanguageIds(supportedFileTypes).map((language) => ({
     language,
     scheme: 'file',
   }));

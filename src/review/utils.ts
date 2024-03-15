@@ -1,8 +1,22 @@
 import * as vscode from 'vscode';
 import { csSource } from '../cs-diagnostics';
 import { categoryToDocsCode } from '../csdoc';
-import { getFunctionNameRange } from '../utils';
 import { IssueDetails, ReviewIssue } from './model';
+
+// Finds the column range of the function name in the line of code that it appears in
+export function getFunctionNameRange(line: string, functionName: string): [number, number] {
+  const functionNameIndex = line.indexOf(functionName);
+  if (functionNameIndex === -1) {
+    const periodIndex = functionName.indexOf('.');
+    if (periodIndex !== -1) {
+      // Try again with the function name without the class name
+      const functionNameWithoutClass = functionName.slice(periodIndex + 1);
+      return getFunctionNameRange(line, functionNameWithoutClass);
+    }
+    return [0, 0];
+  }
+  return [functionNameIndex, functionNameIndex + functionName.length];
+}
 
 function issueToRange(category: string, issue: IssueDetails, document: vscode.TextDocument): vscode.Range {
   const startLine = issue['start-line'] - 1;

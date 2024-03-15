@@ -7,9 +7,9 @@ import vscode, {
   WebviewViewResolveContext,
 } from 'vscode';
 import { CsFeatures, CsStateProperties } from '../cs-extension-state';
-import { PreFlightResponse } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
+import { PreFlightResponse } from '../refactoring/model';
 import { isDefined } from '../utils';
 import { nonce } from './utils';
 
@@ -141,7 +141,7 @@ export class StatusViewProvider implements WebviewViewProvider {
           <p>If applicable, check for any network or authentication issues and then try reloading the extension.</p>
         `;
       } else {
-        const languageIdList = toDistinctLanguageIds(preflight.supported)
+        const languageIdList = toDistinctLanguageIds(preflight.supported['file-types'])
           .map((langIds) => `<li>${langIds}</li>`)
           .join('\n');
         const codeSmellList = preflight['supported']['code-smells']
@@ -225,12 +225,12 @@ export class StatusViewProvider implements WebviewViewProvider {
     `;
   }
 
-private checkLogsContent() {
-  return /*html*/ `
+  private checkLogsContent() {
+    return /*html*/ `
     <p>Please check <a href="" id="show-codescene-log-link">the logs</a> for details, and include any details if 
     opening a support issue.</p>  
   `;
-}
+  }
 
   private getUri(webView: Webview, ...pathSegments: string[]) {
     return webView.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));

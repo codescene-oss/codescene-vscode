@@ -11,7 +11,6 @@ import vscode, {
   WebviewPanel,
   WorkspaceEdit,
 } from 'vscode';
-import { RefactorResponse } from '../cs-rest-api';
 import { categoryToDocsCode } from '../csdoc';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
@@ -19,6 +18,7 @@ import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
 import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
+import { RefactorResponse } from './model';
 import { decorateCode, targetEditor } from './utils';
 
 interface CurrentRefactorState {

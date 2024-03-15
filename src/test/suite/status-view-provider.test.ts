@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { PreFlightResponse } from '../../cs-rest-api';
+import { PreFlightResponse } from '../../refactoring/model';
 import { aceEnabled, codeHealthAnalysisEnabled } from '../../webviews/status-view-provider';
 
 suite('Status view provider test suite', () => {

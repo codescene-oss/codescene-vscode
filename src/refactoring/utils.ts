@@ -1,5 +1,5 @@
 import { Diagnostic, TextDocument, window } from 'vscode';
-import { PreFlightResponse, ReasonsWithDetails } from '../cs-rest-api';
+import { PreFlightResponse, ReasonsWithDetails } from '../refactoring/model';
 import { DiagnosticFilter, isDefined } from '../utils';
 
 function singleLineCommentSeparator(languageId: string) {

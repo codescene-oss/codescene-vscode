@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { logOutputChannel, outputChannel } from '../log';
 import Reviewer from './reviewer';
-import { isDefined, keyStr } from '../utils';
+import { isDefined, rangeStr } from '../utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -53,7 +53,9 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     codeLens: CsReviewCodeLens,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsReviewCodeLens> {
-    logOutputChannel.debug('Resolving Review CodeLenses for ' + keyStr(codeLens.diagnostic));
+    logOutputChannel.debug(
+      `Resolving Review CodeLenses for ${codeLens.diagnostic.message} ${rangeStr(codeLens.diagnostic.range)}`
+    );
 
     codeLens.command = {
       title: codeLens.diagnostic.message,
