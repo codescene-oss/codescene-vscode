@@ -127,7 +127,7 @@ export class StatusViewProvider implements WebviewViewProvider {
   }
 
   private aceContent(preflight?: PreFlightResponse | Error | string) {
-    let content = /*html*/ `<h3>Automated Code Engineering (ACE)</h3>`;
+    let content = /*html*/ `<h3>Augmented Code Engineering (ACE)</h3>`;
     if (isDefined(preflight)) {
       if (typeof preflight === 'string') {
         content += /*html*/ `
@@ -178,7 +178,7 @@ export class StatusViewProvider implements WebviewViewProvider {
 
     const featureNames = {
       'Code health analysis': codeHealthAnalysisEnabled(features),
-      'Automated Code Engineering (ACE)': aceEnabled(features),
+      'Augmented Code Engineering (ACE)': aceEnabled(features),
     };
 
     const signedInListItem = `<li><span class="codicon codicon-shield ${session ? 'color-active' : ''}"></span> ${
@@ -208,7 +208,7 @@ export class StatusViewProvider implements WebviewViewProvider {
 
       ${this.cliStatusContent(features)}
       <!-- Don't show the ace info while cli is initializating -->
-      ${features?.codeHealthAnalysis ? this.aceContent(features.automatedCodeEngineering) : ''}
+      ${features?.codeHealthAnalysis ? this.aceContent(features.ace) : ''}
     `;
   }
 
@@ -242,9 +242,5 @@ export function codeHealthAnalysisEnabled(features?: CsFeatures) {
 }
 
 export function aceEnabled(features?: CsFeatures) {
-  return (
-    isDefined(features?.automatedCodeEngineering) &&
-    typeof features?.automatedCodeEngineering !== 'string' &&
-    !(features?.automatedCodeEngineering instanceof Error)
-  );
+  return isDefined(features?.ace) && typeof features?.ace !== 'string' && !(features?.ace instanceof Error);
 }

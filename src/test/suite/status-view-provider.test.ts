@@ -13,8 +13,8 @@ suite('Status view provider test suite', () => {
 
   test('ACE enabled/disabled', () => {
     assert.strictEqual(aceEnabled(), false);
-    assert.strictEqual(aceEnabled({ automatedCodeEngineering: 'Loading...' }), false);
-    assert.strictEqual(aceEnabled({ automatedCodeEngineering: new Error('Service responded with status 401') }), false);
+    assert.strictEqual(aceEnabled({ ace: 'Loading...' }), false);
+    assert.strictEqual(aceEnabled({ ace: new Error('Service responded with status 401') }), false);
 
     const preFlight: PreFlightResponse = {
       'max-input-loc': 1,
@@ -24,6 +24,6 @@ suite('Status view provider test suite', () => {
         'file-types': [],
       },
     };
-    assert.strictEqual(aceEnabled({ automatedCodeEngineering: preFlight }), true);
+    assert.strictEqual(aceEnabled({ ace: preFlight }), true);
   });
 });

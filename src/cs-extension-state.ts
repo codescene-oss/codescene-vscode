@@ -11,7 +11,7 @@ import { StatusViewProvider } from './webviews/status-view-provider';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
-  automatedCodeEngineering?: PreFlightResponse | Error | string;
+  ace?: PreFlightResponse | Error | string;
 }
 
 export interface CsStateProperties {
@@ -77,14 +77,14 @@ export class CsExtensionState implements vscode.Disposable {
   }
 
   enableACE(preFlight: PreFlightResponse, disposables: vscode.Disposable[]) {
-    this.stateProperties.features = { ...this.stateProperties.features, automatedCodeEngineering: preFlight };
+    this.stateProperties.features = { ...this.stateProperties.features, ace: preFlight };
     this.aceFeatureDisposables = disposables;
     this.refactoringCommand?.enableRequestRefactoringsCmd(preFlight);
     this.updateStatusViews();
   }
 
   disableACE(reason: Error | string) {
-    this.stateProperties.features = { ...this.stateProperties.features, automatedCodeEngineering: reason };
+    this.stateProperties.features = { ...this.stateProperties.features, ace: reason };
 
     this.refactoringCommand?.disableRequestRefactoringsCmd();
     this.aceFeatureDisposables.forEach((d) => d.dispose());
