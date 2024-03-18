@@ -10,7 +10,7 @@ This extension allows you to use [CodeScene](http://www.codescene.com) - the onl
 
 - **Live Analysis of Code Smells:** Receive real-time insights into potential issues and code smells as you code.
 - **Code Smells Guide:** Explore explanations and solutions for identified code smells to level up your coding practices.
-- **Custom Code Health rules:** Customize the Code Health rules to you preference.
+- **Custom Code Health rules:** Customize the Code Health rules to your preference.
 - **Smart Improvement Suggestions:** Get actionable suggestions to enhance your code quality and development efficiency.
 - **ACE:** Seamlessly improve your codebase with Auto-Refactoring powered by AI.
 
@@ -53,7 +53,7 @@ CodeScene has always been great at identifying code smells and prioritizing them
 
 ![screenshot3](screenshots/auto-refactor-showcase.gif)
 
-This feature extends CodeScene's capabilities to not only identify code health issues but also automatically suggest and perform code refactoring to improve the overall maintainability of your codebase. CodeScene's ACE is designed to enhance your development experience by proactively addressing issues in your code. By leveraging advanced analysis techniques with help of AI, it can help identify areas of improvement within your code and provide automated suggestions for refactoring.
+This feature extends CodeScene's capabilities to not only identify code health issues but also automatically suggest and perform code refactoring to improve the overall maintainability of your codebase. CodeScene's ACE is designed to enhance your development experience by proactively addressing issues in your code. By leveraging advanced analysis techniques with help of AI, it can help identify areas of improvement within your code and provide suggestions for refactoring.
 
 To unleash the full potential of the AI features you need to sign in to a CodeScene instance. Clicking "Sign in with CodeScene..." will open an external browser for logging in to CodeScene, then redirect you back to vscode. Read more in the [docs](https://codescene.io/docs/auto-refactor/index.html).
 
