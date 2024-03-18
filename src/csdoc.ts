@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
+import { chScorePrefix } from './review/reviewer';
 import { getLogoUrl } from './utils';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
@@ -17,10 +18,23 @@ class CsDocProvider implements vscode.TextDocumentContentProvider {
   }
 }
 
-export function registerCsDocProvider(context: vscode.ExtensionContext) {
+export function register(context: vscode.ExtensionContext) {
   const provider = new CsDocProvider(context.extensionPath);
   const providerDisposable = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
   context.subscriptions.push(providerDisposable);
+
+  const openDocsForDiagnostic = vscode.commands.registerCommand(
+    'codescene.openDocsForDiagnostic',
+    async (diag: vscode.Diagnostic) => {
+      if (typeof diag.code === 'object') {
+        const docsCode = categoryToDocsCode(diag.code.value.toString());
+        void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
+      } else if (diag.message.startsWith(chScorePrefix)) {
+        void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse('csdoc:code-health.md'));
+      }
+    }
+  );
+  context.subscriptions.push(openDocsForDiagnostic);
 }
 
 export function categoryToDocsCode(issueCategory: string) {

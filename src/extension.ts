@@ -5,7 +5,7 @@ import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
-import { categoryToDocsCode, registerCsDocProvider } from './csdoc';
+import { register as registerCsDoc } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector, toRefactoringDocumentSelector } from './language-support';
 import { outputChannel } from './log';
@@ -74,7 +74,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   CsDiagnosticsCollection.init(context);
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
-  registerCsDocProvider(context);
+  registerCsDoc(context);
   addReviewListeners(context, csDiagnostics);
   addTmpDiffUriScheme(context);
 
@@ -136,28 +136,6 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
     });
   });
   context.subscriptions.push(createRulesTemplateCmd);
-
-  const openDocsForDiagnostic = vscode.commands.registerCommand(
-    'codescene.openDocsForDiagnostic',
-    async (diag: vscode.Diagnostic) => {
-      if (typeof diag.code === 'object') {
-        const docsCode = categoryToDocsCode(diag.code.value.toString());
-        void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
-      } else {
-        const codeHealthDocs = 'Open general code health documentation';
-
-        let options = [];
-        options.push(codeHealthDocs);
-
-        const action = await vscode.window.showQuickPick(options);
-
-        if (action === codeHealthDocs) {
-          void vscode.commands.executeCommand('codescene.openCodeHealthDocs');
-        }
-      }
-    }
-  );
-  context.subscriptions.push(openDocsForDiagnostic);
 
   // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
   // asking the user to log in. (Currently unused)
