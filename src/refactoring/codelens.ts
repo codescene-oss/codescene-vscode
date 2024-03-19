@@ -54,14 +54,6 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     const positionToCodeLens: Map<string, CsRefactorCodeLens> = new Map();
     const positionKey = (pos: vscode.Position) => `${pos.line}`;
 
-    const conditionalCodeLens = (request: CsRefactoringRequest, diagnostic: vscode.Diagnostic) => {
-      const differentLine = request.fnToRefactor.range.start.line !== diagnostic.range.start.line;
-      if (isDefined(request.response)) {
-        return request.response.confidence.level >= 2 && differentLine;
-      }
-      return differentLine;
-    };
-
     supportedDiagnostics.forEach((diagnostic) => {
       const request = CsRefactoringRequests.get(document, diagnostic);
       if (!request) return;
@@ -72,19 +64,6 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
           positionKey(request.fnToRefactor.range.start),
           new CsRefactorCodeLens(request.fnToRefactor.range, document, request)
         );
-
-        /**
-         * Conditionally add a lens not only at the start of the function, but at the start of the diagnostic as well.
-         * For example complex conditionals will be inside a function.
-         * If the refactoring is resolved we show it only if it's a mid-high confidence refactoring. (otherwise it's
-         * a Code improvement guide)
-         **/
-        if (conditionalCodeLens(request, diagnostic)) {
-          positionToCodeLens.set(
-            positionKey(diagnostic.range.start),
-            new CsRefactorCodeLens(diagnostic.range, document, request)
-          );
-        }
       }
     });
 
