@@ -93,7 +93,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsRefactorCodeLens> {
     if (codeLens.csRefactoringRequest instanceof Array) {
-      logOutputChannel.debug(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
+      logOutputChannel.trace(`Resolving Auto-refactor Summary! ${codeLens.document.fileName.split('/').pop()}`);
       codeLens.command = {
         title: `Auto-refactor: ${this.summaryString(codeLens.csRefactoringRequest)}`,
         command: 'codescene.explorerAutoRefactorView.focus',
@@ -102,7 +102,7 @@ export class CsRefactorCodeLensProvider implements vscode.CodeLensProvider<CsRef
     }
 
     const request = codeLens.csRefactoringRequest;
-    logOutputChannel.debug(
+    logOutputChannel.trace(
       `Resolving Auto-refactor CodeLens ${codeLens.document.fileName.split('/').pop()}:"${request.fnToRefactor.name}" ${
         codeLens.csRefactoringRequest && rangeStr(request.fnToRefactor.range)
       }`

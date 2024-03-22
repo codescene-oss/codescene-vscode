@@ -42,7 +42,6 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     const diagnostics = await Reviewer.instance.review(document);
 
     if (!diagnostics || diagnostics.length === 0) {
-      logOutputChannel.debug('No diagnostics for ' + document.fileName);
       return [];
     }
 
@@ -53,7 +52,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     codeLens: CsReviewCodeLens,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsReviewCodeLens> {
-    logOutputChannel.debug(
+    logOutputChannel.trace(
       `Resolving Review CodeLenses for ${codeLens.diagnostic.message} ${rangeStr(codeLens.diagnostic.range)}`
     );
 
