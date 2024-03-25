@@ -15,7 +15,7 @@ export function sign(cliPath: string, payload: string) {
   return new SimpleExecutor().execute({ command: cliPath, args: ['sign'] }, {}, payload);
 }
 
-interface EnclosingFn {
+export interface EnclosingFn {
   name: string;
   'start-line': number;
   'end-line': number;

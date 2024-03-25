@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { findEnclosingFunction } from '../codescene-interop';
+import { EnclosingFn, findEnclosingFunction } from '../codescene-interop';
 import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
@@ -68,7 +68,6 @@ export class CsRefactoringCommands {
   async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
     if (!isDefined(this.commandProps)) return;
     if (vscode.languages.match(this.commandProps.documentSelector, document) === 0) return;
-
     const supportedDiagnostics = diagnostics.filter(this.commandProps.codeSmellFilter);
     const maxInputLoc = this.commandProps.maxInputLoc;
     const fnsToRefactor = await Promise.all(
@@ -96,15 +95,7 @@ async function findFunctionToRefactor(
 
   if (!enclosingFn) return;
 
-  // Note that vscode.Range line numbers are zero-based
-  const enclosingFnRange = new vscode.Range(
-    enclosingFn['start-line'] - 1,
-    enclosingFn['start-column'],
-    enclosingFn['end-line'] - 1,
-    enclosingFn['end-column']
-  );
-
-  const loc = enclosingFnRange.end.line - enclosingFnRange.start.line;
+  const { range: enclosingFnRange, loc } = rangeAndLocFromEnclosingFn(enclosingFn);
   if (loc > maxInputLoc) {
     logOutputChannel.debug(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc}) - ignoring`);
     return;
@@ -118,6 +109,19 @@ async function findFunctionToRefactor(
     content: document.getText(enclosingFnRange),
   } as FnToRefactor;
 }
+
+// Note that vscode.Range line numbers are zero-based, while the CodeScene API uses 1-based line numbers
+export function rangeAndLocFromEnclosingFn(enclosingFn: EnclosingFn) {
+  const range = new vscode.Range(
+    enclosingFn['start-line'] - 1,
+    enclosingFn['start-column'],
+    enclosingFn['end-line'] - 1,
+    enclosingFn['end-column']
+  );
+  // Maybe evident, but worth noting that function with a single line has a loc of 1 :)
+  return { range, loc: range.end.line - range.start.line + 1 };
+}
+
 export const refactoringSymbol = '✨';
 const codeImprovementGuideSymbol = '🧐';
 export const pendingSymbol = '⏳';
