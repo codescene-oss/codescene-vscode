@@ -1,8 +1,7 @@
 import vscode, { CodeActionKind } from 'vscode';
 import { DiagnosticFilter, isDefined } from '../utils';
 import { commandFromRequest, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
-import { reviewDocumentSelector } from '../language-support';
+import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
 
 export class CsRefactorCodeAction implements vscode.CodeActionProvider {
   public static readonly providedCodeActionKinds = [CodeActionKind.QuickFix, CodeActionKind.Empty];
@@ -40,18 +39,14 @@ function toCodeAction(refactoring: ResolvedRefactoring) {
 
   const level = refactoring.response.confidence.level;
   const symbol = toConfidenceSymbol(level);
-  switch (level) {
-    case 3:
-    case 2:
-      codeActionKind = CodeActionKind.QuickFix;
-      break;
-    case 1:
-      codeActionKind = CodeActionKind.Empty;
-      // Override title, worded as an action instead of a noun
-      command.title = `${symbol} View code improvement guide`;
-      break;
-    default:
-      return;
+  if (level > 1) {
+    codeActionKind = CodeActionKind.QuickFix;
+  } else if (level === 1) {
+    codeActionKind = CodeActionKind.Empty;
+    // Override title, worded as an action instead of a noun
+    command.title = `${symbol} View code improvement guide`;
+  } else {
+    return;
   }
 
   // Note that CodeActionKind.Empty does not appear in the problems context menu, only in the

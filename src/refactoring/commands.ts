@@ -146,14 +146,11 @@ const codeImprovementGuideSymbol = '🧐';
 export const pendingSymbol = '⏳';
 
 export function toConfidenceSymbol(level?: number) {
-  switch (level) {
-    case 3:
-    case 2:
-      return refactoringSymbol;
-    case 1:
-      return codeImprovementGuideSymbol;
-    default:
-      return pendingSymbol;
+  if (!isDefined(level)) return pendingSymbol;
+  if (level > 1) {
+    return refactoringSymbol;
+  } else if (level === 1) {
+    return codeImprovementGuideSymbol;
   }
 }
 
@@ -165,18 +162,11 @@ export function commandFromRequest(request: ResolvedRefactoring): vscode.Command
   let title = '';
   let command = presentRefactoringCmdName;
   const symbol = toConfidenceSymbol(request.response.confidence.level);
-  const level = request.response?.confidence.level;
-  switch (level) {
-    case 3:
-    case 2:
-      title = `${symbol} Auto-refactor`;
-      break;
-    case 1:
-      title = `${symbol} Improvement guide`;
-      break;
-    default:
-      title = `${symbol} Auto-refactor`; // errors
-      break;
+  const level = request.response.confidence.level;
+  if (level > 1) {
+    title = `${symbol} Auto-refactor`;
+  } else if (level === 1) {
+    title = `${symbol} Improvement guide`;
   }
   return { title, command, arguments: [request] };
 }

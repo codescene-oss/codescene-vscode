@@ -266,12 +266,12 @@ export class RefactoringPanel {
   }
 
   private async autoRefactorContent(response: RefactorResponse, code: string, languageId: string) {
-    const { confidence, 'reasons-with-details': reasonsWithDetails } = response;
+    const { confidence } = response;
     const {
       level,
       'recommended-action': { details: actionDetails, description: action },
     } = confidence;
-    const actionBadgeClass = `action-badge level-${level}`;
+    const actionBadgeClass = `action-badge level-${level > 2 ? 'green' : level}`;
 
     const reasonsList = this.getReasonsList(response);
     const reasonsText = reasonsList ? `<h4>Reasons for detailed review</h4>\n${reasonsList}` : '';

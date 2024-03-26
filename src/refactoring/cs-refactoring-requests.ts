@@ -76,7 +76,7 @@ export class CsRefactoringRequest {
 }
 
 export function validConfidenceLevel(level: number) {
-  return level > 0 && level <= 3;
+  return level > 0;
 }
 
 /**
