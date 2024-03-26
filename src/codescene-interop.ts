@@ -25,16 +25,25 @@ export interface EnclosingFn {
   'end-column': number;
 }
 /**
- * Executes the command for getting a function coordinate.
+ * Executes the command for getting function coordinates for a list of line numbers.
+ * This command will only return distinct functions, even if several line numbers point to the same function.
  */
-export async function findEnclosingFunction(cliPath: string, extension: string, lineNo: number, payload: string) {
+export async function findEnclosingFunctions(cliPath: string, extension: string, lineNos: number[], payload: string) {
   const result: ExecResult = await new SimpleExecutor().execute(
     {
       command: cliPath,
-      args: ['enclosing-function', '--file-type', extension, '--output-format', 'json', '--line-no', lineNo.toString()],
+      args: [
+        'enclosing-functions',
+        '--file-type',
+        extension,
+        '--output-format',
+        'json',
+        '--line-no',
+        lineNos.join(','),
+      ],
     },
     {},
     payload
   );
-  return JSON.parse(result.stdout) as EnclosingFn;
+  return JSON.parse(result.stdout) as EnclosingFn[];
 }

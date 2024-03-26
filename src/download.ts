@@ -17,14 +17,14 @@ import { logOutputChannel, outputChannel } from './log';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
-    x64: 'codescene-cli-ide-macos-amd64-v3.zip',
-    arm64: 'codescene-cli-ide-macos-aarch64-v3.zip',
+    x64: 'codescene-cli-ide-macos-amd64-v4.zip',
+    arm64: 'codescene-cli-ide-macos-aarch64-v4.zip',
   },
   linux: {
-    x64: 'codescene-cli-ide-linux-amd64-v3.zip',
+    x64: 'codescene-cli-ide-linux-amd64-v4.zip',
   },
   win32: {
-    x64: 'codescene-cli-ide-windows-amd64-v3.zip',
+    x64: 'codescene-cli-ide-windows-amd64-v4.zip',
   },
 };
 

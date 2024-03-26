@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { EnclosingFn, findEnclosingFunction } from '../codescene-interop';
+import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
@@ -69,33 +69,52 @@ export class CsRefactoringCommands {
     if (!isDefined(this.commandProps)) return;
     if (vscode.languages.match(this.commandProps.documentSelector, document) === 0) return;
     const supportedDiagnostics = diagnostics.filter(this.commandProps.codeSmellFilter);
-    const maxInputLoc = this.commandProps.maxInputLoc;
-    const fnsToRefactor = await Promise.all(
-      supportedDiagnostics.map((d) => findFunctionToRefactor(this.cliPath, document, d.range, maxInputLoc))
-    ).then((fns) => fns.filter(isDefined));
 
-    const distinctFns = fnsToRefactor.filter((fn, i, fns) => fns.findIndex((f) => f.range.isEqual(fn.range)) === i);
+    const distinctFns = await this.distinctFnsFromDiagnostics(
+      document,
+      supportedDiagnostics,
+      this.commandProps.maxInputLoc
+    );
+
     CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
+  }
+
+  async distinctFnsFromDiagnostics(
+    document: vscode.TextDocument,
+    diagnostics: vscode.Diagnostic[],
+    maxInputLoc: number
+  ) {
+    // Get distinct ranges so we don't have to run findFunctionToRefactor for the same range multiple times
+    const distinctRanges = diagnostics
+      .filter((diag, i, diags) => diags.findIndex((d) => d.range.isEqual(diag.range)) === i)
+      .map((d) => d.range);
+
+    return await findFunctionsToRefactor(this.cliPath, document, distinctRanges, maxInputLoc);
   }
 }
 
-async function findFunctionToRefactor(
+async function findFunctionsToRefactor(
   cliPath: string,
   document: vscode.TextDocument,
-  range: vscode.Range,
+  ranges: vscode.Range[],
   maxInputLoc: number
 ) {
   const extension = getFileExtension(document.fileName);
-  const enclosingFn = await findEnclosingFunction(
-    cliPath,
-    extension,
-    range.start.line + 1, // range.start.line is zero-based
-    document.getText()
-  );
+  const lineNumbers = ranges.map((r) => r.start.line + 1); // range.start.line is zero-based
+  const enclosingFns = await findEnclosingFunctions(cliPath, extension, lineNumbers, document.getText());
 
-  if (!enclosingFn) return;
+  return enclosingFns
+    .map((enclosingFn) => toFnToRefactor(enclosingFn, document, extension, maxInputLoc))
+    .filter(isDefined);
+}
 
-  const { range: enclosingFnRange, loc } = rangeAndLocFromEnclosingFn(enclosingFn);
+function toFnToRefactor(
+  enclosingFn: EnclosingFn,
+  document: vscode.TextDocument,
+  extension: string,
+  maxInputLoc: number
+) {
+  const { range, loc } = rangeAndLocFromEnclosingFn(enclosingFn);
   if (loc > maxInputLoc) {
     logOutputChannel.debug(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc}) - ignoring`);
     return;
@@ -103,10 +122,10 @@ async function findFunctionToRefactor(
 
   return {
     name: enclosingFn.name,
-    range: enclosingFnRange,
+    range: range,
     functionType: enclosingFn['function-type'],
     'file-type': extension,
-    content: document.getText(enclosingFnRange),
+    content: document.getText(range),
   } as FnToRefactor;
 }
 
