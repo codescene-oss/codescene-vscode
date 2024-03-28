@@ -76,7 +76,8 @@ export class CsRefactoringCommands {
       this.commandProps.maxInputLoc
     );
 
-    CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
+    const fnsToRefactor = distinctFns.slice(0, 10);
+    CsRefactoringRequests.initiate(document, fnsToRefactor, supportedDiagnostics);
   }
 
   async distinctFnsFromDiagnostics(
@@ -105,7 +106,13 @@ async function findFunctionsToRefactor(
 
   return enclosingFns
     .map((enclosingFn) => toFnToRefactor(enclosingFn, document, extension, maxInputLoc))
-    .filter(isDefined);
+    .filter(isDefined)
+    .sort((a, b) => loc(a.range) - loc(b.range));
+}
+
+function loc(range: vscode.Range) {
+  // Maybe evident, but worth noting that function with a single line has a loc of 1 :)
+  return range.end.line - range.start.line + 1;
 }
 
 function toFnToRefactor(
@@ -137,8 +144,7 @@ export function rangeAndLocFromEnclosingFn(enclosingFn: EnclosingFn) {
     enclosingFn['end-line'] - 1,
     enclosingFn['end-column']
   );
-  // Maybe evident, but worth noting that function with a single line has a loc of 1 :)
-  return { range, loc: range.end.line - range.start.line + 1 };
+  return { range, loc: loc(range) };
 }
 
 export const refactoringSymbol = '✨';

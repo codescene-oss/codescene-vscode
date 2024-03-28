@@ -29,6 +29,7 @@ export interface EnclosingFn {
  * This command will only return distinct functions, even if several line numbers point to the same function.
  */
 export async function findEnclosingFunctions(cliPath: string, extension: string, lineNos: number[], payload: string) {
+  if (lineNos.length === 0) return [];
   const result: ExecResult = await new SimpleExecutor().execute(
     {
       command: cliPath,

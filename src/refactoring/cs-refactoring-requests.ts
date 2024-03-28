@@ -93,6 +93,7 @@ export class CsRefactoringRequests {
   static readonly onDidRequestFail = CsRefactoringRequests.errorEmitter.event;
 
   static initiate(document: TextDocument, fnsToRefactor: FnToRefactor[], diagnostics: Diagnostic[]) {
+    let anyPosted = false;
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, document);
@@ -123,8 +124,9 @@ export class CsRefactoringRequests {
         .finally(() => {
           CsRefactoringRequests.requestsChangedEmitter.fire(); // Fire updates for all finished requests
         });
+      anyPosted = true;
     });
-    CsRefactoringRequests.requestsChangedEmitter.fire();
+    anyPosted && CsRefactoringRequests.requestsChangedEmitter.fire();
   }
 
   private static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
