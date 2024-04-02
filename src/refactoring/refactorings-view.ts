@@ -62,7 +62,9 @@ export class RefactoringsView implements vscode.Disposable {
 
     const response = request.resolvedResponse();
     if (!isDefined(response)) {
-      logOutputChannel.warn('No response for this refactoring yet.');
+      const msg = 'No response for this refactoring yet.';
+      logOutputChannel.warn(msg);
+      void vscode.window.showWarningMessage(msg);
       return;
     }
 

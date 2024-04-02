@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
-import CsDiagnosticsCollection, { CsDiagnostics } from './cs-diagnostics';
+import CsDiagnostics from './cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
@@ -28,7 +28,6 @@ interface CsContext {
   cliPath: string;
   csWorkspace: CsWorkspace;
   csExtensionState: CsExtensionState;
-  csDiagnostics: CsDiagnostics;
 }
 
 /**
@@ -57,10 +56,8 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 function startExtension(context: vscode.ExtensionContext, cliPath: string, csExtensionState: CsExtensionState) {
-  const csDiagnostics = new CsDiagnostics();
   const csContext: CsContext = {
     cliPath,
-    csDiagnostics,
     csWorkspace: new CsWorkspace(context),
     csExtensionState,
   };
@@ -71,11 +68,11 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   Telemetry.instance.logUsage('onActivateExtension');
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
-  CsDiagnosticsCollection.init(context);
+  CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDoc(context);
-  addReviewListeners(context, csDiagnostics);
+  addReviewListeners(context);
   addTmpDiffUriScheme(context);
 
   // Add Review CodeLens support
@@ -155,16 +152,23 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
  * Adds listeners for all events that should trigger a review.
  *
  */
-function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsDiagnostics) {
+function addReviewListeners(context: vscode.ExtensionContext) {
   // This provides the initial diagnostics when a file is opened.
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
-      csDiagnostics.review(document);
+      CsDiagnostics.review(document);
+    })
+  );
+
+  // Close document listener for cancelling reviews and refactoring requests
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((document: vscode.TextDocument) => {
+      Reviewer.instance.abort(document);
     })
   );
 
   // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(csDiagnostics.review.bind(csDiagnostics), 2000);
+  const debouncedRun = debounce(CsDiagnostics.review, 2000);
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid debouncing 'output' documents etc.
@@ -178,7 +182,7 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
 
   // This provides the initial diagnostics when the extension is first activated.
   vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    csDiagnostics.review(document);
+    CsDiagnostics.review(document);
   });
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
@@ -186,7 +190,7 @@ function addReviewListeners(context: vscode.ExtensionContext, csDiagnostics: CsD
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
     outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      csDiagnostics.review(document, { skipCache: true });
+      CsDiagnostics.review(document, { skipCache: true });
     });
   });
   context.subscriptions.push(fileSystemWatcher);
@@ -207,18 +211,18 @@ function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsCon
  * @param csContext
  */
 function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { csExtensionState } = csContext;
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
     const msg = 'Auto-refactor disabled in configuration.';
-    csContext.csExtensionState.disableACE(msg);
+    csExtensionState.disableACE(msg);
     outputChannel.appendLine(msg);
     return;
   }
 
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple codelenses etc.
-  csContext.csExtensionState.disableACE('Loading ACE capabilities...');
+  csExtensionState.disableACE('Loading ACE capabilities...');
 
-  const { csDiagnostics, csExtensionState } = csContext;
   CsRestApi.instance
     .fetchRefactorPreflight()
     .then((preflightResponse) => {
@@ -248,7 +252,7 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
 
       // Force update diagnosticCollection to request initial refactorings
       vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-        csDiagnostics.review(document, { skipCache: true });
+        CsDiagnostics.review(document, { skipCache: true });
       });
 
       outputChannel.appendLine('Auto-refactor enabled!');
@@ -298,6 +302,7 @@ function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsCont
     }
   };
 }
+
 function onGetSessionError(csContext: CsContext) {
   return (error: any) => {
     csContext.csExtensionState.setSession();

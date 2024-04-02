@@ -29,6 +29,11 @@ export interface ReviewOpts {
 
 export interface IReviewer {
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
+  abort(document: vscode.TextDocument): void;
+}
+
+function taskId(document: vscode.TextDocument) {
+  return document.uri.fsPath;
 }
 
 class SimpleReviewer implements IReviewer {
@@ -42,14 +47,13 @@ class SimpleReviewer implements IReviewer {
     // Get the fsPath of the current document because we want to execute the
     // 'cs review' command in the same directory as the current document
     // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
-    const documentPath = document.uri.fsPath;
-    const documentDirectory = dirname(documentPath);
+    const documentDirectory = dirname(document.uri.fsPath);
 
     const result = this.executor.execute(
       {
         command: this.cliPath,
         args: ['review', '--file-type', extension, '--output-format', 'json'],
-        taskId: documentPath,
+        taskId: taskId(document),
       },
       { cwd: documentDirectory },
       document.getText()
@@ -59,9 +63,7 @@ class SimpleReviewer implements IReviewer {
       StatsCollector.instance.recordAnalysis(extension, duration);
 
       const data = JSON.parse(stdout) as ReviewResult;
-      let diagnostics = data.review.flatMap((reviewIssue) =>
-        reviewIssueToDiagnostics(reviewIssue, document)
-      );
+      let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
       if (data.score > 0) {
         const roundedScore = +data.score.toFixed(2);
@@ -77,6 +79,10 @@ class SimpleReviewer implements IReviewer {
     });
 
     return diagnostics;
+  }
+
+  abort(document: vscode.TextDocument): void {
+    this.executor.abort(taskId(document));
   }
 }
 
@@ -99,7 +105,6 @@ class CachingReviewer implements IReviewer {
     if (!reviewOpts.skipCache) {
       const cachedResults = this.reviewCache.get(document.fileName);
       if (cachedResults && cachedResults.documentVersion === document.version) {
-        logOutputChannel.debug(`Returning cached diagnostics for ${document.fileName}`);
         return cachedResults.diagnostics;
       }
     }
@@ -110,6 +115,11 @@ class CachingReviewer implements IReviewer {
     this.reviewCache.set(document.fileName, { documentVersion: document.version, diagnostics });
 
     return diagnostics;
+  }
+
+  abort(document: vscode.TextDocument): void {
+    this.reviewer.abort(document);
+    this.reviewCache.delete(document.fileName);
   }
 }
 
@@ -171,5 +181,9 @@ class FilteringReviewer implements IReviewer {
     }
 
     return this.reviewer.review(document, reviewOpts);
+  }
+
+  abort(document: vscode.TextDocument): void {
+    this.reviewer.abort(document);
   }
 }

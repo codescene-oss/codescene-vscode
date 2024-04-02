@@ -44,14 +44,17 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          if (error.code !== 'ABORT_ERR') { // Don't log these, they are expected from the LimitingExecutor
-            logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
+          // Ignore ABORT_ERR, they are expected from the LimitingExecutor
+          if (error.code === 'ABORT_ERR') {
+            logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" aborted after ${Date.now() - start} ms`);
+            return;
           }
+          logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
-        logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" took ${end - start} milliseconds`);
+        logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" took ${end - start} ms`);
         resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
       });
 
@@ -87,21 +90,26 @@ export class LimitingExecutor implements Executor {
     // Check if running already
     const runningProcess = this.runningCommands.get(taskId);
     if (runningProcess) {
-      runningProcess.abort();
+      runningProcess.abort(`[LimitingExecutor] Abort current command ${taskId} and re-run`);
     }
 
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    return this.executor
-      .execute(command, { ...options, signal: abortController.signal }, input)
-      .finally(() => {
-        // Remove the abortController from the map.
-        // The process has exited, and we don't want to risk calling abort() on
-        // a process that has already exited (what if the pid has been reused?)
-        if (this.runningCommands.get(taskId) === abortController) {
-          this.runningCommands.delete(taskId);
-        }
-      });
+    return this.executor.execute(command, { ...options, signal: abortController.signal }, input).finally(() => {
+      // Remove the abortController from the map.
+      // The process has exited, and we don't want to risk calling abort() on
+      // a process that has already exited (what if the pid has been reused?)
+      if (this.runningCommands.get(taskId) === abortController) {
+        this.runningCommands.delete(taskId);
+      }
+    });
+  }
+
+  abort(taskId: string) {
+    const abortController = this.runningCommands.get(taskId);
+    if (abortController) {
+      abortController.abort(`[LimitingExecutor] Abort command ${taskId}`);
+    }
   }
 }
