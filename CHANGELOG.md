@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.1...v0.7.0) (2024-03-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* Remove the Change Coupling feature ([7b59f6c](https://github.com/codescene-oss/codescene-vscode/commit/7b59f6cf9afd0a68ad7cad28ecf53cff38de8683)). This might be reworked and reinstated in a future release.
+    
+### Features
+
+* New Activity bar icon with status view
+* Status bar icon
+* [CodeScene ACE](https://codescene.com/campaigns/ai) beta
+  * Auto-refactor CodeLens ([3066106](https://github.com/codescene-oss/codescene-vscode/commit/3066106626be1ea29595591c3eb2dd475c89aacb))
+  * Auto-Refactoring tree view (initial impl) ([85c682c](https://github.com/codescene-oss/codescene-vscode/commit/85c682c7cd9a8cacc1e7ab2f988114735900e333))
+* Aborting running reviews when closing documents ([e9dea7f](https://github.com/codescene-oss/codescene-vscode/commit/e9dea7fdc583900b40f6b21ba68ecb89c84f5b50))  
+
+
+### Bug fixes
+
+* Correct next uri param for logging in to CodeScene Cloud ([4069727](https://github.com/codescene-oss/codescene-vscode/commit/406972707824a7c085c2683c0e87eda44559716f))
+* Fail extension activation early if binary won't run properly ([e27f2c8](https://github.com/codescene-oss/codescene-vscode/commit/e27f2c899bf155f04309c451a988696bcf2038ab))
+* Handle signing in/out without having to reload extension ([c8ac15b](https://github.com/codescene-oss/codescene-vscode/commit/c8ac15b099e4ef05394a8082c6aa14a2abffc591))
+* Ignore expected abort-errors ([1f51364](https://github.com/codescene-oss/codescene-vscode/commit/1f51364982031204767654482e8a7ba0ee451daf))
+* Packaging and Content-Security-Policy for webviews ([63cc9da](https://github.com/codescene-oss/codescene-vscode/commit/63cc9da601633cd43413025b5675d990ce4abb46))
+* Show file level issues as warnings in Problems panel ([67f984c](https://github.com/codescene-oss/codescene-vscode/commit/67f984cbde61444144c72547bba611225931c324))
+* Sign-in issue due to await on the popup window ([fd8f915](https://github.com/codescene-oss/codescene-vscode/commit/fd8f9159dbd208081f9dfa20b3ee98ce34d395ad))
+
 ### [0.6.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.0...v0.6.1) (2024-02-12)
 
 
