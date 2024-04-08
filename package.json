@@ -24,7 +24,7 @@
     "code review",
     "code quality",
     "code metrics",
-    "complexity",
+    "cyclomatic complexity",
     "refactoring",
     "technical debt"
   ],
