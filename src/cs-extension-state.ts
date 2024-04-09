@@ -71,6 +71,10 @@ export class CsExtensionState implements vscode.Disposable {
     this.updateStatusViews();
   }
 
+  get session(): vscode.AuthenticationSession | undefined {
+    return this.stateProperties.session;
+  }
+
   setCliStatus(cliStatus: string | Error) {
     this.stateProperties.features = { ...this.stateProperties.features, codeHealthAnalysis: cliStatus };
     this.updateStatusViews();

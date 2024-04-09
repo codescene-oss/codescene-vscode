@@ -128,48 +128,50 @@ export class StatusViewProvider implements WebviewViewProvider {
 
   private aceContent(preflight?: PreFlightResponse | Error | string) {
     let content = /*html*/ `<h3>Augmented Code Engineering (ACE)</h3>`;
-    if (isDefined(preflight)) {
-      if (typeof preflight === 'string') {
-        content += /*html*/ `
-          <p>${preflight}</p>
-        `;
-      } else if (preflight instanceof Error) {
-        content += /*html*/ `
-          <p><span class="codicon codicon-error color-inactive"></span> There was an error requesting ACE capabilities:
-          <code class="preflight-error">${preflight.message}</code></p>
-          ${this.checkLogsContent()}
-          <p>If applicable, check for any network or authentication issues and then try reloading the extension.</p>
-        `;
-      } else {
-        const languageIdList = toDistinctLanguageIds(preflight.supported['file-types'])
-          .map((langIds) => `<li>${langIds}</li>`)
-          .join('\n');
-        const codeSmellList = preflight['supported']['code-smells']
-          .map((codeSmells) => `<li>${codeSmells}</li>`)
-          .join('\n');
+    const aceInfo = /*html*/ `
+      <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
+      in using the accounts menu <span class="codicon codicon-account"></span></strong></p>
+      <p>The Auto-refactor capability is available by invitation for all paid CodeScene subscriptions. Sign up <a href="https://codescene.com/ai">here</a>
+      to join the waiting list.</p>
+      <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a></p>
+    `;
 
-        content += /*html*/ `
-          <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
-          <p>
-          Supported languages:
-          <ul>${languageIdList}</ul>
-          Supported code smells:
-          <ul>${codeSmellList}</ul>
-          Also, only functions under ${preflight['max-input-loc']} lines of code will be considered for refactoring.
-          </p>
-          <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
-          <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
-        `;
-      }
-    } else {
+    if (!isDefined(preflight)) {
+      content += aceInfo;
+    } else if (typeof preflight === 'string') {
       content += /*html*/ `
-        <p>If you're part of the preview release program for ACE, the refactoring features will be available as soon as you <strong>sign 
-        in using the accounts menu <span class="codicon codicon-account"></span></strong></p>
-        <p>The Auto-refactor capability is available by invitation for all paid CodeScene subscriptions. Sign up <a href="https://codescene.com/ai">here</a>
-        to join the waiting list.</p>
-        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a></p>
+        <p><strong>${preflight}</strong></p>
+        ${aceInfo}
+      `;
+    } else if (preflight instanceof Error) {
+      content += /*html*/ `
+        <p><span class="codicon codicon-error color-inactive"></span> There was an error requesting ACE capabilities:
+        <code class="preflight-error">${preflight.message}</code></p>
+        ${this.checkLogsContent()}
+        <p>If applicable, check for any network or authentication issues and then try reloading the extension.</p>
+      `;
+    } else {
+      const languageIdList = toDistinctLanguageIds(preflight.supported['file-types'])
+        .map((langIds) => `<li>${langIds}</li>`)
+        .join('\n');
+      const codeSmellList = preflight['supported']['code-smells']
+        .map((codeSmells) => `<li>${codeSmells}</li>`)
+        .join('\n');
+
+      content += /*html*/ `
+        <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
+        <p>
+        Supported languages:
+        <ul>${languageIdList}</ul>
+        Supported code smells:
+        <ul>${codeSmellList}</ul>
+        Also, only functions under ${preflight['max-input-loc']} lines of code will be considered for refactoring.
+        </p>
+        <p><span class="codicon codicon-question"></span> <a href="https://codescene.io/docs/auto-refactor/index.html">Documentation on codescene.io</a><br/>
+        <span class="codicon codicon-verified"></span> <a href="https://codescene.com/product/ace/principles">Privacy Principles for CodeScene AI Based Services</a></p>
       `;
     }
+
     return content;
   }
 

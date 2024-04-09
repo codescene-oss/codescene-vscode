@@ -214,9 +214,12 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   const { csExtensionState } = csContext;
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
-    const msg = 'Auto-refactor disabled in configuration.';
-    csExtensionState.disableACE(msg);
-    outputChannel.appendLine(msg);
+    csExtensionState.disableACE('Auto-refactor disabled in configuration');
+    return;
+  }
+
+  if (!csExtensionState.session) {
+    csExtensionState.disableACE('Not signed in');
     return;
   }
 

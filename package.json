@@ -104,7 +104,7 @@
         },
         "codescene.enableAutoRefactor": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
           "order": 2
         },
