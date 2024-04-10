@@ -39,6 +39,10 @@
         "title": "CodeScene: Create Rules Template"
       },
       {
+        "command": "codescene.showVerboseReview",
+        "title": "CodeScene: Show review with verbose logging"
+      },
+      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },

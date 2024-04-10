@@ -56,21 +56,26 @@ class SimpleReviewer implements IReviewer {
     // 'cs review' command in the same directory as the current document
     // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
     const documentDirectory = dirname(document.uri.fsPath);
+    let cmd = {
+      command: this.cliPath,
+      args: ['review', '--file-type', extension, '--output-format', 'json'],
+      taskId: taskId(document),
+    };
+
+    if (reviewOpts.verbose) {
+      cmd.args.push('--verbose');
+    }
 
     this.reviewEmitter.fire('reviewing');
-    const result = this.executor.execute(
-      {
-        command: this.cliPath,
-        args: ['review', '--file-type', extension, '--output-format', 'json'],
-        taskId: taskId(document),
-      },
-      { cwd: documentDirectory },
-      document.getText()
-    );
+    const result = this.executor.execute(cmd, { cwd: documentDirectory }, document.getText());
 
     const diagnostics = result
-      .then(({ stdout, duration }) => {
+      .then(({ stdout, stderr, duration }) => {
         StatsCollector.instance.recordAnalysis(extension, duration);
+        if (reviewOpts.verbose) {
+          logOutputChannel.info(`Review stdout: ${stdout}`);
+          logOutputChannel.info(`Review verbose: ${stderr}`);
+        }
 
         const data = JSON.parse(stdout) as ReviewResult;
         let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
