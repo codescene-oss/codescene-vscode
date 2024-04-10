@@ -75,8 +75,8 @@
     "viewsWelcome": [
       {
         "view": "codescene.explorerAutoRefactorView",
-        "contents": "To see Auto-refactoring suggestions, you need to sign in to a CodeScene server",
-        "when": "!codescene.isSignedIn"
+        "contents": "To see Auto-refactoring suggestions, you need to \n1. Participate in the [CodeScene ACE beta program](https://codescene.com/ai) \n2. Sign in to a CodeScene server\n3. Enable CodeScene ACE in settings",
+        "when": "!codescene.isSignedIn || !config.codescene.enableAutoRefactor"
       }
     ],
     "menus": {
