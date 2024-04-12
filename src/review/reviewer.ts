@@ -2,7 +2,7 @@ import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
-import { logOutputChannel, outputChannel } from '../log';
+import { outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
@@ -73,8 +73,9 @@ class SimpleReviewer implements IReviewer {
       .then(({ stdout, stderr, duration }) => {
         StatsCollector.instance.recordAnalysis(extension, duration);
         if (reviewOpts.verbose) {
-          logOutputChannel.info(`Review stdout: ${stdout}`);
-          logOutputChannel.info(`Review verbose: ${stderr}`);
+          outputChannel.append(`Review stdout: ${stdout}`);
+          outputChannel.append(`Review verbose: ${stderr}`);
+          outputChannel.show();
         }
 
         const data = JSON.parse(stdout) as ReviewResult;
