@@ -70,11 +70,10 @@ class SimpleReviewer implements IReviewer {
     const result = this.executor.execute(cmd, { cwd: documentDirectory }, document.getText());
 
     const diagnostics = result
-      .then(({ stdout, stderr, duration }) => {
+      .then(({ stderr, stdout, duration }) => {
         StatsCollector.instance.recordAnalysis(extension, duration);
         if (reviewOpts.verbose) {
-          outputChannel.append(`Review stdout: ${stdout}`);
-          outputChannel.append(`Review verbose: ${stderr}`);
+          outputChannel.appendLine(`Review verbose: ${stderr}`);
           outputChannel.show();
         }
 

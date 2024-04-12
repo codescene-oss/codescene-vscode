@@ -139,9 +139,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(createRulesTemplateCmd);
 
   const createShowVerboseReview = vscode.commands.registerCommand('codescene.showVerboseReview', () => {
-    showVerboseReview(cliPath).catch((error: Error) => {
-      void vscode.window.showErrorMessage(error.message);
-    });
+    showVerboseReview();
   });
   context.subscriptions.push(createShowVerboseReview);
 
