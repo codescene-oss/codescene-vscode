@@ -64,8 +64,7 @@ class SimpleReviewer implements IReviewer {
     const diagnostics = result.then(({ stderr, stdout, duration }) => {
       StatsCollector.instance.recordAnalysis(extension, duration);
       if (reviewOpts.verbose) {
-        outputChannel.append('Review result ' + stdout);
-        outputChannel.append('Review verbose \n' + stderr);
+        outputChannel.appendLine('Review verbose \n' + stderr);
         outputChannel.show();
       }
 
