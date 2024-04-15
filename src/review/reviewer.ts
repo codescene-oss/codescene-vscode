@@ -10,6 +10,8 @@ import { reviewIssueToDiagnostics } from './utils';
 
 export const chScorePrefix = 'Code health score';
 
+export type ReviewState = 'reviewing' | 'idle';
+
 export default class Reviewer {
   private static _instance: IReviewer;
 
@@ -30,6 +32,8 @@ export interface ReviewOpts {
 export interface IReviewer {
   review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<vscode.Diagnostic[]>;
   abort(document: vscode.TextDocument): void;
+  readonly onDidReviewFail: vscode.Event<Error>;
+  readonly onDidReview: vscode.Event<ReviewState>;
 }
 
 function taskId(document: vscode.TextDocument) {
@@ -38,6 +42,10 @@ function taskId(document: vscode.TextDocument) {
 
 class SimpleReviewer implements IReviewer {
   private readonly executor: LimitingExecutor = new LimitingExecutor();
+  private readonly errorEmitter = new vscode.EventEmitter<Error>();
+  readonly onDidReviewFail = this.errorEmitter.event;
+  private readonly reviewEmitter = new vscode.EventEmitter<ReviewState>();
+  readonly onDidReview = this.reviewEmitter.event;
 
   constructor(private cliPath: string) {}
 
@@ -49,6 +57,7 @@ class SimpleReviewer implements IReviewer {
     // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
     const documentDirectory = dirname(document.uri.fsPath);
 
+    this.reviewEmitter.fire('reviewing');
     const result = this.executor.execute(
       {
         command: this.cliPath,
@@ -59,24 +68,32 @@ class SimpleReviewer implements IReviewer {
       document.getText()
     );
 
-    const diagnostics = result.then(({ stdout, duration }) => {
-      StatsCollector.instance.recordAnalysis(extension, duration);
+    const diagnostics = result
+      .then(({ stdout, duration }) => {
+        StatsCollector.instance.recordAnalysis(extension, duration);
 
-      const data = JSON.parse(stdout) as ReviewResult;
-      let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+        const data = JSON.parse(stdout) as ReviewResult;
+        let diagnostics = data.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
-      if (data.score > 0) {
-        const roundedScore = +data.score.toFixed(2);
-        const scoreDiagnostic = new vscode.Diagnostic(
-          new vscode.Range(0, 0, 0, 0),
-          `${chScorePrefix}: ${roundedScore}/10`,
-          vscode.DiagnosticSeverity.Information
-        );
-        return [scoreDiagnostic, ...diagnostics];
-      } else {
-        return diagnostics;
-      }
-    });
+        if (data.score > 0) {
+          const roundedScore = +data.score.toFixed(2);
+          const scoreDiagnostic = new vscode.Diagnostic(
+            new vscode.Range(0, 0, 0, 0),
+            `${chScorePrefix}: ${roundedScore}/10`,
+            vscode.DiagnosticSeverity.Information
+          );
+          return [scoreDiagnostic, ...diagnostics];
+        } else {
+          return diagnostics;
+        }
+      })
+      .catch((e) => {
+        this.errorEmitter.fire(e);
+        return [];
+      })
+      .finally(() => {
+        this.reviewEmitter.fire('idle');
+      });
 
     return diagnostics;
   }
@@ -97,6 +114,8 @@ interface ReviewCacheItem {
  */
 class CachingReviewer implements IReviewer {
   private readonly reviewCache = new Map<string, ReviewCacheItem>();
+  readonly onDidReviewFail: vscode.Event<Error> = this.reviewer.onDidReviewFail;
+  readonly onDidReview: vscode.Event<ReviewState> = this.reviewer.onDidReview;
 
   constructor(private reviewer: IReviewer) {}
 
@@ -133,6 +152,8 @@ class CachingReviewer implements IReviewer {
 class FilteringReviewer implements IReviewer {
   private gitExecutor: SimpleExecutor | null = null;
   private gitExecutorCache = new Map<string, boolean>();
+  readonly onDidReviewFail: vscode.Event<Error> = this.reviewer.onDidReviewFail;
+  readonly onDidReview: vscode.Event<ReviewState> = this.reviewer.onDidReview;
 
   constructor(private reviewer: IReviewer) {
     const workspaceFolders = vscode.workspace.workspaceFolders;

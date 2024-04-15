@@ -27,19 +27,14 @@ export default class CsDiagnostics {
       return;
     }
 
-    Reviewer.instance
-      .review(document, reviewOpts)
-      .then((diagnostics) => {
-        // Remove the diagnostics that are for file level issues. These are only shown as code lenses
-        const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
-        CsDiagnostics.set(document.uri, importantDiagnostics);
+    void Reviewer.instance.review(document, reviewOpts).then((diagnostics) => {
+      // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+      const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
+      CsDiagnostics.set(document.uri, importantDiagnostics);
 
-        // Try to request refactorings for the important diagnostics
-        void vscode.commands.executeCommand(requestRefactoringsCmdName, document, importantDiagnostics);
-      })
-      .catch((e) => {
-        logOutputChannel.error(`Review error ${e}`);
-      });
+      // Try to request refactorings for the important diagnostics
+      void vscode.commands.executeCommand(requestRefactoringsCmdName, document, importantDiagnostics);
+    });
   }
 
   static abort(document: vscode.TextDocument) {

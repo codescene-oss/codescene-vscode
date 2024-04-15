@@ -217,8 +217,8 @@ export class StatusViewProvider implements WebviewViewProvider {
   private errorContent(serviceErrors: any[]) {
     return /*html*/ `
       <hr>
-      <h3><span class="codicon codicon-warning color-warning"></span> Service errors</h3>
-      <p>There was an error when communicating with the CodeScene service.</p>
+      <h3><span class="codicon codicon-warning color-warning"></span> Errors</h3>
+      <p>The CodeScene extension has encountered an error.</p>
       ${this.checkLogsContent()}
       <vscode-button id="clear-errors-button" aria-label="Clear errors" 
       title="Ignore and continue using the CodeScene extension">
