@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
-import Reviewer, { chScorePrefix } from '../review/reviewer';
+import Reviewer, { ReviewState, chScorePrefix } from '../review/reviewer';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
@@ -10,7 +10,7 @@ import { targetEditor } from './utils';
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: RefactoringsTreeProvider;
-  private view: vscode.TreeView<CsRefactoringRequest>;
+  private view: vscode.TreeView<CsRefactoringRequest | ReviewState>;
 
   constructor() {
     this.treeDataProvider = new RefactoringsTreeProvider();
@@ -87,11 +87,14 @@ export class RefactoringsView implements vscode.Disposable {
   }
 }
 
-class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringRequest>, vscode.Disposable {
+class RefactoringsTreeProvider
+  implements vscode.TreeDataProvider<CsRefactoringRequest | ReviewState>, vscode.Disposable
+{
   private disposables: vscode.Disposable[] = [];
-  private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | void>();
+  private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | ReviewState | void>();
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
   private readonly documentSelector: vscode.DocumentSelector;
+  private reviewState: ReviewState = 'idle';
 
   activeDocument: vscode.TextDocument | undefined;
 
@@ -105,12 +108,15 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     });
     this.disposables.push(changeRequestsDisposable);
 
+    const reviewStateDisposable = Reviewer.instance.onDidReview((state) => {
+      this.reviewState = state;
+      this.treeDataChangedEmitter.fire();
+    });
+    this.disposables.push(reviewStateDisposable);
+
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((e) => {
-      const newActiveDoc = this.validEditorDoc(e);
-      if (isDefined(newActiveDoc)) {
-        this.activeDocument = newActiveDoc;
-        this.treeDataChangedEmitter.fire();
-      }
+      this.activeDocument = this.validEditorDoc(e);
+      this.treeDataChangedEmitter.fire();
     });
     this.disposables.push(changeTextEditorDisposable);
   }
@@ -131,7 +137,11 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     this.disposables.forEach((d) => d.dispose());
   }
 
-  getTreeItem(request: CsRefactoringRequest): vscode.TreeItem | Thenable<vscode.TreeItem> {
+  getTreeItem(childElement: CsRefactoringRequest | ReviewState): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if (!(childElement instanceof CsRefactoringRequest)) {
+      return new vscode.TreeItem('⏳ Code review in progress...', vscode.TreeItemCollapsibleState.None);
+    }
+
     const toString = (request: CsRefactoringRequest) => {
       const range = request.fnToRefactor.range;
       const symbol = toConfidenceSymbol(request.response?.confidence.level);
@@ -139,21 +149,27 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
         range.start.character
       }]`;
     };
-
-    const item = new vscode.TreeItem(toString(request), vscode.TreeItemCollapsibleState.None);
-    item.tooltip = `Click to go to location in ${request.document.fileName.split('/').pop()}`;
+    const item = new vscode.TreeItem(toString(childElement), vscode.TreeItemCollapsibleState.None);
+    item.tooltip = `Click to go to location in ${childElement.document.fileName.split('/').pop()}`;
     item.command = {
       title: 'Show in file',
       command: 'codescene.revealFunctionInDocument',
-      arguments: [request],
+      arguments: [childElement],
     };
     return item;
   }
 
-  getChildren(element?: CsRefactoringRequest | undefined): vscode.ProviderResult<CsRefactoringRequest[]> {
+  getChildren(
+    element?: CsRefactoringRequest | ReviewState | undefined
+  ): vscode.ProviderResult<CsRefactoringRequest[] | ReviewState[]> {
     if (element || !this.activeDocument) {
       return [];
     }
+
+    if (this.reviewState === 'reviewing') {
+      return [this.reviewState];
+    }
+
     const requestsForActiveDoc = CsRefactoringRequests.getAll(this.activeDocument);
     const presentableRefactoring = requestsForActiveDoc.filter((r) => r.shouldPresent());
     const distinctPerFn = presentableRefactoring.filter(

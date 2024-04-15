@@ -61,11 +61,14 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csWorkspace: new CsWorkspace(context),
     csExtensionState,
   };
-  // CsRestApi.init(context.extension);
   Reviewer.init(cliPath);
   Telemetry.init(context.extension, cliPath);
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
+
+  csExtensionState.addErrorListener(Reviewer.instance.onDidReviewFail);
+  csExtensionState.addReviewStatusListener(Reviewer.instance.onDidReview);
+  csExtensionState.addErrorListener(CsRefactoringRequests.onDidRequestFail);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);

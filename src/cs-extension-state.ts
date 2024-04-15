@@ -5,6 +5,7 @@ import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse } from './refactoring/model';
+import { ReviewState } from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
@@ -17,6 +18,7 @@ export interface CsFeatures {
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features?: CsFeatures;
+  reviewState?: ReviewState;
   serviceErrors?: Array<Error | AxiosError>;
 }
 
@@ -39,11 +41,20 @@ export class CsExtensionState implements vscode.Disposable {
         this.updateStatusViews();
       })
     );
+  }
 
-    CsRefactoringRequests.onDidRequestFail((error) => {
+  addErrorListener(event: vscode.Event<Error | AxiosError<unknown, any>>) {
+    event((error) => {
       if (!this.stateProperties.serviceErrors) this.stateProperties.serviceErrors = [];
       this.stateProperties.serviceErrors.push(error);
       this.updateStatusViews();
+    });
+  }
+
+  addReviewStatusListener(event: vscode.Event<ReviewState>) {
+    event((state) => {
+      this.stateProperties.reviewState = state;
+      this.statusBar.update(this.stateProperties);
     });
   }
 

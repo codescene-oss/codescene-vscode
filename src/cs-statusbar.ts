@@ -4,7 +4,6 @@ import { isDefined } from './utils';
 
 export class CsStatusBar {
   private readonly statusBarItem: vscode.StatusBarItem;
-  private isOnline?: boolean;
 
   constructor() {
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -12,33 +11,41 @@ export class CsStatusBar {
       vscode.StatusBarAlignment.Right,
       -1
     );
-    this.defaultState();
+    this.setState();
     this.statusBarItem.show();
   }
 
   update(stateProperties: CsStateProperties) {
-    this.setOnline(isDefined(stateProperties.session));
+    this.setState(stateProperties);
     this.indicateErrors(stateProperties);
   }
 
-  private defaultState() {
+  private setState(stateProperties?: CsStateProperties) {
     this.statusBarItem.name = 'CodeScene status bar';
-    this.statusBarItem.text = this.textContent();
-    this.statusBarItem.tooltip = this.tooltipContent();
+    this.statusBarItem.text = this.textContent(stateProperties);
+    this.statusBarItem.tooltip = this.tooltipContent(stateProperties);
     this.statusBarItem.command = 'codescene.statusView.focus';
     this.statusBarItem.backgroundColor = undefined;
   }
 
-  private textContent() {
-    return `$(cs-logo) ${this.isOnline ? 'Signed in' : ''}`;
-  }
-  private tooltipContent() {
-    return `${this.isOnline ? 'CodeScene extension active, user signed in' : 'CodeScene extension active'}`;
+  private isOnline(stateProperties?: CsStateProperties) {
+    return isDefined(stateProperties?.session);
   }
 
-  private setOnline(online?: boolean) {
-    this.isOnline = online;
-    this.defaultState();
+  private isReviewing(stateProperties?: CsStateProperties) {
+    return stateProperties?.reviewState === 'reviewing';
+  }
+
+  private textContent(stateProperties?: CsStateProperties) {
+    if (this.isReviewing(stateProperties)) return '$(loading~spin) Reviewing';
+    return `$(cs-logo) ${this.isOnline(stateProperties) ? 'Active/Online' : 'Active'}`;
+  }
+
+  private tooltipContent(stateProperties?: CsStateProperties) {
+    if (this.isReviewing(stateProperties)) return 'CodeScene review in progress...';
+    return `${
+      this.isOnline(stateProperties) ? 'CodeScene extension active, user signed in' : 'CodeScene extension active'
+    }`;
   }
 
   private indicateErrors(stateProperties: CsStateProperties) {
@@ -48,12 +55,10 @@ export class CsStatusBar {
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       this.statusBarItem.tooltip = 'Click to open the status view.';
     } else if (isDefined(stateProperties.serviceErrors) && stateProperties.serviceErrors.length > 0) {
-      // Indicates a service error
-      this.statusBarItem.text = `$(cs-logo) Service error`;
+      // Indicates a service/reviewer error
+      this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
       this.statusBarItem.tooltip = 'Click to open the status view.';
-    } else {
-      this.defaultState();
     }
   }
 }
