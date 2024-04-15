@@ -1,4 +1,3 @@
-// @CodeScene(disable:"Primitive Obsession", disable:"Bumpy Road Ahead")
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, {
@@ -12,7 +11,6 @@ import vscode, {
   WorkspaceEdit,
 } from 'vscode';
 import { categoryToDocsCode } from '../csdoc';
-import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
 import { nonce } from '../webviews/utils';
@@ -30,6 +28,11 @@ interface CurrentRefactorState {
 interface RefactorPanelParams {
   refactoring: ResolvedRefactoring;
 }
+
+type Code = {
+  content: string;
+  languageId: string;
+};
 
 export class RefactoringPanel {
   public static currentPanel: RefactoringPanel | undefined;
@@ -87,15 +90,11 @@ export class RefactoringPanel {
   /**
    * Create a virtual document used for tmp diffing in the editor.
    * The scheme is registered with a content provider in extension.ts
-   * @param name
-   * @param content
-   * @param languageId
-   * @returns
    */
-  private async createTempDocument(name: string, content: string, languageId: string) {
-    const tmpUri = vscode.Uri.from({ scheme: 'tmp-diff', path: name, query: content });
+  private async createTempDocument(name: string, code: Code) {
+    const tmpUri = vscode.Uri.from({ scheme: 'tmp-diff', path: name, query: code.content });
     const tmpDoc = await vscode.workspace.openTextDocument(tmpUri);
-    return vscode.languages.setTextDocumentLanguage(tmpDoc, languageId);
+    return vscode.languages.setTextDocumentLanguage(tmpDoc, code.languageId);
   }
 
   private async showDiff(refactoringState: CurrentRefactorState) {
@@ -107,8 +106,14 @@ export class RefactoringPanel {
 
     // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
     // imposes a save dialog on the user when closing the diff.
-    const originalCodeTmpDoc = await this.createTempDocument('Original', document.getText(range), document.languageId);
-    const refactoringTmpDoc = await this.createTempDocument('Refactoring', code, document.languageId);
+    const originalCodeTmpDoc = await this.createTempDocument('Original', {
+      content: document.getText(range),
+      languageId: document.languageId,
+    });
+    const refactoringTmpDoc = await this.createTempDocument('Refactoring', {
+      content: code,
+      languageId: document.languageId,
+    });
 
     // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
     // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
@@ -188,7 +193,10 @@ export class RefactoringPanel {
     const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
     this.currentRefactorState.code = decoratedCode;
 
-    const content = await this.autoRefactorOrCodeImprovementContent(response, decoratedCode, document.languageId);
+    const content = await this.autoRefactorOrCodeImprovementContent(response, {
+      content: decoratedCode,
+      languageId: document.languageId,
+    });
 
     const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
@@ -232,12 +240,12 @@ export class RefactoringPanel {
     return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
 
-  private async autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: string, languageId: string) {
+  private async autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: Code) {
     const { level } = response.confidence;
     if (level >= 2) {
-      return this.autoRefactorContent(response, code, languageId);
+      return this.autoRefactorContent(response, code);
     }
-    return this.codeImprovementContent(response, code, languageId);
+    return this.codeImprovementContent(response, code);
   }
 
   private functionInfoContent(fnToRefactor: FnToRefactor) {
@@ -250,11 +258,11 @@ export class RefactoringPanel {
     </div>`;
   }
 
-  private async codeContainerContent(code: string, languageId: string) {
+  private async codeContainerContent(code: Code) {
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
       'markdown.api.render',
-      '```' + languageId + '\n' + code + '\n```'
+      '```' + code.languageId + '\n' + code.content + '\n```'
     );
     return /*html*/ `
     <div class="code-container">
@@ -265,7 +273,7 @@ export class RefactoringPanel {
     </div>`;
   }
 
-  private async autoRefactorContent(response: RefactorResponse, code: string, languageId: string) {
+  private async autoRefactorContent(response: RefactorResponse, code: Code) {
     const { confidence } = response;
     const {
       level,
@@ -281,7 +289,7 @@ export class RefactoringPanel {
           <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
         </p>  
         ${reasonsText}
-        ${await this.codeContainerContent(code, languageId)}
+        ${await this.codeContainerContent(code)}
         <div class="bottom-controls">
           <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
@@ -302,7 +310,7 @@ export class RefactoringPanel {
     return vscode.commands.executeCommand<string>('markdown.api.render', docsGuide.toString());
   }
 
-  private async codeImprovementContent(response: RefactorResponse, code: string, languageId: string) {
+  private async codeImprovementContent(response: RefactorResponse, code: Code) {
     const {
       'refactoring-properties': { 'removed-code-smells': removedCodeSmells },
     } = response;
@@ -317,7 +325,7 @@ export class RefactoringPanel {
     const content = /*html*/ `
         ${solutionContent}
         <h4>Example from your code</h4>
-        ${await this.codeContainerContent(code, languageId)}
+        ${await this.codeContainerContent(code)}
         <div class="bottom-controls">
           <div class="button-group left">
             <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
