@@ -18,9 +18,9 @@ import { createCodeSmellsFilter } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
-import { showVerboseReview } from './verbose-review';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
+import { registerCommand as registerVerboseReviewCmd } from './verbose-review';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
@@ -138,11 +138,8 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   });
   context.subscriptions.push(createRulesTemplateCmd);
 
-  const createShowVerboseReview = vscode.commands.registerCommand('codescene.showVerboseReview', () => {
-    showVerboseReview();
-  });
-  context.subscriptions.push(createShowVerboseReview);
-
+  registerVerboseReviewCmd(context, reviewDocumentSelector());
+  
   // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
   // asking the user to log in. (Currently unused)
   const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {

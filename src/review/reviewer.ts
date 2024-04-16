@@ -49,6 +49,13 @@ class SimpleReviewer implements IReviewer {
 
   constructor(private cliPath: string) {}
 
+  private codeHealthRulesInfo(verboseOutput: string) {
+    return verboseOutput
+      .split('\n')
+      .filter((line) => line.startsWith('Overriding code health') || line.startsWith('Using custom code health'))
+      .join('\n');
+  }
+
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
     const extension = getFileExtension(document.fileName);
 
@@ -73,7 +80,9 @@ class SimpleReviewer implements IReviewer {
       .then(({ stderr, stdout, duration }) => {
         StatsCollector.instance.recordAnalysis(extension, duration);
         if (reviewOpts.verbose) {
-          outputChannel.appendLine(`Review verbose: ${stderr}`);
+          outputChannel.appendLine('');
+          outputChannel.appendLine('Custom code health rules info:');
+          outputChannel.appendLine(this.codeHealthRulesInfo(stderr));
           outputChannel.show();
         }
 
@@ -94,7 +103,7 @@ class SimpleReviewer implements IReviewer {
       })
       .catch((e) => {
         this.errorEmitter.fire(e);
-        return [];
+        return [] as vscode.Diagnostic[];
       })
       .finally(() => {
         this.reviewEmitter.fire('idle');
