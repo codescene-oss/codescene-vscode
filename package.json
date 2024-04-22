@@ -39,6 +39,10 @@
         "title": "CodeScene: Create Rules Template"
       },
       {
+        "command": "codescene.checkRules",
+        "title": "CodeScene: Check code health rule match for selected file"
+      },
+      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },
