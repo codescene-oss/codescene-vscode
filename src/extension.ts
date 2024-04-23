@@ -14,7 +14,7 @@ import { CsRefactorCodeLensProvider } from './refactoring/codelens';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { RefactoringsView } from './refactoring/refactorings-view';
-import { createCodeSmellsFilter } from './refactoring/utils';
+import { createCodeSmellsFilter, targetEditor } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
@@ -24,6 +24,7 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { ReviewExplorerView } from './review/explorer-view';
 
 interface CsContext {
   cliPath: string;
@@ -80,6 +81,8 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   addReviewListeners(context);
   addTmpDiffUriScheme(context);
 
+  context.subscriptions.push(new ReviewExplorerView());
+
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
   context.subscriptions.push(codeLensProvider);
@@ -126,6 +129,17 @@ function setupStatsCollector() {
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   const { cliPath, csExtensionState } = csContext;
+
+  const revealRangeInDocumentCommand = vscode.commands.registerCommand(
+    'codescene.revealRangeInDocument',
+    (document: vscode.TextDocument, range: vscode.Range, revealType?: vscode.TextEditorRevealType) => {
+      const editor = targetEditor(document);
+      if (editor) {
+        editor.revealRange(range, revealType || vscode.TextEditorRevealType.Default);
+      }
+    }
+  );
+  context.subscriptions.push(revealRangeInDocumentCommand);
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
@@ -265,7 +279,7 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
 
       // Force update diagnosticCollection to request initial refactorings
       vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-        CsDiagnostics.review(document, { skipCache: true });
+        CsDiagnostics.review(document);
       });
 
       outputChannel.appendLine('Auto-refactor enabled!');

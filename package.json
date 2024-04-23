@@ -63,6 +63,10 @@
     "views": {
       "explorer": [
         {
+          "id": "codescene.explorerCodeReviewView",
+          "name": "Code health"
+        },
+        {
           "id": "codescene.explorerAutoRefactorView",
           "name": "Auto-refactor"
         }
@@ -81,6 +85,10 @@
         "view": "codescene.explorerAutoRefactorView",
         "contents": "To see Auto-refactoring suggestions, you need to \n1. Participate in the [CodeScene ACE beta program](https://codescene.com/ai) \n2. Sign in to a CodeScene server\n3. Enable CodeScene ACE in settings",
         "when": "!codescene.isSignedIn || !config.codescene.enableAutoRefactor"
+      },
+      {
+        "view": "codescene.explorerCodeReviewView",
+        "contents": "When CodeScene code reviews are done, results will be presented here."
       }
     ],
     "menus": {

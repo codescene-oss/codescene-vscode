@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
-import Reviewer, { ReviewState, chScorePrefix } from '../review/reviewer';
+import Reviewer, { ReviewState } from '../review/reviewer';
+import { chScorePrefix } from '../review/utils';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
-import { targetEditor } from './utils';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -30,7 +30,7 @@ export class RefactoringsView implements vscode.Disposable {
           const score = diagnosticsForDoc.find((d) => d.message.startsWith(chScorePrefix));
           if (score) {
             // Add short code health score to the view description
-            this.view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score')})`;
+            this.view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score: ')})`;
           }
         }
       })
@@ -38,10 +38,6 @@ export class RefactoringsView implements vscode.Disposable {
 
     this.disposables.push(
       vscode.commands.registerCommand('codescene.gotoAndPresentRefactoring', this.gotoAndPresentRefactoring, this)
-    );
-
-    this.disposables.push(
-      vscode.commands.registerCommand('codescene.revealFunctionInDocument', this.revealFunctionInDocument, this)
     );
   }
 
@@ -68,20 +64,13 @@ export class RefactoringsView implements vscode.Disposable {
       return;
     }
 
-    this.revealFunctionInDocument(response);
+    void vscode.commands.executeCommand('codescene.revealRangeInDocument', response.document, response.fnToRefactor.range);
     void vscode.commands.executeCommand(presentRefactoringCmdName, response);
-  }
-
-  private revealFunctionInDocument(response: ResolvedRefactoring) {
-    const editor = targetEditor(response.document);
-    if (editor) {
-      editor.revealRange(response.fnToRefactor.range, vscode.TextEditorRevealType.Default);
-    }
   }
 
   dispose() {
     this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
-    this.view.description = ''; // Don't leave a trailling description when disposing the view
+    this.view.description = ''; // Don't leave a trailing description when disposing the view
 
     this.disposables.forEach((d) => d.dispose());
   }
@@ -110,9 +99,13 @@ class RefactoringsTreeProvider
 
     const reviewStateDisposable = Reviewer.instance.onDidReview((state) => {
       this.reviewState = state;
-      this.treeDataChangedEmitter.fire();
     });
     this.disposables.push(reviewStateDisposable);
+    
+    const cacheUpdateDisposable = Reviewer.instance.onDidCacheUpdate(() => {
+      this.treeDataChangedEmitter.fire();
+    });
+    this.disposables.push(cacheUpdateDisposable);
 
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((e) => {
       const newActiveDoc = this.validEditorDoc(e);
@@ -156,8 +149,8 @@ class RefactoringsTreeProvider
     item.tooltip = `Click to go to location in ${childElement.document.fileName.split('/').pop()}`;
     item.command = {
       title: 'Show in file',
-      command: 'codescene.revealFunctionInDocument',
-      arguments: [childElement],
+      command: 'codescene.revealRangeInDocument',
+      arguments: [childElement.document, childElement.fnToRefactor.range],
     };
     return item;
   }

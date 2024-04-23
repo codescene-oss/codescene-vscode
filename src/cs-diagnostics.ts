@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { requestRefactoringsCmdName } from './refactoring/commands';
-import Reviewer, { ReviewOpts, chScorePrefix } from './review/reviewer';
+import Reviewer, { ReviewOpts } from './review/reviewer';
 import { reviewDocumentSelector } from './language-support';
-import { logOutputChannel } from './log';
+import { chScorePrefix } from './review/utils';
 
 export const csSource = 'CodeScene';
 

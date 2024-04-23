@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
 import { CsRestApi } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
+import { isCsDiagnosticCode } from '../review/utils';
 import Telemetry from '../telemetry';
 import { isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './commands';
@@ -187,7 +188,7 @@ function diagKey(diagnostic: Diagnostic) {
   if (!isDefined(diagnostic.code)) {
     return `${diagnostic.message}-${rangeStr(diagnostic.range)}`;
   }
-  if (typeof diagnostic.code === 'object') {
+  if (isCsDiagnosticCode(diagnostic.code)) {
     return `${diagnostic.code.value}-${rangeStr(diagnostic.range)}`;
   }
   return `${diagnostic.code}-${rangeStr(diagnostic.range)}`;
