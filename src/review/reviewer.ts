@@ -41,8 +41,6 @@ class CachingReviewer {
   readonly onDidReviewFail = this.errorEmitter.event;
   private readonly reviewEmitter = new vscode.EventEmitter<ReviewState>();
   readonly onDidReview = this.reviewEmitter.event;
-  private readonly cacheEmitter = new vscode.EventEmitter<void>();
-  readonly onDidCacheUpdate: vscode.Event<void> = this.cacheEmitter.event;
 
   constructor(private reviewer: InternalReviewer) {}
 
@@ -62,10 +60,7 @@ class CachingReviewer {
         if (!reviewResult) {
           return [];
         }
-
-        const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-        this.cacheEmitter.fire();
-        return diagnostics;
+        return reviewResultToDiagnostics(reviewResult, document);
       })
       .catch((e) => {
         this.errorEmitter.fire(e);

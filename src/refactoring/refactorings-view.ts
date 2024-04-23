@@ -64,7 +64,11 @@ export class RefactoringsView implements vscode.Disposable {
       return;
     }
 
-    void vscode.commands.executeCommand('codescene.revealRangeInDocument', response.document, response.fnToRefactor.range);
+    void vscode.commands.executeCommand(
+      'codescene.revealRangeInDocument',
+      response.document,
+      response.fnToRefactor.range
+    );
     void vscode.commands.executeCommand(presentRefactoringCmdName, response);
   }
 
@@ -101,11 +105,6 @@ class RefactoringsTreeProvider
       this.reviewState = state;
     });
     this.disposables.push(reviewStateDisposable);
-    
-    const cacheUpdateDisposable = Reviewer.instance.onDidCacheUpdate(() => {
-      this.treeDataChangedEmitter.fire();
-    });
-    this.disposables.push(cacheUpdateDisposable);
 
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((e) => {
       const newActiveDoc = this.validEditorDoc(e);

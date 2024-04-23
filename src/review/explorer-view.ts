@@ -2,6 +2,7 @@ import vscode from 'vscode';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 import { chScorePrefix, isCsDiagnosticCode } from './utils';
+import { logOutputChannel } from '../log';
 
 export class ReviewExplorerView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -16,6 +17,17 @@ export class ReviewExplorerView implements vscode.Disposable {
       showCollapseAll: true,
     });
     this.disposables.push(this.view);
+
+    const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      const document = editor?.document;
+      if (!isDefined(document)) return;
+      const reviewCacheItem = Reviewer.instance.reviewCache.get(document.fileName);
+      if (!isDefined(reviewCacheItem)) return;
+      this.view.reveal(new ReviewTreeBranch(document, reviewCacheItem)).then(undefined, (reason) => {
+        logOutputChannel.warn(`Failed to reveal review tree branch: ${reason}`);
+      });
+    });
+    this.disposables.push(changeTextEditorDisposable);
 
     this.view.description = 'CodeScene analysis results';
   }
@@ -83,15 +95,11 @@ class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | R
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
 
   constructor() {
-    const reviewStateDisposable = Reviewer.instance.onDidReview(() => {
-      this.treeDataChangedEmitter.fire();
-    });
-    this.disposables.push(reviewStateDisposable);
-
-    const reviewListener = Reviewer.instance.onDidCacheUpdate(() => {
-      this.treeDataChangedEmitter.fire();
-    });
-    this.disposables.push(reviewListener);
+    this.disposables.push(
+      Reviewer.instance.onDidReview(() => {
+        this.treeDataChangedEmitter.fire();
+      })
+    );
   }
 
   getTreeItem(element: ReviewTreeBranch | ReviewTreeLeaf): vscode.TreeItem | Thenable<vscode.TreeItem> {
@@ -102,7 +110,7 @@ class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | R
     }
 
     const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
-    item.iconPath = new vscode.ThemeIcon('warning');
+    item.iconPath = new vscode.ThemeIcon('cs-logo', new vscode.ThemeColor('button.background'));
     // item.tooltip = new vscode.MarkdownString(...);
     item.command = {
       command: 'codescene.revealRangeInDocument',
@@ -123,6 +131,13 @@ class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | R
     }
 
     return buildTreeFromReviewCache();
+  }
+
+  getParent(element: ReviewTreeBranch | ReviewTreeLeaf): vscode.ProviderResult<ReviewTreeBranch | ReviewTreeLeaf> {
+    if (element instanceof ReviewTreeLeaf) {
+      return element.parent;
+    }
+    return null;
   }
 
   dispose() {
