@@ -42,7 +42,24 @@ class CachingReviewer {
   private readonly reviewEmitter = new vscode.EventEmitter<ReviewState>();
   readonly onDidReview = this.reviewEmitter.event;
 
+  private reviewsRunning = 0;
+
   constructor(private reviewer: InternalReviewer) {}
+
+  private startReviewEvent() {
+    this.reviewsRunning++;
+    this.reviewEmitter.fire('reviewing');
+  }
+
+  private endReviewEvent() {
+    this.reviewsRunning--;
+    if (this.reviewsRunning === 0) {
+      this.reviewEmitter.fire('idle');
+    } else {
+      // Fire event to indicate that we are still reviewing although one review has finished
+      this.reviewEmitter.fire('reviewing');
+    }
+  }
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
     // If we have a cached promise for this document, return it.
@@ -53,7 +70,7 @@ class CachingReviewer {
       }
     }
 
-    this.reviewEmitter.fire('reviewing');
+    this.startReviewEvent();
     const diagnostics = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
@@ -67,7 +84,7 @@ class CachingReviewer {
         return [] as vscode.Diagnostic[];
       })
       .finally(() => {
-        this.reviewEmitter.fire('idle');
+        this.endReviewEvent();
       });
 
     // Store the diagnostics promise in the cache
