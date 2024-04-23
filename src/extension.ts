@@ -18,7 +18,7 @@ import { createCodeSmellsFilter } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
-import CheckRules, { checkCodeHealthRules } from './check-rules';
+import { checkCodeHealthRules } from './check-rules';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
@@ -63,7 +63,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csExtensionState,
   };
   Reviewer.init(cliPath);
-  CheckRules.init(cliPath);
+
   Telemetry.init(context.extension, cliPath);
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
@@ -140,7 +140,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(createRulesTemplateCmd);
 
   const createCheckRules = vscode.commands.registerCommand('codescene.checkRules', () => {
-    checkCodeHealthRules();
+    checkCodeHealthRules(cliPath);
   });
   context.subscriptions.push(createCheckRules);
 

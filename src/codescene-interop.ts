@@ -9,6 +9,13 @@ export function codeHealthRulesJson(cliPath: string) {
 }
 
 /**
+ * Executes the command for checking code health rule match against file
+ */
+export function codeHealthRulesCheck(cliPath: string, rootPath: string, filePath: string) {
+  return new SimpleExecutor().execute({ command: cliPath, args: ['check-rules', filePath] }, {cwd: rootPath});
+}
+
+/**
  * Executes the command for signing a payload.
  */
 export function sign(cliPath: string, payload: string) {
