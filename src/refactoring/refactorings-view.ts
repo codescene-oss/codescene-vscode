@@ -115,8 +115,11 @@ class RefactoringsTreeProvider
     this.disposables.push(reviewStateDisposable);
 
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((e) => {
-      this.activeDocument = this.validEditorDoc(e);
-      this.treeDataChangedEmitter.fire();
+      const newActiveDoc = this.validEditorDoc(e);
+      if (isDefined(newActiveDoc)) {
+        this.activeDocument = newActiveDoc;
+        this.treeDataChangedEmitter.fire();
+      }
     });
     this.disposables.push(changeTextEditorDisposable);
   }
