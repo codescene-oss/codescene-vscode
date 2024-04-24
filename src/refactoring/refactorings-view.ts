@@ -65,10 +65,12 @@ export class RefactoringsView implements vscode.Disposable {
     }
 
     void vscode.commands.executeCommand(
-      'codescene.revealRangeInDocument',
-      response.document,
-      response.fnToRefactor.range
+      'editor.action.goToLocations',
+      response.document.uri,
+      response.fnToRefactor.range.start,
+      [new vscode.Location(response.document.uri, response.fnToRefactor.range)]
     );
+
     void vscode.commands.executeCommand(presentRefactoringCmdName, response);
   }
 
@@ -109,7 +111,7 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
   }
 
   private validEditorDoc(e: vscode.TextEditor | undefined) {
-    if (isDefined(e) && vscode.languages.match(this.documentSelector, e?.document) !== 0) return e.document;
+    if (isDefined(e) && vscode.languages.match(this.documentSelector, e.document) !== 0) return e.document;
   }
 
   get activeFileName(): string | undefined {
@@ -138,10 +140,12 @@ class RefactoringsTreeProvider implements vscode.TreeDataProvider<CsRefactoringR
     };
     const item = new vscode.TreeItem(toString(childElement), vscode.TreeItemCollapsibleState.None);
     item.tooltip = `Click to go to location in ${childElement.document.fileName.split('/').pop()}`;
+
+    const location = new vscode.Location(childElement.document.uri, childElement.fnToRefactor.range);
     item.command = {
-      title: 'Show in file',
-      command: 'codescene.revealRangeInDocument',
-      arguments: [childElement.document, childElement.fnToRefactor.range],
+      command: 'editor.action.goToLocations',
+      title: 'Go To Location(s)',
+      arguments: [childElement.document.uri, childElement.fnToRefactor.range.start, [location]],
     };
     return item;
   }

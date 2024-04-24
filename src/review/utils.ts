@@ -107,8 +107,12 @@ function createCsDiagnosticCode(category: string) {
  * @returns true if the code is a diagnostic code that is most probably created by createCsDiagnosticCode above
  */
 export function isCsDiagnosticCode(
-  code: string | number | { value: string | number; target: vscode.Uri } | undefined
+  code?: string | number | { value: string | number; target: vscode.Uri }
 ): code is { value: string; target: vscode.Uri } {
   if (typeof code !== 'object') return false;
   return code.target instanceof vscode.Uri && code.target.scheme === 'command';
+}
+
+export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }): string {
+  return isCsDiagnosticCode(code) ? code.value.toString() : 'unknown diagnostic code';
 }

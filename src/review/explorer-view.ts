@@ -1,8 +1,8 @@
 import vscode from 'vscode';
+import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
-import { chScorePrefix, isCsDiagnosticCode } from './utils';
-import { logOutputChannel } from '../log';
+import { chScorePrefix, getCsDiagnosticCode } from './utils';
 
 export class ReviewExplorerView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -20,9 +20,11 @@ export class ReviewExplorerView implements vscode.Disposable {
 
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
       const document = editor?.document;
-      if (!isDefined(document)) return;
+      if (!isDefined(document) || !this.view.visible) return;
+
       const reviewCacheItem = Reviewer.instance.reviewCache.get(document.fileName);
       if (!isDefined(reviewCacheItem)) return;
+
       this.view.reveal(new ReviewTreeBranch(document, reviewCacheItem)).then(undefined, (reason) => {
         logOutputChannel.warn(`Failed to reveal review tree branch: ${reason}`);
       });
@@ -34,7 +36,6 @@ export class ReviewExplorerView implements vscode.Disposable {
 
   dispose() {
     this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
-    this.view.description = ''; // Don't leave a trailling description when disposing the view
 
     this.disposables.forEach((d) => d.dispose());
   }
@@ -83,20 +84,19 @@ class ReviewTreeLeaf {
 
   constructor(parent: ReviewTreeBranch, diagnostic: vscode.Diagnostic) {
     this.parent = parent;
-    const code = isCsDiagnosticCode(diagnostic.code) ? diagnostic.code.value.toString() : 'unknown diagnostic code';
-    this.label = `${code} ${rangeStr(diagnostic.range)}`;
+    this.label = `${getCsDiagnosticCode(diagnostic.code)} ${rangeStr(diagnostic.range)}`;
     this.diagnostic = diagnostic;
   }
 }
 
 class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | ReviewTreeLeaf>, vscode.Disposable {
-  private treeDataChangedEmitter = new vscode.EventEmitter<ReviewTreeBranch | ReviewTreeBranch[] | void>();
+  private treeDataChangedEmitter = new vscode.EventEmitter<void>();
   private disposables: vscode.Disposable[] = [];
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
 
   constructor() {
     this.disposables.push(
-      Reviewer.instance.onDidReview(() => {
+      Reviewer.instance.onDidReview((e) => {
         this.treeDataChangedEmitter.fire();
       })
     );
@@ -105,17 +105,27 @@ class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | R
   getTreeItem(element: ReviewTreeBranch | ReviewTreeLeaf): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (element instanceof ReviewTreeBranch) {
       const item = new vscode.TreeItem(element.label, element.collapsibleState);
+      const issues = element.children.length;
+      const relativePath = vscode.workspace.asRelativePath(element.document.uri);
+      item.tooltip = new vscode.MarkdownString(`${relativePath} - **${issues}** code health issues found`);
       item.resourceUri = element.document.uri;
       return item;
     }
 
     const item = new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.None);
-    item.iconPath = new vscode.ThemeIcon('cs-logo', new vscode.ThemeColor('button.background'));
-    // item.tooltip = new vscode.MarkdownString(...);
+
+    item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground'));
+    const code = getCsDiagnosticCode(element.diagnostic.code);
+    const msgDetails = element.diagnostic.message.replace(code, '').trim();
+    item.tooltip = new vscode.MarkdownString(
+      `**${code}** ${msgDetails} on line ${element.diagnostic.range.start.line + 1}`
+    );
+
+    const location = new vscode.Location(element.parent.document.uri, element.diagnostic.range);
     item.command = {
-      command: 'codescene.revealRangeInDocument',
-      title: 'Show in editor',
-      arguments: [element.parent.document, element.diagnostic.range],
+      command: 'editor.action.goToLocations',
+      title: 'Go To Location(s)',
+      arguments: [element.parent.document.uri, element.diagnostic.range.start, [location]],
     };
     return item;
   }
