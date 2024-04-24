@@ -8,7 +8,7 @@ import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { reviewResultToDiagnostics } from './utils';
 
-export type ReviewState = 'reviewing' | 'idle';
+export type ReviewEvent = { type: 'reviewstart' | 'reviewend' | 'idle'; document?: vscode.TextDocument };
 
 export default class Reviewer {
   private static _instance: CachingReviewer;
@@ -39,25 +39,23 @@ class CachingReviewer {
 
   private readonly errorEmitter = new vscode.EventEmitter<Error>();
   readonly onDidReviewFail = this.errorEmitter.event;
-  private readonly reviewEmitter = new vscode.EventEmitter<ReviewState>();
+  private readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
   readonly onDidReview = this.reviewEmitter.event;
 
   private reviewsRunning = 0;
 
   constructor(private reviewer: InternalReviewer) {}
 
-  private startReviewEvent() {
+  private startReviewEvent(document: vscode.TextDocument) {
     this.reviewsRunning++;
-    this.reviewEmitter.fire('reviewing');
+    this.reviewEmitter.fire({ type: 'reviewstart', document });
   }
 
-  private endReviewEvent() {
+  private endReviewEvent(document: vscode.TextDocument) {
     this.reviewsRunning--;
+    this.reviewEmitter.fire({ type: 'reviewend', document });
     if (this.reviewsRunning === 0) {
-      this.reviewEmitter.fire('idle');
-    } else {
-      // Fire event to indicate that we are still reviewing although one review has finished
-      this.reviewEmitter.fire('reviewing');
+      this.reviewEmitter.fire({ type: 'idle' });
     }
   }
 
@@ -70,7 +68,7 @@ class CachingReviewer {
       }
     }
 
-    this.startReviewEvent();
+    this.startReviewEvent(document);
     const diagnostics = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
@@ -84,7 +82,7 @@ class CachingReviewer {
         return [] as vscode.Diagnostic[];
       })
       .finally(() => {
-        this.endReviewEvent();
+        this.endReviewEvent(document);
       });
 
     // Store the diagnostics promise in the cache
