@@ -64,7 +64,8 @@
       "explorer": [
         {
           "id": "codescene.explorerCodeReviewView",
-          "name": "Code health"
+          "name": "Code health",
+          "when": "config.codescene.enableCodeHealthView"
         },
         {
           "id": "codescene.explorerAutoRefactorView",
@@ -88,7 +89,7 @@
       },
       {
         "view": "codescene.explorerCodeReviewView",
-        "contents": "When CodeScene code reviews are done, results will be presented here."
+        "contents": "When CodeScene code reviews are done, results will be collected here."
       }
     ],
     "menus": {
@@ -114,28 +115,34 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.enableAutoRefactor": {
+        "codescene.enableCodeHealthView": {
           "type": "boolean",
           "default": false,
-          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
-          "order": 2
+          "description": "Enable code health view in the explorer panel",
+          "order": 5
         },
         "codescene.gitignore": {
           "type": "boolean",
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
-          "order": 3
+          "order": 8
+        },
+        "codescene.enableAutoRefactor": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
+          "order": 15
         },
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://codescene.io",
-          "order": 4
+          "order": 20
         },
         "codescene.cloudApiUrl": {
           "type": "string",
           "default": "https://api.codescene.io",
           "description": "The API URL of the CodeScene Cloud service",
-          "order": 5
+          "order": 22
         }
       }
     },

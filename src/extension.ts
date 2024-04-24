@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
+import { checkCodeHealthRules } from './check-rules';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnostics from './cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
@@ -19,7 +20,6 @@ import { CsReviewCodeLensProvider } from './review/codelens';
 import { ReviewExplorerView } from './review/explorer-view';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
-import { checkCodeHealthRules } from './check-rules';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';

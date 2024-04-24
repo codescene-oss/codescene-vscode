@@ -18,20 +18,24 @@ export class ReviewExplorerView implements vscode.Disposable {
     });
     this.disposables.push(this.view);
 
-    const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-      const document = editor?.document;
-      if (!isDefined(document) || !this.view.visible) return;
-
-      const reviewCacheItem = Reviewer.instance.reviewCache.get(document.fileName);
-      if (!isDefined(reviewCacheItem)) return;
-
-      this.view.reveal(new ReviewTreeBranch(document, reviewCacheItem)).then(undefined, (reason) => {
-        logOutputChannel.warn(`Failed to reveal review tree branch: ${reason}`);
-      });
-    });
+    const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((editor) =>
+      this.revealInTreeView(editor)
+    );
     this.disposables.push(changeTextEditorDisposable);
 
     this.view.description = 'CodeScene analysis results';
+  }
+
+  private revealInTreeView(editor?: vscode.TextEditor) {
+    const document = editor?.document;
+    if (!isDefined(document) || !this.view.visible) return;
+
+    const reviewCacheItem = Reviewer.instance.reviewCache.get(document.fileName);
+    if (!isDefined(reviewCacheItem)) return;
+
+    this.view.reveal(new ReviewTreeBranch(document, reviewCacheItem)).then(undefined, (reason) => {
+      logOutputChannel.warn(`Failed to reveal review tree branch: ${reason}`);
+    });
   }
 
   dispose() {
