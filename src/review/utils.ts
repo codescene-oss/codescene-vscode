@@ -74,7 +74,7 @@ export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: 
   if (reviewResult.score > 0) {
     const scoreDiagnostic = new vscode.Diagnostic(
       new vscode.Range(0, 0, 0, 0),
-      `${chScorePrefix}${+reviewResult.score.toFixed()}/10`,
+      `${chScorePrefix}${+reviewResult.score.toFixed(2)}/10`,
       vscode.DiagnosticSeverity.Information
     );
     return [scoreDiagnostic, ...diagnostics];

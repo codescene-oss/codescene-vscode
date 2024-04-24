@@ -64,8 +64,4 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
 
     return codeLens;
   }
-
-  update() {
-    this.onDidChangeCodeLensesEmitter.fire();
-  }
 }
