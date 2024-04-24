@@ -140,7 +140,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(createRulesTemplateCmd);
 
   const createCheckRules = vscode.commands.registerCommand('codescene.checkRules', () => {
-    checkCodeHealthRules(cliPath);
+    void checkCodeHealthRules(cliPath);
   });
   context.subscriptions.push(createCheckRules);
 
