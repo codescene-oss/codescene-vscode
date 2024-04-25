@@ -25,6 +25,7 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerReviewDecorations } from './review/presentation';
 
 interface CsContext {
   cliPath: string;
@@ -82,6 +83,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   addTmpDiffUriScheme(context);
 
   context.subscriptions.push(new ReviewExplorerView());
+  registerReviewDecorations(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();

@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import Reviewer from '../review/reviewer';
-import { chScorePrefix } from '../review/utils';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
@@ -25,13 +24,13 @@ export class RefactoringsView implements vscode.Disposable {
       this.treeDataProvider.onDidChangeTreeData(async (e) => {
         const fileName = this.treeDataProvider.activeFileName;
         this.view.description = fileName;
+        if (e === 'reviewing') return; // Important to not try and await the scorePresentation below if we know a review is running
+
         if (isDefined(this.treeDataProvider.activeDocument)) {
-          const diagnosticsForDoc = await Reviewer.instance.review(this.treeDataProvider.activeDocument);
-          const score = diagnosticsForDoc.find((d) => d.message.startsWith(chScorePrefix));
-          if (score) {
-            // Add short code health score to the view description
-            this.view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score: ')})`;
-          }
+          const scorePresentation = await Reviewer.instance.review(this.treeDataProvider.activeDocument)
+            .scorePresentation;
+          // Add short code health score to the view description
+          this.view.description = `${fileName} (score: ${scorePresentation})`;
         }
       })
     );

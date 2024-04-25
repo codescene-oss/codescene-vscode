@@ -1,8 +1,9 @@
 import vscode from 'vscode';
 import { logOutputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
+import { scoreToDescription, toCsReviewUri } from './presentation';
 import Reviewer, { ReviewCacheItem } from './reviewer';
-import { chScorePrefix, getCsDiagnosticCode } from './utils';
+import { chScorePrefix, fileAndFunctionLevelIssueCount, formatScore, getCsDiagnosticCode } from './utils';
 
 export class ReviewExplorerView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -22,8 +23,6 @@ export class ReviewExplorerView implements vscode.Disposable {
       this.revealInTreeView(editor)
     );
     this.disposables.push(changeTextEditorDisposable);
-
-    this.view.description = 'CodeScene analysis results';
   }
 
   private revealInTreeView(editor?: vscode.TextEditor) {
@@ -48,32 +47,32 @@ export class ReviewExplorerView implements vscode.Disposable {
 class ReviewTreeBranch {
   document: vscode.TextDocument;
   label: string;
+  score?: number;
+  issues?: number;
   children: ReviewTreeLeaf[] = [];
+  hasError = false;
 
-  constructor(document: vscode.TextDocument, item: ReviewCacheItem) {
+  constructor(document: vscode.TextDocument, { csReview }: ReviewCacheItem) {
     this.document = document;
     const file = document.uri.path.split('/').pop();
     this.label = `${file} - Reviewing...`;
 
-    item.diagnostics
-      .then((diagnostics) => {
-        const scoreDiagnostic = diagnostics.find((d) => d.message.startsWith(chScorePrefix));
-        let score = 'n/a';
-        if (isDefined(scoreDiagnostic)) {
-          score = scoreDiagnostic.message.replace(chScorePrefix, '');
-        }
-        this.label = `${file} - ${score}`;
-        this.children = diagnostics
-          .map((d) => {
-            if (d.message.startsWith(chScorePrefix)) return;
-            return new ReviewTreeLeaf(this, d);
-          })
-          .filter(isDefined)
-          .sort((a, b) => a.diagnostic.range.start.line - b.diagnostic.range.start.line);
-      })
-      .catch(() => {
-        this.label = `${file} - Error in review`;
-      });
+    void csReview.reviewResult.then((reviewResult) => {
+      if (!reviewResult) this.hasError = true;
+      this.score = reviewResult?.score;
+      this.label = `${file} - ${formatScore(this.score)}`;
+      this.issues = reviewResult ? fileAndFunctionLevelIssueCount(reviewResult) : undefined;
+    });
+
+    void csReview.diagnostics.then((diagnostics) => {
+      this.children = diagnostics
+        .map((d) => {
+          if (d.message.startsWith(chScorePrefix)) return;
+          return new ReviewTreeLeaf(this, d);
+        })
+        .filter(isDefined)
+        .sort((a, b) => a.diagnostic.range.start.line - b.diagnostic.range.start.line);
+    });
   }
 
   get collapsibleState(): vscode.TreeItemCollapsibleState {
@@ -109,10 +108,19 @@ class ReviewTreeProvider implements vscode.TreeDataProvider<ReviewTreeBranch | R
   getTreeItem(element: ReviewTreeBranch | ReviewTreeLeaf): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (element instanceof ReviewTreeBranch) {
       const item = new vscode.TreeItem(element.label, element.collapsibleState);
-      const issues = element.children.length;
       const relativePath = vscode.workspace.asRelativePath(element.document.uri);
-      item.tooltip = new vscode.MarkdownString(`${relativePath} - **${issues}** code health issues found`);
-      item.resourceUri = element.document.uri;
+
+      const markdownString = () => {
+        if (element.hasError) return `${relativePath} • Error while reviewing`;
+
+        const score = element.score;
+        return score
+          ? `${relativePath} • **${scoreToDescription(score)}** • ${element.issues} code health issues found`
+          : `${relativePath} • Reviewing...`;
+      };
+
+      item.tooltip = new vscode.MarkdownString(markdownString());
+      item.resourceUri = toCsReviewUri(element.document.uri, { score: element.score, issues: element.issues });
       return item;
     }
 

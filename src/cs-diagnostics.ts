@@ -27,7 +27,7 @@ export default class CsDiagnostics {
       return;
     }
 
-    void Reviewer.instance.review(document, reviewOpts).then((diagnostics) => {
+    void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
       // Remove the diagnostics that are for file level issues. These are only shown as code lenses
       const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
       CsDiagnostics.set(document.uri, importantDiagnostics);

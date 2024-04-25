@@ -33,7 +33,7 @@ export class CsStatusBar {
   }
 
   private isReviewing(stateProperties?: CsStateProperties) {
-    return stateProperties?.reviewEvent?.type !== 'idle';
+    return isDefined(stateProperties?.reviewerState) && stateProperties?.reviewerState !== 'idle';
   }
 
   private textContent(stateProperties?: CsStateProperties) {

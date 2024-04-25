@@ -64,7 +64,7 @@
       "explorer": [
         {
           "id": "codescene.explorerCodeReviewView",
-          "name": "Code health",
+          "name": "Code health review",
           "when": "config.codescene.enableCodeHealthView"
         },
         {
@@ -154,7 +154,41 @@
           "fontCharacter": "\\e900"
         }
       }
-    }
+    },
+    "colors": [
+      {
+        "id": "codescene.codeHealth.healthy",
+        "description": "Color for indicating healthy code",
+        "defaults": {
+          "light": "#4f9f78",
+          "dark": "#72b293"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.problematic",
+        "description": "Color for indicating problematic code that needs attention",
+        "defaults": {
+          "light": "#f19367",
+          "dark": "#f4a985"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.unhealthy",
+        "description": "Color for indicating unhealthy code with high risk for defects",
+        "defaults": {
+          "light": "#e0525c",
+          "dark": "#e6757d"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.undefined",
+        "description": "Color for indicating unknown code health",
+        "defaults": {
+          "light": "#b3bccd",
+          "dark": "#cfd7e7"
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

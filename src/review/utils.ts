@@ -68,13 +68,25 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
   });
 }
 
+export function fileAndFunctionLevelIssueCount(reviewResult: ReviewResult) {
+  return reviewResult.review.reduce((prev, curr) => {
+    if (curr.functions) {
+      return prev + curr.functions.length; // a bunch of function level issues
+    }
+    return prev + 1; // a file level issue
+  }, 0);
+}
+export function formatScore(score: number | void): string {
+  return score ? `${+score.toFixed(2)}/10` : 'n/a';
+}
+
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
   let diagnostics = reviewResult.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
   if (reviewResult.score > 0) {
     const scoreDiagnostic = new vscode.Diagnostic(
       new vscode.Range(0, 0, 0, 0),
-      `${chScorePrefix}${+reviewResult.score.toFixed(2)}/10`,
+      `${chScorePrefix}${formatScore(reviewResult.score)}`,
       vscode.DiagnosticSeverity.Information
     );
     return [scoreDiagnostic, ...diagnostics];

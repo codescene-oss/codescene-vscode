@@ -15,10 +15,12 @@ export interface CsFeatures {
   ace?: PreFlightResponse | Error | string;
 }
 
+export type ReviewerState = 'reviewing' | 'idle';
+
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features?: CsFeatures;
-  reviewEvent?: ReviewEvent;
+  reviewerState?: ReviewerState;
   serviceErrors?: Array<Error | AxiosError>;
 }
 
@@ -52,8 +54,8 @@ export class CsExtensionState implements vscode.Disposable {
   }
 
   addReviewStatusListener(event: vscode.Event<ReviewEvent>) {
-    event((state) => {
-      this.stateProperties.reviewEvent = state;
+    event((event) => {
+      this.stateProperties.reviewerState = event.type === 'idle' ? 'idle' : 'reviewing';
       this.statusBar.update(this.stateProperties);
     });
   }

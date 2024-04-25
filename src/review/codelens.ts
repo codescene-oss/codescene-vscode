@@ -39,7 +39,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    const diagnostics = await Reviewer.instance.review(document);
+    const diagnostics = await Reviewer.instance.review(document).diagnostics;
 
     if (!diagnostics || diagnostics.length === 0) {
       return [];

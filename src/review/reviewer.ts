@@ -6,7 +6,7 @@ import { outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
-import { reviewResultToDiagnostics } from './utils';
+import { formatScore, reviewResultToDiagnostics } from './utils';
 
 export type ReviewEvent = { type: 'reviewstart' | 'reviewend' | 'idle'; document?: vscode.TextDocument };
 
@@ -27,11 +27,30 @@ export interface ReviewOpts {
   [key: string]: string | boolean;
 }
 
+export class CsReview {
+  readonly diagnostics: Promise<vscode.Diagnostic[]>;
+  readonly score: Promise<void | number>;
+
+  constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {
+    this.score = reviewResult.then((reviewResult) => reviewResult?.score);
+    this.diagnostics = reviewResult.then((reviewResult) => {
+      if (!reviewResult) {
+        return [];
+      }
+      return reviewResultToDiagnostics(reviewResult, document);
+    });
+  }
+
+  get scorePresentation() {
+    return this.score.then((score) => formatScore(score));
+  }
+}
+
 // Cache the results of the 'cs review' command so that we don't have to run it again
 export interface ReviewCacheItem {
   document: vscode.TextDocument;
   documentVersion: number;
-  diagnostics: Promise<vscode.Diagnostic[]>;
+  csReview: CsReview;
 }
 
 class CachingReviewer {
@@ -59,39 +78,34 @@ class CachingReviewer {
     }
   }
 
-  review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<vscode.Diagnostic[]> {
+  review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): CsReview {
     // If we have a cached promise for this document, return it.
     if (!reviewOpts.skipCache) {
       const cachedResults = this.reviewCache.get(document.fileName);
       if (cachedResults && cachedResults.documentVersion === document.version) {
-        return cachedResults.diagnostics;
+        return cachedResults.csReview;
       }
     }
 
     this.startReviewEvent(document);
-    const diagnostics = this.reviewer
+    const reviewPromise = this.reviewer
       .review(document, reviewOpts)
-      .then((reviewResult) => {
-        if (!reviewResult) {
-          return [];
-        }
-        return reviewResultToDiagnostics(reviewResult, document);
-      })
       .catch((e) => {
         this.errorEmitter.fire(e);
-        return [] as vscode.Diagnostic[];
       })
       .finally(() => {
         this.endReviewEvent(document);
       });
 
+    const csReview = new CsReview(document, reviewPromise);
+
     // Store the diagnostics promise in the cache
     this.reviewCache.set(document.fileName, {
       document,
       documentVersion: document.version,
-      diagnostics,
+      csReview,
     });
-    return diagnostics;
+    return csReview;
   }
 
   abort(document: vscode.TextDocument): void {
