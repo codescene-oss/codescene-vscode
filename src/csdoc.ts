@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
-import { chScorePrefix } from './review/reviewer';
+import { chScorePrefix, isCsDiagnosticCode } from './review/utils';
 import { getLogoUrl } from './utils';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
@@ -26,7 +26,7 @@ export function register(context: vscode.ExtensionContext) {
   const openDocsForDiagnostic = vscode.commands.registerCommand(
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
-      if (typeof diag.code === 'object') {
+      if (isCsDiagnosticCode(diag.code)) {
         const docsCode = categoryToDocsCode(diag.code.value.toString());
         void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
       } else if (diag.message.startsWith(chScorePrefix)) {

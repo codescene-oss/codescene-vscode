@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
+import { checkCodeHealthRules } from './check-rules';
 import { getConfiguration, onDidChangeConfiguration } from './configuration';
 import CsDiagnostics from './cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
@@ -16,14 +17,15 @@ import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { RefactoringsView } from './refactoring/refactorings-view';
 import { createCodeSmellsFilter } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
+import { ReviewExplorerView } from './review/explorer-view';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
-import { checkCodeHealthRules } from './check-rules';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerReviewDecorations } from './review/presentation';
 
 interface CsContext {
   cliPath: string;
@@ -79,6 +81,9 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   registerCsDoc(context);
   addReviewListeners(context);
   addTmpDiffUriScheme(context);
+
+  context.subscriptions.push(new ReviewExplorerView());
+  registerReviewDecorations(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
@@ -265,7 +270,7 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
 
       // Force update diagnosticCollection to request initial refactorings
       vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-        CsDiagnostics.review(document, { skipCache: true });
+        CsDiagnostics.review(document);
       });
 
       outputChannel.appendLine('Auto-refactor enabled!');

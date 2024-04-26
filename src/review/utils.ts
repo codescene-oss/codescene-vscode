@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import { csSource } from '../cs-diagnostics';
 import { categoryToDocsCode } from '../csdoc';
-import { IssueDetails, ReviewIssue } from './model';
+import { IssueDetails, ReviewIssue, ReviewResult } from './model';
+
+export const chScorePrefix = 'Code health score: ';
 
 // Finds the column range of the function name in the line of code that it appears in
 export function getFunctionNameRange(line: string, functionName: string): [number, number] {
@@ -44,7 +46,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
       reviewIssue.category,
       vscode.DiagnosticSeverity.Warning
     );
-    diagnostic.code = createDiagnosticCode(reviewIssue.category);
+    diagnostic.code = createCsDiagnosticCode(reviewIssue.category);
     return [diagnostic];
   }
 
@@ -61,9 +63,36 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
     }
     const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
     diagnostic.source = csSource;
-    diagnostic.code = createDiagnosticCode(category);
+    diagnostic.code = createCsDiagnosticCode(category);
     return diagnostic;
   });
+}
+
+export function fileAndFunctionLevelIssueCount(reviewResult: ReviewResult) {
+  return reviewResult.review.reduce((prev, curr) => {
+    if (curr.functions) {
+      return prev + curr.functions.length; // a bunch of function level issues
+    }
+    return prev + 1; // a file level issue
+  }, 0);
+}
+export function formatScore(score: number | void): string {
+  return score ? `${+score.toFixed(2)}/10` : 'n/a';
+}
+
+export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
+  let diagnostics = reviewResult.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+
+  if (reviewResult.score > 0) {
+    const scoreDiagnostic = new vscode.Diagnostic(
+      new vscode.Range(0, 0, 0, 0),
+      `${chScorePrefix}${formatScore(reviewResult.score)}`,
+      vscode.DiagnosticSeverity.Information
+    );
+    return [scoreDiagnostic, ...diagnostics];
+  } else {
+    return diagnostics;
+  }
 }
 
 /**
@@ -71,7 +100,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
  * @param category
  * @returns
  */
-function createDiagnosticCode(category: string) {
+function createCsDiagnosticCode(category: string) {
   const docsCode = categoryToDocsCode(category);
   const args = [vscode.Uri.parse(`csdoc:${docsCode}.md`)];
   const openDocCommandUri = vscode.Uri.parse(
@@ -81,4 +110,21 @@ function createDiagnosticCode(category: string) {
     value: category,
     target: openDocCommandUri,
   };
+}
+
+/**
+ * Used throughtout the extension to determine if a diagnostic code is a CodeScene diagnostic code
+ *
+ * @param code vscode.Diagnostic.code
+ * @returns true if the code is a diagnostic code that is most probably created by createCsDiagnosticCode above
+ */
+export function isCsDiagnosticCode(
+  code?: string | number | { value: string | number; target: vscode.Uri }
+): code is { value: string; target: vscode.Uri } {
+  if (typeof code !== 'object') return false;
+  return code.target instanceof vscode.Uri && code.target.scheme === 'command';
+}
+
+export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }): string {
+  return isCsDiagnosticCode(code) ? code.value.toString() : 'unknown diagnostic code';
 }

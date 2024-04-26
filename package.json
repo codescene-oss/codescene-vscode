@@ -63,6 +63,11 @@
     "views": {
       "explorer": [
         {
+          "id": "codescene.explorerCodeReviewView",
+          "name": "Code health review",
+          "when": "config.codescene.enableCodeHealthView"
+        },
+        {
           "id": "codescene.explorerAutoRefactorView",
           "name": "Auto-refactor"
         }
@@ -81,6 +86,10 @@
         "view": "codescene.explorerAutoRefactorView",
         "contents": "To see Auto-refactoring suggestions, you need to \n1. Participate in the [CodeScene ACE beta program](https://codescene.com/ai) \n2. Sign in to a CodeScene server\n3. Enable CodeScene ACE in settings",
         "when": "!codescene.isSignedIn || !config.codescene.enableAutoRefactor"
+      },
+      {
+        "view": "codescene.explorerCodeReviewView",
+        "contents": "When CodeScene code reviews are done, results will be collected here."
       }
     ],
     "menus": {
@@ -106,28 +115,34 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.enableAutoRefactor": {
+        "codescene.enableCodeHealthView": {
           "type": "boolean",
           "default": false,
-          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
-          "order": 2
+          "description": "Enable code health view in the explorer panel",
+          "order": 5
         },
         "codescene.gitignore": {
           "type": "boolean",
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
-          "order": 3
+          "order": 8
+        },
+        "codescene.enableAutoRefactor": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
+          "order": 15
         },
         "codescene.cloudUrl": {
           "type": "string",
           "default": "https://codescene.io",
-          "order": 4
+          "order": 20
         },
         "codescene.cloudApiUrl": {
           "type": "string",
           "default": "https://api.codescene.io",
           "description": "The API URL of the CodeScene Cloud service",
-          "order": 5
+          "order": 22
         }
       }
     },
@@ -139,7 +154,41 @@
           "fontCharacter": "\\e900"
         }
       }
-    }
+    },
+    "colors": [
+      {
+        "id": "codescene.codeHealth.healthy",
+        "description": "Color for indicating healthy code",
+        "defaults": {
+          "light": "#4f9f78",
+          "dark": "#72b293"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.problematic",
+        "description": "Color for indicating problematic code that needs attention",
+        "defaults": {
+          "light": "#f19367",
+          "dark": "#f4a985"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.unhealthy",
+        "description": "Color for indicating unhealthy code with high risk for defects",
+        "defaults": {
+          "light": "#e0525c",
+          "dark": "#e6757d"
+        }
+      },
+      {
+        "id": "codescene.codeHealth.undefined",
+        "description": "Color for indicating unknown code health",
+        "defaults": {
+          "light": "#b3bccd",
+          "dark": "#cfd7e7"
+        }
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

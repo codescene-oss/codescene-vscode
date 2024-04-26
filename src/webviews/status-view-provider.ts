@@ -53,6 +53,9 @@ export class StatusViewProvider implements WebviewViewProvider {
         case 'focus-problems-view':
           void vscode.commands.executeCommand('workbench.action.problems.focus');
           return;
+        case 'focus-explorer-code-health-view':
+          void vscode.commands.executeCommand('codescene.explorerCodeReviewView.focus');
+          return;
         case 'clear-errors':
           void vscode.commands.executeCommand('codescene.extensionState.clearErrors');
           logOutputChannel.clear();
@@ -112,9 +115,9 @@ export class StatusViewProvider implements WebviewViewProvider {
       return /*html*/ `
         <h3>Code Health Analysis</h3>
         <p>Live <a href="https://codescene.io/docs/terminology/codescene-terminology.html#code-health">Code Health</a> 
-        Analysis is enabled. Code health metrics and issues are available as a CodeLenses and in the 
-        <a href="" id="problems-panel-link">Problems panel</a>.
-        </p>
+        Analysis is enabled. Code health metrics and issues are available as a CodeLense and in the 
+        <a href="" id="problems-panel-link">Problems panel</a>. Analysed files are also available in the 
+        <a href="" id="explorer-code-health-link">Code Health view</a>, if it's enabled.</p>
       `;
     }
     if (features?.codeHealthAnalysis instanceof Error) {

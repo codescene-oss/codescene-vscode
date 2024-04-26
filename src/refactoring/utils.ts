@@ -37,7 +37,7 @@ export function createCodeSmellsFilter(refactorCapabilities: PreFlightResponse):
 }
 
 /**
- * Finds the editor associated with the request document.
+ * Finds the editor associated with a document.
  *
  * Primarily this is the activeTextEditor, but that might be out of focus. If so, we will
  * target the first editor in the list of visibleTextEditors matching the request document.

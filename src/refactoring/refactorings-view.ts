@@ -1,16 +1,15 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
-import Reviewer, { ReviewState, chScorePrefix } from '../review/reviewer';
+import Reviewer from '../review/reviewer';
 import { isDefined } from '../utils';
 import { pendingSymbol, presentRefactoringCmdName, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
-import { targetEditor } from './utils';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 
 export class RefactoringsView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: RefactoringsTreeProvider;
-  private view: vscode.TreeView<CsRefactoringRequest | ReviewState>;
+  private view: vscode.TreeView<CsRefactoringRequest | ReviewStatus>;
 
   constructor() {
     this.treeDataProvider = new RefactoringsTreeProvider();
@@ -25,23 +24,19 @@ export class RefactoringsView implements vscode.Disposable {
       this.treeDataProvider.onDidChangeTreeData(async (e) => {
         const fileName = this.treeDataProvider.activeFileName;
         this.view.description = fileName;
+        if (e === 'reviewing') return; // Important to not try and await the scorePresentation below if we know a review is running
+
         if (isDefined(this.treeDataProvider.activeDocument)) {
-          const diagnosticsForDoc = await Reviewer.instance.review(this.treeDataProvider.activeDocument);
-          const score = diagnosticsForDoc.find((d) => d.message.startsWith(chScorePrefix));
-          if (score) {
-            // Add short code health score to the view description
-            this.view.description = `${fileName} (${score.message.replace(chScorePrefix, 'score')})`;
-          }
+          const scorePresentation = await Reviewer.instance.review(this.treeDataProvider.activeDocument)
+            .scorePresentation;
+          // Add short code health score to the view description
+          this.view.description = `${fileName} (score: ${scorePresentation})`;
         }
       })
     );
 
     this.disposables.push(
       vscode.commands.registerCommand('codescene.gotoAndPresentRefactoring', this.gotoAndPresentRefactoring, this)
-    );
-
-    this.disposables.push(
-      vscode.commands.registerCommand('codescene.revealFunctionInDocument', this.revealFunctionInDocument, this)
     );
   }
 
@@ -68,34 +63,35 @@ export class RefactoringsView implements vscode.Disposable {
       return;
     }
 
-    this.revealFunctionInDocument(response);
-    void vscode.commands.executeCommand(presentRefactoringCmdName, response);
-  }
+    void vscode.commands.executeCommand(
+      'editor.action.goToLocations',
+      response.document.uri,
+      response.fnToRefactor.range.start,
+      [new vscode.Location(response.document.uri, response.fnToRefactor.range)]
+    );
 
-  private revealFunctionInDocument(response: ResolvedRefactoring) {
-    const editor = targetEditor(response.document);
-    if (editor) {
-      editor.revealRange(response.fnToRefactor.range, vscode.TextEditorRevealType.Default);
-    }
+    void vscode.commands.executeCommand(presentRefactoringCmdName, response);
   }
 
   dispose() {
     this.treeDataProvider.dispose(); // Dispose and clear the treedataprovider first, emptying the view
-    this.view.description = ''; // Don't leave a trailling description when disposing the view
+    this.view.description = ''; // Don't leave a trailing description when disposing the view
 
     this.disposables.forEach((d) => d.dispose());
   }
 }
 
+type ReviewStatus = 'reviewing' | 'done';
+
 class RefactoringsTreeProvider
-  implements vscode.TreeDataProvider<CsRefactoringRequest | ReviewState>, vscode.Disposable
+  implements vscode.TreeDataProvider<CsRefactoringRequest | ReviewStatus>, vscode.Disposable
 {
   private disposables: vscode.Disposable[] = [];
-  private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | ReviewState | void>();
+  private treeDataChangedEmitter = new vscode.EventEmitter<CsRefactoringRequest | ReviewStatus | void>();
   readonly onDidChangeTreeData = this.treeDataChangedEmitter.event;
   private readonly documentSelector: vscode.DocumentSelector;
-  private reviewState: ReviewState = 'idle';
 
+  private documentsInReview: Map<string, ReviewStatus> = new Map();
   activeDocument: vscode.TextDocument | undefined;
 
   constructor() {
@@ -108,21 +104,30 @@ class RefactoringsTreeProvider
     });
     this.disposables.push(changeRequestsDisposable);
 
-    const reviewStateDisposable = Reviewer.instance.onDidReview((state) => {
-      this.reviewState = state;
-      this.treeDataChangedEmitter.fire();
-    });
-    this.disposables.push(reviewStateDisposable);
-
     const changeTextEditorDisposable = vscode.window.onDidChangeActiveTextEditor((e) => {
-      this.activeDocument = this.validEditorDoc(e);
-      this.treeDataChangedEmitter.fire();
+      const newActiveDoc = this.validEditorDoc(e);
+      if (isDefined(newActiveDoc)) {
+        this.activeDocument = newActiveDoc;
+        this.treeDataChangedEmitter.fire();
+      }
     });
     this.disposables.push(changeTextEditorDisposable);
+
+    const reviewListenerDisposable = Reviewer.instance.onDidReview((e) => {
+      if (!e.document) return;
+      if (e.type === 'reviewstart') {
+        this.documentsInReview.set(e.document?.fileName, 'reviewing');
+        this.treeDataChangedEmitter.fire('reviewing');
+      } else if (e.type === 'reviewend') {
+        this.documentsInReview.set(e.document?.fileName, 'done');
+        this.treeDataChangedEmitter.fire('done');
+      }
+    });
+    this.disposables.push(reviewListenerDisposable);
   }
 
   private validEditorDoc(e: vscode.TextEditor | undefined) {
-    if (isDefined(e) && vscode.languages.match(this.documentSelector, e?.document) !== 0) return e.document;
+    if (isDefined(e) && vscode.languages.match(this.documentSelector, e.document) !== 0) return e.document;
   }
 
   get activeFileName(): string | undefined {
@@ -137,7 +142,7 @@ class RefactoringsTreeProvider
     this.disposables.forEach((d) => d.dispose());
   }
 
-  getTreeItem(childElement: CsRefactoringRequest | ReviewState): vscode.TreeItem | Thenable<vscode.TreeItem> {
+  getTreeItem(childElement: CsRefactoringRequest | ReviewStatus): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (!(childElement instanceof CsRefactoringRequest)) {
       return new vscode.TreeItem('⏳ Code review in progress...', vscode.TreeItemCollapsibleState.None);
     }
@@ -151,24 +156,24 @@ class RefactoringsTreeProvider
     };
     const item = new vscode.TreeItem(toString(childElement), vscode.TreeItemCollapsibleState.None);
     item.tooltip = `Click to go to location in ${childElement.document.fileName.split('/').pop()}`;
+
+    const location = new vscode.Location(childElement.document.uri, childElement.fnToRefactor.range);
     item.command = {
-      title: 'Show in file',
-      command: 'codescene.revealFunctionInDocument',
-      arguments: [childElement],
+      command: 'editor.action.goToLocations',
+      title: 'Go To Location(s)',
+      arguments: [childElement.document.uri, childElement.fnToRefactor.range.start, [location]],
     };
     return item;
   }
 
   getChildren(
-    element?: CsRefactoringRequest | ReviewState | undefined
-  ): vscode.ProviderResult<CsRefactoringRequest[] | ReviewState[]> {
+    element?: CsRefactoringRequest | ReviewStatus | undefined
+  ): vscode.ProviderResult<CsRefactoringRequest[] | ReviewStatus[]> {
     if (element || !this.activeDocument) {
       return [];
     }
 
-    if (this.reviewState === 'reviewing') {
-      return [this.reviewState];
-    }
+    if (this.documentsInReview.get(this.activeDocument.fileName) !== 'done') return ['reviewing'];
 
     const requestsForActiveDoc = CsRefactoringRequests.getAll(this.activeDocument);
     const presentableRefactoring = requestsForActiveDoc.filter((r) => r.shouldPresent());

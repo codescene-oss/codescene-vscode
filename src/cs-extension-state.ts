@@ -5,7 +5,7 @@ import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse } from './refactoring/model';
-import { ReviewState } from './review/reviewer';
+import { ReviewEvent } from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
@@ -15,10 +15,12 @@ export interface CsFeatures {
   ace?: PreFlightResponse | Error | string;
 }
 
+export type ReviewerState = 'reviewing' | 'idle';
+
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features?: CsFeatures;
-  reviewState?: ReviewState;
+  reviewerState?: ReviewerState;
   serviceErrors?: Array<Error | AxiosError>;
 }
 
@@ -51,9 +53,9 @@ export class CsExtensionState implements vscode.Disposable {
     });
   }
 
-  addReviewStatusListener(event: vscode.Event<ReviewState>) {
-    event((state) => {
-      this.stateProperties.reviewState = state;
+  addReviewStatusListener(event: vscode.Event<ReviewEvent>) {
+    event((event) => {
+      this.stateProperties.reviewerState = event.type === 'idle' ? 'idle' : 'reviewing';
       this.statusBar.update(this.stateProperties);
     });
   }

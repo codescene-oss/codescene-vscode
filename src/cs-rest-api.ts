@@ -2,10 +2,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as vscode from 'vscode';
 import { getServerApiUrl } from './configuration';
+import { Coupling } from './coupling/model';
 import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
-import { Coupling } from './coupling/model';
+import { getCsDiagnosticCode } from './review/utils';
 
 const defaultTimeout = 10000;
 const refactoringTimeout = 60000;
@@ -109,20 +110,14 @@ export class CsRestApi {
     };
     const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
 
-    const codeToCategory = (
-      diagnosticCode: string | number | { value: string | number; target: vscode.Uri } | undefined
-    ) => {
-      if (typeof diagnosticCode === 'object') {
-        return diagnosticCode.value.toString();
-      }
-      return 'unknown category';
-    };
-
-    const reviews = diagnostics.map((diagnostic) => ({
-      category: codeToCategory(diagnostic.code),
-      'start-line': diagnostic.range.start.line - fnToRefactor.range.start.line,
-      'end-line': diagnostic.range.end.line - fnToRefactor.range.start.line,
-    }));
+    const reviews = diagnostics.map((diagnostic) => {
+      const category = getCsDiagnosticCode(diagnostic.code);
+      return {
+        category,
+        'start-line': diagnostic.range.start.line - fnToRefactor.range.start.line,
+        'end-line': diagnostic.range.end.line - fnToRefactor.range.start.line,
+      };
+    });
 
     const request: RefactorRequest = {
       review: reviews,
