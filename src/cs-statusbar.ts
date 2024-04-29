@@ -32,17 +32,17 @@ export class CsStatusBar {
     return isDefined(stateProperties?.session);
   }
 
-  private isReviewing(stateProperties?: CsStateProperties) {
-    return isDefined(stateProperties?.reviewerState) && stateProperties?.reviewerState !== 'idle';
+  private isAnalysing(stateProperties?: CsStateProperties) {
+    return isDefined(stateProperties?.analysisState) && stateProperties?.analysisState !== 'idle';
   }
 
   private textContent(stateProperties?: CsStateProperties) {
-    if (this.isReviewing(stateProperties)) return '$(loading~spin) Reviewing';
+    if (this.isAnalysing(stateProperties)) return '$(loading~spin) Analysing';
     return `$(cs-logo) ${this.isOnline(stateProperties) ? 'Active/Online' : 'Active'}`;
   }
 
   private tooltipContent(stateProperties?: CsStateProperties) {
-    if (this.isReviewing(stateProperties)) return 'CodeScene review in progress...';
+    if (this.isAnalysing(stateProperties)) return 'CodeScene analysis in progress...';
     return `${
       this.isOnline(stateProperties) ? 'CodeScene extension active, user signed in' : 'CodeScene extension active'
     }`;

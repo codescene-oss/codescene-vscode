@@ -1,12 +1,14 @@
 import vscode from 'vscode';
 import { isDefined } from '../utils';
 
+const scheme = 'codescene-review';
+
 class ReviewDecorationProvider implements vscode.FileDecorationProvider {
   provideFileDecoration(
     uri: vscode.Uri,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<vscode.FileDecoration> {
-    if (uri.scheme === 'codescene-review') {
+    if (uri.scheme === scheme) {
       const queryParams = new URLSearchParams(uri.query);
       const score = isDefined(queryParams.get('score')) ? parseFloat(queryParams.get('score')!) : undefined;
       const badge = queryParams.get('issues') || '';
@@ -57,7 +59,7 @@ export function toCsReviewUri(uri: vscode.Uri, { score, issues }: { score?: numb
   issues && queryParams.set('issues', issues.toString());
 
   const reviewUri = uri.with({
-    scheme: 'codescene-review',
+    scheme,
     authority: 'codescene',
     query: queryParams.toString(),
   });

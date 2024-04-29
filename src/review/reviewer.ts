@@ -7,8 +7,9 @@ import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
+import { AnalysisEvent } from '../analysis-common';
 
-export type ReviewEvent = { type: 'reviewstart' | 'reviewend' | 'idle'; document?: vscode.TextDocument };
+export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
 export default class Reviewer {
   private static _instance: CachingReviewer;
@@ -67,12 +68,12 @@ class CachingReviewer {
 
   private startReviewEvent(document: vscode.TextDocument) {
     this.reviewsRunning++;
-    this.reviewEmitter.fire({ type: 'reviewstart', document });
+    this.reviewEmitter.fire({ type: 'start', document });
   }
 
   private endReviewEvent(document: vscode.TextDocument) {
     this.reviewsRunning--;
-    this.reviewEmitter.fire({ type: 'reviewend', document });
+    this.reviewEmitter.fire({ type: 'end', document });
     if (this.reviewsRunning === 0) {
       this.reviewEmitter.fire({ type: 'idle' });
     }
