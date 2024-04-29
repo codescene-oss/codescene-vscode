@@ -43,6 +43,10 @@
         "title": "CodeScene: Check code health rule match for selected file"
       },
       {
+        "command": "codescene.runDeltaAnalysis",
+        "title": "CodeScene: Run delta analysis"
+      },
+      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },

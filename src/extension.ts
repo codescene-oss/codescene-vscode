@@ -26,6 +26,7 @@ import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerReviewDecorations } from './review/presentation';
+import { registerDeltaCommand } from './delta/analyser';
 
 interface CsContext {
   cliPath: string;
@@ -131,6 +132,8 @@ function setupStatsCollector() {
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   const { cliPath, csExtensionState } = csContext;
+
+  registerDeltaCommand(context, cliPath);
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
