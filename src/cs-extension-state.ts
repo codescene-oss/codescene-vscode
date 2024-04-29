@@ -2,25 +2,27 @@ import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
+import { DeltaAnalyser } from './delta/analyser';
 import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse } from './refactoring/model';
-import { ReviewEvent } from './review/reviewer';
+import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
+import { AnalysisEvent } from './analysis-common';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
   ace?: PreFlightResponse | Error | string;
 }
 
-export type ReviewerState = 'reviewing' | 'idle';
+export type RunnerState = 'running' | 'idle';
 
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features?: CsFeatures;
-  reviewerState?: ReviewerState;
+  analysisState?: RunnerState;
   serviceErrors?: Array<Error | AxiosError>;
 }
 
@@ -45,19 +47,26 @@ export class CsExtensionState implements vscode.Disposable {
     );
   }
 
-  addErrorListener(event: vscode.Event<Error | AxiosError<unknown, any>>) {
-    event((error) => {
-      if (!this.stateProperties.serviceErrors) this.stateProperties.serviceErrors = [];
-      this.stateProperties.serviceErrors.push(error);
-      this.updateStatusViews();
-    });
+  /**
+   * Call this after the Reviewer and DeltaAnalyser have been initialized.
+   */
+  addListeners() {
+    Reviewer.instance.onDidReview(this.handleAnalysisEvent.bind(this));
+    Reviewer.instance.onDidReviewFail(this.handleError.bind(this));
+    DeltaAnalyser.instance.onDidAnalyse(this.handleAnalysisEvent.bind(this));
+    DeltaAnalyser.instance.onDidAnalysisFail(this.handleError.bind(this));
+    CsRefactoringRequests.onDidRequestFail(this.handleError.bind(this));
   }
 
-  addReviewStatusListener(event: vscode.Event<ReviewEvent>) {
-    event((event) => {
-      this.stateProperties.reviewerState = event.type === 'idle' ? 'idle' : 'reviewing';
-      this.statusBar.update(this.stateProperties);
-    });
+  private handleAnalysisEvent(event: AnalysisEvent) {
+    this.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
+    this.statusBar.update(this.stateProperties);
+  }
+
+  private handleError(error: Error) {
+    if (!this.stateProperties.serviceErrors) this.stateProperties.serviceErrors = [];
+    this.stateProperties.serviceErrors.push(error);
+    this.updateStatusViews();
   }
 
   updateStatusViews() {
