@@ -296,9 +296,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
     if (e.added && e.added.length > 0) {
-      enableRemoteFeatures(context, csContext);
       // We only have one session in this extension currently, so grabbing the first one is ok.
       csExtensionState.setSession(e.added[0]);
+      enableRemoteFeatures(context, csContext);
     } else {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
