@@ -168,9 +168,11 @@ class DeltaResult {
     } else if (this.result === 'failed') {
       return 'Analysis failed';
     } else {
-      return `🚩 ${this.result.name} ${roundScore(this.result['old-score'])} -> ${roundScore(
+      const scoreString = `${this.result['old-score'] ? roundScore(this.result['old-score']) : 'n/a'} -> ${roundScore(
         this.result['new-score']
       )}`;
+
+      return `🚩 ${this.result.name} ${scoreString}`;
     }
   }
 }
@@ -201,12 +203,16 @@ function findingsFromDelta(delta: DeltaForFile | DeltaAnalysisState) {
   if (typeof delta === 'string') return [];
 
   const deltaFindings = delta.findings.flatMap((finding) =>
-    finding['change-details'].flatMap((changeDetail) =>
-      changeDetail.locations.map(
+    finding['change-details'].flatMap((changeDetail) => {
+      if (!changeDetail.locations) {
+        return new DeltaFinding(finding.category, changeDetail.description, new vscode.Position(0, 0));
+      }
+
+      return changeDetail.locations.map(
         (location) =>
-          new DeltaFinding(finding.category, changeDetail.description, new vscode.Position(location['start-line'], 0))
-      )
-    )
+          new DeltaFinding(finding.category, changeDetail.description, new vscode.Position(location['start-line'], 0)) // function-level issues
+      );
+    })
   );
   return deltaFindings;
 }

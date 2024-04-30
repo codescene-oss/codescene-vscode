@@ -2,7 +2,7 @@
 export interface DeltaForFile {
   name: string;
   findings: Finding[];
-  'old-score': number;
+  'old-score': number | null;
   'new-score': number;
 }
 
@@ -18,7 +18,7 @@ interface ChangeDetails {
   'change-type': ChangeType;
   description: string;
   value: number;
-  locations: Location[];
+  locations?: Location[];
 }
 
 interface Location {
