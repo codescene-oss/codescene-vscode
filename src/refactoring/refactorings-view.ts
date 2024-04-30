@@ -24,11 +24,12 @@ export class RefactoringsView implements vscode.Disposable {
       this.treeDataProvider.onDidChangeTreeData(async (e) => {
         const fileName = this.treeDataProvider.activeFileName;
         this.view.description = fileName;
-        if (e === 'reviewing') return; // Important to not try and await the scorePresentation below if we know a review is running
 
         if (isDefined(this.treeDataProvider.activeDocument)) {
-          const scorePresentation = await Reviewer.instance.review(this.treeDataProvider.activeDocument)
-            .scorePresentation;
+          const reviewCacheItem = Reviewer.instance.reviewCache.get(this.treeDataProvider.activeDocument.fileName);
+          if (!reviewCacheItem) return;
+
+          const scorePresentation = await reviewCacheItem.csReview.scorePresentation;
           // Add short code health score to the view description
           this.view.description = `${fileName} (score: ${scorePresentation})`;
         }

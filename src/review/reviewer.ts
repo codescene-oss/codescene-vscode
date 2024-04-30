@@ -90,6 +90,11 @@ class CachingReviewer {
     this.startReviewEvent(document);
     const reviewPromise = this.reviewer
       .review(document, reviewOpts)
+      .then((reviewResult) => {
+        // Don't cache aborted/void reviews
+        if (!reviewResult) this.reviewCache.delete(document.fileName);
+        return reviewResult;
+      })
       .catch((e) => {
         this.errorEmitter.fire(e);
       })
@@ -135,7 +140,7 @@ class SimpleReviewer implements InternalReviewer {
     // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
     const documentDirectory = dirname(document.uri.fsPath);
 
-    const { stdout, duration } = await this.executor.execute(
+    const { stdout, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
         args: ['review', '--file-type', extension, '--output-format', 'json'],
@@ -144,6 +149,7 @@ class SimpleReviewer implements InternalReviewer {
       { cwd: documentDirectory },
       document.getText()
     );
+    if (exitCode === 'ABORT_ERR') return;
     StatsCollector.instance.recordAnalysis(extension, duration);
     return JSON.parse(stdout) as ReviewResult;
   }

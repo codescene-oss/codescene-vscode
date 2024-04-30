@@ -4,7 +4,7 @@ import { logOutputChannel } from './log';
 export interface ExecResult {
   stdout: string;
   stderr: string;
-  exitCode: number;
+  exitCode: number | string;
   duration: number;
 }
 
@@ -44,9 +44,11 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          // Ignore ABORT_ERR, they are expected from the LimitingExecutor
+          // Resolve ABORT_ERRors - they are expected, but explicitly set output to empty just in case
           if (error.code === 'ABORT_ERR') {
-            logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" aborted after ${Date.now() - start} ms`);
+            const end = Date.now();
+            logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" aborted after ${end - start} ms`);
+            resolve({ stdout: '', stderr: '', exitCode: error?.code || 0, duration: end - start });
             return;
           }
           logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);

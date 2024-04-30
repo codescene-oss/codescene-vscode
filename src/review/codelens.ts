@@ -23,6 +23,13 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
   constructor() {
     outputChannel.appendLine('Creating Review CodeLens provider');
     this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
+    this.disposables.push(
+      Reviewer.instance.onDidReview((event) => {
+        if (event.type === 'reviewend') {
+          this.onDidChangeCodeLensesEmitter.fire();
+        }
+      })
+    );
   }
 
   get onDidChangeCodeLenses(): vscode.Event<void> {
@@ -39,7 +46,8 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    const diagnostics = await Reviewer.instance.review(document).diagnostics;
+    const cacheItem = Reviewer.instance.reviewCache.get(document.fileName);
+    const diagnostics = cacheItem && (await cacheItem.csReview.diagnostics);
 
     if (!diagnostics || diagnostics.length === 0) {
       return [];
