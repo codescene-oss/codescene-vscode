@@ -78,7 +78,8 @@
         },
         {
           "id": "codescene.deltaTreeView",
-          "name": "Quality Gate"
+          "name": "Quality Gate",
+          "icon": "$(lock)"
         }
       ],
       "codescene-activity-bar": [

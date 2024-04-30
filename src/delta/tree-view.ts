@@ -17,6 +17,16 @@ export class DeltaAnalysisView implements vscode.Disposable {
       showCollapseAll: true,
     });
 
+    this.treeDataProvider.onDidTreeUpdate((tree) => {
+      const results = resultsInTree(tree);
+      const issues = issuesInFiles(results);
+      this.view.badge = {
+        value: results.length,
+        tooltip:
+          results.length > 0 ? `Found ${results.length} file(s) with declining code health (${issues} issues)` : '',
+      };
+    });
+
     this.disposables.push(
       this.view.onDidChangeVisibility((e) => {
         if (e.visible) {
@@ -33,6 +43,27 @@ export class DeltaAnalysisView implements vscode.Disposable {
   }
 }
 
+function issuesInFiles(items: Array<DeltaResult | DeltaFinding>): number {
+  return items.reduce((prev, curr) => {
+    if (curr instanceof DeltaFinding) {
+      return prev + 1; // Count DeltaFindings
+    }
+    return prev + issuesInFiles(curr.children); // Recurse into DeltaFindings
+  }, 0);
+}
+
+function resultsInTree(items: Array<GitRoot | DeltaResult>): DeltaResult[] {
+  const deltaResults: DeltaResult[] = [];
+  items.forEach((item) => {
+    if (item instanceof DeltaResult) {
+      if (typeof item.result !== 'string') deltaResults.push(item); // Only count when result is done
+      return;
+    }
+    deltaResults.push(...resultsInTree(item.children));
+  });
+  return deltaResults;
+}
+
 class DeltaAnalysisTreeProvider
   implements vscode.TreeDataProvider<GitRoot | DeltaResult | DeltaFinding>, vscode.Disposable
 {
@@ -40,6 +71,12 @@ class DeltaAnalysisTreeProvider
     new vscode.EventEmitter<GitRoot | DeltaResult>();
   readonly onDidChangeTreeData: vscode.Event<GitRoot | DeltaResult | DeltaFinding | void> =
     this.treeDataChangedEmitter.event;
+
+  private treeUpdateEmitter: vscode.EventEmitter<Array<GitRoot | DeltaResult>> = new vscode.EventEmitter<
+    Array<GitRoot | DeltaResult>
+  >();
+  readonly onDidTreeUpdate = this.treeUpdateEmitter.event;
+
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
@@ -76,7 +113,9 @@ class DeltaAnalysisTreeProvider
       return []; // No children for DeltaResult. Yet
     }
 
-    return buildTree();
+    const tree = buildTree();
+    this.treeUpdateEmitter.fire(tree);
+    return tree;
   }
 
   dispose() {
@@ -113,7 +152,7 @@ class GitRoot {
 }
 
 class DeltaResult {
-  private result: DeltaForFile | DeltaAnalysisState;
+  readonly result: DeltaForFile | DeltaAnalysisState;
   readonly collapsibleState: vscode.TreeItemCollapsibleState;
   readonly children: DeltaFinding[] = [];
   constructor(result: DeltaForFile | DeltaAnalysisState) {
