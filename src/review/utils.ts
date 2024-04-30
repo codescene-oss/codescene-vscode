@@ -76,8 +76,12 @@ export function fileAndFunctionLevelIssueCount(reviewResult: ReviewResult) {
     return prev + 1; // a file level issue
   }, 0);
 }
+
+export function roundScore(score: number): number {
+  return +score.toFixed(2);
+}
 export function formatScore(score: number | void): string {
-  return score ? `${+score.toFixed(2)}/10` : 'n/a';
+  return score ? `${roundScore(score)}/10` : 'n/a';
 }
 
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {

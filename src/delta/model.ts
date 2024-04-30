@@ -6,16 +6,16 @@ export interface DeltaForFile {
   'new-score': number;
 }
 
-interface Finding {
+export interface Finding {
   category: string;
-  'change-type': string;
+  'change-type': ChangeType;
   'new-pp': number;
   'change-details': ChangeDetails[];
   threshold: number;
 }
 
 interface ChangeDetails {
-  'change-type': string;
+  'change-type': ChangeType;
   description: string;
   value: number;
   locations: Location[];
@@ -26,3 +26,5 @@ interface Location {
   'end-line': number;
   function: string;
 }
+
+type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';

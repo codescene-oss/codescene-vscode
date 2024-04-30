@@ -44,7 +44,8 @@
       },
       {
         "command": "codescene.runDeltaAnalysis",
-        "title": "CodeScene: Run delta analysis"
+        "title": "CodeScene: Run delta analysis",
+        "icon": "$(refresh)"
       },
       {
         "command": "codescene.openCodeHealthDocs",
@@ -74,6 +75,10 @@
         {
           "id": "codescene.explorerAutoRefactorView",
           "name": "Auto-refactor"
+        },
+        {
+          "id": "codescene.deltaTreeView",
+          "name": "Quality Gate"
         }
       ],
       "codescene-activity-bar": [
@@ -101,6 +106,13 @@
         {
           "command": "codescene.gotoAndPresentRefactoring",
           "when": "view == codescene.explorerAutoRefactorView"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "codescene.runDeltaAnalysis",
+          "when": "view === codescene.deltaTreeView",
+          "group": "navigation"
         }
       ],
       "commandPalette": [

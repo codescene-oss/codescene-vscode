@@ -7,6 +7,8 @@ import { CsExtensionState } from './cs-extension-state';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { register as registerCsDoc } from './csdoc';
+import { DeltaAnalyser, registerDeltaCommand } from './delta/analyser';
+import { DeltaAnalysisView } from './delta/tree-view';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector, toRefactoringDocumentSelector } from './language-support';
 import { outputChannel } from './log';
@@ -18,6 +20,7 @@ import { RefactoringsView } from './refactoring/refactorings-view';
 import { createCodeSmellsFilter } from './refactoring/utils';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import { ReviewExplorerView } from './review/explorer-view';
+import { registerReviewDecorations } from './review/presentation';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
@@ -25,8 +28,6 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { registerReviewDecorations } from './review/presentation';
-import { registerDeltaCommand } from './delta/analyser';
 
 interface CsContext {
   cliPath: string;
@@ -66,6 +67,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
     csExtensionState,
   };
   Reviewer.init(cliPath);
+  DeltaAnalyser.init(cliPath);
 
   Telemetry.init(context.extension, cliPath);
   // send telemetry on activation (gives us basic usage stats)
@@ -85,6 +87,8 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
 
   context.subscriptions.push(new ReviewExplorerView());
   registerReviewDecorations(context);
+
+  context.subscriptions.push(new DeltaAnalysisView());
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
