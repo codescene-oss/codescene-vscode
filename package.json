@@ -100,6 +100,10 @@
       {
         "view": "codescene.explorerCodeReviewView",
         "contents": "When CodeScene code reviews are done, results will be collected here."
+      },
+      {
+        "view": "codescene.deltaTreeView",
+        "contents": "Click the refresh button to initiate a CodeScene delta analysis. This will compare the current state of your code with the latest (HEAD) commit and present any introduced code smells."
       }
     ],
     "menus": {
