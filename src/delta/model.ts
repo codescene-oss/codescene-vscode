@@ -14,17 +14,26 @@ export interface Finding {
   threshold: number;
 }
 
-interface ChangeDetails {
+export interface ChangeDetails {
   'change-type': ChangeType;
   description: string;
   value: number;
   locations?: Location[];
 }
 
-interface Location {
-  'start-line': number;
-  'end-line': number;
+export interface Location {
+  'start-line'?: number;
+  'end-line'?: number;
+  'start-line-before'?: number;
+  'end-line-before'?: number;
   function: string;
 }
 
-type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';
+export type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';
+
+export function isImprovement(changeType: ChangeType) {
+  return changeType === 'improved' || changeType === 'fixed';
+}
+export function isDegradation(changeType: ChangeType) {
+  return changeType === 'degraded' || changeType === 'introduced';
+}

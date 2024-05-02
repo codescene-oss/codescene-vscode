@@ -28,6 +28,7 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerDeltaAnalysisDecorations } from './delta/presentation';
 
 interface CsContext {
   cliPath: string;
@@ -86,6 +87,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string, csExt
   registerReviewDecorations(context);
 
   context.subscriptions.push(new DeltaAnalysisView());
+  registerDeltaAnalysisDecorations(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
