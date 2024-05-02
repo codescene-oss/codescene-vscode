@@ -81,11 +81,8 @@ class DeltaAnalysisTreeProvider
 
   constructor() {
     this.disposables.push(
-      DeltaAnalyser.instance.onDidAnalysisEnd(() => {
-        this.treeDataChangedEmitter.fire();
-      }),
-      DeltaAnalyser.instance.onDidAnalysisStart(() => {
-        this.treeDataChangedEmitter.fire();
+      DeltaAnalyser.instance.onDidAnalyse((event) => {
+        if (event.type !== 'idle') this.treeDataChangedEmitter.fire();
       })
     );
   }

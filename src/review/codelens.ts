@@ -25,7 +25,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
     this.disposables.push(
       Reviewer.instance.onDidReview((event) => {
-        if (event.type === 'reviewend') {
+        if (event.type === 'end') {
           this.onDidChangeCodeLensesEmitter.fire();
         }
       })

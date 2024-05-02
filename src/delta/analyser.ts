@@ -2,7 +2,9 @@ import vscode, { workspace } from 'vscode';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { DeltaForFile } from './model';
+import { AnalysisEvent } from '../analysis-common';
 
+export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
 export type DeltaAnalysisState = 'running' | 'failed';
 export type DeltaAnalysisResult = DeltaForFile[] | DeltaAnalysisState;
 
@@ -16,10 +18,13 @@ export function registerDeltaCommand(context: vscode.ExtensionContext, cliPath: 
 
 export class DeltaAnalyser {
   private static _instance: DeltaAnalyser;
-  private analysisStartEmitter: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
-  readonly onDidAnalysisStart = this.analysisStartEmitter.event;
-  private analysisEndEmitter: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
-  readonly onDidAnalysisEnd = this.analysisEndEmitter.event;
+
+  private readonly errorEmitter = new vscode.EventEmitter<Error>();
+  readonly onDidAnalysisFail = this.errorEmitter.event;
+  private analysisEmitter: vscode.EventEmitter<DeltaAnalysisEvent> = new vscode.EventEmitter<DeltaAnalysisEvent>();
+  readonly onDidAnalyse = this.analysisEmitter.event;
+
+  private analysesRunning = 0;
 
   readonly analysisResults: Map<string, DeltaForFile[] | DeltaAnalysisResult> = new Map();
 
@@ -34,10 +39,6 @@ export class DeltaAnalyser {
   }
 
   static analyseWorkspace() {
-    return DeltaAnalyser._instance.analyseWorkspace();
-  }
-
-  async analyseWorkspace() {
     const rootPaths = workspace.workspaceFolders?.map((folder) => {
       return folder.uri.fsPath;
     });
@@ -46,12 +47,25 @@ export class DeltaAnalyser {
     }
 
     rootPaths.forEach(async (rootPath) => {
-      void this.runDeltaAnalysis(rootPath);
+      void DeltaAnalyser._instance.runDeltaAnalysis(rootPath);
     });
   }
 
+  private startAnalysisEvent(path: string) {
+    this.analysesRunning++;
+    this.analysisEmitter.fire({ type: 'start', path });
+  }
+
+  private endAnalysisEvent(path: string) {
+    this.analysesRunning--;
+    this.analysisEmitter.fire({ type: 'end', path });
+    if (this.analysesRunning === 0) {
+      this.analysisEmitter.fire({ type: 'idle' });
+    }
+  }
+
   async runDeltaAnalysis(rootPath: string) {
-    this.analysisStartEmitter.fire();
+    this.startAnalysisEvent(rootPath);
     DeltaAnalyser.instance.analysisResults.set(rootPath, 'running');
     return new SimpleExecutor()
       .execute({ command: this.cliPath, args: ['delta', '--output-format', 'json'] }, { cwd: rootPath })
@@ -66,11 +80,11 @@ export class DeltaAnalyser {
         DeltaAnalyser.instance.analysisResults.set(rootPath, JSON.parse(result.stdout) as DeltaForFile[]);
       })
       .catch((error) => {
-        logOutputChannel.error(`Error running delta analysis in ${rootPath}: ${error}`);
         DeltaAnalyser.instance.analysisResults.set(rootPath, 'failed');
+        this.errorEmitter.fire(error);
       })
       .finally(() => {
-        this.analysisEndEmitter.fire();
+        this.endAnalysisEvent(rootPath);
       });
   }
 }

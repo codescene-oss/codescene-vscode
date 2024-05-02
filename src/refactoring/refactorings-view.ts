@@ -116,10 +116,10 @@ class RefactoringsTreeProvider
 
     const reviewListenerDisposable = Reviewer.instance.onDidReview((e) => {
       if (!e.document) return;
-      if (e.type === 'reviewstart') {
+      if (e.type === 'start') {
         this.documentsInReview.set(e.document?.fileName, 'reviewing');
         this.treeDataChangedEmitter.fire('reviewing');
-      } else if (e.type === 'reviewend') {
+      } else if (e.type === 'end') {
         this.documentsInReview.set(e.document?.fileName, 'done');
         this.treeDataChangedEmitter.fire('done');
       }

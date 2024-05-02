@@ -10,6 +10,7 @@ import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider } from './webviews/status-view-provider';
+import { AnalysisEvent } from './analysis-common';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -50,20 +51,16 @@ export class CsExtensionState implements vscode.Disposable {
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
   addListeners() {
-    Reviewer.instance.onDidReview((event) => {
-      this.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
-      this.statusBar.update(this.stateProperties);
-    });
-    DeltaAnalyser.instance.onDidAnalysisStart(() => {
-      this.stateProperties.analysisState = 'running';
-      this.statusBar.update(this.stateProperties);
-    });
-    DeltaAnalyser.instance.onDidAnalysisEnd(() => {
-      this.stateProperties.analysisState = 'idle';
-      this.statusBar.update(this.stateProperties);
-    });
+    Reviewer.instance.onDidReview(this.handleAnalysisEvent.bind(this));
     Reviewer.instance.onDidReviewFail(this.handleError.bind(this));
+    DeltaAnalyser.instance.onDidAnalyse(this.handleAnalysisEvent.bind(this));
+    DeltaAnalyser.instance.onDidAnalysisFail(this.handleError.bind(this));
     CsRefactoringRequests.onDidRequestFail(this.handleError.bind(this));
+  }
+
+  private handleAnalysisEvent(event: AnalysisEvent) {
+    this.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
+    this.statusBar.update(this.stateProperties);
   }
 
   private handleError(error: Error) {
