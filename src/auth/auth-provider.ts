@@ -15,6 +15,7 @@ import {
 } from 'vscode';
 import { getServerUrl } from '../configuration';
 import { outputChannel } from '../log';
+import Telemetry from '../telemetry';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -127,6 +128,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
    * Log in to CodeScene
    */
   private async login() {
+    Telemetry.instance.logUsage('auth/attempted');
     return await window.withProgress<LoginResponse>(
       {
         location: ProgressLocation.Notification,
@@ -149,6 +151,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
             codeExchangePromise.promise,
             new Promise<LoginResponse>((_, reject) => setTimeout(() => reject('Cancelled'), 60000)),
             promiseFromEvent<any, any>(cancel.onCancellationRequested, (_, __, reject) => {
+              Telemetry.instance.logUsage('auth/cancelled');
               reject('User Cancelled');
             }).promise,
           ]);
@@ -173,20 +176,24 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       const userId = query.get('user-id');
 
       if (token === null) {
+        Telemetry.instance.logUsage('auth/rejected');
         reject('No token found in redirect');
         return;
       }
 
       if (name === null) {
+        Telemetry.instance.logUsage('auth/rejected');
         reject('No name found in redirect');
         return;
       }
 
       if (userId === null) {
+        Telemetry.instance.logUsage('auth/rejected');
         reject('No user-id found in redirect');
         return;
       }
 
+      Telemetry.instance.logUsage('auth/successful');
       resolve({ name, token, userId });
     };
   }
