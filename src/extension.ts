@@ -284,7 +284,6 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { csExtensionState } = csContext;
   const authProvider = new CsAuthenticationProvider(context);
 
   // If there's already a session we enable the remote features, otherwise a badge will appear in the
@@ -295,15 +294,15 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
-    if (e.added && e.added.length > 0) {
-      // We only have one session in this extension currently, so grabbing the first one is ok.
-      csExtensionState.setSession(e.added[0]);
-      enableRemoteFeatures(context, csContext);
-    } else {
+    if (e.removed && e.removed.length > 0) {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       void vscode.authentication.getSession(AUTH_TYPE, []);
-      csExtensionState.setSession(undefined);
+      onGetSessionSuccess(context, csContext)(undefined); // removed a session
+    }
+    if (e.added && e.added.length > 0) {
+      // We only have one session in this extension currently, so grabbing the first one is ok.
+      onGetSessionSuccess(context, csContext)(e.added[0]);
     }
   });
   context.subscriptions.push(authProvider);

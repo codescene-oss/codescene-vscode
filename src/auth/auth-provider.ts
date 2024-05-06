@@ -1,16 +1,17 @@
 import { v4 as uuid } from 'uuid';
 import {
-  authentication,
   AuthenticationProvider,
   AuthenticationProviderAuthenticationSessionsChangeEvent,
   AuthenticationSession,
+  CancellationTokenSource,
   Disposable,
-  env,
   EventEmitter,
   ExtensionContext,
   ProgressLocation,
   Uri,
   UriHandler,
+  authentication,
+  env,
   window,
 } from 'vscode';
 import { getServerUrl } from '../configuration';
@@ -36,6 +37,7 @@ interface LoginResponse {
 }
 
 export class CsAuthenticationProvider implements AuthenticationProvider, Disposable {
+  private static runningLogin?: CancellationTokenSource;
   private sessionChangeEmitter = new EventEmitter<AuthenticationProviderAuthenticationSessionsChangeEvent>();
   private disposable: Disposable;
   private uriHandler = new UriEventHandler();
@@ -128,14 +130,15 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
    * Log in to CodeScene
    */
   private async login() {
+    this.cancelLogin();
     Telemetry.instance.logUsage('auth/attempted');
-    return await window.withProgress<LoginResponse>(
+    return window.withProgress<LoginResponse>(
       {
         location: ProgressLocation.Notification,
         title: 'Signing in to CodeScene...',
         cancellable: true,
       },
-      async (_, cancel) => {
+      async (_, cancelButtonToken) => {
         const tokenParams = new URLSearchParams({
           next: `/configuration/devtools-tokens/add/vscode`,
         });
@@ -144,22 +147,40 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
         await env.openExternal(loginUrl);
 
-        let codeExchangePromise = promiseFromEvent(this.uriHandler.event, this.handleUri());
+        const promises: Promise<any>[] = [];
+        const codeExchangePromise = promiseFromEvent(this.uriHandler.event, this.handleUri());
+        const timeoutPromise = new Promise<LoginResponse>((_, reject) => setTimeout(() => reject('Cancelled'), 60000));
+        const cancelledByButtonPromise = promiseFromEvent(
+          cancelButtonToken.onCancellationRequested,
+          (_, __, reject) => {
+            Telemetry.instance.logUsage('auth/cancelled');
+            reject('User Cancelled');
+          }
+        ).promise;
+        promises.push(codeExchangePromise.promise, timeoutPromise, cancelledByButtonPromise);
+
+        if (CsAuthenticationProvider.runningLogin) {
+          promises.push(
+            promiseFromEvent(CsAuthenticationProvider.runningLogin.token.onCancellationRequested, (_, __, reject) => {
+              Telemetry.instance.logUsage('auth/cancelled');
+              reject('Cancelled due to starting another login attempt');
+            }).promise
+          );
+        }
 
         try {
-          return await Promise.race([
-            codeExchangePromise.promise,
-            new Promise<LoginResponse>((_, reject) => setTimeout(() => reject('Cancelled'), 60000)),
-            promiseFromEvent<any, any>(cancel.onCancellationRequested, (_, __, reject) => {
-              Telemetry.instance.logUsage('auth/cancelled');
-              reject('User Cancelled');
-            }).promise,
-          ]);
+          return await Promise.race(promises);
         } finally {
-          codeExchangePromise?.cancel.fire();
+          codeExchangePromise.cancel.fire();
         }
       }
     );
+  }
+
+  // Cancel currently running login (if any)
+  private cancelLogin() {
+    if (CsAuthenticationProvider.runningLogin) CsAuthenticationProvider.runningLogin.cancel();
+    CsAuthenticationProvider.runningLogin = new CancellationTokenSource();
   }
 
   /**
