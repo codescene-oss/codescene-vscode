@@ -5,20 +5,6 @@ import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analys
 import { ChangeDetails, ChangeType, DeltaForFile, Location, isDegradation, isImprovement } from './model';
 import { toCsAnalysisUri } from './presentation';
 
-export function buildTree(): Array<GitRoot | FileWithChanges | DeltaAnalysisState> {
-  // Skip the GitRoot level if there's only one workspace
-  if (DeltaAnalyser.instance.analysisResults.size === 1) {
-    const [rootPath, analysis] = DeltaAnalyser.instance.analysisResults.entries().next().value;
-    return gitRootChildren(analysis, new GitRoot(rootPath, analysis));
-  }
-
-  const items: Array<GitRoot | FileWithChanges> = [];
-  DeltaAnalyser.instance.analysisResults.forEach((value, key) => {
-    items.push(new GitRoot(key, value));
-  });
-  return items;
-}
-
 export function issuesInFiles(items: Array<FileWithChanges | DeltaFinding>): number {
   return items.reduce((prev, curr) => {
     if (curr instanceof DeltaFinding) {
@@ -46,6 +32,34 @@ export function resultsInTree(items: Array<GitRoot | FileWithChanges | DeltaAnal
 
 interface DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem;
+}
+
+export function buildTree(): Array<GitRoot | FileWithChanges | DeltaAnalysisState> {
+  // Skip the GitRoot level if there's only one workspace
+  if (DeltaAnalyser.instance.analysisResults.size === 1) {
+    const [rootPath, analysis] = DeltaAnalyser.instance.analysisResults.entries().next().value;
+    return gitRootChildren(analysis, new GitRoot(rootPath, analysis));
+  }
+
+  const items: Array<GitRoot | FileWithChanges> = [];
+  DeltaAnalyser.instance.analysisResults.forEach((value, key) => {
+    items.push(new GitRoot(key, value));
+  });
+  return items;
+}
+
+function gitRootChildren(analysis: DeltaAnalysisResult, parent: GitRoot): Array<FileWithChanges | DeltaAnalysisState> {
+  if (typeof analysis === 'string') {
+    return [analysis];
+  }
+
+  if (analysis.length === 0) return [];
+
+  const items: FileWithChanges[] = [];
+  analysis.forEach((deltaForFile) => {
+    items.push(new FileWithChanges(deltaForFile, parent));
+  });
+  return items.sort((a, b) => a.uri.path.localeCompare(b.uri.path));
 }
 
 export class GitRoot implements DeltaTreeViewItem {
@@ -80,7 +94,8 @@ export class FileWithChanges implements DeltaTreeViewItem {
       this.result['new-score']
     )}`;
     const fileName = path.basename(this.result.name);
-    item.label = `🚩 ${fileName} ${scoreString}`;
+    item.label = `${fileName} ${scoreString}`;
+    item.contextValue = 'fileWithChanges';
     return item;
   }
 }
@@ -88,11 +103,11 @@ export class FileWithChanges implements DeltaTreeViewItem {
 export class DeltaFinding implements DeltaTreeViewItem {
   private fnName?: string;
   private description: string;
-  private position: vscode.Position;
+  readonly position: vscode.Position;
   readonly changeType: ChangeType;
 
   constructor(
-    private parent: FileWithChanges,
+    readonly parent: FileWithChanges,
     private category: string,
     changeDetails: ChangeDetails,
     location?: Location
@@ -116,13 +131,17 @@ export class DeltaFinding implements DeltaTreeViewItem {
     }
     item.tooltip = `${statusText} • ${this.description}`;
 
-    const location = new vscode.Location(this.parent.uri, this.position);
-    item.command = {
-      command: 'editor.action.goToLocations',
-      title: 'Go To Location(s)',
-      arguments: [this.parent.uri, this.position, [location]],
-    };
+    if (this.supportsRefactoring()) {
+      item.contextValue = 'deltaFindingRefactorable';
+    } else {
+      item.contextValue = 'deltaFinding';
+    }
     return item;
+  }
+
+  // TODO - implement support for filtering DeltaFindings based on preflight response
+  private supportsRefactoring() {
+    return true;
   }
 
   private label() {
@@ -131,20 +150,6 @@ export class DeltaFinding implements DeltaTreeViewItem {
     }
     return `${this.category}`;
   }
-}
-
-function gitRootChildren(analysis: DeltaAnalysisResult, parent: GitRoot): Array<FileWithChanges | DeltaAnalysisState> {
-  if (typeof analysis === 'string') {
-    return [analysis];
-  }
-
-  if (analysis.length === 0) return [];
-
-  const items: FileWithChanges[] = [];
-  analysis.forEach((deltaForFile) => {
-    items.push(new FileWithChanges(deltaForFile, parent));
-  });
-  return items;
 }
 
 function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
@@ -159,7 +164,7 @@ function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
       );
     })
   );
-  return deltaFindings;
+  return deltaFindings.sort((a, b) => a.position.line - b.position.line);
 }
 
 function getLineNumber(location: Location) {

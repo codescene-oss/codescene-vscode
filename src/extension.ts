@@ -8,6 +8,7 @@ import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { register as registerCsDoc } from './csdoc';
 import { DeltaAnalyser, registerDeltaCommand } from './delta/analyser';
+import { registerDeltaAnalysisDecorations } from './delta/presentation';
 import { DeltaAnalysisView } from './delta/tree-view';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector, toRefactoringDocumentSelector } from './language-support';
@@ -28,7 +29,6 @@ import Telemetry from './telemetry';
 import { registerStatusViewProvider } from './webviews/status-view-provider';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { registerDeltaAnalysisDecorations } from './delta/presentation';
 
 interface CsContext {
   cliPath: string;

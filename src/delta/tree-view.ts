@@ -16,15 +16,17 @@ export class DeltaAnalysisView implements vscode.Disposable {
       showCollapseAll: true,
     });
 
-    this.treeDataProvider.onDidTreeUpdate((tree) => {
-      const results = resultsInTree(tree);
-      const issues = issuesInFiles(results);
-      this.view.badge = {
-        value: results.length,
-        tooltip:
-          results.length > 0 ? `Found ${results.length} file(s) with declining code health (${issues} issues)` : '',
-      };
-    });
+    this.disposables.push(
+      this.treeDataProvider.onDidTreeUpdate((tree) => {
+        const results = resultsInTree(tree);
+        const issues = issuesInFiles(results);
+        this.view.badge = {
+          value: results.length,
+          tooltip:
+            results.length > 0 ? `Found ${results.length} file(s) with declining code health (${issues} issues)` : '',
+        };
+      })
+    );
 
     this.disposables.push(
       this.view.onDidChangeVisibility((e) => {
@@ -35,6 +37,20 @@ export class DeltaAnalysisView implements vscode.Disposable {
     );
 
     this.disposables.push(this.view);
+
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.deltaTreeContext.goto', (event: DeltaFinding) => {
+        const uri = event.parent.uri;
+        const position = event.position;
+        const location = new vscode.Location(uri, position);
+        void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
+      })
+    );
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.deltaTreeContext.requestRefactoring', (event: DeltaFinding) => {
+        console.log('Request refactoring context command called!');
+      })
+    );
   }
 
   dispose() {
