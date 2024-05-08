@@ -33,7 +33,9 @@ export default class CsDiagnostics {
       CsDiagnostics.set(document.uri, importantDiagnostics);
 
       // Try to request refactorings for the important diagnostics
-      void vscode.commands.executeCommand(requestRefactoringsCmdName, document, importantDiagnostics);
+      void vscode.commands
+        .executeCommand(requestRefactoringsCmdName, document, importantDiagnostics)
+        .then(undefined, (error) => {}); // ignore unregistered command
     });
   }
 }

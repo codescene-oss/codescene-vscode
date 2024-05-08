@@ -1,16 +1,15 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
+import { AnalysisEvent } from './analysis-common';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { DeltaAnalyser } from './delta/analyser';
-import { CsRefactoringCommands } from './refactoring/commands';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
-import { StatusViewProvider } from './webviews/status-view-provider';
-import { AnalysisEvent } from './analysis-common';
+import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -31,100 +30,91 @@ export interface CsStateProperties {
  * the state properties, the other part is to handle the state of components that are registered
  * when the user signs in and out of CodeScene.
  */
-export class CsExtensionState implements vscode.Disposable {
-  private disposables: vscode.Disposable[] = [];
-  private stateProperties: CsStateProperties = {};
+export class CsExtensionState {
+  readonly stateProperties: CsStateProperties = {};
+  readonly statusViewProvider: StatusViewProvider;
+  readonly statusBar: CsStatusBar;
 
-  private refactoringCommand: CsRefactoringCommands | undefined;
-  private aceFeatureDisposables: vscode.Disposable[] = [];
+  constructor(context: vscode.ExtensionContext) {
+    this.statusViewProvider = registerStatusViewProvider(context);
+    this.statusBar = new CsStatusBar();
+  }
 
-  constructor(private readonly statusViewProvider: StatusViewProvider, private readonly statusBar: CsStatusBar) {
-    this.disposables.push(
-      vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
-        this.stateProperties.serviceErrors = undefined;
-        this.updateStatusViews();
-      })
-    );
+  private static _instance: CsExtensionState;
+
+  static init(context: vscode.ExtensionContext) {
+    CsExtensionState._instance = new CsExtensionState(context);
+  }
+  static get stateProperties() {
+    return CsExtensionState._instance.stateProperties;
   }
 
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  addListeners() {
-    Reviewer.instance.onDidReview(this.handleAnalysisEvent.bind(this));
-    Reviewer.instance.onDidReviewFail(this.handleError.bind(this));
-    DeltaAnalyser.instance.onDidAnalyse(this.handleAnalysisEvent.bind(this));
-    DeltaAnalyser.instance.onDidAnalysisFail(this.handleError.bind(this));
-    CsRefactoringRequests.onDidRequestFail(this.handleError.bind(this));
+  static addListeners() {
+    Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent);
+    Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleError);
+    DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent);
+    DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleError);
+    CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError);
+  }
+
+  static clearErrors() {
+    CsExtensionState.stateProperties.serviceErrors = undefined;
+    CsExtensionState._instance.updateStatusViews();
   }
 
   private handleAnalysisEvent(event: AnalysisEvent) {
-    this.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
-    this.statusBar.update(this.stateProperties);
+    CsExtensionState.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
+    CsExtensionState._instance.updateStatusViews(); // TODO - flag to update status bar only
   }
 
   private handleError(error: Error) {
-    if (!this.stateProperties.serviceErrors) this.stateProperties.serviceErrors = [];
-    this.stateProperties.serviceErrors.push(error);
-    this.updateStatusViews();
+    if (!CsExtensionState.stateProperties.serviceErrors) CsExtensionState.stateProperties.serviceErrors = [];
+    CsExtensionState.stateProperties.serviceErrors.push(error);
+    CsExtensionState._instance.updateStatusViews();
   }
 
-  updateStatusViews() {
-    this.statusViewProvider.update(this.stateProperties);
-    this.statusBar.update(this.stateProperties);
+  private updateStatusViews() {
+    // TODO - statusviews can read from stateProperties directly
+    CsExtensionState._instance.statusViewProvider.update(CsExtensionState.stateProperties);
+    CsExtensionState._instance.statusBar.update(CsExtensionState.stateProperties);
   }
 
   /**
    * Sets session state and updates the codescene.isSignedIn context variable.
-   * This can be used in package.json to conditionally enable/disable views.
+   * It's used in package.json to conditionally enable/disable views.
    */
-  setSession(session?: vscode.AuthenticationSession) {
+  static setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsRestApi.instance.setSession(session);
     Telemetry.instance.setSession(session);
-    this.stateProperties.session = session;
+    CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      this.disableACE('Not signed in'); // Ace cannot be active if not signed in
+      CsExtensionState.setACEState('Not signed in'); // Ace cannot be active if not signed in
       return;
     }
 
-    this.updateStatusViews();
+    CsExtensionState._instance.updateStatusViews();
   }
 
-  get session(): vscode.AuthenticationSession | undefined {
-    return this.stateProperties.session;
+  static get session(): vscode.AuthenticationSession | undefined {
+    return CsExtensionState.stateProperties.session;
   }
 
-  setCliStatus(cliStatus: string | Error) {
-    this.stateProperties.features = { ...this.stateProperties.features, codeHealthAnalysis: cliStatus };
-    this.updateStatusViews();
+  static setCliState(cliState: string | Error) {
+    CsExtensionState.stateProperties.features = {
+      ...CsExtensionState.stateProperties.features,
+      codeHealthAnalysis: cliState,
+    };
+    CsExtensionState._instance.updateStatusViews();
   }
 
-  enableACE(preFlight: PreFlightResponse, disposables: vscode.Disposable[]) {
-    this.stateProperties.features = { ...this.stateProperties.features, ace: preFlight };
-    this.aceFeatureDisposables = disposables;
-    this.refactoringCommand?.enableRequestRefactoringsCmd(preFlight);
-    this.updateStatusViews();
-  }
-
-  disableACE(reason: Error | string) {
-    this.stateProperties.features = { ...this.stateProperties.features, ace: reason };
-
-    this.refactoringCommand?.disableRequestRefactoringsCmd();
-    this.aceFeatureDisposables.forEach((d) => d.dispose());
-    this.aceFeatureDisposables = [];
-    CsRefactoringRequests.deleteAll();
-    this.updateStatusViews();
-  }
-
-  setRefactoringCommand(refactoringCommand: CsRefactoringCommands) {
-    this.refactoringCommand = refactoringCommand;
-  }
-
-  dispose() {
-    this.disposables.forEach((d) => d.dispose());
-    // (aceFeatureDisposables are added to context.subscriptions and disposed from there)
+  static setACEState(aceState: PreFlightResponse | Error | string) {
+    CsExtensionState.stateProperties.features = { ...CsExtensionState.stateProperties.features, ace: aceState };
+    CsExtensionState._instance.updateStatusViews();
   }
 }
