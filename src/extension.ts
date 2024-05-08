@@ -222,9 +222,11 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, cliPat
       outputChannel.appendLine('Auto-refactor enabled!');
     },
     (error: Error | string) => {
-      const message = typeof error === 'string' ? error : error.message;
-      outputChannel.appendLine(`Unable to enable refactoring capabilities. ${message}`);
-      void vscode.window.showErrorMessage(`Unable to enable refactoring capabilities. ${message}`);
+      if (error instanceof Error) {
+        const message = `Unable to enable refactoring capabilities. ${error.message}`;
+        outputChannel.appendLine(message);
+        void vscode.window.showErrorMessage(message);
+      }
       CsExtensionState.setACEState(error);
     }
   );
