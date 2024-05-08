@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.1...v0.7.2) (2024-05-08)
+
+
+### Features
+
+* Add loading indication in status-bar and Auto-refactor panel when reviewing code ([89b7c52](https://github.com/codescene-oss/codescene-vscode/commit/89b7c5228a512c98d574da8160b7c56033c05035))
+* Added a check rules command to utilize check-rules in CLI ([663c2db](https://github.com/codescene-oss/codescene-vscode/commit/663c2dbf35051342bf86443bcf16b7d8f0f011c9))
+* Code Health Review panel, a view of analysed files ([c93e7c2](https://github.com/codescene-oss/codescene-vscode/commit/c93e7c2a3466435923950a466688efef58ec1a3f))
+
+
+### Bug fixes
+
+* Cancels currently running login if initiating another while waiting ([9bfad0e](https://github.com/codescene-oss/codescene-vscode/commit/9bfad0e0e5bf48dd8b3225b4d34168c0228a796d))
+* Get back review debounce behaviour on file changes ([fed400a](https://github.com/codescene-oss/codescene-vscode/commit/fed400a9cc56454a52fcf86631529169952e6e13))
+* Regression in ACE activation when first signing in ([723718d](https://github.com/codescene-oss/codescene-vscode/commit/723718de38739bd6fb57ccf3f633a58dead15981))
+* Show welcomeView for Auto-refactor panel when setting is disabled ([7ffec91](https://github.com/codescene-oss/codescene-vscode/commit/7ffec91da122d96a6d3516ed32f5fac37052e3c1))
+
 ### [0.7.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.0...v0.7.1) (2024-04-09)
 
 ## [0.7.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.6.1...v0.7.0) (2024-03-22)
