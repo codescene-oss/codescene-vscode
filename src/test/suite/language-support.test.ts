@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { toRefactoringDocumentSelector } from '../../language-support';
+import { toRefactoringDocumentSelector } from '../../refactoring/addon';
 import { RefactoringSupport } from '../../refactoring/model';
 
 suite('Language support test suite', () => {

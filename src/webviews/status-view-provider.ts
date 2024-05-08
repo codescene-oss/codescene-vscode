@@ -6,7 +6,7 @@ import vscode, {
   WebviewViewProvider,
   WebviewViewResolveContext,
 } from 'vscode';
-import { CsFeatures, CsStateProperties } from '../cs-extension-state';
+import { CsExtensionState, CsFeatures, CsStateProperties } from '../cs-extension-state';
 import { toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
@@ -57,7 +57,7 @@ export class StatusViewProvider implements WebviewViewProvider {
           void vscode.commands.executeCommand('codescene.explorerCodeReviewView.focus');
           return;
         case 'clear-errors':
-          void vscode.commands.executeCommand('codescene.extensionState.clearErrors');
+          CsExtensionState.clearErrors();
           logOutputChannel.clear();
           return;
         case 'show-codescene-log-output':

@@ -82,23 +82,11 @@ export function reviewDocumentSelector(): vscode.DocumentSelector {
  *
  * This is used in determining what files to enable refactoring features for.
  */
-function fileTypeToLanguageId(fileType: string) {
+export function fileTypeToLanguageId(fileType: string) {
   return extToLanguageId.get(fileType);
 }
 
 export function toDistinctLanguageIds(supportedFileTypes: string[]): string[] {
   const definedLangIds = supportedFileTypes.flatMap(fileTypeToLanguageId).filter(isDefined);
   return [...new Set(definedLangIds)];
-}
-
-/**
- *
- * @param refactoringSupport
- * @returns A list of distinct DocumentSelectors for the supported file types
- */
-export function toRefactoringDocumentSelector(supportedFileTypes: string[]): vscode.DocumentSelector {
-  return toDistinctLanguageIds(supportedFileTypes).map((language) => ({
-    language,
-    scheme: 'file',
-  }));
 }

@@ -1,12 +1,10 @@
 import vscode from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
-import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
 import { CsRefactoringRequests, ResolvedRefactoring, validConfidenceLevel } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
 import { RefactoringPanel } from './refactoring-panel';
-import { createCodeSmellsFilter } from './utils';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const presentRefactoringCmdName = 'codescene.presentRefactoring';
@@ -20,67 +18,51 @@ export interface FnToRefactor {
   functionType: string;
 }
 
-interface RefactoringCommandProps {
-  documentSelector: vscode.DocumentSelector;
-  codeSmellFilter: DiagnosticFilter;
-  maxInputLoc: number;
-}
-
-export class CsRefactoringCommands {
+export class CsRefactoringCommands implements vscode.Disposable {
+  private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri;
-  private commandProps?: RefactoringCommandProps;
 
-  constructor(context: vscode.ExtensionContext, private cliPath: string) {
-    this.extensionUri = context.extensionUri;
+  constructor(
+    extensionUri: vscode.Uri,
+    private cliPath: string,
+    private documentSelector: vscode.DocumentSelector,
+    private codeSmellFilter: DiagnosticFilter,
+    private maxInputLoc: number
+  ) {
+    this.extensionUri = extensionUri;
     const requestRefactoringCmd = vscode.commands.registerCommand(
       requestRefactoringsCmdName,
       this.requestRefactorings,
       this
     );
-    context.subscriptions.push(requestRefactoringCmd);
+    this.disposables.push(requestRefactoringCmd);
+
     const presentRefactoringCmd = vscode.commands.registerCommand(
       presentRefactoringCmdName,
       this.presentRefactoringRequest,
       this
     );
-    context.subscriptions.push(presentRefactoringCmd);
+    this.disposables.push(presentRefactoringCmd);
   }
 
-  presentRefactoringRequest(refactoring: ResolvedRefactoring) {
+  private presentRefactoringRequest(refactoring: ResolvedRefactoring) {
     RefactoringPanel.createOrShow({
       extensionUri: this.extensionUri,
       refactoring,
     });
   }
 
-  enableRequestRefactoringsCmd(preflightResponse: PreFlightResponse) {
-    this.commandProps = {
-      documentSelector: toRefactoringDocumentSelector(preflightResponse.supported['file-types']),
-      codeSmellFilter: createCodeSmellsFilter(preflightResponse),
-      maxInputLoc: preflightResponse['max-input-loc'],
-    };
-  }
+  private async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    if (vscode.languages.match(this.documentSelector, document) === 0) return;
+    const supportedDiagnostics = diagnostics.filter(this.codeSmellFilter);
 
-  disableRequestRefactoringsCmd() {
-    this.commandProps = undefined;
-  }
-
-  async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (!isDefined(this.commandProps)) return;
-    if (vscode.languages.match(this.commandProps.documentSelector, document) === 0) return;
-    const supportedDiagnostics = diagnostics.filter(this.commandProps.codeSmellFilter);
-
-    const distinctFns = await this.distinctFnsFromDiagnostics(
-      document,
-      supportedDiagnostics,
-      this.commandProps.maxInputLoc
-    );
+    const distinctFns = await this.distinctFnsFromDiagnostics(document, supportedDiagnostics, this.maxInputLoc);
 
     const fnsToRefactor = distinctFns.slice(0, 10);
     CsRefactoringRequests.initiate(document, fnsToRefactor, supportedDiagnostics);
   }
 
-  async distinctFnsFromDiagnostics(
+  private async distinctFnsFromDiagnostics(
     document: vscode.TextDocument,
     diagnostics: vscode.Diagnostic[],
     maxInputLoc: number
@@ -91,6 +73,11 @@ export class CsRefactoringCommands {
       .map((d) => d.range);
 
     return await findFunctionsToRefactor(this.cliPath, document, distinctRanges, maxInputLoc);
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
+    this.disposables = [];
   }
 }
 
