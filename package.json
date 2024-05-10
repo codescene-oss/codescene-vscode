@@ -48,6 +48,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "codescene.codeHealthGateHelp",
+        "title": "CodeScene: Delta analysis help",
+        "icon": "$(question)"
+      },
+      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },
@@ -124,7 +129,12 @@
         {
           "command": "codescene.runDeltaAnalysis",
           "when": "view === codescene.codeHealthGateView",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "codescene.codeHealthGateHelp",
+          "when": "view === codescene.codeHealthGateView",
+          "group": "navigation@2"
         }
       ],
       "commandPalette": [
