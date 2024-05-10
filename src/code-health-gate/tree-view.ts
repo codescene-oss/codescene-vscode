@@ -3,7 +3,7 @@ import { isDefined } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
 import { DeltaFinding, FileWithChanges, GitRoot, buildTree, issuesInFiles, resultsInTree } from './tree-model';
 
-export class DeltaAnalysisView implements vscode.Disposable {
+export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: DeltaAnalysisTreeProvider;
   private view: vscode.TreeView<GitRoot | FileWithChanges | DeltaAnalysisResult | DeltaFinding>;
@@ -11,7 +11,7 @@ export class DeltaAnalysisView implements vscode.Disposable {
   constructor() {
     this.treeDataProvider = new DeltaAnalysisTreeProvider();
 
-    this.view = vscode.window.createTreeView('codescene.deltaTreeView', {
+    this.view = vscode.window.createTreeView('codescene.codeHealthGateView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
     });
@@ -39,7 +39,7 @@ export class DeltaAnalysisView implements vscode.Disposable {
     this.disposables.push(this.view);
 
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.deltaTreeContext.goto', (event: DeltaFinding) => {
+      vscode.commands.registerCommand('codescene.chGateTreeContext.goto', (event: DeltaFinding) => {
         const uri = event.parent.uri;
         const position = event.position;
         const location = new vscode.Location(uri, position);
@@ -47,7 +47,7 @@ export class DeltaAnalysisView implements vscode.Disposable {
       })
     );
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.deltaTreeContext.requestRefactoring', (event: DeltaFinding) => {
+      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (event: DeltaFinding) => {
         console.log('Request refactoring context command called!');
       })
     );

@@ -3,7 +3,7 @@ import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
-import { DeltaAnalyser } from './delta/analyser';
+import { DeltaAnalyser } from './code-health-gate/analyser';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
