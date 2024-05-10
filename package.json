@@ -83,12 +83,8 @@
           "when": "config.codescene.enableCodeHealthView"
         },
         {
-          "id": "codescene.explorerAutoRefactorView",
-          "name": "Auto-refactor"
-        },
-        {
           "id": "codescene.deltaTreeView",
-          "name": "Quality Gate",
+          "name": "Code Health Gate",
           "icon": "$(lock)"
         }
       ],
@@ -103,11 +99,6 @@
     },
     "viewsWelcome": [
       {
-        "view": "codescene.explorerAutoRefactorView",
-        "contents": "To see Auto-refactoring suggestions, you need to \n1. Participate in the [CodeScene ACE beta program](https://codescene.com/ai) \n2. Sign in to a CodeScene server\n3. Enable CodeScene ACE in settings",
-        "when": "!codescene.isSignedIn || !config.codescene.enableAutoRefactor"
-      },
-      {
         "view": "codescene.explorerCodeReviewView",
         "contents": "When CodeScene code reviews are done, results will be collected here."
       },
@@ -118,10 +109,6 @@
     ],
     "menus": {
       "view/item/context": [
-        {
-          "command": "codescene.gotoAndPresentRefactoring",
-          "when": "view == codescene.explorerAutoRefactorView"
-        },
         {
           "command": "codescene.deltaTreeContext.requestRefactoring",
           "when": "view == codescene.deltaTreeView && viewItem === 'deltaFindingRefactorable'",

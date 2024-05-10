@@ -2,12 +2,8 @@ import vscode from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
-import { CsRefactoringRequests, ResolvedRefactoring, validConfidenceLevel } from './cs-refactoring-requests';
-import { PreFlightResponse } from './model';
+import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
-
-export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
-export const presentRefactoringCmdName = 'codescene.presentRefactoring';
 
 export interface FnToRefactor {
   name: string;
@@ -31,14 +27,14 @@ export class CsRefactoringCommands implements vscode.Disposable {
   ) {
     this.extensionUri = extensionUri;
     const requestRefactoringCmd = vscode.commands.registerCommand(
-      requestRefactoringsCmdName,
+      'codescene.requestRefactorings',
       this.requestRefactorings,
       this
     );
     this.disposables.push(requestRefactoringCmd);
 
     const presentRefactoringCmd = vscode.commands.registerCommand(
-      presentRefactoringCmdName,
+      'codescene.presentRefactoring',
       this.presentRefactoringRequest,
       this
     );
@@ -147,21 +143,4 @@ export function toConfidenceSymbol(level?: number) {
   } else if (level === 1) {
     return codeImprovementGuideSymbol;
   }
-}
-
-export function commandFromRequest(request: ResolvedRefactoring): vscode.Command | undefined {
-  if (!validConfidenceLevel(request.response.confidence.level)) {
-    return; // No command for invalid confidence levels
-  }
-
-  let title = '';
-  let command = presentRefactoringCmdName;
-  const symbol = toConfidenceSymbol(request.response.confidence.level);
-  const level = request.response.confidence.level;
-  if (level > 1) {
-    title = `${symbol} Auto-refactor`;
-  } else if (level === 1) {
-    title = `${symbol} Improvement guide`;
-  }
-  return { title, command, arguments: [request] };
 }
