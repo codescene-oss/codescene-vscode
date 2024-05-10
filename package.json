@@ -56,12 +56,12 @@
         "title": "View in ACE panel"
       },
       {
-        "command": "codescene.deltaTreeContext.goto",
+        "command": "codescene.chGateTreeContext.goto",
         "title": "CodeScene: Go to location",
         "icon": "$(arrow-right)"
       },
       {
-        "command": "codescene.deltaTreeContext.requestRefactoring",
+        "command": "codescene.chGateTreeContext.requestRefactoring",
         "title": "CodeScene: Request refactoring",
         "icon": "$(sparkle)"
       }
@@ -83,7 +83,7 @@
           "when": "config.codescene.enableCodeHealthView"
         },
         {
-          "id": "codescene.deltaTreeView",
+          "id": "codescene.codeHealthGateView",
           "name": "Code Health Gate",
           "icon": "$(lock)"
         }
@@ -103,27 +103,27 @@
         "contents": "When CodeScene code reviews are done, results will be collected here."
       },
       {
-        "view": "codescene.deltaTreeView",
+        "view": "codescene.codeHealthGateView",
         "contents": "Click the refresh button to initiate a CodeScene delta analysis. This will compare the current state of your code with the latest (HEAD) commit and present any introduced code smells."
       }
     ],
     "menus": {
       "view/item/context": [
         {
-          "command": "codescene.deltaTreeContext.requestRefactoring",
-          "when": "view == codescene.deltaTreeView && viewItem === 'deltaFindingRefactorable'",
+          "command": "codescene.chGateTreeContext.requestRefactoring",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'deltaFindingRefactorable'",
           "group": "inline@1"
         },
         {
-          "command": "codescene.deltaTreeContext.goto",
-          "when": "view == codescene.deltaTreeView && viewItem =~ /^deltaFinding/",
+          "command": "codescene.chGateTreeContext.goto",
+          "when": "view == codescene.codeHealthGateView && viewItem =~ /^deltaFinding/",
           "group": "inline@2"
         }
       ],
       "view/title": [
         {
           "command": "codescene.runDeltaAnalysis",
-          "when": "view === codescene.deltaTreeView",
+          "when": "view === codescene.codeHealthGateView",
           "group": "navigation"
         }
       ],
@@ -133,11 +133,11 @@
           "when": "false"
         },
         {
-          "command": "codescene.deltaTreeContext.goto",
+          "command": "codescene.chGateTreeContext.goto",
           "when": "false"
         },
         {
-          "command": "codescene.deltaTreeContext.requestRefactoring",
+          "command": "codescene.chGateTreeContext.requestRefactoring",
           "when": "false"
         }
       ]
