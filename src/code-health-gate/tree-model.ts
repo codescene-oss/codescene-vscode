@@ -141,7 +141,7 @@ export class DeltaFinding implements DeltaTreeViewItem {
 
   // TODO - implement support for filtering DeltaFindings based on preflight response
   private supportsRefactoring() {
-    return true;
+    return false;
   }
 
   private label() {

@@ -48,7 +48,7 @@ export class StatusViewProvider implements WebviewViewProvider {
           void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
           return;
         case 'focus-code-health-gate-view':
-          void vscode.commands.executeCommand('codescene.deltaTreeView.focus');
+          void vscode.commands.executeCommand('codescene.codeHealthGateView.focus');
           return;
         case 'focus-problems-view':
           void vscode.commands.executeCommand('workbench.action.problems.focus');
