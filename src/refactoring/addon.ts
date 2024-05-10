@@ -5,11 +5,8 @@ import CsDiagnostics from '../cs-diagnostics';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi } from '../cs-rest-api';
 import { toDistinctLanguageIds } from '../language-support';
-import { CsRefactorCodeAction } from './codeaction';
-import { CsRefactorCodeLensProvider } from './codelens';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequests } from './cs-refactoring-requests';
-import { RefactoringsView } from './refactorings-view';
 import { createCodeSmellsFilter } from './utils';
 
 const aceDisposables: vscode.Disposable[] = [];
@@ -44,7 +41,6 @@ export async function enableACE(context: vscode.ExtensionContext, cliPath: strin
     const commandDisposable = new CsRefactoringCommands(
       context.extensionUri,
       cliPath,
-
       refactoringSelector,
       codeSmellFilter,
       preflightResponse['max-input-loc']
@@ -52,17 +48,15 @@ export async function enableACE(context: vscode.ExtensionContext, cliPath: strin
     aceDisposables.push(commandDisposable);
 
     // Collect all disposables used by the refactoring features
-    const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
-    aceDisposables.push(codeLensProvider);
-    aceDisposables.push(vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider));
+    // const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
+    // aceDisposables.push(codeLensProvider);
+    // aceDisposables.push(vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider));
 
-    aceDisposables.push(
-      vscode.languages.registerCodeActionsProvider(refactoringSelector, new CsRefactorCodeAction(codeSmellFilter), {
-        providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-      })
-    );
-
-    aceDisposables.push(new RefactoringsView());
+    // aceDisposables.push(
+    //   vscode.languages.registerCodeActionsProvider(refactoringSelector, new CsRefactorCodeAction(codeSmellFilter), {
+    //     providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
+    //   })
+    // );
 
     /* Add disposables to both subscription context and the extension state list
      * of disposables. This is to ensure they're disposed either when the extension

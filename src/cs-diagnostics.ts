@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from './language-support';
-import { requestRefactoringsCmdName } from './refactoring/commands';
 import Reviewer, { ReviewOpts } from './review/reviewer';
 import { chScorePrefix } from './review/utils';
 
@@ -31,11 +30,6 @@ export default class CsDiagnostics {
       // Remove the diagnostics that are for file level issues. These are only shown as code lenses
       const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
       CsDiagnostics.set(document.uri, importantDiagnostics);
-
-      // Try to request refactorings for the important diagnostics
-      void vscode.commands
-        .executeCommand(requestRefactoringsCmdName, document, importantDiagnostics)
-        .then(undefined, (error) => {}); // ignore unregistered command
     });
   }
 }

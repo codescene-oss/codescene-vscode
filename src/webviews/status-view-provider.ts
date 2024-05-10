@@ -47,8 +47,8 @@ export class StatusViewProvider implements WebviewViewProvider {
         case 'open-settings':
           void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
           return;
-        case 'focus-explorer-ace-view':
-          void vscode.commands.executeCommand('codescene.explorerAutoRefactorView.focus');
+        case 'focus-code-health-gate-view':
+          void vscode.commands.executeCommand('codescene.deltaTreeView.focus');
           return;
         case 'focus-problems-view':
           void vscode.commands.executeCommand('workbench.action.problems.focus');
@@ -166,7 +166,7 @@ export class StatusViewProvider implements WebviewViewProvider {
         .join('\n');
 
       content += /*html*/ `
-        <p>The ACE <a href="" id="auto-refactor-link">Auto-refactor</a> view is active and available in the Explorer activity bar.</p>
+      <p>ACE capabilities are available from the <a href="" id="code-health-gate-link">Code Quality Gate</a> view.</p>
         <p>
         Supported languages:
         <ul>${languageIdList}</ul>
