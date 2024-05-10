@@ -14,7 +14,14 @@ export async function checkCodeHealthRules(cliPath: string) {
     const fileName = path.basename(absoluteFilePath);
     const folder = path.dirname(absoluteFilePath);
     const result = await codeHealthRulesCheck(cliPath, folder, fileName);
-    outputChannel.appendLine('----------\n' + result.stdout + '----------');
+    const msg = result.stdout;
+    const error = result.stderr;
+    outputChannel.appendLine('----------');
+    if (error.trim() !== '') {
+      outputChannel.append(error);
+    }
+    outputChannel.append(msg);
+    outputChannel.appendLine('----------');
     outputChannel.show();
   } else {
     void window.showErrorMessage('No file is currently selected.');
