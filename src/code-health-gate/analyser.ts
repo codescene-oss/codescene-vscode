@@ -1,14 +1,19 @@
+import path from 'path';
 import vscode, { workspace } from 'vscode';
+import { AnalysisEvent } from '../analysis-common';
+import { csSource } from '../diagnostics/cs-diagnostics';
+import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { DeltaForFile } from './model';
-import { AnalysisEvent } from '../analysis-common';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { isDefined } from '../utils';
+import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
-export type DeltaAnalysisState = 'running' | 'failed';
+export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
 export type DeltaAnalysisResult = DeltaForFile[] | DeltaAnalysisState;
 
-export function registerDeltaCommand(context: vscode.ExtensionContext, cliPath: string) {
+export function registerDeltaCommand(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('codescene.runDeltaAnalysis', () => {
       return DeltaAnalyser.analyseWorkspace();
@@ -23,7 +28,7 @@ export class DeltaAnalyser {
   readonly onDidAnalysisFail = this.errorEmitter.event;
   private analysisEmitter: vscode.EventEmitter<DeltaAnalysisEvent> = new vscode.EventEmitter<DeltaAnalysisEvent>();
   readonly onDidAnalyse = this.analysisEmitter.event;
-
+  private supportedCodeSmells?: string[];
   private analysesRunning = 0;
 
   readonly analysisResults: Map<string, DeltaForFile[] | DeltaAnalysisResult> = new Map();
@@ -47,8 +52,15 @@ export class DeltaAnalyser {
     }
 
     rootPaths.forEach(async (rootPath) => {
-      void DeltaAnalyser._instance.runDeltaAnalysis(rootPath);
+      void DeltaAnalyser.instance.runDeltaAnalysis(rootPath);
     });
+  }
+
+  static enableAce(supportedCodeSmells: string[]) {
+    DeltaAnalyser.instance.supportedCodeSmells = supportedCodeSmells;
+  }
+  static disableAce() {
+    DeltaAnalyser.instance.supportedCodeSmells = undefined;
   }
 
   private startAnalysisEvent(path: string) {
@@ -64,7 +76,7 @@ export class DeltaAnalyser {
     }
   }
 
-  async runDeltaAnalysis(rootPath: string) {
+  private async runDeltaAnalysis(rootPath: string) {
     this.startAnalysisEvent(rootPath);
     DeltaAnalyser.instance.analysisResults.set(rootPath, 'running');
     return new SimpleExecutor()
@@ -77,7 +89,11 @@ export class DeltaAnalyser {
           DeltaAnalyser.instance.analysisResults.set(rootPath, []);
           return;
         }
-        DeltaAnalyser.instance.analysisResults.set(rootPath, JSON.parse(result.stdout) as DeltaForFile[]);
+        const deltaResults = JSON.parse(result.stdout) as DeltaForFile[];
+        if (DeltaAnalyser.instance.supportedCodeSmells) {
+          requestRefactoringsForDegradations(rootPath, deltaResults, DeltaAnalyser.instance.supportedCodeSmells);
+        }
+        DeltaAnalyser.instance.analysisResults.set(rootPath, deltaResults);
       })
       .catch((error) => {
         DeltaAnalyser.instance.analysisResults.set(rootPath, 'failed');
@@ -87,4 +103,71 @@ export class DeltaAnalyser {
         this.endAnalysisEvent(rootPath);
       });
   }
+}
+
+/**
+ * Try to send refactoring requests for all supported degradations found in these files
+ *
+ * @param deltaForFiles
+ */
+function requestRefactoringsForDegradations(
+  rootPath: string,
+  deltaForFiles: DeltaForFile[],
+  supportedCodeSmells: string[]
+) {
+  deltaForFiles.forEach((deltaForFile) => {
+    const absPath = path.join(rootPath, deltaForFile.name);
+    const uri = vscode.Uri.file(absPath);
+    vscode.workspace.openTextDocument(uri).then(
+      async (doc) => {
+        const diagnostics = diagnosticsForFile(doc, deltaForFile, supportedCodeSmells);
+        deltaForFile.refactorings = await vscode.commands.executeCommand<CsRefactoringRequest[]>(
+          'codescene.requestRefactorings',
+          doc,
+          diagnostics
+        );
+      },
+      (err) => {
+        logOutputChannel.error(`[Analyser] Failed to open ${uri.fsPath}: ${err}`);
+      }
+    );
+  });
+}
+
+function diagnosticsForFile(document: vscode.TextDocument, delta: DeltaForFile, supportedCodeSmells: string[]) {
+  return (
+    delta.findings
+      // Include only supported codesmells
+      .filter((finding) => supportedCodeSmells.includes(finding.category))
+      .flatMap((finding) => {
+        return diagnosticsFromFinding(document, finding);
+      })
+  );
+}
+
+function diagnosticsFromFinding(document: vscode.TextDocument, finding: Finding) {
+  return (
+    finding['change-details']
+      // Only consider degradations
+      .filter((changeDetail) => isDegradation(changeDetail['change-type']))
+      .flatMap((changeDetail) => {
+        // function-level issues (file level issues have no locations)
+        return changeDetail.locations?.map((location) => {
+          const range = fnCoordinateToRange(
+            finding.category,
+            {
+              name: location.function,
+              startLine: getStartLine(location),
+              endLine: getEndLine(location),
+            },
+            document
+          );
+          const diagnostic = new vscode.Diagnostic(range, finding.category, vscode.DiagnosticSeverity.Warning);
+          diagnostic.source = csSource;
+          diagnostic.code = createCsDiagnosticCode(finding.category);
+          return diagnostic;
+        });
+      })
+      .filter(isDefined)
+  );
 }

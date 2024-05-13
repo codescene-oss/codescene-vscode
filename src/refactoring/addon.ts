@@ -1,13 +1,39 @@
 // Functions for handling enabling and disabling the ACE "addon" components
-import vscode from 'vscode';
+import { AxiosError } from 'axios';
+import vscode, { Diagnostic } from 'vscode';
 import { getConfiguration } from '../configuration';
-import CsDiagnostics from '../cs-diagnostics';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi } from '../cs-rest-api';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequests } from './cs-refactoring-requests';
-import { createCodeSmellsFilter } from './utils';
+import { PreFlightResponse } from './model';
+
+/**
+ * Work in progress API just to keep us from creating too many contact points between
+ * the ACE functionality and the rest of the extension
+ */
+export interface AceAPI {
+  enableACE: (context: vscode.ExtensionContext, cliPath: string) => Promise<PreFlightResponse>;
+  disableACE: () => void;
+  onDidChangeRequests: vscode.Event<void>;
+  onDidRequestFail: vscode.Event<Error | AxiosError>;
+}
+
+/**
+ * Aside from the AceAPI, this "addon" also contributes these commands from commands.ts:
+ *  - codescene.requestRefactorings
+ *  - codescene.presentRefactoring
+ */
+export function activate(): AceAPI {
+  return {
+    enableACE,
+    disableACE,
+    onDidChangeRequests: CsRefactoringRequests.onDidChangeRequests,
+    onDidRequestFail: CsRefactoringRequests.onDidRequestFail,
+  };
+}
 
 const aceDisposables: vscode.Disposable[] = [];
 
@@ -17,8 +43,8 @@ const aceDisposables: vscode.Disposable[] = [];
  *
  * @param context
  */
-export async function enableACE(context: vscode.ExtensionContext, cliPath: string) {
-  // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple codelenses etc.
+async function enableACE(context: vscode.ExtensionContext, cliPath: string) {
+  // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
   disableACE();
 
   const enableACE = getConfiguration('enableAutoRefactor');
@@ -36,8 +62,6 @@ export async function enableACE(context: vscode.ExtensionContext, cliPath: strin
     const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
     const codeSmellFilter = createCodeSmellsFilter(preflightResponse);
 
-    // This command is registered here, but will act as a noop until it gets enabled with help of an appropriate preflight
-    // response, see below (enableRequestRefactoringsCmd)
     const commandDisposable = new CsRefactoringCommands(
       context.extensionUri,
       cliPath,
@@ -72,10 +96,17 @@ export async function enableACE(context: vscode.ExtensionContext, cliPath: strin
   });
 }
 
-export function disableACE() {
+function disableACE() {
   aceDisposables.forEach((d) => d.dispose());
   aceDisposables.length = 0;
   CsRefactoringRequests.deleteAll();
+}
+
+export type DiagnosticFilter = (d: Diagnostic) => boolean;
+
+function createCodeSmellsFilter(refactorCapabilities: PreFlightResponse): DiagnosticFilter {
+  return (d: Diagnostic) =>
+    d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 }
 
 /**

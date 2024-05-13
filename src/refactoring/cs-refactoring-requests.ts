@@ -49,8 +49,8 @@ export class CsRefactoringRequest {
    * @returns Object conforming to the ResolvedRefactoring interface if the response is
    * resolved, undefined otherwise
    */
-  resolvedResponse(): ResolvedRefactoring | undefined {
-    if (!isDefined(this.response)) return;
+  resolvedRefactoring(): ResolvedRefactoring | undefined {
+    if (this.isPending()) return;
     return {
       ...this,
       response: this.response,
@@ -94,7 +94,8 @@ export class CsRefactoringRequests {
   static readonly onDidRequestFail = CsRefactoringRequests.errorEmitter.event;
 
   static initiate(document: TextDocument, fnsToRefactor: FnToRefactor[], diagnostics: Diagnostic[]) {
-    let anyPosted = false;
+    const requests: CsRefactoringRequest[] = [];
+
     fnsToRefactor.forEach(async (fn) => {
       const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, document);
@@ -125,9 +126,13 @@ export class CsRefactoringRequests {
         .finally(() => {
           CsRefactoringRequests.requestsChangedEmitter.fire(); // Fire updates for all finished requests
         });
-      anyPosted = true;
+      requests.push(req);
     });
-    anyPosted && CsRefactoringRequests.requestsChangedEmitter.fire();
+
+    if (requests.length > 0) {
+      CsRefactoringRequests.requestsChangedEmitter.fire();
+    }
+    return requests;
   }
 
   private static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {

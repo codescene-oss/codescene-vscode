@@ -61,14 +61,14 @@
         "title": "View in ACE panel"
       },
       {
-        "command": "codescene.chGateTreeContext.goto",
-        "title": "CodeScene: Go to location",
-        "icon": "$(arrow-right)"
+        "command": "codescene.chGateTreeContext.requestRefactoring",
+        "title": "View ACE refactoring",
+        "icon": "$(sparkle)"
       },
       {
-        "command": "codescene.chGateTreeContext.requestRefactoring",
-        "title": "CodeScene: Request refactoring",
-        "icon": "$(sparkle)"
+        "command": "codescene.chGateTreeContext.openDocumentation",
+        "title": "Open documentation",
+        "icon": "$(info)"
       }
     ],
     "viewsContainers": {
@@ -116,13 +116,13 @@
       "view/item/context": [
         {
           "command": "codescene.chGateTreeContext.requestRefactoring",
-          "when": "view == codescene.codeHealthGateView && viewItem === 'deltaFindingRefactorable'",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-refactorableFunction'",
           "group": "inline@1"
         },
         {
-          "command": "codescene.chGateTreeContext.goto",
-          "when": "view == codescene.codeHealthGateView && viewItem =~ /^deltaFinding/",
-          "group": "inline@2"
+          "command": "codescene.chGateTreeContext.openDocumentation",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-issue'",
+          "group": "inline@1"
         }
       ],
       "view/title": [
@@ -140,10 +140,6 @@
       "commandPalette": [
         {
           "command": "codescene.gotoAndPresentRefactoring",
-          "when": "false"
-        },
-        {
-          "command": "codescene.chGateTreeContext.goto",
           "when": "false"
         },
         {

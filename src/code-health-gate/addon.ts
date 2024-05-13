@@ -1,9 +1,10 @@
 import vscode from 'vscode';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import { CodeHealthGateView } from './tree-view';
+import { AceAPI } from '../refactoring/addon';
 
-export default function initializeCodeHealthGate(context: vscode.ExtensionContext) {
-  context.subscriptions.push(new CodeHealthGateView());
+export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+  context.subscriptions.push(new CodeHealthGateView(aceApi));
   registerDeltaAnalysisDecorations(context);
 
   context.subscriptions.push(
