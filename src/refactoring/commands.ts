@@ -1,9 +1,10 @@
 import vscode from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
-import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
+import { getFileExtension, isDefined } from '../utils';
 import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
 import { RefactoringPanel } from './refactoring-panel';
+import { DiagnosticFilter } from './addon';
 
 export interface FnToRefactor {
   name: string;
@@ -54,8 +55,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
     const distinctFns = await this.distinctFnsFromDiagnostics(document, supportedDiagnostics, this.maxInputLoc);
 
-    const fnsToRefactor = distinctFns.slice(0, 10);
-    CsRefactoringRequests.initiate(document, fnsToRefactor, supportedDiagnostics);
+    return CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
   }
 
   private async distinctFnsFromDiagnostics(

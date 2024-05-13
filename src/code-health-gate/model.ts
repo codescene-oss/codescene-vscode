@@ -1,9 +1,14 @@
+import vscode from 'vscode';
+import path from 'path';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface DeltaForFile {
   name: string;
   findings: Finding[];
   'old-score': number | null;
   'new-score': number;
+  refactorings?: CsRefactoringRequest[]; // Ace specific
 }
 
 export interface Finding {
@@ -36,4 +41,17 @@ export function isImprovement(changeType: ChangeType) {
 }
 export function isDegradation(changeType: ChangeType) {
   return changeType === 'degraded' || changeType === 'introduced';
+}
+
+export function getStartLine(location: Location) {
+  const lineNo = location['start-line'] || location['start-line-before'];
+  return lineNo || 1;
+}
+export function getEndLine(location: Location) {
+  const lineNo = location['end-line'] || location['end-line-before'];
+  return lineNo || 1;
+}
+
+export function toAbsoluteUri(rootPath: string, relativePath: string) {
+  return vscode.Uri.file(path.join(rootPath, relativePath));
 }
