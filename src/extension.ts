@@ -4,13 +4,13 @@ import { checkCodeHealthRules } from './check-rules';
 import initializeCodeHealthGate from './code-health-gate/addon';
 import { DeltaAnalyser, registerDeltaCommand } from './code-health-gate/analyser';
 import { onDidChangeConfiguration } from './configuration';
-import CsDiagnostics from './cs-diagnostics';
+import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
 import { register as registerCsDoc } from './csdoc';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
-import { disableACE, enableACE } from './refactoring/addon';
+import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import { ReviewExplorerView } from './review/explorer-view';
@@ -25,6 +25,7 @@ import debounce = require('lodash.debounce');
 interface CsContext {
   cliPath: string;
   csWorkspace: CsWorkspace;
+  aceApi: AceAPI;
 }
 
 /**
@@ -55,6 +56,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string) {
   const csContext: CsContext = {
     cliPath,
     csWorkspace: new CsWorkspace(context),
+    aceApi: activateAce(),
   };
   Reviewer.init(cliPath);
   DeltaAnalyser.init(cliPath);
@@ -86,7 +88,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string) {
   const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableOrDisableACECapabilities(context, csContext.cliPath);
+      debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
 
@@ -124,7 +126,7 @@ function setupStatsCollector() {
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   const { cliPath } = csContext;
 
-  registerDeltaCommand(context, cliPath);
+  registerDeltaCommand(context);
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
     void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
@@ -148,7 +150,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {
     vscode.authentication
       .getSession(AUTH_TYPE, [], { createIfNone: true })
-      .then(onGetSessionSuccess(context, csContext.cliPath), onGetSessionError());
+      .then(onGetSessionSuccess(context, csContext), onGetSessionError());
   });
   context.subscriptions.push(loginCommand);
 }
@@ -204,19 +206,21 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 /**
  * Activate functionality that requires signing in to a CodeScene server.
  */
-function enableRemoteFeatures(context: vscode.ExtensionContext, cliPath: string) {
-  enableOrDisableACECapabilities(context, cliPath);
+function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
+  enableOrDisableACECapabilities(context, csContext);
 }
 
-function disableRemoteFeatures() {
-  disableACE();
+function disableRemoteFeatures(aceApi: AceAPI) {
+  aceApi.disableACE();
 }
 
-function enableOrDisableACECapabilities(context: vscode.ExtensionContext, cliPath: string) {
+function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+  const { cliPath, aceApi } = csContext;
   CsExtensionState.setACEState('Loading ACE capabilities...');
-  enableACE(context, cliPath).then(
+  aceApi.enableACE(context, cliPath).then(
     (result) => {
       CsExtensionState.setACEState(result);
+      DeltaAnalyser.enableAce(result.supported['code-smells']);
       outputChannel.appendLine('Auto-refactor enabled!');
     },
     (error: Error | string) => {
@@ -225,6 +229,7 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, cliPat
         outputChannel.appendLine(message);
         void vscode.window.showErrorMessage(message);
       }
+      DeltaAnalyser.disableAce();
       CsExtensionState.setACEState(error);
     }
   );
@@ -235,9 +240,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 
   // If there's already a session we enable the remote features, otherwise a badge will appear in the
   // accounts menu - see AuthenticationGetSessionOptions.createIfNone?: boolean
-  vscode.authentication
-    .getSession(AUTH_TYPE, [])
-    .then(onGetSessionSuccess(context, csContext.cliPath), onGetSessionError());
+  vscode.authentication.getSession(AUTH_TYPE, []).then(onGetSessionSuccess(context, csContext), onGetSessionError());
 
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
@@ -245,11 +248,11 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       void vscode.authentication.getSession(AUTH_TYPE, []);
-      onGetSessionSuccess(context, csContext.cliPath)(undefined); // removed a session
+      onGetSessionSuccess(context, csContext)(undefined); // removed a session
     }
     if (e.added && e.added.length > 0) {
       // We only have one session in this extension currently, so grabbing the first one is ok.
-      onGetSessionSuccess(context, csContext.cliPath)(e.added[0]);
+      onGetSessionSuccess(context, csContext)(e.added[0]);
     }
   });
   context.subscriptions.push(authProvider);
@@ -258,13 +261,13 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 // This method is called when your extension is deactivated
 export function deactivate() {}
 
-function onGetSessionSuccess(context: vscode.ExtensionContext, cliPath: string) {
+function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext) {
   return (session: vscode.AuthenticationSession | undefined) => {
     CsExtensionState.setSession(session);
     if (session) {
-      enableRemoteFeatures(context, cliPath);
+      enableRemoteFeatures(context, csContext);
     } else {
-      disableRemoteFeatures();
+      disableRemoteFeatures(csContext.aceApi);
     }
   };
 }

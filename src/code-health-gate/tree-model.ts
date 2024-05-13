@@ -2,7 +2,7 @@ import path from 'path';
 import vscode from 'vscode';
 import { roundScore } from '../review/utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import { ChangeDetails, ChangeType, DeltaForFile, Location, isDegradation, isImprovement } from './model';
+import { ChangeDetails, ChangeType, DeltaForFile, Location, toStartLineNumber, isDegradation, isImprovement, toAbsoluteUri } from './model';
 import { toCsAnalysisUri } from './presentation';
 
 export function issuesInFiles(items: Array<FileWithChanges | DeltaFinding>): number {
@@ -113,7 +113,7 @@ export class DeltaFinding implements DeltaTreeViewItem {
     location?: Location
   ) {
     this.fnName = location?.function;
-    this.position = location ? new vscode.Position(getLineNumber(location), 0) : new vscode.Position(0, 0);
+    this.position = location ? new vscode.Position(toStartLineNumber(location), 0) : new vscode.Position(0, 0);
     this.description = changeDetails.description;
     this.changeType = changeDetails['change-type'];
   }
@@ -165,14 +165,4 @@ function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
     })
   );
   return deltaFindings.sort((a, b) => a.position.line - b.position.line);
-}
-
-function getLineNumber(location: Location) {
-  const lineNo = location['start-line'] || location['start-line-before'];
-  if (lineNo) return lineNo - 1;
-  return 0;
-}
-
-function toAbsoluteUri(rootPath: string, relativePath: string) {
-  return vscode.Uri.file(path.join(rootPath, relativePath));
 }

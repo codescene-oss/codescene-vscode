@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { reviewDocumentSelector } from './language-support';
-import Reviewer, { ReviewOpts } from './review/reviewer';
-import { chScorePrefix } from './review/utils';
+import { reviewDocumentSelector } from '../language-support';
+import Reviewer, { ReviewOpts } from '../review/reviewer';
+import { chScorePrefix } from '../review/utils';
 
 export const csSource = 'CodeScene';
 
