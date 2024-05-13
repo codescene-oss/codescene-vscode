@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.2...v0.7.3) (2024-05-13)
+
+
+### Bug fixes
+
+* Show errors from the check-rules command ([23feed1](https://github.com/codescene-oss/codescene-vscode/commit/23feed1c856880cada92777a1c80c540c070d264))
+
 ### [0.7.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.1...v0.7.2) (2024-05-08)
 
 
