@@ -2,9 +2,9 @@
 import { AxiosError } from 'axios';
 import vscode, { Diagnostic } from 'vscode';
 import { getConfiguration } from '../configuration';
-import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi } from '../cs-rest-api';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequests } from './cs-refactoring-requests';

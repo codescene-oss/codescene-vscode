@@ -1,9 +1,19 @@
 import path from 'path';
 import vscode from 'vscode';
+import { CsRefactoringRequest, ResolvedRefactoring } from '../refactoring/cs-refactoring-requests';
 import { roundScore } from '../review/utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import { ChangeDetails, ChangeType, DeltaForFile, Location, toStartLineNumber, isDegradation, isImprovement, toAbsoluteUri } from './model';
-import { toCsAnalysisUri } from './presentation';
+import {
+  ChangeDetails,
+  ChangeType,
+  DeltaForFile,
+  Location,
+  isDegradation,
+  isImprovement,
+  toAbsoluteUri,
+  toStartLineNumber,
+} from './model';
+import { toDeltaAnalysisUri, toDeltaIssueUri } from './presentation';
 
 export function issuesInFiles(items: Array<FileWithChanges | DeltaFinding>): number {
   return items.reduce((prev, curr) => {
@@ -34,10 +44,18 @@ interface DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem;
 }
 
-export function buildTree(): Array<GitRoot | FileWithChanges | DeltaAnalysisState> {
+export interface AceRequests {
+  refactoring: ResolvedRefactoring;
+  requests: CsRefactoringRequest[];
+}
+
+export function buildTree(refactoringInfo?: AceRequests): Array<GitRoot | FileWithChanges | DeltaAnalysisState> {
   // Skip the GitRoot level if there's only one workspace
   if (DeltaAnalyser.instance.analysisResults.size === 1) {
-    const [rootPath, analysis] = DeltaAnalyser.instance.analysisResults.entries().next().value;
+    const [rootPath, analysis] = DeltaAnalyser.instance.analysisResults.entries().next().value as [
+      string,
+      DeltaAnalysisResult
+    ];
     return gitRootChildren(analysis, new GitRoot(rootPath, analysis));
   }
 
@@ -85,10 +103,7 @@ export class FileWithChanges implements DeltaTreeViewItem {
   }
 
   toTreeItem(): vscode.TreeItem {
-    const item = new vscode.TreeItem(
-      toCsAnalysisUri(this.uri, issuesInFiles(this.children)),
-      this.children.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
-    );
+    const item = new vscode.TreeItem(toDeltaAnalysisUri(this.uri, this.children), this.collapsedState);
 
     const scoreString = `${this.result['old-score'] ? roundScore(this.result['old-score']) : 'n/a'} -> ${roundScore(
       this.result['new-score']
@@ -98,19 +113,27 @@ export class FileWithChanges implements DeltaTreeViewItem {
     item.contextValue = 'fileWithChanges';
     return item;
   }
+
+  private get collapsedState() {
+    if (this.children.length === 0) return vscode.TreeItemCollapsibleState.None;
+    if (this.children.length < 5) return vscode.TreeItemCollapsibleState.Expanded;
+    return vscode.TreeItemCollapsibleState.Collapsed;
+  }
 }
 
 export class DeltaFinding implements DeltaTreeViewItem {
-  private fnName?: string;
   private description: string;
+  readonly fnName?: string;
   readonly position: vscode.Position;
   readonly changeType: ChangeType;
+  refactorable = false;
 
   constructor(
     readonly parent: FileWithChanges,
     private category: string,
     changeDetails: ChangeDetails,
-    location?: Location
+    location?: Location,
+    readonly refactoring?: CsRefactoringRequest
   ) {
     this.fnName = location?.function;
     this.position = location ? new vscode.Position(toStartLineNumber(location), 0) : new vscode.Position(0, 0);
@@ -119,37 +142,57 @@ export class DeltaFinding implements DeltaTreeViewItem {
   }
 
   toTreeItem(): vscode.TreeItem {
-    const item = new vscode.TreeItem(this.label(), vscode.TreeItemCollapsibleState.None);
+    const item = new vscode.TreeItem(toDeltaIssueUri(this), vscode.TreeItemCollapsibleState.None);
+    item.label = this.label;
+    item.iconPath = this.iconPath;
+    item.tooltip = `${capitalizeFirstLetter(this.changeType)} ${this.category} • ${this.description}`;
+    item.contextValue = 'deltaFinding';
+    this.refactoring?.promise?.then(() => {
+      this.refactoring?.shouldPresent() && this.presentAsRefactorable(item);
+    }, undefined);
 
-    let statusText = '';
-    if (isDegradation(this.changeType)) {
-      statusText = 'Degradation';
-      item.iconPath = new vscode.ThemeIcon('close', new vscode.ThemeColor('errorForeground'));
-    } else if (isImprovement(this.changeType)) {
-      statusText = 'Improvement';
-      item.iconPath = new vscode.ThemeIcon('check', new vscode.ThemeColor('iconForeground')); // testing.iconPassed (green)
-    }
-    item.tooltip = `${statusText} • ${this.description}`;
-
-    if (this.supportsRefactoring()) {
-      item.contextValue = 'deltaFindingRefactorable';
-    } else {
-      item.contextValue = 'deltaFinding';
-    }
+    item.command = this.command;
     return item;
   }
 
-  // TODO - implement support for filtering DeltaFindings based on preflight response
-  private supportsRefactoring() {
-    return false;
+  private presentAsRefactorable(item: vscode.TreeItem) {
+    this.refactorable = true;
+    item.resourceUri = toDeltaIssueUri(this, true);
+    item.description = 'Refactoring available';
+    item.contextValue = 'deltaFindingRefactorable';
   }
 
-  private label() {
+  private get command() {
+    const uri = this.parent.uri;
+    const position = this.position;
+    const location = new vscode.Location(uri, position);
+    return {
+      command: 'editor.action.goToLocations',
+      title: 'Go to location',
+      arguments: [uri, position, [location]],
+    };
+    // void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
+  }
+
+  private get iconPath() {
+    if (isDegradation(this.changeType)) {
+      return new vscode.ThemeIcon('warning', new vscode.ThemeColor('codescene.codeHealth.unhealthy'));
+    } else if (isImprovement(this.changeType)) {
+      return new vscode.ThemeIcon('pass', new vscode.ThemeColor('codescene.codeHealth.healthy'));
+    }
+    return undefined;
+  }
+
+  private get label() {
     if (this.fnName) {
-      return `Function '${this.fnName}'`;
+      return `${this.fnName}`;
     }
     return `${this.category}`;
   }
+}
+
+function capitalizeFirstLetter(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
@@ -159,10 +202,21 @@ function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
         return new DeltaFinding(parent, finding.category, changeDetail);
       }
 
-      return changeDetail.locations.map(
-        (location) => new DeltaFinding(parent, finding.category, changeDetail, location) // function-level issues
-      );
+      // function-level issues
+      return changeDetail.locations.map((location) => {
+        const refactoring = refactoringFromLocation(location, delta.refactorings);
+        return new DeltaFinding(parent, finding.category, changeDetail, location, refactoring);
+      });
     })
   );
   return deltaFindings.sort((a, b) => a.position.line - b.position.line);
+}
+
+function refactoringFromLocation(location: Location, refactorings?: CsRefactoringRequest[]) {
+  if (!refactorings) return;
+  return refactorings.find(
+    (refactoring) =>
+      refactoring.fnToRefactor.name === location.function &&
+      refactoring.fnToRefactor.range.contains(new vscode.Position(toStartLineNumber(location), 0))
+  );
 }

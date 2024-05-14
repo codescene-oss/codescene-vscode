@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { checkCodeHealthRules } from './check-rules';
-import initializeCodeHealthGate from './code-health-gate/addon';
+import { activate as activateCodeHealthGate } from './code-health-gate/addon';
 import { DeltaAnalyser, registerDeltaCommand } from './code-health-gate/analyser';
 import { onDidChangeConfiguration } from './configuration';
-import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { CsExtensionState } from './cs-extension-state';
 import { register as registerCsDoc } from './csdoc';
+import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
@@ -77,7 +77,7 @@ function startExtension(context: vscode.ExtensionContext, cliPath: string) {
   context.subscriptions.push(new ReviewExplorerView());
   registerReviewDecorations(context);
 
-  initializeCodeHealthGate(context);
+  activateCodeHealthGate(context, csContext.aceApi);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();

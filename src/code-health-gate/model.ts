@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import path from 'path';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface DeltaForFile {
@@ -7,6 +8,7 @@ export interface DeltaForFile {
   findings: Finding[];
   'old-score': number | null;
   'new-score': number;
+  refactorings?: CsRefactoringRequest[]; // Ace specific
 }
 
 export interface Finding {

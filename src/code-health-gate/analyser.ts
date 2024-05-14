@@ -5,6 +5,7 @@ import { csSource } from '../diagnostics/cs-diagnostics';
 import { createCsDiagnosticCode, issueToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
 import { DeltaForFile, Finding, isImprovement, toEndLineNumber, toStartLineNumber } from './model';
 
@@ -118,11 +119,13 @@ function requestRefactoringsForDegradations(
     const absPath = path.join(rootPath, delta.name);
     const uri = vscode.Uri.file(absPath);
     vscode.workspace.openTextDocument(uri).then(
-      (doc) => {
+      async (doc) => {
         const diagnostics = diagnosticsForFile(doc, delta, supportedCodeSmells);
-        vscode.commands.executeCommand('codescene.requestRefactorings', doc, diagnostics).then(undefined, (err) => {
-          logOutputChannel.error(`Failed to request refactoring: ${err}`);
-        });
+        delta.refactorings = await vscode.commands.executeCommand<CsRefactoringRequest[]>(
+          'codescene.requestRefactorings',
+          doc,
+          diagnostics
+        );
       },
       (err) => {
         logOutputChannel.error(`[Analyser] Failed to open ${uri.fsPath}: ${err}`);

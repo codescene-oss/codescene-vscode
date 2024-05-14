@@ -55,7 +55,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
     const distinctFns = await this.distinctFnsFromDiagnostics(document, supportedDiagnostics, this.maxInputLoc);
 
-    CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
+    return CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
   }
 
   private async distinctFnsFromDiagnostics(

@@ -1,15 +1,25 @@
 import vscode from 'vscode';
 import { isDefined } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import { DeltaFinding, FileWithChanges, GitRoot, buildTree, issuesInFiles, resultsInTree } from './tree-model';
+import {
+  AceRequests,
+  DeltaFinding,
+  FileWithChanges,
+  GitRoot,
+  buildTree,
+  issuesInFiles,
+  resultsInTree,
+} from './tree-model';
+import { AceAPI } from '../refactoring/addon';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: DeltaAnalysisTreeProvider;
   private view: vscode.TreeView<GitRoot | FileWithChanges | DeltaAnalysisResult | DeltaFinding>;
 
-  constructor() {
-    this.treeDataProvider = new DeltaAnalysisTreeProvider();
+  constructor(aceApi?: AceAPI) {
+    this.treeDataProvider = new DeltaAnalysisTreeProvider(aceApi);
 
     this.view = vscode.window.createTreeView('codescene.codeHealthGateView', {
       treeDataProvider: this.treeDataProvider,
@@ -38,7 +48,8 @@ export class CodeHealthGateView implements vscode.Disposable {
 
     this.disposables.push(this.view);
 
-    this.disposables.push(
+    /*   
+      this.disposables.push(
       vscode.commands.registerCommand('codescene.chGateTreeContext.goto', (event: DeltaFinding) => {
         const uri = event.parent.uri;
         const position = event.position;
@@ -46,9 +57,10 @@ export class CodeHealthGateView implements vscode.Disposable {
         void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
       })
     );
+ */
     this.disposables.push(
       vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (event: DeltaFinding) => {
-        console.log('Request refactoring context command called!');
+        void vscode.commands.executeCommand('codescene.presentRefactoring', event.refactoring!.resolvedRefactoring());
       })
     );
   }
@@ -73,12 +85,20 @@ class DeltaAnalysisTreeProvider
 
   private disposables: vscode.Disposable[] = [];
 
-  constructor() {
+  constructor(aceApi?: AceAPI) {
     this.disposables.push(
       DeltaAnalyser.instance.onDidAnalyse((event) => {
         if (event.type !== 'idle') this.treeDataChangedEmitter.fire();
       })
     );
+    if (aceApi) {
+      this.disposables.push(
+        aceApi.onDidChangeRequests(() => {
+          // TODO Maybe debounce this a couple of 100 ms
+          this.treeDataChangedEmitter.fire();
+        })
+      );
+    }
   }
 
   getTreeItem(element: GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding): vscode.TreeItem {
@@ -99,10 +119,7 @@ class DeltaAnalysisTreeProvider
       if (element instanceof DeltaFinding) return []; // No children for DeltaFindings
       return element.children;
     }
-
-    const tree = buildTree();
-    this.treeUpdateEmitter.fire(tree);
-    return tree;
+    return buildTree();
   }
 
   dispose() {

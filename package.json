@@ -61,13 +61,8 @@
         "title": "View in ACE panel"
       },
       {
-        "command": "codescene.chGateTreeContext.goto",
-        "title": "CodeScene: Go to location",
-        "icon": "$(arrow-right)"
-      },
-      {
         "command": "codescene.chGateTreeContext.requestRefactoring",
-        "title": "CodeScene: Request refactoring",
+        "title": "CodeScene: ACE Refactoring suggestion",
         "icon": "$(sparkle)"
       }
     ],
@@ -118,11 +113,6 @@
           "command": "codescene.chGateTreeContext.requestRefactoring",
           "when": "view == codescene.codeHealthGateView && viewItem === 'deltaFindingRefactorable'",
           "group": "inline@1"
-        },
-        {
-          "command": "codescene.chGateTreeContext.goto",
-          "when": "view == codescene.codeHealthGateView && viewItem =~ /^deltaFinding/",
-          "group": "inline@2"
         }
       ],
       "view/title": [
@@ -140,10 +130,6 @@
       "commandPalette": [
         {
           "command": "codescene.gotoAndPresentRefactoring",
-          "when": "false"
-        },
-        {
-          "command": "codescene.chGateTreeContext.goto",
           "when": "false"
         },
         {
