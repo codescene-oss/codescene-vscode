@@ -103,9 +103,10 @@ class DeltaAnalysisTreeProvider
 
   getTreeItem(element: GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding): vscode.TreeItem {
     if (typeof element === 'string') {
-      return element === 'running'
-        ? new vscode.TreeItem('Running analysis...', vscode.TreeItemCollapsibleState.None)
-        : new vscode.TreeItem('Analysis failed', vscode.TreeItemCollapsibleState.None);
+      let msg = 'Analysis failed';
+      if (element === 'running') msg = 'Running analysis...';
+      if (element === 'no-issues-found') msg = 'No new issues found';
+      return new vscode.TreeItem(msg, vscode.TreeItemCollapsibleState.None);
     }
 
     return element.toTreeItem();

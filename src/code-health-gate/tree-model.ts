@@ -71,7 +71,7 @@ function gitRootChildren(analysis: DeltaAnalysisResult, parent: GitRoot): Array<
     return [analysis];
   }
 
-  if (analysis.length === 0) return [];
+  if (analysis.length === 0) return ['no-issues-found'];
 
   const items: FileWithChanges[] = [];
   analysis.forEach((deltaForFile) => {
@@ -209,7 +209,9 @@ function findingsFromDelta(parent: FileWithChanges, delta: DeltaForFile) {
       });
     })
   );
-  return deltaFindings.sort((a, b) => a.position.line - b.position.line);
+  return deltaFindings
+    .sort((a, b) => a.position.line - b.position.line)
+    .sort((a, b) => Number(isImprovement(a.changeType)) - Number(isImprovement(b.changeType)));
 }
 
 function refactoringFromLocation(location: Location, refactorings?: CsRefactoringRequest[]) {

@@ -10,7 +10,7 @@ import { isDefined } from '../utils';
 import { DeltaForFile, Finding, isImprovement, toEndLineNumber, toStartLineNumber } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
-export type DeltaAnalysisState = 'running' | 'failed';
+export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
 export type DeltaAnalysisResult = DeltaForFile[] | DeltaAnalysisState;
 
 export function registerDeltaCommand(context: vscode.ExtensionContext) {
