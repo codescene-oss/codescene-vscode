@@ -2,12 +2,12 @@ import path from 'path';
 import vscode, { workspace } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { csSource } from '../diagnostics/cs-diagnostics';
-import { createCsDiagnosticCode, issueToRange } from '../diagnostics/utils';
+import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
-import { DeltaForFile, Finding, isImprovement, toEndLineNumber, toStartLineNumber } from './model';
+import { DeltaForFile, Finding, isImprovement, getEndLine, getStartLine } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -153,12 +153,12 @@ function diagnosticsFromFinding(document: vscode.TextDocument, finding: Finding)
 
       // function-level issues
       return changeDetail.locations.map((location) => {
-        const range = issueToRange(
+        const range = fnCoordinateToRange(
           finding.category,
           {
             name: location.function,
-            startLine: toStartLineNumber(location),
-            endLine: toEndLineNumber(location),
+            startLine: getStartLine(location),
+            endLine: getEndLine(location),
           },
           document
         );

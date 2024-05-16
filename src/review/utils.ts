@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { csSource } from '../diagnostics/cs-diagnostics';
-import { createCsDiagnosticCode, issueToRange } from '../diagnostics/utils';
+import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
 import { IssueDetails, ReviewIssue, ReviewResult } from './model';
 
 export const chScorePrefix = 'Code health score: ';
@@ -20,7 +20,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
   // Function level issues
   return reviewIssue.functions.map((func: IssueDetails) => {
     const category = reviewIssue.category;
-    const range = issueToRange(
+    const range = fnCoordinateToRange(
       reviewIssue.category,
       { name: func.title, startLine: func['start-line'], endLine: func['end-line'] },
       document

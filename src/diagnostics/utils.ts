@@ -22,7 +22,7 @@ interface FunctionCoordinate {
   endLine: number;
 }
 
-export function issueToRange(
+export function fnCoordinateToRange(
   category: string,
   functionCoordinate: FunctionCoordinate,
   document: vscode.TextDocument

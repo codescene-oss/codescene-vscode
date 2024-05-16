@@ -43,15 +43,13 @@ export function isDegradation(changeType: ChangeType) {
   return changeType === 'degraded' || changeType === 'introduced';
 }
 
-export function toStartLineNumber(location: Location) {
+export function getStartLine(location: Location) {
   const lineNo = location['start-line'] || location['start-line-before'];
-  if (lineNo) return lineNo - 1;
-  return 0;
+  return lineNo || 0;
 }
-export function toEndLineNumber(location: Location) {
+export function getEndLine(location: Location) {
   const lineNo = location['end-line'] || location['end-line-before'];
-  if (lineNo) return lineNo - 1;
-  return 0;
+  return lineNo || 0;
 }
 
 export function toAbsoluteUri(rootPath: string, relativePath: string) {

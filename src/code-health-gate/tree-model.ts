@@ -11,7 +11,7 @@ import {
   isDegradation,
   isImprovement,
   toAbsoluteUri,
-  toStartLineNumber,
+  getStartLine,
 } from './model';
 import { toDeltaAnalysisUri, toDeltaIssueUri } from './presentation';
 
@@ -136,7 +136,7 @@ export class DeltaFinding implements DeltaTreeViewItem {
     readonly refactoring?: CsRefactoringRequest
   ) {
     this.fnName = location?.function;
-    this.position = location ? new vscode.Position(toStartLineNumber(location), 0) : new vscode.Position(0, 0);
+    this.position = locationToPos(location);
     this.description = changeDetails.description;
     this.changeType = changeDetails['change-type'];
   }
@@ -219,6 +219,10 @@ function refactoringFromLocation(location: Location, refactorings?: CsRefactorin
   return refactorings.find(
     (refactoring) =>
       refactoring.fnToRefactor.name === location.function &&
-      refactoring.fnToRefactor.range.contains(new vscode.Position(toStartLineNumber(location), 0))
+      refactoring.fnToRefactor.range.contains(locationToPos(location))
   );
+}
+
+function locationToPos(location?: Location) {
+  return location ? new vscode.Position(getStartLine(location) - 1, 0) : new vscode.Position(0, 0);
 }
