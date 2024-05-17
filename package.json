@@ -111,7 +111,7 @@
       "view/item/context": [
         {
           "command": "codescene.chGateTreeContext.requestRefactoring",
-          "when": "view == codescene.codeHealthGateView && viewItem === 'deltaFindingRefactorable'",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-refactorableFunction'",
           "group": "inline@1"
         }
       ],

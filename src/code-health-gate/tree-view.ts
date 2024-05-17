@@ -1,22 +1,13 @@
 import vscode from 'vscode';
+import { AceAPI } from '../refactoring/addon';
 import { isDefined } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import {
-  AceRequests,
-  DeltaFinding,
-  FileWithChanges,
-  GitRoot,
-  buildTree,
-  issuesInFiles,
-  resultsInTree,
-} from './tree-model';
-import { AceAPI } from '../refactoring/addon';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { DeltaFunctionInfo, DeltaTreeViewItem, buildTree, countIssuesIn, filesWithIssuesInTree } from './tree-model';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: DeltaAnalysisTreeProvider;
-  private view: vscode.TreeView<GitRoot | FileWithChanges | DeltaAnalysisResult | DeltaFinding>;
+  private view: vscode.TreeView<DeltaTreeViewItem | DeltaAnalysisResult>;
 
   constructor(aceApi?: AceAPI) {
     this.treeDataProvider = new DeltaAnalysisTreeProvider(aceApi);
@@ -28,12 +19,12 @@ export class CodeHealthGateView implements vscode.Disposable {
 
     this.disposables.push(
       this.treeDataProvider.onDidTreeUpdate((tree) => {
-        const results = resultsInTree(tree);
-        const issues = issuesInFiles(results);
+        const results = filesWithIssuesInTree(tree);
+        const issues = countIssuesIn(tree);
         this.view.badge = {
           value: results.length,
           tooltip:
-            results.length > 0 ? `Found ${results.length} file(s) with declining code health (${issues} issues)` : '',
+            results.length > 0 ? `Found ${results.length} file(s) with introduced code health issues` : '',
         };
       })
     );
@@ -59,7 +50,7 @@ export class CodeHealthGateView implements vscode.Disposable {
     );
  */
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (event: DeltaFinding) => {
+      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (event: DeltaFunctionInfo) => {
         void vscode.commands.executeCommand('codescene.presentRefactoring', event.refactoring!.resolvedRefactoring());
       })
     );
@@ -71,16 +62,15 @@ export class CodeHealthGateView implements vscode.Disposable {
 }
 
 class DeltaAnalysisTreeProvider
-  implements vscode.TreeDataProvider<GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding>, vscode.Disposable
+  implements vscode.TreeDataProvider<DeltaTreeViewItem | DeltaAnalysisState>, vscode.Disposable
 {
-  private treeDataChangedEmitter: vscode.EventEmitter<
-    GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding | void
-  > = new vscode.EventEmitter<GitRoot | FileWithChanges | DeltaAnalysisState>();
-  readonly onDidChangeTreeData: vscode.Event<GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding | void> =
+  private treeDataChangedEmitter: vscode.EventEmitter<DeltaTreeViewItem | DeltaAnalysisState | void> =
+    new vscode.EventEmitter<DeltaTreeViewItem | DeltaAnalysisState>();
+  readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | DeltaAnalysisState | void> =
     this.treeDataChangedEmitter.event;
 
-  private treeUpdateEmitter: vscode.EventEmitter<Array<GitRoot | FileWithChanges | DeltaAnalysisState>> =
-    new vscode.EventEmitter<Array<GitRoot | FileWithChanges | DeltaAnalysisState>>();
+  private treeUpdateEmitter: vscode.EventEmitter<Array<DeltaTreeViewItem | DeltaAnalysisState>> =
+    new vscode.EventEmitter<Array<DeltaTreeViewItem | DeltaAnalysisState>>();
   readonly onDidTreeUpdate = this.treeUpdateEmitter.event;
 
   private disposables: vscode.Disposable[] = [];
@@ -101,7 +91,7 @@ class DeltaAnalysisTreeProvider
     }
   }
 
-  getTreeItem(element: GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding): vscode.TreeItem {
+  getTreeItem(element: DeltaTreeViewItem | DeltaAnalysisState): vscode.TreeItem {
     if (typeof element === 'string') {
       let msg = 'Analysis failed';
       if (element === 'running') msg = 'Running analysis...';
@@ -113,14 +103,15 @@ class DeltaAnalysisTreeProvider
   }
 
   getChildren(
-    element?: GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding
-  ): vscode.ProviderResult<Array<GitRoot | FileWithChanges | DeltaAnalysisState | DeltaFinding>> {
+    element?: DeltaTreeViewItem | DeltaAnalysisState
+  ): vscode.ProviderResult<Array<DeltaTreeViewItem | DeltaAnalysisState>> {
     if (isDefined(element)) {
-      if (typeof element === 'string') return []; // No children for DeltaAnalysisState
-      if (element instanceof DeltaFinding) return []; // No children for DeltaFindings
+      if (typeof element === 'string') return []; // No children for DeltaAnalysisStates
       return element.children;
     }
-    return buildTree();
+    const tree = buildTree();
+    this.treeUpdateEmitter.fire(tree);
+    return tree;
   }
 
   dispose() {

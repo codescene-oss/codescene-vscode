@@ -1,6 +1,5 @@
 import vscode from 'vscode';
-import { DeltaFinding, issuesInFiles } from './tree-model';
-import { isImprovement } from './model';
+import { DeltaFunctionInfo, DeltaTreeViewItem, countIssuesIn } from './tree-model';
 
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new DeltaAnalysisDecorationProvider()));
@@ -19,7 +18,7 @@ class DeltaAnalysisDecorationProvider implements vscode.FileDecorationProvider {
       const badge = queryParams.get('issues') || '';
       return {
         badge,
-        tooltip: `${badge} function(s) with degrading code health`,
+        tooltip: `${badge} issue(s) with degrading code health`,
       };
     }
 
@@ -32,9 +31,9 @@ class DeltaAnalysisDecorationProvider implements vscode.FileDecorationProvider {
  * @param uri
  * @returns
  */
-export function toDeltaAnalysisUri(uri: vscode.Uri, children: DeltaFinding[]): vscode.Uri {
+export function toDeltaAnalysisUri(uri: vscode.Uri, children?: DeltaTreeViewItem[]): vscode.Uri {
   const queryParams = new URLSearchParams();
-  queryParams.set('issues', issuesInFiles(children).toString());
+  children && queryParams.set('issues', countIssuesIn(children).toString());
 
   return uri.with({
     scheme: deltaAnalysisScheme,
@@ -53,11 +52,9 @@ class DeltaIssueDecorationProvider implements vscode.FileDecorationProvider {
     if (uri.scheme === deltaIssueScheme) {
       const queryParams = new URLSearchParams(uri.query);
       const refactorable = queryParams.get('refactorable');
-      const isImprovement = queryParams.get('is-improvement') === 'true';
       return {
         badge: refactorable ? '✨' : undefined,
         tooltip: refactorable ? 'Can be refactored' : undefined,
-        color: isImprovement ? undefined : new vscode.ThemeColor('descriptionForeground'),
       };
     }
 
@@ -65,10 +62,9 @@ class DeltaIssueDecorationProvider implements vscode.FileDecorationProvider {
   }
 }
 
-export function toDeltaIssueUri(finding: DeltaFinding, refactorable?: boolean): vscode.Uri {
+export function toDeltaFunctionUri(functionInfo: DeltaFunctionInfo, refactorable?: boolean): vscode.Uri {
   const queryParams = new URLSearchParams();
   refactorable && queryParams.set('refactorable', refactorable.toString());
-  queryParams.set('is-improvement', isImprovement(finding.changeType).toString());
 
   return vscode.Uri.from({
     scheme: deltaIssueScheme,
