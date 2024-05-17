@@ -7,7 +7,7 @@ import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
-import { DeltaForFile, Finding, isImprovement, getEndLine, getStartLine } from './model';
+import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -108,20 +108,20 @@ export class DeltaAnalyser {
 /**
  * Try to send refactoring requests for all supported degradations found in these files
  *
- * @param deltaResults
+ * @param deltaForFiles
  */
 function requestRefactoringsForDegradations(
   rootPath: string,
-  deltaResults: DeltaForFile[],
+  deltaForFiles: DeltaForFile[],
   supportedCodeSmells: string[]
 ) {
-  deltaResults.forEach((delta) => {
-    const absPath = path.join(rootPath, delta.name);
+  deltaForFiles.forEach((deltaForFile) => {
+    const absPath = path.join(rootPath, deltaForFile.name);
     const uri = vscode.Uri.file(absPath);
     vscode.workspace.openTextDocument(uri).then(
       async (doc) => {
-        const diagnostics = diagnosticsForFile(doc, delta, supportedCodeSmells);
-        delta.refactorings = await vscode.commands.executeCommand<CsRefactoringRequest[]>(
+        const diagnostics = diagnosticsForFile(doc, deltaForFile, supportedCodeSmells);
+        deltaForFile.refactorings = await vscode.commands.executeCommand<CsRefactoringRequest[]>(
           'codescene.requestRefactorings',
           doc,
           diagnostics
@@ -135,38 +135,39 @@ function requestRefactoringsForDegradations(
 }
 
 function diagnosticsForFile(document: vscode.TextDocument, delta: DeltaForFile, supportedCodeSmells: string[]) {
-  return delta.findings
-    .flatMap((finding) => {
-      // Skip unsupported codesmells
-      if (!supportedCodeSmells.includes(finding.category)) return;
-      return diagnosticsFromFinding(document, finding);
-    })
-    .filter(isDefined);
+  return (
+    delta.findings
+      // Include only supported codesmells
+      .filter((finding) => supportedCodeSmells.includes(finding.category))
+      .flatMap((finding) => {
+        return diagnosticsFromFinding(document, finding);
+      })
+  );
 }
 
 function diagnosticsFromFinding(document: vscode.TextDocument, finding: Finding) {
-  return finding['change-details']
-    .flatMap((changeDetail) => {
-      // Skip improvements and file level issues
-      if (isImprovement(changeDetail['change-type'])) return;
-      if (!changeDetail.locations) return;
-
-      // function-level issues
-      return changeDetail.locations.map((location) => {
-        const range = fnCoordinateToRange(
-          finding.category,
-          {
-            name: location.function,
-            startLine: getStartLine(location),
-            endLine: getEndLine(location),
-          },
-          document
-        );
-        const diagnostic = new vscode.Diagnostic(range, finding.category, vscode.DiagnosticSeverity.Warning);
-        diagnostic.source = csSource;
-        diagnostic.code = createCsDiagnosticCode(finding.category);
-        return diagnostic;
-      });
-    })
-    .filter(isDefined);
+  return (
+    finding['change-details']
+      // Only consider degradations
+      .filter((changeDetail) => isDegradation(changeDetail['change-type']))
+      .flatMap((changeDetail) => {
+        // function-level issues (file level issues have no locations)
+        return changeDetail.locations?.map((location) => {
+          const range = fnCoordinateToRange(
+            finding.category,
+            {
+              name: location.function,
+              startLine: getStartLine(location),
+              endLine: getEndLine(location),
+            },
+            document
+          );
+          const diagnostic = new vscode.Diagnostic(range, finding.category, vscode.DiagnosticSeverity.Warning);
+          diagnostic.source = csSource;
+          diagnostic.code = createCsDiagnosticCode(finding.category);
+          return diagnostic;
+        });
+      })
+      .filter(isDefined)
+  );
 }

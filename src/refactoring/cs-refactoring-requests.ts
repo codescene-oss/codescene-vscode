@@ -87,9 +87,6 @@ function validConfidenceLevel(level: number) {
 export class CsRefactoringRequests {
   private static readonly map: Map<string, Map<string, CsRefactoringRequest>> = new Map();
 
-  // private static readonly refactoringRequestsEmitter = new EventEmitter<CsRefactoringRequest[]>();
-  // static readonly onDidRefactoringsUpdate = CsRefactoringRequests.refactoringRequestsEmitter.event;
-
   private static readonly requestsChangedEmitter = new EventEmitter<void>();
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsChangedEmitter.event;
 
@@ -133,7 +130,6 @@ export class CsRefactoringRequests {
     });
 
     if (requests.length > 0) {
-      // CsRefactoringRequests.refactoringRequestsEmitter.fire(requests);
       CsRefactoringRequests.requestsChangedEmitter.fire();
     }
     return requests;
