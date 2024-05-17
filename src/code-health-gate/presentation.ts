@@ -1,9 +1,9 @@
 import vscode from 'vscode';
-import { DeltaFunctionInfo, DeltaTreeViewItem, countIssuesIn } from './tree-model';
+import { DeltaTreeViewItem, countIssuesIn } from './tree-model';
 
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new DeltaAnalysisDecorationProvider()));
-  context.subscriptions.push(vscode.window.registerFileDecorationProvider(new DeltaIssueDecorationProvider()));
+  context.subscriptions.push(vscode.window.registerFileDecorationProvider(new DeltaFnInfoDecorationProvider()));
 }
 
 const deltaAnalysisScheme = 'codescene-deltaanalysis';
@@ -18,7 +18,7 @@ class DeltaAnalysisDecorationProvider implements vscode.FileDecorationProvider {
       const badge = queryParams.get('issues') || '';
       return {
         badge,
-        tooltip: `${badge} issue(s) with degrading code health`,
+        tooltip: `Contains ${badge} issue(s) degrading code health`,
       };
     }
 
@@ -42,19 +42,23 @@ export function toDeltaAnalysisUri(uri: vscode.Uri, children?: DeltaTreeViewItem
   });
 }
 
-const deltaIssueScheme = 'codescene-deltaissue';
+const deltaFnInfoScheme = 'codescene-deltafninfo';
 
-class DeltaIssueDecorationProvider implements vscode.FileDecorationProvider {
+class DeltaFnInfoDecorationProvider implements vscode.FileDecorationProvider {
   provideFileDecoration(
     uri: vscode.Uri,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<vscode.FileDecoration> {
-    if (uri.scheme === deltaIssueScheme) {
+    if (uri.scheme === deltaFnInfoScheme) {
       const queryParams = new URLSearchParams(uri.query);
-      const refactorable = queryParams.get('refactorable');
+      const refactorable = queryParams.get('refactorable') === 'true';
+      const issues = queryParams.get('issues');
+      const issuesText = issues && `Contains ${issues} issue(s) degrading code health`;
+      const refactorableText = refactorable && 'Can be refactored';
+      const tooltip = `${issuesText ? issuesText : ''}${refactorableText ? ` • ${refactorableText}` : ''}`;
       return {
-        badge: refactorable ? '✨' : undefined,
-        tooltip: refactorable ? 'Can be refactored' : undefined,
+        badge: issues || '',
+        tooltip,
       };
     }
 
@@ -62,12 +66,13 @@ class DeltaIssueDecorationProvider implements vscode.FileDecorationProvider {
   }
 }
 
-export function toDeltaFunctionUri(functionInfo: DeltaFunctionInfo, refactorable?: boolean): vscode.Uri {
+export function toDeltaFunctionUri(issues: number, refactorable?: boolean): vscode.Uri {
   const queryParams = new URLSearchParams();
+  issues && queryParams.set('issues', issues.toString());
   refactorable && queryParams.set('refactorable', refactorable.toString());
 
   return vscode.Uri.from({
-    scheme: deltaIssueScheme,
+    scheme: deltaFnInfoScheme,
     authority: 'codescene',
     query: queryParams.toString(),
   });

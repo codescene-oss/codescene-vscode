@@ -2,7 +2,14 @@ import vscode from 'vscode';
 import { AceAPI } from '../refactoring/addon';
 import { isDefined } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import { DeltaFunctionInfo, DeltaTreeViewItem, buildTree, countIssuesIn, filesWithIssuesInTree } from './tree-model';
+import {
+  DeltaFunctionInfo,
+  DeltaIssue,
+  DeltaTreeViewItem,
+  buildTree,
+  countIssuesIn,
+  filesWithIssuesInTree,
+} from './tree-model';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -23,8 +30,7 @@ export class CodeHealthGateView implements vscode.Disposable {
         const issues = countIssuesIn(tree);
         this.view.badge = {
           value: results.length,
-          tooltip:
-            results.length > 0 ? `Found ${results.length} file(s) with introduced code health issues` : '',
+          tooltip: results.length > 0 ? `Found ${results.length} file(s) with introduced code health issues` : '',
         };
       })
     );
@@ -50,8 +56,11 @@ export class CodeHealthGateView implements vscode.Disposable {
     );
  */
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (event: DeltaFunctionInfo) => {
-        void vscode.commands.executeCommand('codescene.presentRefactoring', event.refactoring!.resolvedRefactoring());
+      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (fnInfo: DeltaFunctionInfo) => {
+        void vscode.commands.executeCommand('codescene.presentRefactoring', fnInfo.refactoring!.resolvedRefactoring());
+      }),
+      vscode.commands.registerCommand('codescene.chGateTreeContext.openDocumentation', (issue: DeltaIssue) => {
+        void vscode.commands.executeCommand('codescene.openDocsForIssueCategory', issue.category);
       })
     );
   }

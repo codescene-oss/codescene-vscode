@@ -62,8 +62,13 @@
       },
       {
         "command": "codescene.chGateTreeContext.requestRefactoring",
-        "title": "CodeScene: ACE Refactoring suggestion",
+        "title": "View ACE refactoring",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "codescene.chGateTreeContext.openDocumentation",
+        "title": "Open documentation",
+        "icon": "$(info)"
       }
     ],
     "viewsContainers": {
@@ -112,6 +117,11 @@
         {
           "command": "codescene.chGateTreeContext.requestRefactoring",
           "when": "view == codescene.codeHealthGateView && viewItem === 'delta-refactorableFunction'",
+          "group": "inline@1"
+        },
+        {
+          "command": "codescene.chGateTreeContext.openDocumentation",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-issue'",
           "group": "inline@1"
         }
       ],

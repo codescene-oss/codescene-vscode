@@ -109,14 +109,16 @@ class FileWithIssues implements DeltaTreeViewItem {
 
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(toDeltaAnalysisUri(this.uri, this.children), this.collapsedState);
+    item.label = this.label;
+    return item;
+  }
 
+  private get label() {
     const scoreString = `${this.result['old-score'] ? roundScore(this.result['old-score']) : 'n/a'} -> ${roundScore(
       this.result['new-score']
     )}`;
     const fileName = path.basename(this.result.name);
-    item.label = `${fileName} ${scoreString}`;
-    item.contextValue = 'fileWithChanges';
-    return item;
+    return `${fileName} ${scoreString}`;
   }
 
   private get collapsedState() {
@@ -138,13 +140,14 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   }
 
   toTreeItem(): vscode.TreeItem {
-    const item = new vscode.TreeItem(toDeltaFunctionUri(this), vscode.TreeItemCollapsibleState.Collapsed);
+    const issues = countIssuesIn(this.children);
+    const item = new vscode.TreeItem(toDeltaFunctionUri(issues), vscode.TreeItemCollapsibleState.Collapsed);
     item.label = this.fnName;
     item.iconPath = new vscode.ThemeIcon('symbol-function');
-    // item.tooltip = `${capitalizeFirstLetter(this.changeType)} ${this.category} • ${this.description}`;
+    item.tooltip = `Function ${this.fnName}`;
     item.command = this.command;
     this.refactoring?.promise?.then(() => {
-      this.refactoring?.shouldPresent() && this.presentAsRefactorable(item);
+      this.refactoring?.shouldPresent() && this.presentAsRefactorable(item, issues);
     }, undefined);
 
     return item;
@@ -160,21 +163,21 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     };
   }
 
-  private presentAsRefactorable(item: vscode.TreeItem) {
+  private presentAsRefactorable(item: vscode.TreeItem, issues: number) {
     this.refactorable = true;
-    item.resourceUri = toDeltaFunctionUri(this, true);
+    item.resourceUri = toDeltaFunctionUri(issues, true);
     item.description = 'Refactoring available';
     item.contextValue = 'delta-refactorableFunction';
   }
 }
 
-class DeltaIssue implements DeltaTreeViewItem {
+export class DeltaIssue implements DeltaTreeViewItem {
   readonly changeType: ChangeType;
   private readonly position: vscode.Position;
 
   constructor(
     readonly parent: DeltaFunctionInfo | FileWithIssues,
-    private category: string,
+    readonly category: string,
     changeDetails: ChangeDetails,
     location?: Location
   ) {
@@ -186,6 +189,8 @@ class DeltaIssue implements DeltaTreeViewItem {
     const item = new vscode.TreeItem(this.category, vscode.TreeItemCollapsibleState.None);
     item.iconPath = this.iconPath;
     item.command = this.command;
+    item.tooltip = `${capitalizeFirstLetter(this.changeType)} ${this.category}`;
+    item.contextValue = 'delta-issue';
     return item;
   }
 

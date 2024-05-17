@@ -27,14 +27,20 @@ export function register(context: vscode.ExtensionContext) {
     'codescene.openDocsForDiagnostic',
     async (diag: vscode.Diagnostic) => {
       if (isCsDiagnosticCode(diag.code)) {
-        const docsCode = categoryToDocsCode(diag.code.value.toString());
-        void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
+        void vscode.commands.executeCommand('codescene.openDocsForIssueCategory', diag.code.value.toString());
       } else if (diag.message.startsWith(chScorePrefix)) {
         void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse('csdoc:code-health.md'));
       }
     }
   );
-  context.subscriptions.push(openDocsForDiagnostic);
+  const openDocsForCode = vscode.commands.registerCommand(
+    'codescene.openDocsForIssueCategory',
+    async (category: string) => {
+      const docsCode = categoryToDocsCode(category);
+      void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
+    }
+  );
+  context.subscriptions.push(openDocsForDiagnostic, openDocsForCode);
 }
 
 export function categoryToDocsCode(issueCategory: string) {
