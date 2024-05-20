@@ -38,7 +38,10 @@ export class CodeHealthGateView implements vscode.Disposable {
     this.disposables.push(
       this.view.onDidChangeVisibility((e) => {
         if (e.visible) {
-          void vscode.commands.executeCommand('codescene.runDeltaAnalysis');
+          // This is our only automatic trigger of the analysis at the moment.
+          // Ignore promise rejection here, since this might be triggered on startup 
+          // before the command has been registered properly.
+          vscode.commands.executeCommand('codescene.runDeltaAnalysis').then(undefined, () => {});
         }
       })
     );
