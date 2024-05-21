@@ -1,5 +1,6 @@
 import { ChildProcess, execFile, ExecOptions } from 'child_process';
 import { logOutputChannel } from './log';
+import { isDefined } from './utils';
 
 export interface ExecResult {
   stdout: string;
@@ -60,7 +61,7 @@ export class SimpleExecutor implements Executor {
         resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
       });
 
-      if (input && childProcess.stdin) {
+      if (isDefined(input) && childProcess.stdin) {
         this.writeInput(childProcess, input);
       }
 
