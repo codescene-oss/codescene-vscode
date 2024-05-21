@@ -265,7 +265,7 @@ function refactoringFromLocation(location: Location, refactorings?: CsRefactorin
   return refactorings.find(
     (refactoring) =>
       refactoring.fnToRefactor.name === location.function &&
-      refactoring.fnToRefactor.range.contains(locationToPos(location))
+      refactoring.fnToRefactor.range.start.line === getStartLine(location) - 1
   );
 }
 

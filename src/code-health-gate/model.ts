@@ -45,11 +45,11 @@ export function isDegradation(changeType: ChangeType) {
 
 export function getStartLine(location: Location) {
   const lineNo = location['start-line'] || location['start-line-before'];
-  return lineNo || 0;
+  return lineNo || 1;
 }
 export function getEndLine(location: Location) {
   const lineNo = location['end-line'] || location['end-line-before'];
-  return lineNo || 0;
+  return lineNo || 1;
 }
 
 export function toAbsoluteUri(rootPath: string, relativePath: string) {
