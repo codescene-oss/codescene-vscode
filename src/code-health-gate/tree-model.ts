@@ -223,8 +223,6 @@ function fileAndFunctionLevelIssues(
   delta: DeltaForFile
 ): Array<DeltaFunctionInfo | DeltaIssue> {
   const functions: Map<string, DeltaFunctionInfo> = new Map();
-  const keyFn = (location: Location) => `${location.function} [${getStartLine(location)}:${getEndLine(location)}]`;
-
   const fileLevelIssues: DeltaIssue[] = [];
   delta.findings.forEach((finding) => {
     // Find all functions with locations and create DeltaFunctionInfo for them
@@ -238,7 +236,7 @@ function fileAndFunctionLevelIssues(
       // Function "locations" might be nested under several different "findings"
       // We'll save them in a map to easily retreive them before adding the DeltaIssues
       changeDetail.locations.forEach((location) => {
-        const key = keyFn(location);
+        const key = location.function;
         let fnInfo = functions.get(key);
         if (!fnInfo) {
           fnInfo = new DeltaFunctionInfo(parent, location, refactoringFromLocation(location, delta.refactorings));
