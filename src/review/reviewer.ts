@@ -2,7 +2,7 @@ import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
-import { outputChannel } from '../log';
+import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
@@ -78,6 +78,29 @@ class CachingReviewer {
     }
   }
 
+  /**
+   * ReviewErrors with exit !== 1 are reported separately (or not at all),
+   * as they are not considered fatal.
+   */
+  private handleReviewError(e: Error, document: vscode.TextDocument) {
+    if (e instanceof ReviewError) {
+      switch (e.exitCode) {
+        case 2:
+          logOutputChannel.warn(e.message);
+          return;
+        case 'ABORT_ERR':
+          // Delete the cache entry for this document if the review was aborted (document closed)
+          // Otherwise it won't be reviewed immediately when the document is opened again
+          this.reviewCache.delete(document.fileName);
+          return;
+        default:
+          logOutputChannel.error(e.message);
+          this.errorEmitter.fire(e); // Fire errors for all other errors
+          return;
+      }
+    }
+  }
+
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): CsReview {
     // If we have a cached promise for this document, return it.
     if (!reviewOpts.skipCache) {
@@ -91,13 +114,11 @@ class CachingReviewer {
     const reviewPromise = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
-        // Don't cache aborted/void reviews
+        // Don't cache reviews of ignored files
         if (!reviewResult) this.reviewCache.delete(document.fileName);
         return reviewResult;
       })
-      .catch((e) => {
-        this.errorEmitter.fire(e);
-      })
+      .catch((e) => this.handleReviewError(e, document))
       .finally(() => {
         this.endReviewEvent(document);
       });
@@ -123,6 +144,12 @@ interface InternalReviewer {
   abort(document: vscode.TextDocument): void;
 }
 
+class ReviewError extends Error {
+  constructor(public exitCode: number | string, public message: string) {
+    super();
+  }
+}
+
 function taskId(document: vscode.TextDocument) {
   return `${document.uri.fsPath} v${document.version}`;
 }
@@ -132,7 +159,7 @@ class SimpleReviewer implements InternalReviewer {
 
   constructor(private cliPath: string) {}
 
-  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult | void> {
+  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult> {
     const extension = getFileExtension(document.fileName);
 
     // Get the fsPath of the current document because we want to execute the
@@ -140,16 +167,21 @@ class SimpleReviewer implements InternalReviewer {
     // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
     const documentDirectory = dirname(document.uri.fsPath);
 
-    const { stdout, exitCode, duration } = await this.executor.execute(
+    const { stdout, stderr, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
         args: ['review', '--file-type', extension, '--output-format', 'json'],
         taskId: taskId(document),
+        ignoreError: true, // Ignore executor errors and handle exitCode/stderr here instead
       },
       { cwd: documentDirectory },
       document.getText()
     );
-    if (exitCode === 'ABORT_ERR') return;
+
+    if (exitCode !== 0) {
+      throw new ReviewError(exitCode, `CodeScene review failed: '${stderr.trim()}' (exit ${exitCode})`);
+    }
+
     StatsCollector.instance.recordAnalysis(extension, duration);
     return JSON.parse(stdout) as ReviewResult;
   }

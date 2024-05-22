@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
+import { reviewDocumentSelector } from './language-support';
 import { requestRefactoringsCmdName } from './refactoring/commands';
 import Reviewer, { ReviewOpts } from './review/reviewer';
-import { reviewDocumentSelector } from './language-support';
 import { chScorePrefix } from './review/utils';
 
 export const csSource = 'CodeScene';
@@ -35,9 +35,5 @@ export default class CsDiagnostics {
       // Try to request refactorings for the important diagnostics
       void vscode.commands.executeCommand(requestRefactoringsCmdName, document, importantDiagnostics);
     });
-  }
-
-  static abort(document: vscode.TextDocument) {
-    Reviewer.instance.abort(document);
   }
 }
