@@ -145,6 +145,10 @@
         {
           "command": "codescene.chGateTreeContext.requestRefactoring",
           "when": "false"
+        },
+        {
+          "command": "codescene.chGateTreeContext.openDocumentation",
+          "when": "false"
         }
       ]
     },

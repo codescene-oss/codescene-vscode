@@ -1,11 +1,11 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
+import { DeltaAnalyser } from './code-health-gate/analyser';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
-import { DeltaAnalyser } from './code-health-gate/analyser';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
-import { PreFlightResponse } from './refactoring/model';
+import { PreFlightResponse, isPreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
@@ -47,6 +47,22 @@ export class CsExtensionState {
   }
   static get stateProperties() {
     return CsExtensionState._instance.stateProperties;
+  }
+
+  static get cliPath(): string {
+    const cliPath = CsExtensionState._instance.stateProperties.features?.codeHealthAnalysis;
+    if (typeof cliPath !== 'string') {
+      throw new Error(`CodeScene CLI path not set (${cliPath})`);
+    }
+    return cliPath;
+  }
+
+  /**
+   * Returns the preflight response if ACE is enabled, otherwise undefined.
+   */
+  static get acePreflight(): PreFlightResponse | undefined {
+    const ace = CsExtensionState._instance.stateProperties.features?.ace;
+    return isPreFlightResponse(ace) ? ace : undefined;
   }
 
   /**

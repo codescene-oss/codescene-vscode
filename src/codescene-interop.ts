@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+import { CsExtensionState } from './cs-extension-state';
 import { ExecResult, SimpleExecutor } from './executor';
 
 /**
@@ -12,7 +13,7 @@ export function codeHealthRulesJson(cliPath: string) {
  * Executes the command for checking code health rule match against file
  */
 export function codeHealthRulesCheck(cliPath: string, rootPath: string, filePath: string) {
-  return new SimpleExecutor().execute({ command: cliPath, args: ['check-rules', filePath] }, {cwd: rootPath});
+  return new SimpleExecutor().execute({ command: cliPath, args: ['check-rules', filePath] }, { cwd: rootPath });
 }
 
 /**
@@ -36,11 +37,11 @@ export interface EnclosingFn {
  * Executes the command for getting function coordinates for a list of line numbers.
  * This command will only return distinct functions, even if several line numbers point to the same function.
  */
-export async function findEnclosingFunctions(cliPath: string, extension: string, lineNos: number[], payload: string) {
+export async function findEnclosingFunctions(extension: string, lineNos: number[], payload: string) {
   if (lineNos.length === 0) return [];
   const result: ExecResult = await new SimpleExecutor().execute(
     {
-      command: cliPath,
+      command: CsExtensionState.cliPath,
       args: [
         'enclosing-functions',
         '--file-type',

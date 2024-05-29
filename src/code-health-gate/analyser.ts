@@ -8,6 +8,7 @@ import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
 import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
+import { CsExtensionState } from '../cs-extension-state';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -28,7 +29,6 @@ export class DeltaAnalyser {
   readonly onDidAnalysisFail = this.errorEmitter.event;
   private analysisEmitter: vscode.EventEmitter<DeltaAnalysisEvent> = new vscode.EventEmitter<DeltaAnalysisEvent>();
   readonly onDidAnalyse = this.analysisEmitter.event;
-  private supportedCodeSmells?: string[];
   private analysesRunning = 0;
 
   readonly analysisResults: Map<string, DeltaForFile[] | DeltaAnalysisResult> = new Map();
@@ -54,13 +54,6 @@ export class DeltaAnalyser {
     rootPaths.forEach(async (rootPath) => {
       void DeltaAnalyser.instance.runDeltaAnalysis(rootPath);
     });
-  }
-
-  static enableAce(supportedCodeSmells: string[]) {
-    DeltaAnalyser.instance.supportedCodeSmells = supportedCodeSmells;
-  }
-  static disableAce() {
-    DeltaAnalyser.instance.supportedCodeSmells = undefined;
   }
 
   private startAnalysisEvent(path: string) {
@@ -90,8 +83,12 @@ export class DeltaAnalyser {
           return;
         }
         const deltaResults = JSON.parse(result.stdout) as DeltaForFile[];
-        if (DeltaAnalyser.instance.supportedCodeSmells) {
-          requestRefactoringsForDegradations(rootPath, deltaResults, DeltaAnalyser.instance.supportedCodeSmells);
+        if (CsExtensionState.acePreflight) {
+          requestRefactoringsForDegradations(
+            rootPath,
+            deltaResults,
+            CsExtensionState.acePreflight.supported['code-smells']
+          );
         }
         DeltaAnalyser.instance.analysisResults.set(rootPath, deltaResults);
       })
@@ -106,8 +103,9 @@ export class DeltaAnalyser {
 }
 
 /**
- * Try to send refactoring requests for all supported degradations found in these files
- *
+ * Try to send refactoring requests for all supported degradations found in these files.
+ * Mutates/decorates the deltaForFiles with the refactoring requests if applicable.
+ * 
  * @param deltaForFiles
  */
 function requestRefactoringsForDegradations(

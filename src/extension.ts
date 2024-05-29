@@ -5,7 +5,7 @@ import { activate as activateCodeHealthGate } from './code-health-gate/addon';
 import { DeltaAnalyser, registerDeltaCommand } from './code-health-gate/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
-import { register as registerCsDoc } from './csdoc';
+import { register as registerCsDoc } from './documentation/csdoc-provider';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector } from './language-support';
@@ -180,8 +180,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid debouncing 'output' documents etc.
       if (e.document.uri.scheme === 'file') {
-        // Immediately clear request list on code changes
-        CsRefactoringRequests.delete(e.document);
         debouncedRun(e.document);
       }
     })
@@ -220,7 +218,6 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   aceApi.enableACE(context, cliPath).then(
     (result) => {
       CsExtensionState.setACEState(result);
-      DeltaAnalyser.enableAce(result.supported['code-smells']);
       outputChannel.appendLine('Auto-refactor enabled!');
     },
     (error: Error | string) => {
@@ -229,7 +226,6 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
         outputChannel.appendLine(message);
         void vscode.window.showErrorMessage(message);
       }
-      DeltaAnalyser.disableAce();
       CsExtensionState.setACEState(error);
     }
   );

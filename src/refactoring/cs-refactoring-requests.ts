@@ -1,9 +1,8 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { Diagnostic, EventEmitter, Range, TextDocument } from 'vscode';
+import { EventEmitter, TextDocument } from 'vscode';
 import { CsRestApi } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { isCsDiagnosticCode } from '../review/utils';
 import Telemetry from '../telemetry';
 import { isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './commands';
@@ -21,7 +20,7 @@ export class CsRefactoringRequest {
   document: TextDocument;
   traceId: string;
   response?: RefactorResponse;
-  promise?: Promise<RefactorResponse>;
+  promise: Promise<RefactorResponse>;
   private abortController: AbortController;
 
   constructor(fnToRefactor: FnToRefactor, document: TextDocument) {
@@ -29,16 +28,20 @@ export class CsRefactoringRequest {
     this.document = document;
     this.traceId = uuidv4();
     this.abortController = new AbortController();
-  }
-
-  post(diagnostics: Diagnostic[]) {
+    Telemetry.instance.logUsage('refactor/requested', { 'trace-id': this.traceId });
     this.promise = CsRestApi.instance
-      .fetchRefactoring(diagnostics, this.fnToRefactor, this.traceId, this.abortController.signal)
+      .fetchRefactoring(this.fnToRefactor, this.traceId, this.abortController.signal)
       .then((response) => {
         this.response = response;
         return response;
+      })
+      .catch((error) => {
+        let msg = error.message;
+        if (error instanceof AxiosError) {
+          msg = getErrorString(error);
+        }
+        throw new Error(msg);
       });
-    return this.promise;
   }
 
   abort() {
@@ -85,28 +88,19 @@ function validConfidenceLevel(level: number) {
  * Used to get the proper requests when presenting the refactoring codelenses and codeactions.
  */
 export class CsRefactoringRequests {
-  private static readonly map: Map<string, Map<string, CsRefactoringRequest>> = new Map();
-
   private static readonly requestsChangedEmitter = new EventEmitter<void>();
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsChangedEmitter.event;
 
   private static readonly errorEmitter = new EventEmitter<Error | AxiosError>();
   static readonly onDidRequestFail = CsRefactoringRequests.errorEmitter.event;
 
-  static initiate(document: TextDocument, fnsToRefactor: FnToRefactor[], diagnostics: Diagnostic[]) {
+  static initiate(document: TextDocument, fnsToRefactor: FnToRefactor[]) {
     const requests: CsRefactoringRequest[] = [];
 
     fnsToRefactor.forEach(async (fn) => {
-      const diagnosticsForFn = diagnostics.filter((d) => fn.range.contains(d.range));
       const req = new CsRefactoringRequest(fn, document);
-      Telemetry.instance.logUsage('refactor/requested', { 'trace-id': req.traceId });
       logOutputChannel.debug(`Refactor request for ${logIdString(req.traceId, req.fnToRefactor)}`);
-
-      // Put the request for each diagnostic in a map for access in codelens and codeaction providers
-      diagnosticsForFn.forEach((d) => CsRefactoringRequests.set(document, d, req));
-
-      req
-        .post(diagnosticsForFn)
+      req.promise
         .then((response) => {
           logOutputChannel.debug(
             `Refactor response for ${logIdString(req.traceId, req.fnToRefactor)}: ${confidenceString(
@@ -115,12 +109,7 @@ export class CsRefactoringRequests {
           );
         })
         .catch((error) => {
-          let msg = error.message;
-          if (error instanceof AxiosError) {
-            msg = getErrorString(error);
-          }
-          logOutputChannel.error(`Refactor error for ${logIdString(req.traceId, req.fnToRefactor)}: ${msg}`);
-          CsRefactoringRequests.deleteByFnRange(req.document, req.fnToRefactor.range);
+          logOutputChannel.error(`Refactor error for ${logIdString(req.traceId, req.fnToRefactor)}: ${error.message}`);
           CsRefactoringRequests.errorEmitter.fire(error);
         })
         .finally(() => {
@@ -134,69 +123,6 @@ export class CsRefactoringRequests {
     }
     return requests;
   }
-
-  private static set(document: TextDocument, diagnostic: Diagnostic, request: CsRefactoringRequest) {
-    const uriString = document.uri.toString();
-    let map = CsRefactoringRequests.map.get(uriString);
-    if (!map) {
-      map = new Map();
-      CsRefactoringRequests.map.set(uriString, map);
-    }
-    map.set(diagKey(diagnostic), request);
-  }
-
-  static deleteAll() {
-    CsRefactoringRequests.map.clear();
-    CsRefactoringRequests.requestsChangedEmitter.fire();
-  }
-
-  // TODO call abort() while deleting requests (deletaAll, deleteByFnRange as well)
-  static delete(document: TextDocument) {
-    CsRefactoringRequests.map.delete(document.uri.toString());
-    CsRefactoringRequests.requestsChangedEmitter.fire();
-  }
-
-  // TODO BUG - this doesn't work with complex methods or complex conditionals where functionRange != diagnostic range
-  static deleteByFnRange(document: TextDocument, functionRange: Range) {
-    const map = CsRefactoringRequests.map.get(document.uri.toString());
-    if (!map) {
-      return;
-    }
-    const matchedKeys: string[] = [];
-    map.forEach((req, key) => {
-      if (req.fnToRefactor.range.isEqual(functionRange)) {
-        matchedKeys.push(key);
-      }
-    });
-    const anyDeleted = matchedKeys.map((key) => map.delete(key)).some((a) => a);
-    anyDeleted && CsRefactoringRequests.requestsChangedEmitter.fire();
-  }
-
-  static get(document: TextDocument, diagnostic: Diagnostic) {
-    const map = CsRefactoringRequests.map.get(document.uri.toString());
-    if (!map) {
-      return;
-    }
-    return map.get(diagKey(diagnostic));
-  }
-
-  static getAll(document: TextDocument) {
-    const map = CsRefactoringRequests.map.get(document.uri.toString());
-    if (!map) {
-      return [];
-    }
-    return [...map.values()];
-  }
-}
-
-function diagKey(diagnostic: Diagnostic) {
-  if (!isDefined(diagnostic.code)) {
-    return `${diagnostic.message}-${rangeStr(diagnostic.range)}`;
-  }
-  if (isCsDiagnosticCode(diagnostic.code)) {
-    return `${diagnostic.code.value}-${rangeStr(diagnostic.range)}`;
-  }
-  return `${diagnostic.code}-${rangeStr(diagnostic.range)}`;
 }
 
 function getErrorString(err: AxiosError) {

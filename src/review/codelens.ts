@@ -1,18 +1,22 @@
 import * as vscode from 'vscode';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
+import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
-import Reviewer from './reviewer';
 import { isDefined, rangeStr } from '../utils';
+import Reviewer from './reviewer';
+import { getCsDiagnosticCode } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
  */
 export class CsReviewCodeLens extends vscode.CodeLens {
-  readonly diagnostic: vscode.Diagnostic;
-
-  constructor(range: vscode.Range, diagnostic: vscode.Diagnostic, command?: vscode.Command) {
+  constructor(
+    range: vscode.Range,
+    readonly diagnostic: vscode.Diagnostic,
+    readonly document: vscode.TextDocument,
+    command?: vscode.Command
+  ) {
     super(range, command);
-    this.diagnostic = diagnostic;
   }
 }
 
@@ -53,7 +57,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d));
+    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d, document));
   }
 
   resolveCodeLens?(
@@ -64,10 +68,17 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       `Resolving Review CodeLenses for ${codeLens.diagnostic.message} ${rangeStr(codeLens.diagnostic.range)}`
     );
 
+    const params: InteractiveDocsParams = {
+      codeSmell: {
+        category: getCsDiagnosticCode(codeLens.diagnostic.code),
+        position: codeLens.diagnostic.range.start,
+      },
+      document: codeLens.document,
+    };
     codeLens.command = {
       title: codeLens.diagnostic.message,
-      command: 'codescene.openDocsForDiagnostic',
-      arguments: [codeLens.diagnostic],
+      command: 'codescene.openInteractiveDocsPanel',
+      arguments: [params],
     };
 
     return codeLens;

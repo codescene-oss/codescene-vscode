@@ -1,8 +1,11 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
-import { chScorePrefix, isCsDiagnosticCode } from './review/utils';
-import { getLogoUrl } from './utils';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import Reviewer from '../review/reviewer';
+import { chScorePrefix, isCsDiagnosticCode } from '../review/utils';
+import { getLogoUrl } from '../utils';
+import { CategoryWithPosition, DocumentationPanel } from './documentation-panel';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
   constructor(private extensionPath: string) {}
@@ -40,7 +43,22 @@ export function register(context: vscode.ExtensionContext) {
       void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
     }
   );
-  context.subscriptions.push(openDocsForDiagnostic, openDocsForCode);
+
+  const openInteractiveDocsPanel = vscode.commands.registerCommand(
+    'codescene.openInteractiveDocsPanel',
+    (params: InteractiveDocsParams) => {
+      const panelParams = Object.assign({ extensionUri: context.extensionUri }, params);
+      DocumentationPanel.createOrShow(panelParams);
+    }
+  );
+
+  context.subscriptions.push(openDocsForDiagnostic, openDocsForCode, openInteractiveDocsPanel);
+}
+
+export interface InteractiveDocsParams {
+  codeSmell: CategoryWithPosition;
+  document: vscode.TextDocument;
+  refactoring?: CsRefactoringRequest;
 }
 
 export function categoryToDocsCode(issueCategory: string) {
