@@ -22,5 +22,5 @@ export async function getLogoUrl(extensionPath: string): Promise<string> {
 }
 
 export function rangeStr(range: Range) {
-  return `[${range.start.line + 1}:${range.start.character}->${range.end.line + 1}:${range.end.character}]`;
+  return `[${range.start.line + 1}:${range.start.character}→${range.end.line + 1}:${range.end.character}]`;
 }

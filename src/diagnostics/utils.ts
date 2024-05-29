@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { categoryToDocsCode } from '../csdoc';
+import { categoryToDocsCode } from '../documentation/csdoc-provider';
 
 // Finds the column range of the function name in the line of code that it appears in
 export function getFunctionNameRange(line: string, functionName: string): [number, number] {

@@ -61,8 +61,8 @@
         "title": "View in ACE panel"
       },
       {
-        "command": "codescene.chGateTreeContext.requestRefactoring",
-        "title": "View ACE refactoring",
+        "command": "codescene.chGateTreeContext.presentRefactoring",
+        "title": "View Auto-refactoring",
         "icon": "$(sparkle)"
       },
       {
@@ -115,7 +115,7 @@
     "menus": {
       "view/item/context": [
         {
-          "command": "codescene.chGateTreeContext.requestRefactoring",
+          "command": "codescene.chGateTreeContext.presentRefactoring",
           "when": "view == codescene.codeHealthGateView && viewItem === 'delta-refactorableFunction'",
           "group": "inline@1"
         },
@@ -143,7 +143,11 @@
           "when": "false"
         },
         {
-          "command": "codescene.chGateTreeContext.requestRefactoring",
+          "command": "codescene.chGateTreeContext.presentRefactoring",
+          "when": "false"
+        },
+        {
+          "command": "codescene.chGateTreeContext.openDocumentation",
           "when": "false"
         }
       ]

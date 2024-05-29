@@ -21,7 +21,11 @@ const webviewConfig = {
   ...baseConfig,
   target: 'es2020',
   format: 'esm',
-  entryPoints: ['./src/refactoring/webview-script.ts', './src/webviews/status-webview-script.ts'],
+  entryPoints: [
+    './src/refactoring/webview-script.ts',
+    './src/documentation/webview-script.ts',
+    './src/webviews/status-webview-script.ts',
+  ],
   outdir: './out',
   plugins: [
     copy({
