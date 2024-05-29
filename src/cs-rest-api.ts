@@ -1,12 +1,10 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import { getServerApiUrl } from './configuration';
 import { Coupling } from './coupling/model';
 import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
-import { getCsDiagnosticCode } from './review/utils';
 
 const defaultTimeout = 10000;
 const refactoringTimeout = 60000;
@@ -95,12 +93,7 @@ export class CsRestApi {
     return this.fetchJson<PreFlightResponse>(refactorUrl);
   }
 
-  async fetchRefactoring(
-    diagnostics: vscode.Diagnostic[],
-    fnToRefactor: FnToRefactor,
-    traceId: string,
-    signal?: AbortSignal
-  ) {
+  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
@@ -110,19 +103,18 @@ export class CsRestApi {
     };
     const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
 
-    const reviews = diagnostics.map((diagnostic) => {
-      const category = getCsDiagnosticCode(diagnostic.code);
+    const reviews = fnToRefactor.codeSmells.map((codeSmell) => {
       return {
-        category,
-        'start-line': diagnostic.range.start.line - fnToRefactor.range.start.line,
-        'end-line': diagnostic.range.end.line - fnToRefactor.range.start.line,
+        category: codeSmell.category,
+        'start-line': codeSmell.relativeStartLine,
+        'end-line': codeSmell.relativeEndLine,
       };
     });
 
     const request: RefactorRequest = {
       review: reviews,
       'source-snippet': {
-        'file-type': fnToRefactor['file-type'],
+        'file-type': fnToRefactor.fileType,
         'function-type': fnToRefactor.functionType,
         body: fnToRefactor.content,
       },

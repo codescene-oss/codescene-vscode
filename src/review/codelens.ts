@@ -1,18 +1,22 @@
 import * as vscode from 'vscode';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
+import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
-import Reviewer from './reviewer';
 import { isDefined, rangeStr } from '../utils';
+import Reviewer from './reviewer';
+import { chScorePrefix, getCsDiagnosticCode, isCsDiagnosticCode } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
  */
 export class CsReviewCodeLens extends vscode.CodeLens {
-  readonly diagnostic: vscode.Diagnostic;
-
-  constructor(range: vscode.Range, diagnostic: vscode.Diagnostic, command?: vscode.Command) {
+  constructor(
+    range: vscode.Range,
+    readonly diagnostic: vscode.Diagnostic,
+    readonly document: vscode.TextDocument,
+    command?: vscode.Command
+  ) {
     super(range, command);
-    this.diagnostic = diagnostic;
   }
 }
 
@@ -53,23 +57,44 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d));
+    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d, document));
   }
 
   resolveCodeLens?(
     codeLens: CsReviewCodeLens,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsReviewCodeLens> {
-    logOutputChannel.trace(
-      `Resolving Review CodeLenses for ${codeLens.diagnostic.message} ${rangeStr(codeLens.diagnostic.range)}`
-    );
+    const diagnostic = codeLens.diagnostic;
+    logOutputChannel.trace(`Resolving Review CodeLenses for ${diagnostic.message} ${rangeStr(diagnostic.range)}`);
 
-    codeLens.command = {
-      title: codeLens.diagnostic.message,
-      command: 'codescene.openDocsForDiagnostic',
-      arguments: [codeLens.diagnostic],
-    };
-
+    if (isCsDiagnosticCode(diagnostic.code)) {
+      codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document);
+    } else if (diagnostic.message.startsWith(chScorePrefix)) {
+      codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
+    }
     return codeLens;
+  }
+
+  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, document: vscode.TextDocument) {
+    const params: InteractiveDocsParams = {
+      codeSmell: {
+        category: getCsDiagnosticCode(diagnostic.code),
+        position: diagnostic.range.start,
+      },
+      document,
+    };
+    return {
+      title: diagnostic.message,
+      command: 'codescene.openInteractiveDocsPanel',
+      arguments: [params],
+    };
+  }
+
+  private showCodeHealthDocsCommand(message: string) {
+    return {
+      title: message,
+      command: 'markdown.showPreviewToSide',
+      arguments: [vscode.Uri.parse('csdoc:code-health.md')],
+    };
   }
 }

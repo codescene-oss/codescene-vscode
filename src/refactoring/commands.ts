@@ -1,74 +1,112 @@
-import vscode from 'vscode';
+import vscode, { ViewColumn } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
 import { getFileExtension, isDefined } from '../utils';
-import { CsRefactoringRequests, ResolvedRefactoring } from './cs-refactoring-requests';
+import { toRefactoringDocumentSelector } from './addon';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { PreFlightResponse } from './model';
 import { RefactoringPanel } from './refactoring-panel';
-import { DiagnosticFilter } from './addon';
+import { isCsDiagnosticCode } from '../review/utils';
 
 export interface FnToRefactor {
   name: string;
   range: vscode.Range;
   content: string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'file-type': string;
+  fileType: string;
   functionType: string;
+  codeSmells: FnCodeSmell[];
+}
+
+interface FnCodeSmell {
+  category: string;
+  relativeStartLine: number;
+  relativeEndLine: number;
 }
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri;
+  private documentSelector: vscode.DocumentSelector;
 
-  constructor(
-    extensionUri: vscode.Uri,
-    private cliPath: string,
-    private documentSelector: vscode.DocumentSelector,
-    private codeSmellFilter: DiagnosticFilter,
-    private maxInputLoc: number
-  ) {
+  constructor(extensionUri: vscode.Uri, private preflightResponse: PreFlightResponse) {
     this.extensionUri = extensionUri;
-    const requestRefactoringCmd = vscode.commands.registerCommand(
-      'codescene.requestRefactorings',
-      this.requestRefactorings,
-      this
-    );
-    this.disposables.push(requestRefactoringCmd);
+    this.documentSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
 
-    const presentRefactoringCmd = vscode.commands.registerCommand(
-      'codescene.presentRefactoring',
-      this.presentRefactoringRequest,
-      this
+    this.disposables.push(
+      vscode.commands.registerCommand('codescene.requestRefactorings', this.requestRefactoringsCmd, this),
+      vscode.commands.registerCommand('codescene.presentRefactoring', this.presentRefactoringRequestCmd, this),
+      vscode.commands.registerCommand('codescene.getFunctionToRefactor', this.getFunctionToRefactorCmd, this),
+      vscode.commands.registerCommand(
+        'codescene.requestAndPresentRefactoring',
+        this.requestAndPresentRefactoringCmd,
+        this
+      )
     );
-    this.disposables.push(presentRefactoringCmd);
   }
 
-  private presentRefactoringRequest(refactoring: ResolvedRefactoring) {
+  private presentRefactoringRequestCmd(refactoring: CsRefactoringRequest, viewColumn?: vscode.ViewColumn) {
     RefactoringPanel.createOrShow({
       extensionUri: this.extensionUri,
       refactoring,
+      viewColumn,
     });
   }
 
-  private async requestRefactorings(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    if (vscode.languages.match(this.documentSelector, document) === 0) return;
-    const supportedDiagnostics = diagnostics.filter(this.codeSmellFilter);
-
-    const distinctFns = await this.distinctFnsFromDiagnostics(document, supportedDiagnostics, this.maxInputLoc);
-
-    return CsRefactoringRequests.initiate(document, distinctFns, supportedDiagnostics);
+  private async requestRefactoringsCmd(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const distinctFns = await this.supportedDistinctFnsToRefactor(document, diagnostics);
+    if (!distinctFns) return;
+    return CsRefactoringRequests.initiate(document, distinctFns);
   }
 
-  private async distinctFnsFromDiagnostics(
-    document: vscode.TextDocument,
-    diagnostics: vscode.Diagnostic[],
-    maxInputLoc: number
-  ) {
+  private async getFunctionToRefactorCmd(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const distinctFns = await this.supportedDistinctFnsToRefactor(document, diagnostics);
+    return distinctFns?.[0];
+  }
+
+  private async supportedDistinctFnsToRefactor(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    if (vscode.languages.match(this.documentSelector, document) === 0) return;
+    return await this.findFunctionsToRefactor(document, diagnostics);
+  }
+
+  private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor: FnToRefactor) {
+    if (vscode.languages.match(this.documentSelector, document) === 0) return;
+    const request = CsRefactoringRequests.initiate(document, [fnToRefactor]);
+    this.presentRefactoringRequestCmd(request[0], ViewColumn.Active);
+  }
+
+  private async findFunctionsToRefactor(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+    const maxInputLoc = this.preflightResponse['max-input-loc'];
+
+    // Filter diagnostics that are currently supported by ACE
+    const supported = this.supportedDiagnostics(diagnostics);
+
     // Get distinct ranges so we don't have to run findFunctionToRefactor for the same range multiple times
-    const distinctRanges = diagnostics
+    const distinctRanges = supported
       .filter((diag, i, diags) => diags.findIndex((d) => d.range.isEqual(diag.range)) === i)
       .map((d) => d.range);
 
-    return await findFunctionsToRefactor(this.cliPath, document, distinctRanges, maxInputLoc);
+    const extension = getFileExtension(document.fileName);
+    const lineNumbers = distinctRanges.map((r) => r.start.line + 1); // range.start.line is zero-based
+    const enclosingFns = await findEnclosingFunctions(extension, lineNumbers, document.getText());
+
+    return enclosingFns
+      .filter((enclosingFn) => {
+        const activeLoc = enclosingFn['active-code-size'];
+        if (activeLoc <= maxInputLoc) return true;
+        logOutputChannel.debug(
+          `Function "${enclosingFn.name}" exceeds max-input-loc (${activeLoc} > ${maxInputLoc}) - ignoring`
+        );
+        return false;
+      })
+      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, extension, supported))
+      .sort((a, b) => linesOfCode(a.range) - linesOfCode(b.range));
+  }
+
+  private supportedDiagnostics(diagnostics: vscode.Diagnostic[]) {
+    return diagnostics.filter(
+      (d: vscode.Diagnostic) =>
+        d.code instanceof Object && this.preflightResponse.supported['code-smells'].includes(d.code.value.toString())
+    );
   }
 
   dispose() {
@@ -77,23 +115,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
   }
 }
 
-async function findFunctionsToRefactor(
-  cliPath: string,
-  document: vscode.TextDocument,
-  ranges: vscode.Range[],
-  maxInputLoc: number
-) {
-  const extension = getFileExtension(document.fileName);
-  const lineNumbers = ranges.map((r) => r.start.line + 1); // range.start.line is zero-based
-  const enclosingFns = await findEnclosingFunctions(cliPath, extension, lineNumbers, document.getText());
-
-  return enclosingFns
-    .map((enclosingFn) => toFnToRefactor(enclosingFn, document, extension, maxInputLoc))
-    .filter(isDefined)
-    .sort((a, b) => loc(a.range) - loc(b.range));
-}
-
-function loc(range: vscode.Range) {
+function linesOfCode(range: vscode.Range) {
   // Maybe evident, but worth noting that function with a single line has a loc of 1 :)
   return range.end.line - range.start.line + 1;
 }
@@ -102,23 +124,28 @@ function toFnToRefactor(
   enclosingFn: EnclosingFn,
   document: vscode.TextDocument,
   extension: string,
-  maxInputLoc: number
+  supportedDiagnostics: vscode.Diagnostic[]
 ) {
-  const activeLoc = enclosingFn['active-code-size'];
-  const range = rangeFromEnclosingFn(enclosingFn);
-  if (activeLoc > maxInputLoc) {
-    logOutputChannel.debug(
-      `Function "${enclosingFn.name}" exceeds max-input-loc (${activeLoc} > ${maxInputLoc}) - ignoring`
-    );
-    return;
-  }
+  const codeSmells: FnCodeSmell[] = supportedDiagnostics
+    .map((d) => {
+      const category = isCsDiagnosticCode(d.code) ? d.code.value : undefined;
+      if (!category) return;
+      return {
+        category,
+        relativeStartLine: d.range.start.line - enclosingFn['start-line'],
+        relativeEndLine: d.range.end.line - enclosingFn['start-line'],
+      };
+    })
+    .filter(isDefined);
 
+  const range = rangeFromEnclosingFn(enclosingFn);
   return {
     name: enclosingFn.name,
-    range: range,
+    range,
     functionType: enclosingFn['function-type'],
-    'file-type': extension,
+    fileType: extension,
     content: document.getText(range),
+    codeSmells,
   } as FnToRefactor;
 }
 

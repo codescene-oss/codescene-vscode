@@ -46,11 +46,6 @@ export interface DeltaTreeViewItem {
   children?: Array<DeltaTreeViewItem | DeltaAnalysisState>;
 }
 
-export interface AceRequests {
-  refactoring: ResolvedRefactoring;
-  requests: CsRefactoringRequest[];
-}
-
 export function buildTree(): Array<DeltaTreeViewItem | DeltaAnalysisState> {
   // Skip the GitRoot level if there's only one workspace
   if (DeltaAnalyser.instance.analysisResults.size === 1) {
@@ -114,7 +109,7 @@ class FileWithIssues implements DeltaTreeViewItem {
   }
 
   private get label() {
-    const scoreString = `${this.result['old-score'] ? roundScore(this.result['old-score']) : 'n/a'} -> ${roundScore(
+    const scoreString = `${this.result['old-score'] ? roundScore(this.result['old-score']) : 'n/a'} → ${roundScore(
       this.result['new-score']
     )}`;
     const fileName = path.basename(this.result.name);
@@ -146,9 +141,16 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     item.iconPath = new vscode.ThemeIcon('symbol-function');
     item.tooltip = `Function ${this.fnName}`;
     item.command = this.command;
-    this.refactoring?.promise?.then(() => {
-      this.refactoring?.shouldPresent() && this.presentAsRefactorable(item, issues);
-    }, undefined);
+
+    if (this.refactoring) {
+      this.presentAsLoadingRefactoring(item);
+      this.refactoring.promise.then(
+        () => {
+          this.refactoring?.shouldPresent() ? this.presentAsRefactorable(item, issues) : (item.description = undefined);
+        },
+        () => (item.description = undefined)
+      );
+    }
 
     return item;
   }
@@ -163,17 +165,21 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     };
   }
 
+  private presentAsLoadingRefactoring(item: vscode.TreeItem) {
+    item.description = 'Attempting refactoring...';
+  }
+
   private presentAsRefactorable(item: vscode.TreeItem, issues: number) {
     this.refactorable = true;
     item.resourceUri = toDeltaFunctionUri(issues, true);
-    item.description = 'Refactoring available';
+    item.description = 'Auto-refactor available';
     item.contextValue = 'delta-refactorableFunction';
   }
 }
 
 export class DeltaIssue implements DeltaTreeViewItem {
   readonly changeType: ChangeType;
-  private readonly position: vscode.Position;
+  readonly position: vscode.Position;
 
   constructor(
     readonly parent: DeltaFunctionInfo | FileWithIssues,
@@ -195,7 +201,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get command() {
-    const uri = this.parent instanceof DeltaFunctionInfo ? this.parent.parent.uri : this.parent.uri;
+    const uri = this.parentUri;
     const location = new vscode.Location(uri, this.position);
     return {
       command: 'editor.action.goToLocations',
@@ -211,6 +217,10 @@ export class DeltaIssue implements DeltaTreeViewItem {
       return new vscode.ThemeIcon('pass', new vscode.ThemeColor('codescene.codeHealth.healthy'));
     }
     return undefined;
+  }
+
+  get parentUri() {
+    return this.parent instanceof DeltaFunctionInfo ? this.parent.parent.uri : this.parent.uri;
   }
 }
 

@@ -10,6 +10,8 @@ import {
   countIssuesIn,
   filesWithIssuesInTree,
 } from './tree-model';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -39,7 +41,7 @@ export class CodeHealthGateView implements vscode.Disposable {
       this.view.onDidChangeVisibility((e) => {
         if (e.visible) {
           // This is our only automatic trigger of the analysis at the moment.
-          // Ignore promise rejection here, since this might be triggered on startup 
+          // Ignore promise rejection here, since this might be triggered on startup
           // before the command has been registered properly.
           vscode.commands.executeCommand('codescene.runDeltaAnalysis').then(undefined, () => {});
         }
@@ -48,22 +50,22 @@ export class CodeHealthGateView implements vscode.Disposable {
 
     this.disposables.push(this.view);
 
-    /*   
-      this.disposables.push(
-      vscode.commands.registerCommand('codescene.chGateTreeContext.goto', (event: DeltaFinding) => {
-        const uri = event.parent.uri;
-        const position = event.position;
-        const location = new vscode.Location(uri, position);
-        void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
-      })
-    );
- */
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (fnInfo: DeltaFunctionInfo) => {
+      vscode.commands.registerCommand('codescene.chGateTreeContext.presentRefactoring', (fnInfo: DeltaFunctionInfo) => {
         void vscode.commands.executeCommand('codescene.presentRefactoring', fnInfo.refactoring!.resolvedRefactoring());
       }),
       vscode.commands.registerCommand('codescene.chGateTreeContext.openDocumentation', (issue: DeltaIssue) => {
-        void vscode.commands.executeCommand('codescene.openDocsForIssueCategory', issue.category);
+        let refactoring: CsRefactoringRequest | undefined;
+        if (issue.parent instanceof DeltaFunctionInfo) refactoring = issue.parent.refactoring;
+        void vscode.workspace.openTextDocument(issue.parentUri).then((document) => {
+          const { position, category } = issue;
+          const params: InteractiveDocsParams = {
+            codeSmell: { category, position },
+            document,
+            refactoring,
+          };
+          void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params);
+        });
       })
     );
   }

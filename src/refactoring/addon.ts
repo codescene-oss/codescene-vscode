@@ -1,6 +1,6 @@
 // Functions for handling enabling and disabling the ACE "addon" components
 import { AxiosError } from 'axios';
-import vscode, { Diagnostic } from 'vscode';
+import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi } from '../cs-rest-api';
@@ -59,28 +59,8 @@ async function enableACE(context: vscode.ExtensionContext, cliPath: string) {
   }
 
   return CsRestApi.instance.fetchRefactorPreflight().then((preflightResponse) => {
-    const refactoringSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
-    const codeSmellFilter = createCodeSmellsFilter(preflightResponse);
-
-    const commandDisposable = new CsRefactoringCommands(
-      context.extensionUri,
-      cliPath,
-      refactoringSelector,
-      codeSmellFilter,
-      preflightResponse['max-input-loc']
-    );
+    const commandDisposable = new CsRefactoringCommands(context.extensionUri, preflightResponse);
     aceDisposables.push(commandDisposable);
-
-    // Collect all disposables used by the refactoring features
-    // const codeLensProvider = new CsRefactorCodeLensProvider(codeSmellFilter);
-    // aceDisposables.push(codeLensProvider);
-    // aceDisposables.push(vscode.languages.registerCodeLensProvider(refactoringSelector, codeLensProvider));
-
-    // aceDisposables.push(
-    //   vscode.languages.registerCodeActionsProvider(refactoringSelector, new CsRefactorCodeAction(codeSmellFilter), {
-    //     providedCodeActionKinds: CsRefactorCodeAction.providedCodeActionKinds,
-    //   })
-    // );
 
     /* Add disposables to both subscription context and the extension state list
      * of disposables. This is to ensure they're disposed either when the extension
@@ -99,14 +79,6 @@ async function enableACE(context: vscode.ExtensionContext, cliPath: string) {
 function disableACE() {
   aceDisposables.forEach((d) => d.dispose());
   aceDisposables.length = 0;
-  CsRefactoringRequests.deleteAll();
-}
-
-export type DiagnosticFilter = (d: Diagnostic) => boolean;
-
-function createCodeSmellsFilter(refactorCapabilities: PreFlightResponse): DiagnosticFilter {
-  return (d: Diagnostic) =>
-    d.code instanceof Object && refactorCapabilities.supported['code-smells'].includes(d.code.value.toString());
 }
 
 /**
