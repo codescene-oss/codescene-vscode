@@ -1,22 +1,23 @@
 import { dirname } from 'path';
-import * as vscode from 'vscode';
+import vscode from 'vscode';
+import { AnalysisEvent } from '../analysis-common';
 import { getConfiguration } from '../configuration';
+import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
-import { AnalysisEvent } from '../analysis-common';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(cliPath: string): void {
+  static init(): void {
     outputChannel.appendLine('Initializing code Reviewer');
-    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(cliPath)));
+    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.cliPath)));
   }
 
   static get instance(): CachingReviewer {

@@ -15,7 +15,7 @@ import { PreFlightResponse } from './model';
  * the ACE functionality and the rest of the extension
  */
 export interface AceAPI {
-  enableACE: (context: vscode.ExtensionContext, cliPath: string) => Promise<PreFlightResponse>;
+  enableACE: (context: vscode.ExtensionContext) => Promise<PreFlightResponse>;
   disableACE: () => void;
   onDidChangeRequests: vscode.Event<void>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
@@ -43,7 +43,7 @@ const aceDisposables: vscode.Disposable[] = [];
  *
  * @param context
  */
-async function enableACE(context: vscode.ExtensionContext, cliPath: string) {
+async function enableACE(context: vscode.ExtensionContext) {
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
   disableACE();
 
