@@ -14,7 +14,7 @@ export default class Telemetry {
 
   private session?: vscode.AuthenticationSession;
 
-  constructor(extension: vscode.Extension<any>, private cliPath: string) {
+  constructor(extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
       sendEventData: (eventName, eventData) => {
         this.postTelemetry(eventName, eventData).catch(() => {}); // post but ignore errors (logged using logAxiosError in interceptor instead)
@@ -35,9 +35,9 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-  static init(extension: vscode.Extension<any>, cliPath: string): void {
+  static init(extension: vscode.Extension<any>): void {
     outputChannel.appendLine('Initializing telemetry logger');
-    Telemetry._instance = new Telemetry(extension, cliPath);
+    Telemetry._instance = new Telemetry(extension);
   }
 
   static get instance(): Telemetry {
@@ -63,7 +63,7 @@ export default class Telemetry {
     // To ensure we are sending exactly the same data to the sign command as we are sending in the body of the request,
     // we stringify the data manually.
     const jsonData = JSON.stringify(data);
-    const signResult: ExecResult = await sign(this.cliPath, jsonData);
+    const signResult: ExecResult = await sign(jsonData);
 
     const config: AxiosRequestConfig = {
       headers: {
