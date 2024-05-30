@@ -1,19 +1,19 @@
-import { outputChannel } from './log';
+import path from 'path';
 import { window } from 'vscode';
 import { codeHealthRulesCheck } from './codescene-interop';
-import * as path from 'path';
+import { outputChannel } from './log';
 
 /**
  * Function to show matching code health rule for currently opened file.
  * @returns void
  */
-export async function checkCodeHealthRules(cliPath: string) {
+export async function checkCodeHealthRules() {
   const editor = window.activeTextEditor;
   if (editor && editor.document) {
     const absoluteFilePath = editor.document.uri.fsPath;
     const fileName = path.basename(absoluteFilePath);
     const folder = path.dirname(absoluteFilePath);
-    const result = await codeHealthRulesCheck(cliPath, folder, fileName);
+    const result = await codeHealthRulesCheck(folder, fileName);
     const msg = result.stdout;
     const error = result.stderr;
     outputChannel.appendLine('----------');

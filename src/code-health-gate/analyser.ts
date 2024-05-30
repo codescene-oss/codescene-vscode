@@ -1,6 +1,7 @@
 import path from 'path';
 import vscode, { workspace } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
+import { CsExtensionState } from '../cs-extension-state';
 import { csSource } from '../diagnostics/cs-diagnostics';
 import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
@@ -8,7 +9,6 @@ import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
 import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
-import { CsExtensionState } from '../cs-extension-state';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -35,8 +35,8 @@ export class DeltaAnalyser {
 
   constructor(private cliPath: string) {}
 
-  static init(cliPath: string) {
-    DeltaAnalyser._instance = new DeltaAnalyser(cliPath);
+  static init() {
+    DeltaAnalyser._instance = new DeltaAnalyser(CsExtensionState.cliPath);
   }
 
   static get instance() {
@@ -105,7 +105,7 @@ export class DeltaAnalyser {
 /**
  * Try to send refactoring requests for all supported degradations found in these files.
  * Mutates/decorates the deltaForFiles with the refactoring requests if applicable.
- * 
+ *
  * @param deltaForFiles
  */
 function requestRefactoringsForDegradations(

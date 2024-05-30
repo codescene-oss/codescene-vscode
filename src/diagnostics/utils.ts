@@ -1,4 +1,4 @@
-import vscode from 'vscode';
+import * as vscode from 'vscode';
 import { categoryToDocsCode } from '../documentation/csdoc-provider';
 
 // Finds the column range of the function name in the line of code that it appears in

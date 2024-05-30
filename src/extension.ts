@@ -1,17 +1,16 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { checkCodeHealthRules } from './check-rules';
 import { activate as activateCodeHealthGate } from './code-health-gate/addon';
 import { DeltaAnalyser, registerDeltaCommand } from './code-health-gate/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
-import { register as registerCsDoc } from './documentation/csdoc-provider';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
+import { register as registerCsDoc } from './documentation/csdoc-provider';
 import { ensureLatestCompatibleCliExists } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
-import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import { ReviewExplorerView } from './review/explorer-view';
 import { registerReviewDecorations } from './review/presentation';
@@ -23,7 +22,6 @@ import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
 interface CsContext {
-  cliPath: string;
   csWorkspace: CsWorkspace;
   aceApi: AceAPI;
 }
@@ -40,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
   ensureLatestCompatibleCliExists(context.extensionPath)
     .then((cliPath) => {
       CsExtensionState.setCliState(cliPath);
-      startExtension(context, cliPath);
+      startExtension(context);
     })
     .catch((error: Error) => {
       const { message } = error;
@@ -52,17 +50,16 @@ export async function activate(context: vscode.ExtensionContext) {
   setupStatsCollector();
 }
 
-function startExtension(context: vscode.ExtensionContext, cliPath: string) {
+function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
-    cliPath,
     csWorkspace: new CsWorkspace(context),
     aceApi: activateAce(),
   };
-  Reviewer.init(cliPath);
-  DeltaAnalyser.init(cliPath);
+  Reviewer.init();
+  DeltaAnalyser.init();
   CsExtensionState.addListeners();
 
-  Telemetry.init(context.extension, cliPath);
+  Telemetry.init(context.extension);
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
 
@@ -124,8 +121,6 @@ function setupStatsCollector() {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { cliPath } = csContext;
-
   registerDeltaCommand(context);
 
   const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
@@ -134,14 +129,14 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(openCodeHealthDocsCmd);
 
   const createRulesTemplateCmd = vscode.commands.registerCommand('codescene.createRulesTemplate', () => {
-    createRulesTemplate(cliPath).catch((error: Error) => {
+    createRulesTemplate().catch((error: Error) => {
       void vscode.window.showErrorMessage(error.message);
     });
   });
   context.subscriptions.push(createRulesTemplateCmd);
 
   const createCheckRules = vscode.commands.registerCommand('codescene.checkRules', () => {
-    void checkCodeHealthRules(cliPath);
+    void checkCodeHealthRules();
   });
   context.subscriptions.push(createCheckRules);
 
@@ -213,9 +208,9 @@ function disableRemoteFeatures(aceApi: AceAPI) {
 }
 
 function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { cliPath, aceApi } = csContext;
+  const { aceApi } = csContext;
   CsExtensionState.setACEState('Loading ACE capabilities...');
-  aceApi.enableACE(context, cliPath).then(
+  aceApi.enableACE(context).then(
     (result) => {
       CsExtensionState.setACEState(result);
       outputChannel.appendLine('Auto-refactor enabled!');

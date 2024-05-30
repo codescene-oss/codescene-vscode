@@ -5,22 +5,25 @@ import { ExecResult, SimpleExecutor } from './executor';
 /**
  * Executes the command for creating a code health rules template.
  */
-export function codeHealthRulesJson(cliPath: string) {
-  return new SimpleExecutor().execute({ command: cliPath, args: ['code-health-rules-template'] });
+export function codeHealthRulesJson() {
+  return new SimpleExecutor().execute({ command: CsExtensionState.cliPath, args: ['code-health-rules-template'] });
 }
 
 /**
  * Executes the command for checking code health rule match against file
  */
-export function codeHealthRulesCheck(cliPath: string, rootPath: string, filePath: string) {
-  return new SimpleExecutor().execute({ command: cliPath, args: ['check-rules', filePath] }, { cwd: rootPath });
+export function codeHealthRulesCheck(rootPath: string, filePath: string) {
+  return new SimpleExecutor().execute(
+    { command: CsExtensionState.cliPath, args: ['check-rules', filePath] },
+    { cwd: rootPath }
+  );
 }
 
 /**
  * Executes the command for signing a payload.
  */
-export function sign(cliPath: string, payload: string) {
-  return new SimpleExecutor().execute({ command: cliPath, args: ['sign'] }, {}, payload);
+export function sign(payload: string) {
+  return new SimpleExecutor().execute({ command: CsExtensionState.cliPath, args: ['sign'] }, {}, payload);
 }
 
 export interface EnclosingFn {
