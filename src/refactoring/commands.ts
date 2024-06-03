@@ -4,9 +4,9 @@ import { toRefactoringDocumentSelector } from '../language-support';
 import { logOutputChannel } from '../log';
 import { DiagnosticFilter, getFileExtension, isDefined } from '../utils';
 import { CsRefactoringRequests, ResolvedRefactoring, validConfidenceLevel } from './cs-refactoring-requests';
+import { PreFlightResponse } from './model';
 import { RefactoringPanel } from './refactoring-panel';
 import { createCodeSmellsFilter } from './utils';
-import { PreFlightResponse } from './model';
 
 export const requestRefactoringsCmdName = 'codescene.requestRefactorings';
 export const presentRefactoringCmdName = 'codescene.presentRefactoring';
@@ -121,9 +121,12 @@ function toFnToRefactor(
   extension: string,
   maxInputLoc: number
 ) {
-  const { range, loc } = rangeAndLocFromEnclosingFn(enclosingFn);
-  if (loc > maxInputLoc) {
-    logOutputChannel.debug(`Function "${enclosingFn.name}" exceeds max-input-loc (${loc} > ${maxInputLoc}) - ignoring`);
+  const activeLoc = enclosingFn['active-code-size'];
+  const range = rangeFromEnclosingFn(enclosingFn);
+  if (activeLoc > maxInputLoc) {
+    logOutputChannel.debug(
+      `Function "${enclosingFn.name}" exceeds max-input-loc (${activeLoc} > ${maxInputLoc}) - ignoring`
+    );
     return;
   }
 
@@ -137,14 +140,13 @@ function toFnToRefactor(
 }
 
 // Note that vscode.Range line numbers are zero-based, while the CodeScene API uses 1-based line numbers
-export function rangeAndLocFromEnclosingFn(enclosingFn: EnclosingFn) {
-  const range = new vscode.Range(
+export function rangeFromEnclosingFn(enclosingFn: EnclosingFn) {
+  return new vscode.Range(
     enclosingFn['start-line'] - 1,
     enclosingFn['start-column'],
     enclosingFn['end-line'] - 1,
     enclosingFn['end-column']
   );
-  return { range, loc: loc(range) };
 }
 
 export const refactoringSymbol = '✨';

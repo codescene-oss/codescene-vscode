@@ -30,6 +30,7 @@ export interface EnclosingFn {
   'function-type': string;
   'start-column': number;
   'end-column': number;
+  'active-code-size': number;
 }
 /**
  * Executes the command for getting function coordinates for a list of line numbers.
