@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { Range } from 'vscode';
 import { EnclosingFn } from '../../codescene-interop';
-import { rangeAndLocFromEnclosingFn } from '../../refactoring/commands';
+import { rangeFromEnclosingFn } from '../../refactoring/commands';
 
 const enclosingFn1: EnclosingFn = {
   name: 'anon',
@@ -11,6 +11,7 @@ const enclosingFn1: EnclosingFn = {
   'function-type': 'FatArrrowFn',
   'start-column': 0,
   'end-column': 19,
+  'active-code-size': 1,
 };
 
 const enclosingFn2: EnclosingFn = {
@@ -21,18 +22,17 @@ const enclosingFn2: EnclosingFn = {
   'function-type': 'StandaloneFn',
   'start-column': 0,
   'end-column': 1,
+  'active-code-size': 54,
 };
 
 suite('Refactor commands Test Suite', () => {
   test('Handle output from findEnclosingFunction call', async () => {
-    const { range, loc } = rangeAndLocFromEnclosingFn(enclosingFn1);
+    const range = rangeFromEnclosingFn(enclosingFn1);
     assert.ok(range.isEqual(new Range(0, 0, 0, 19)));
-    assert.equal(loc, 1);
   });
 
   test('Handle output from findEnclosingFunction call', async () => {
-    const { range, loc } = rangeAndLocFromEnclosingFn(enclosingFn2);
+    const range = rangeFromEnclosingFn(enclosingFn2);
     assert.ok(range.isEqual(new Range(47, 0, 100, 1)));
-    assert.equal(loc, 54);
   });
 });
