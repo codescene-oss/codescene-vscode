@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.3...v0.7.4) (2024-06-05)
+
+
+### Bug fixes
+
+* Check max-input-loc against the functions active code size (not counting comments) ([#61](https://github.com/codescene-oss/codescene-vscode/pull/61))
+* Improved review error handling ([e45d155](https://github.com/codescene-oss/codescene-vscode/commit/e45d1557eaa2f3a6572e7bad46c69f6e110e054d))
+* Review of empty documents hangs ([51ecbf8](https://github.com/codescene-oss/codescene-vscode/commit/51ecbf8a2bb124d28d896625f98d009e65d3d74e))
+
 ### [0.7.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.2...v0.7.3) (2024-05-13)
 
 
