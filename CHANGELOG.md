@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.4...v0.7.5) (2024-06-05)
+
+
+### Bug fixes
+
+* Add a large-method-guide.md for when presenting large method refactorings as Code Improvement Guides. ([f1a7baf](https://github.com/codescene-oss/codescene-vscode/commit/f1a7baf20488b9f1e82fb1d1ebd3f4b9563903a6))
+
 ### [0.7.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.3...v0.7.4) (2024-06-05)
 
 
