@@ -4,7 +4,7 @@ import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer from './reviewer';
-import { getCsDiagnosticCode } from './utils';
+import { chScorePrefix, getCsDiagnosticCode, isCsDiagnosticCode } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -64,23 +64,37 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     codeLens: CsReviewCodeLens,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<CsReviewCodeLens> {
-    logOutputChannel.trace(
-      `Resolving Review CodeLenses for ${codeLens.diagnostic.message} ${rangeStr(codeLens.diagnostic.range)}`
-    );
+    const diagnostic = codeLens.diagnostic;
+    logOutputChannel.trace(`Resolving Review CodeLenses for ${diagnostic.message} ${rangeStr(diagnostic.range)}`);
 
+    if (isCsDiagnosticCode(diagnostic.code)) {
+      codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document);
+    } else if (diagnostic.message.startsWith(chScorePrefix)) {
+      codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
+    }
+    return codeLens;
+  }
+
+  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, document: vscode.TextDocument) {
     const params: InteractiveDocsParams = {
       codeSmell: {
-        category: getCsDiagnosticCode(codeLens.diagnostic.code),
-        position: codeLens.diagnostic.range.start,
+        category: getCsDiagnosticCode(diagnostic.code),
+        position: diagnostic.range.start,
       },
-      document: codeLens.document,
+      document,
     };
-    codeLens.command = {
-      title: codeLens.diagnostic.message,
+    return {
+      title: diagnostic.message,
       command: 'codescene.openInteractiveDocsPanel',
       arguments: [params],
     };
+  }
 
-    return codeLens;
+  private showCodeHealthDocsCommand(message: string) {
+    return {
+      title: message,
+      command: 'markdown.showPreviewToSide',
+      arguments: [vscode.Uri.parse('csdoc:code-health.md')],
+    };
   }
 }

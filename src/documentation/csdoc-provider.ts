@@ -2,8 +2,6 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import Reviewer from '../review/reviewer';
-import { chScorePrefix, isCsDiagnosticCode } from '../review/utils';
 import { getLogoUrl } from '../utils';
 import { CategoryWithPosition, DocumentationPanel } from './documentation-panel';
 
@@ -26,24 +24,6 @@ export function register(context: vscode.ExtensionContext) {
   const providerDisposable = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
   context.subscriptions.push(providerDisposable);
 
-  const openDocsForDiagnostic = vscode.commands.registerCommand(
-    'codescene.openDocsForDiagnostic',
-    async (diag: vscode.Diagnostic) => {
-      if (isCsDiagnosticCode(diag.code)) {
-        void vscode.commands.executeCommand('codescene.openDocsForIssueCategory', diag.code.value.toString());
-      } else if (diag.message.startsWith(chScorePrefix)) {
-        void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse('csdoc:code-health.md'));
-      }
-    }
-  );
-  const openDocsForCode = vscode.commands.registerCommand(
-    'codescene.openDocsForIssueCategory',
-    async (category: string) => {
-      const docsCode = categoryToDocsCode(category);
-      void vscode.commands.executeCommand('markdown.showPreviewToSide', vscode.Uri.parse(`csdoc:${docsCode}.md`));
-    }
-  );
-
   const openInteractiveDocsPanel = vscode.commands.registerCommand(
     'codescene.openInteractiveDocsPanel',
     (params: InteractiveDocsParams) => {
@@ -52,7 +32,7 @@ export function register(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(openDocsForDiagnostic, openDocsForCode, openInteractiveDocsPanel);
+  context.subscriptions.push(openInteractiveDocsPanel);
 }
 
 export interface InteractiveDocsParams {
