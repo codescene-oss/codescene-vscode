@@ -51,7 +51,7 @@ export class CodeHealthGateView implements vscode.Disposable {
     this.disposables.push(this.view);
 
     this.disposables.push(
-      vscode.commands.registerCommand('codescene.chGateTreeContext.requestRefactoring', (fnInfo: DeltaFunctionInfo) => {
+      vscode.commands.registerCommand('codescene.chGateTreeContext.presentRefactoring', (fnInfo: DeltaFunctionInfo) => {
         void vscode.commands.executeCommand('codescene.presentRefactoring', fnInfo.refactoring!.resolvedRefactoring());
       }),
       vscode.commands.registerCommand('codescene.chGateTreeContext.openDocumentation', (issue: DeltaIssue) => {

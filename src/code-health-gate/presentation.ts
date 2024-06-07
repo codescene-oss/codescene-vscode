@@ -54,7 +54,7 @@ class DeltaFnInfoDecorationProvider implements vscode.FileDecorationProvider {
       const refactorable = queryParams.get('refactorable') === 'true';
       const issues = queryParams.get('issues');
       const issuesText = issues && `Contains ${issues} issue(s) degrading code health`;
-      const refactorableText = refactorable && 'Can be refactored';
+      const refactorableText = refactorable && 'Auto-refactor available';
       const tooltip = `${issuesText ? issuesText : ''}${refactorableText ? ` • ${refactorableText}` : ''}`;
       return {
         badge: issues || '',

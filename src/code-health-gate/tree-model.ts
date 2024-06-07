@@ -144,9 +144,12 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 
     if (this.refactoring) {
       this.presentAsLoadingRefactoring(item);
-      this.refactoring.promise.then(() => {
-        this.refactoring?.shouldPresent() ? this.presentAsRefactorable(item, issues) : (item.description = undefined);
-      }, undefined);
+      this.refactoring.promise.then(
+        () => {
+          this.refactoring?.shouldPresent() ? this.presentAsRefactorable(item, issues) : (item.description = undefined);
+        },
+        () => (item.description = undefined)
+      );
     }
 
     return item;
@@ -169,7 +172,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   private presentAsRefactorable(item: vscode.TreeItem, issues: number) {
     this.refactorable = true;
     item.resourceUri = toDeltaFunctionUri(issues, true);
-    item.description = 'Refactoring available';
+    item.description = 'Auto-refactor available';
     item.contextValue = 'delta-refactorableFunction';
   }
 }
