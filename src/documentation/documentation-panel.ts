@@ -7,6 +7,7 @@ import Reviewer from '../review/reviewer';
 import { getLogoUrl, isDefined } from '../utils';
 import { nonce } from '../webviews/utils';
 import { categoryToDocsCode } from './csdoc-provider';
+import { CsExtensionState } from '../cs-extension-state';
 
 export interface CategoryWithPosition {
   category: string;
@@ -81,15 +82,24 @@ export class DocumentationPanel implements Disposable {
     const title = category;
     const webviewScript = this.getUri('out', 'documentation', 'webview-script.js');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
-    const documentationCss = this.getUri('assets', 'refactor-styles.css');
+    const documentationCss = this.getUri('assets', 'documentation-styles.css');
+    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
-    const webView = this.webViewPanel.webview;
 
-    this.state.fnToRefactor = await this.showRefactorButton(document, position.line);
-    const refactoringPossible = isDefined(this.state.fnToRefactor);
-
+    if (CsExtensionState.acePreflight) {
+      void this.findRefactorableFunction(document, position.line).then((fnToRefactor) => {
+        if (!this.state) return;
+        this.state.fnToRefactor = fnToRefactor;
+        void this.webViewPanel.webview.postMessage({
+          command: 'show-refactor-button',
+          args: [isDefined(fnToRefactor)],
+        });
+      });
+    }
+    
     const docsContent = await this.docsForCategory(category);
 
+    const webView = this.webViewPanel.webview;
     webView.html = /*html*/ `
     <!DOCTYPE html>
     <html lang="en">
@@ -105,6 +115,7 @@ export class DocumentationPanel implements Disposable {
         />
         <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
         <link href="${documentationCss}" type="text/css" rel="stylesheet" />
+        <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
     </head>
 
     <body>
@@ -115,7 +126,10 @@ export class DocumentationPanel implements Disposable {
           <code>${fileName}</code> contains a ${category} code-smell at line ${position.line + 1}.
         </p>
 
-        ${refactoringPossible ? '<vscode-button id="refactoring-button">Suggest refactoring</vscode-button>' : ''}
+        <vscode-button id="refactoring-button" class="hidden">
+          <span slot="start" class="codicon codicon-sparkle"></span>
+          Auto-refactor
+        </vscode-button>
         <hr>
         <br>
         ${docsContent}
@@ -125,7 +139,7 @@ export class DocumentationPanel implements Disposable {
     `;
   }
 
-  private async showRefactorButton(document: vscode.TextDocument, lineNo: number) {
+  private async findRefactorableFunction(document: vscode.TextDocument, lineNo: number) {
     if (!this.state) return;
 
     const diagnostics = await Reviewer.instance.review(document).diagnostics;
@@ -137,7 +151,6 @@ export class DocumentationPanel implements Disposable {
       diagnosticsAtLine,
       this.state.codeSmell.position.line
     );
-    this.state.fnToRefactor = fnToRefactor;
     return fnToRefactor;
   }
 

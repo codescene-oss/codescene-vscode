@@ -11,5 +11,13 @@ function sendMessage(command: string) {
 }
 
 function main() {
-  document.getElementById('refactoring-button')?.addEventListener('click', () => sendMessage('initiate-refactoring'));
+  const refactoringButton = document.getElementById('refactoring-button');
+  refactoringButton?.addEventListener('click', () => sendMessage('initiate-refactoring'));
+
+  window.addEventListener('message', (event) => {
+    const { command, args } = event.data;
+    if (command === 'show-refactor-button') {
+      args[0] ? refactoringButton?.classList.remove('hidden') : refactoringButton?.classList.add('hidden');
+    }
+  });
 }
