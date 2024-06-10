@@ -14,7 +14,7 @@ function main() {
   document.getElementById('function-location')?.addEventListener('click', () => sendMessage('goto-function-location'));
 
   const refactoringButton = document.getElementById('refactoring-button');
-  refactoringButton?.addEventListener('click', () => sendMessage('initiate-refactoring'));
+  refactoringButton?.addEventListener('click', () => sendMessage('show-refactoring'));
 
   window.addEventListener('message', (event) => {
     const { command, args } = event.data;
