@@ -83,14 +83,10 @@
     "views": {
       "explorer": [
         {
-          "id": "codescene.explorerCodeReviewView",
-          "name": "Code health review",
-          "when": "config.codescene.enableCodeHealthView"
-        },
-        {
           "id": "codescene.codeHealthGateView",
           "name": "Code Health Gate",
-          "icon": "$(lock)"
+          "icon": "$(lock)",
+          "when": "config.codescene.previewCodeHealthGate"
         }
       ],
       "codescene-activity-bar": [
@@ -103,10 +99,6 @@
       ]
     },
     "viewsWelcome": [
-      {
-        "view": "codescene.explorerCodeReviewView",
-        "contents": "When CodeScene code reviews are done, results will be collected here."
-      },
       {
         "view": "codescene.codeHealthGateView",
         "contents": "Click the refresh button to initiate a CodeScene delta analysis. This will compare the current state of your code with the latest (HEAD) commit and present any introduced code smells."
@@ -161,10 +153,10 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.enableCodeHealthView": {
+        "codescene.previewCodeHealthGate": {
           "type": "boolean",
           "default": false,
-          "description": "Enable code health view in the explorer panel",
+          "description": "Preview the Code Health Gate view",
           "order": 5
         },
         "codescene.gitignore": {
