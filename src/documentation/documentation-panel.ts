@@ -8,6 +8,7 @@ import Reviewer from '../review/reviewer';
 import { getLogoUrl, isDefined } from '../utils';
 import { nonce } from '../webviews/utils';
 import { categoryToDocsCode } from './csdoc-provider';
+import { logOutputChannel } from '../log';
 
 export interface CategoryWithPosition {
   category: string;
@@ -51,6 +52,9 @@ export class DocumentationPanel implements Disposable {
       case 'initiate-refactoring':
         this.initiateRefactoring();
         return;
+      case 'goto-function-location':
+        this.goToFunctionLocation();
+        return;
     }
   }
 
@@ -71,16 +75,32 @@ export class DocumentationPanel implements Disposable {
     }
   }
 
+  private goToFunctionLocation() {
+    if (!this.state) return;
+    const uri = this.state.documentUri;
+
+    /**
+     * Need to do this because the goToLocations command expects a proper vscode.Position,
+     * not a {line, character} object which we might get when coming from a diagnostic
+     * target uri (where args are encoded as query params). The uri is fine though ¯\_(ツ)_/¯
+     */
+    const { line, character } = this.state.codeSmell.position;
+    const position = new vscode.Position(line, character);
+
+    const location = new vscode.Location(uri, position);
+    void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
+  }
+
   private async updateWebView(params: DocPanelParams) {
-    // this.webViewPanel.title = category; // <- update title to something?
     const {
       codeSmell: { category, position },
       documentUri,
     } = params;
-    const fileName = path.basename(documentUri.path);
     this.state = params;
 
     const title = category;
+    this.webViewPanel.title = `CodeScene - ${title}`;
+    
     const webviewScript = this.getUri('out', 'documentation', 'webview-script.js');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
     const documentationCss = this.getUri('assets', 'documentation-styles.css');
@@ -128,21 +148,29 @@ export class DocumentationPanel implements Disposable {
         <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
         <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
 
-        <p>
-          <code>${fileName}</code> contains a ${category} code-smell at line ${position.line + 1}.
-        </p>
-
-        <vscode-button id="refactoring-button" class="hidden">
-          <span slot="start" class="codicon codicon-sparkle"></span>
-          Auto-refactor
-        </vscode-button>
-        <hr>
+        ${this.documentationHeaderContent(documentUri, position)}
         <br>
         ${docsContent}
     </body>
 
     </html>
     `;
+  }
+
+  private documentationHeaderContent(uri: Uri, position: vscode.Position) {
+    const fileName = path.basename(uri.path);
+    return /*html*/ `
+    <div class="documentation-header">
+      <div id="function-location" title="Go to line ${position.line + 1} in ${fileName}">
+        <span>${fileName}</span><span class="line-no">:L${position.line + 1}</span>
+      </div>
+      <vscode-button id="refactoring-button" class="hidden">
+        <span slot="start" class="codicon codicon-sparkle"></span>
+        Auto-refactor
+      </vscode-button>
+    </div>
+    <hr>
+  `;
   }
 
   private async findRefactorableFunction(document: vscode.TextDocument, lineNo: number) {
