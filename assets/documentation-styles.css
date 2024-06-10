@@ -1,3 +1,27 @@
 .hidden {
   display: none;
 }
+
+.documentation-header {
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+#function-location {
+  font-size: smaller;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 4px 0;
+  border-radius: 4px;
+
+  span.line-no {
+    color: var(--vscode-disabledForeground);
+  }
+}
+
+#function-location:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
