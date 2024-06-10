@@ -17,7 +17,6 @@ function main() {
     .getElementById('code-health-gate-link')
     ?.addEventListener('click', () => sendMessage('focus-code-health-gate-view'));
   document.getElementById('problems-panel-link')?.addEventListener('click', () => sendMessage('focus-problems-view'));
-  document.getElementById('explorer-code-health-link')?.addEventListener('click', () => sendMessage('focus-explorer-code-health-view'));
   document.getElementById('clear-errors-button')?.addEventListener('click', () => sendMessage('clear-errors'));
   document
     .getElementById('show-codescene-log-link')

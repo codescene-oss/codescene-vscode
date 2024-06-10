@@ -12,8 +12,6 @@ import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsReviewCodeLensProvider } from './review/codelens';
-import { ReviewExplorerView } from './review/explorer-view';
-import { registerReviewDecorations } from './review/presentation';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
@@ -70,9 +68,6 @@ function startExtension(context: vscode.ExtensionContext) {
   registerCsDoc(context);
   addReviewListeners(context);
   addTmpDiffUriScheme(context);
-
-  context.subscriptions.push(new ReviewExplorerView());
-  registerReviewDecorations(context);
 
   activateCodeHealthGate(context, csContext.aceApi);
 
