@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { categoryToDocsCode } from '../documentation/csdoc-provider';
 
 // Finds the column range of the function name in the line of code that it appears in
 export function getFunctionNameRange(line: string, functionName: string): [number, number] {
@@ -42,21 +41,4 @@ export function fnCoordinateToRange(
   // function name to find the range
   const [startColumn, endColumn] = getFunctionNameRange(startLineText, functionCoordinate.name);
   return new vscode.Range(startLine, startColumn, startLine, endColumn);
-}
-
-/**
- * Creates a diagnostic code with a target that opens documentation for the issue category
- * @param category
- * @returns
- */
-export function createCsDiagnosticCode(category: string) {
-  const docsCode = categoryToDocsCode(category);
-  const args = [vscode.Uri.parse(`csdoc:${docsCode}.md`)];
-  const openDocCommandUri = vscode.Uri.parse(
-    `command:markdown.showPreviewToSide?${encodeURIComponent(JSON.stringify(args))}`
-  );
-  return {
-    value: category,
-    target: openDocCommandUri,
-  };
 }

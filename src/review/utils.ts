@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { csSource } from '../diagnostics/cs-diagnostics';
-import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
+import { fnCoordinateToRange } from '../diagnostics/utils';
 import { IssueDetails, ReviewIssue, ReviewResult } from './model';
 
 export const chScorePrefix = 'Code health score: ';
@@ -8,12 +8,9 @@ export const chScorePrefix = 'Code health score: ';
 export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
   // File level issues
   if (!reviewIssue.functions) {
-    const diagnostic = new vscode.Diagnostic(
-      new vscode.Range(0, 0, 0, 0),
-      reviewIssue.category,
-      vscode.DiagnosticSeverity.Warning
-    );
-    diagnostic.code = createCsDiagnosticCode(reviewIssue.category);
+    const range = new vscode.Range(0, 0, 0, 0);
+    const diagnostic = new vscode.Diagnostic(range, reviewIssue.category, vscode.DiagnosticSeverity.Warning);
+    diagnostic.code = createDiagnosticCodeWithTarget(reviewIssue.category, range.start, document);
     return [diagnostic];
   }
 
@@ -34,7 +31,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
     }
     const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
     diagnostic.source = csSource;
-    diagnostic.code = createCsDiagnosticCode(category);
+    diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document);
     return diagnostic;
   });
 }
@@ -70,19 +67,23 @@ export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: 
   }
 }
 
-/**
- * Used throughtout the extension to determine if a diagnostic code is a CodeScene diagnostic code
- *
- * @param code vscode.Diagnostic.code
- * @returns true if the code is a diagnostic code that is most probably created by createCsDiagnosticCode above
- */
-export function isCsDiagnosticCode(
-  code?: string | number | { value: string | number; target: vscode.Uri }
-): code is { value: string; target: vscode.Uri } {
-  if (typeof code !== 'object') return false;
-  return code.target instanceof vscode.Uri && code.target.scheme === 'command';
+export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }) {
+  if (typeof code === 'string') return code;
+  if (typeof code === 'object') return code.value.toString();
 }
 
-export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }): string {
-  return isCsDiagnosticCode(code) ? code.value.toString() : 'unknown diagnostic code';
+/**
+ * Creates a diagnostic code with a target that opens documentation for the issue category
+ * @param category
+ * @returns
+ */
+function createDiagnosticCodeWithTarget(category: string, position: vscode.Position, document: vscode.TextDocument) {
+  const args = [{ codeSmell: { category, position }, documentUri: document.uri }];
+  const openDocCommandUri = vscode.Uri.parse(
+    `command:codescene.openInteractiveDocsPanel?${encodeURIComponent(JSON.stringify(args))}`
+  );
+  return {
+    value: category,
+    target: openDocCommandUri,
+  };
 }

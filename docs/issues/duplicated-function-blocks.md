@@ -1,5 +1,3 @@
-High Degree of Code Duplication
-
 Avoid duplicated, aka copy-pasted, code inside the module. More duplication lowers the code health.
 
 Duplicated code might lead to code that's harder to maintain as the same logical change has to be done in multiple places. Look to extract a shared representation which can be re-used across functions.

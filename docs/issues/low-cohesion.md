@@ -1,5 +1,3 @@
-Cohesion
-
 Cohesion is calculated using the LCOM4 metric. Low cohesion means that the module/class has multiple **unrelated** responsibilities, doing too many things and breaking the Single Responsibility Principle.
 
 With LCOM4, the functions inside a module are **related** if:

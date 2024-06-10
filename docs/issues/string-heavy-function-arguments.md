@@ -1,5 +1,3 @@
-String Heavy Function Arguments
-
 The functions in this file have a high ratio of strings as arguments. Avoid adding more.
 
 Heavy usage of built-in string types indicate a missing domain language. There are also validation implications since code needs to be written that checks the semantics of the string type.
