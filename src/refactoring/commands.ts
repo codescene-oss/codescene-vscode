@@ -1,12 +1,12 @@
 import vscode, { ViewColumn } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
+import { getCsDiagnosticCode } from '../review/utils';
 import { getFileExtension, isDefined } from '../utils';
 import { toRefactoringDocumentSelector } from './addon';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
 import { RefactoringPanel } from './refactoring-panel';
-import { isCsDiagnosticCode } from '../review/utils';
 
 export interface FnToRefactor {
   name: string;
@@ -103,10 +103,12 @@ export class CsRefactoringCommands implements vscode.Disposable {
   }
 
   private supportedDiagnostics(diagnostics: vscode.Diagnostic[]) {
-    return diagnostics.filter(
-      (d: vscode.Diagnostic) =>
-        d.code instanceof Object && this.preflightResponse.supported['code-smells'].includes(d.code.value.toString())
-    );
+    return diagnostics.filter((d: vscode.Diagnostic) => {
+      if (typeof d.code === 'string') return this.preflightResponse.supported['code-smells'].includes(d.code);
+      if (typeof d.code === 'object') {
+        return this.preflightResponse.supported['code-smells'].includes(d.code.value.toString());
+      }
+    });
   }
 
   dispose() {
@@ -128,7 +130,7 @@ function toFnToRefactor(
 ) {
   const codeSmells: FnCodeSmell[] = supportedDiagnostics
     .map((d) => {
-      const category = isCsDiagnosticCode(d.code) ? d.code.value : undefined;
+      const category = getCsDiagnosticCode(d.code);
       if (!category) return;
       return {
         category,

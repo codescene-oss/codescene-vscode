@@ -1,10 +1,8 @@
-Brain Class
-
 A *brain class* - also known as a *god class* - is a large module with too many responsibilities. A module is a brain class if:
 
 - it's a large module with many lines of code
 - it has many functions
-- and at least one [Brain Method](./brain-method.md).
+- and at least one **Brain Method**.
 
 Brain classes are problematic since changes become more complex over time, harder to test, and challenging to refactor the longer you wait.
 

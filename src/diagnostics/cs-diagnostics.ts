@@ -27,7 +27,7 @@ export default class CsDiagnostics {
     }
 
     void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
-      // Remove the diagnostics that are for file level issues. These are only shown as code lenses
+      // Remove the diagnostic showing the code health score. It should only be shown as a codelens, not in the problems view.
       const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
       CsDiagnostics.set(document.uri, importantDiagnostics);
     });

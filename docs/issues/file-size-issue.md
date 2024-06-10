@@ -1,5 +1,3 @@
-File Size Issue
-
 The file has grown to a large number of lines of code. Avoid large files with many lines of code as they make it hard to get an overview of their content.
 
 When a single module starts to accumulate too many lines of code, there's an increased risk of modularity issues. Act now to prevent future issues.

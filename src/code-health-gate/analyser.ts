@@ -3,7 +3,7 @@ import vscode, { workspace } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
 import { csSource } from '../diagnostics/cs-diagnostics';
-import { createCsDiagnosticCode, fnCoordinateToRange } from '../diagnostics/utils';
+import { fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
@@ -166,7 +166,7 @@ function diagnosticsFromFinding(document: vscode.TextDocument, finding: Finding)
           );
           const diagnostic = new vscode.Diagnostic(range, finding.category, vscode.DiagnosticSeverity.Warning);
           diagnostic.source = csSource;
-          diagnostic.code = createCsDiagnosticCode(finding.category);
+          diagnostic.code = finding.category;
           return diagnostic;
         });
       })

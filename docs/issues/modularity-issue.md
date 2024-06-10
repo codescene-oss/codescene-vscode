@@ -1,6 +1,4 @@
-Modularity Issue
-
-This file is large in terms of lines of code and has accumulated many functions. Together, this indicates that the file could degrade into a [Brain Class](./brain-class.md) unless acted upon.
+This file is large in terms of lines of code and has accumulated many functions. Together, this indicates that the file could degrade into a **Brain Class** unless acted upon.
 
 This is an early warning that the software design starts to get problematic. Look for opportunities to modularize the code by separating related groups of functions into new cohesive files/classes/modules.
 
