@@ -113,7 +113,7 @@
         },
         {
           "command": "codescene.chGateTreeContext.openDocumentation",
-          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-issue'",
+          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-degradation'",
           "group": "inline@1"
         }
       ],

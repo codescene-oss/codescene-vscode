@@ -196,7 +196,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
     item.iconPath = this.iconPath;
     item.command = this.command;
     item.tooltip = `${capitalizeFirstLetter(this.changeType)} ${this.category}`;
-    item.contextValue = 'delta-issue';
+    item.contextValue = isDegradation(this.changeType) ? 'delta-degradation' : 'delta-improvement';
     return item;
   }
 
