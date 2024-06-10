@@ -37,17 +37,18 @@ export class CsRefactoringCommands implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.presentRefactoring', this.presentRefactoringRequestCmd, this),
       vscode.commands.registerCommand('codescene.getFunctionToRefactor', this.getFunctionToRefactorCmd, this),
       vscode.commands.registerCommand(
-        'codescene.requestAndPresentRefactoring',
-        this.requestAndPresentRefactoringCmd,
+        'codescene.initiateRefactoringForFunction',
+        this.initiateRefactoringForFunction,
         this
       )
     );
   }
 
-  private presentRefactoringRequestCmd(refactoring: CsRefactoringRequest, viewColumn?: vscode.ViewColumn) {
+  private presentRefactoringRequestCmd(request?: CsRefactoringRequest, viewColumn?: vscode.ViewColumn) {
+    if (!request) return;
     RefactoringPanel.createOrShow({
       extensionUri: this.extensionUri,
-      refactoring,
+      refactoring: request,
       viewColumn,
     });
   }
@@ -68,10 +69,10 @@ export class CsRefactoringCommands implements vscode.Disposable {
     return await this.findFunctionsToRefactor(document, diagnostics);
   }
 
-  private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor: FnToRefactor) {
+  private initiateRefactoringForFunction(document: vscode.TextDocument, fnToRefactor: FnToRefactor) {
     if (vscode.languages.match(this.documentSelector, document) === 0) return;
-    const request = CsRefactoringRequests.initiate(document, [fnToRefactor]);
-    this.presentRefactoringRequestCmd(request[0], ViewColumn.Active);
+    const requests = CsRefactoringRequests.initiate(document, [fnToRefactor]);
+    return requests[0];
   }
 
   private async findFunctionsToRefactor(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {

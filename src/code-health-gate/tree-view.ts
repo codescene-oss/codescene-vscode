@@ -55,13 +55,13 @@ export class CodeHealthGateView implements vscode.Disposable {
         void vscode.commands.executeCommand('codescene.presentRefactoring', fnInfo.refactoring!.resolvedRefactoring());
       }),
       vscode.commands.registerCommand('codescene.chGateTreeContext.openDocumentation', (issue: DeltaIssue) => {
-        let refactoring: CsRefactoringRequest | undefined;
-        if (issue.parent instanceof DeltaFunctionInfo) refactoring = issue.parent.refactoring;
+        let request: CsRefactoringRequest | undefined;
+        if (issue.parent instanceof DeltaFunctionInfo) request = issue.parent.refactoring;
         const { position, category } = issue;
         const params: InteractiveDocsParams = {
           codeSmell: { category, position },
           documentUri: issue.parentUri,
-          refactoring,
+          request,
         };
         void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params);
       })
