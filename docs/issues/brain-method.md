@@ -1,5 +1,3 @@
-Brain method
-
 A *brain method* is a large and complex function that centralizes the behavior of the module.
 
 Brain methods, as described in Object-Oriented Metrics in Practice, by Lanza and Marinescu, are detected using a

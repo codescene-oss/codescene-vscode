@@ -1,5 +1,3 @@
-Missing Arguments Abstractions
-
 The functions in this file have too many arguments, indicating a lack of encapsulation or too many responsibilities in the same functions. Avoid adding more.
 
 This code health issue is measured as the average number of function arguments across the whole file. A function with many arguments can be simplified either by 

@@ -37,7 +37,7 @@ export function register(context: vscode.ExtensionContext) {
 
 export interface InteractiveDocsParams {
   codeSmell: CategoryWithPosition;
-  document: vscode.TextDocument;
+  documentUri: vscode.Uri;
   refactoring?: CsRefactoringRequest;
 }
 

@@ -1,6 +1,4 @@
-Constructor Over-Injection
-
-This constructor has too many arguments, indicating an object with low [cohesion](./low-cohesion.md) or [missing function argument abstraction](./missing-function-argument-abstraction.md). Avoid adding more arguments. Remediate this issue by one of:
+This constructor has too many arguments, indicating an object with low cohesion or missing function argument abstraction. Avoid adding more arguments. Remediate this issue by one of:
 
 - Splitting the class if it has too many responsibilities.
 - Introducing an abstraction (class, record, struct, etc.) which encapsulates the arguments. 

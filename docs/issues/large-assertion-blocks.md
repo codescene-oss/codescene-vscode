@@ -1,5 +1,3 @@
-Large Assertion Blocks
-
 This test file has several blocks of large, consecutive assert statements. Avoid adding more.
 
 Large blocks with consecutive assertions indicate a missing abstraction. Often, large assert blocks lead to duplicated test criteria too. Consider extracting and encapsulating custom assertions that communicate the test criteria in the language of your domain.

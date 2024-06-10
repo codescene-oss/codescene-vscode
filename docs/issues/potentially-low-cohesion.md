@@ -1,0 +1,1 @@
+The module has cohesion issues, but it's still at a manageable level.

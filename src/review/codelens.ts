@@ -4,7 +4,7 @@ import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer from './reviewer';
-import { chScorePrefix, getCsDiagnosticCode, isCsDiagnosticCode } from './utils';
+import { chScorePrefix, getCsDiagnosticCode } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -67,21 +67,26 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     const diagnostic = codeLens.diagnostic;
     logOutputChannel.trace(`Resolving Review CodeLenses for ${diagnostic.message} ${rangeStr(diagnostic.range)}`);
 
-    if (isCsDiagnosticCode(diagnostic.code)) {
-      codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document);
-    } else if (diagnostic.message.startsWith(chScorePrefix)) {
+    if (diagnostic.message.startsWith(chScorePrefix)) {
       codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
+    } else {
+      codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document.uri);
     }
     return codeLens;
   }
 
-  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, document: vscode.TextDocument) {
+  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, documentUri: vscode.Uri) {
+    const category = getCsDiagnosticCode(diagnostic.code);
+    if (!category) {
+      logOutputChannel.warn(`Unknown diagnostic code "${diagnostic.code}"`);
+      return;
+    }
     const params: InteractiveDocsParams = {
       codeSmell: {
-        category: getCsDiagnosticCode(diagnostic.code),
+        category,
         position: diagnostic.range.start,
       },
-      document,
+      documentUri,
     };
     return {
       title: diagnostic.message,
@@ -94,7 +99,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     return {
       title: message,
       command: 'markdown.showPreviewToSide',
-      arguments: [vscode.Uri.parse('csdoc:code-health.md')],
+      arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
     };
   }
 }
