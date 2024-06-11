@@ -10,7 +10,7 @@ import {
   DeltaTreeViewItem,
   buildTree,
   filesWithIssuesInTree,
-  refactoringsInTree
+  refactoringsInTree,
 } from './tree-model';
 
 export class CodeHealthGateView implements vscode.Disposable {
@@ -50,7 +50,7 @@ export class CodeHealthGateView implements vscode.Disposable {
           // This is our only automatic trigger of the analysis at the moment.
           // Ignore promise rejection here, since this might be triggered on startup
           // before the command has been registered properly.
-          vscode.commands.executeCommand('codescene.runDeltaAnalysis').then(undefined, () => {});
+          DeltaAnalyser.analyseWorkspace();
         }
       })
     );

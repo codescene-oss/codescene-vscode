@@ -2,7 +2,7 @@ import vscode, { ViewColumn } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
 import { getCsDiagnosticCode } from '../review/utils';
-import { getFileExtension, isDefined } from '../utils';
+import { getFileExtension, isDefined, registerCommandWithTelemetry } from '../utils';
 import { toRefactoringDocumentSelector } from './addon';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
@@ -34,7 +34,12 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
     this.disposables.push(
       vscode.commands.registerCommand('codescene.requestRefactorings', this.requestRefactoringsCmd, this),
-      vscode.commands.registerCommand('codescene.presentRefactoring', this.presentRefactoringRequestCmd, this),
+      registerCommandWithTelemetry({
+        commandId: 'codescene.presentRefactoring',
+        handler: this.presentRefactoringRequestCmd,
+        thisArg: this,
+        logArgs: (request?: CsRefactoringRequest) => ({ "trace-id": request?.traceId }),
+      }),
       vscode.commands.registerCommand('codescene.getFunctionToRefactor', this.getFunctionToRefactorCmd, this),
       vscode.commands.registerCommand(
         'codescene.initiateRefactoringForFunction',

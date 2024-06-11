@@ -7,7 +7,7 @@ import { fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { isDefined } from '../utils';
+import { isDefined, registerCommandWithTelemetry } from '../utils';
 import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
@@ -16,8 +16,11 @@ export type DeltaAnalysisResult = DeltaForFile[] | DeltaAnalysisState;
 
 export function registerDeltaCommand(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.runDeltaAnalysis', () => {
-      return DeltaAnalyser.analyseWorkspace();
+    registerCommandWithTelemetry({
+      commandId: 'codescene.runDeltaAnalysis',
+      handler: () => {
+        return DeltaAnalyser.analyseWorkspace();
+      },
     })
   );
 }
