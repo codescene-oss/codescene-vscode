@@ -18,6 +18,7 @@ import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerCommandWithTelemetry } from './utils';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -118,31 +119,31 @@ function setupStatsCollector() {
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   registerDeltaCommand(context);
 
-  const openCodeHealthDocsCmd = vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
-    void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
+  const openCodeHealthDocsCmd = registerCommandWithTelemetry({
+    commandId: 'codescene.openCodeHealthDocs',
+    handler: () => {
+      void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
+    },
   });
   context.subscriptions.push(openCodeHealthDocsCmd);
 
-  const createRulesTemplateCmd = vscode.commands.registerCommand('codescene.createRulesTemplate', () => {
-    createRulesTemplate().catch((error: Error) => {
-      void vscode.window.showErrorMessage(error.message);
-    });
+  const createRulesTemplateCmd = registerCommandWithTelemetry({
+    commandId: 'codescene.createRulesTemplate',
+    handler: () => {
+      createRulesTemplate().catch((error: Error) => {
+        void vscode.window.showErrorMessage(error.message);
+      });
+    },
   });
   context.subscriptions.push(createRulesTemplateCmd);
 
-  const createCheckRules = vscode.commands.registerCommand('codescene.checkRules', () => {
-    void checkCodeHealthRules();
+  const createCheckRules = registerCommandWithTelemetry({
+    commandId: 'codescene.checkRules',
+    handler: () => {
+      void checkCodeHealthRules();
+    },
   });
   context.subscriptions.push(createCheckRules);
-
-  // This command tries to get a "codescene" session. The createIfNone option causes a dialog to pop up,
-  // asking the user to log in. (Currently unused)
-  const loginCommand = vscode.commands.registerCommand('codescene.signInWithCodeScene', () => {
-    vscode.authentication
-      .getSession(AUTH_TYPE, [], { createIfNone: true })
-      .then(onGetSessionSuccess(context, csContext), onGetSessionError());
-  });
-  context.subscriptions.push(loginCommand);
 }
 
 /**

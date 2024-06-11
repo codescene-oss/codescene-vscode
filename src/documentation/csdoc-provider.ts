@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { getLogoUrl } from '../utils';
+import { getLogoUrl, registerCommandWithTelemetry } from '../utils';
 import { CategoryWithPosition, DocumentationPanel } from './documentation-panel';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
@@ -24,13 +24,14 @@ export function register(context: vscode.ExtensionContext) {
   const providerDisposable = vscode.workspace.registerTextDocumentContentProvider('csdoc', provider);
   context.subscriptions.push(providerDisposable);
 
-  const openInteractiveDocsPanel = vscode.commands.registerCommand(
-    'codescene.openInteractiveDocsPanel',
-    (params: InteractiveDocsParams) => {
+  const openInteractiveDocsPanel = registerCommandWithTelemetry({
+    commandId: 'codescene.openInteractiveDocsPanel',
+    handler: (params: InteractiveDocsParams) => {
       const panelParams = Object.assign({ extensionUri: context.extensionUri }, params);
       DocumentationPanel.createOrShow(panelParams);
-    }
-  );
+    },
+    logArgs: (params: InteractiveDocsParams) => ({ category: params.codeSmell.category }),
+  });
 
   context.subscriptions.push(openInteractiveDocsPanel);
 }
