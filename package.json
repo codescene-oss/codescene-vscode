@@ -49,7 +49,7 @@
       },
       {
         "command": "codescene.codeHealthGateHelp",
-        "title": "CodeScene: Delta analysis help",
+        "title": "CodeScene: Code Health Gate help",
         "icon": "$(question)"
       },
       {
