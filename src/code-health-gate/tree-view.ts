@@ -4,6 +4,7 @@ import { AceAPI } from '../refactoring/addon';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
+import { registerDeltaAnalysisDecorations } from './presentation';
 import {
   DeltaFunctionInfo,
   DeltaIssue,
@@ -18,7 +19,9 @@ export class CodeHealthGateView implements vscode.Disposable {
   private treeDataProvider: DeltaAnalysisTreeProvider;
   private view: vscode.TreeView<DeltaTreeViewItem | DeltaAnalysisResult>;
 
-  constructor(aceApi?: AceAPI) {
+  constructor(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+    registerDeltaAnalysisDecorations(context);
+
     this.treeDataProvider = new DeltaAnalysisTreeProvider(aceApi);
 
     this.view = vscode.window.createTreeView('codescene.codeHealthGateView', {
@@ -73,6 +76,10 @@ export class CodeHealthGateView implements vscode.Disposable {
         void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params);
       })
     );
+  }
+
+  isVisible() {
+    return this.view.visible;
   }
 
   dispose() {
