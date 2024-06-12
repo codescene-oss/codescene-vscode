@@ -7,7 +7,7 @@ import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
-import { ensureLatestCompatibleCliExists } from './download';
+import { ensureCompatibleCli } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
@@ -34,8 +34,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   CsExtensionState.init(context);
 
-  ensureLatestCompatibleCliExists(context.extensionPath)
+  ensureCompatibleCli(context.extensionPath)
     .then((cliPath) => {
+      outputChannel.appendLine('CodeScene CLI is in place and working!');
       CsExtensionState.setCliState(cliPath);
       startExtension(context);
     })

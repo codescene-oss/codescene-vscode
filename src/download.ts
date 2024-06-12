@@ -15,30 +15,33 @@ import * as path from 'path';
 import { SimpleExecutor } from './executor';
 import { logOutputChannel, outputChannel } from './log';
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const EXPECTED_CLI_VERSION = '9e5d10617b713fadd3fed61232efff2cea911d05';
+
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
-    x64: 'codescene-cli-ide-macos-amd64-v4.zip',
-    arm64: 'codescene-cli-ide-macos-aarch64-v4.zip',
+    x64: `codescene-cli-ide-macos-amd64-${EXPECTED_CLI_VERSION}.zip`,
+    arm64: `codescene-cli-ide-macos-aarch64-${EXPECTED_CLI_VERSION}.zip`,
   },
   linux: {
-    x64: 'codescene-cli-ide-linux-amd64-v4.zip',
+    x64: `codescene-cli-ide-linux-amd64-${EXPECTED_CLI_VERSION}.zip`,
   },
   win32: {
-    x64: 'codescene-cli-ide-windows-amd64-v4.zip',
+    x64: `codescene-cli-ide-windows-amd64-${EXPECTED_CLI_VERSION}.zip`,
   },
 };
 
-function getArtifactDownloadName(platform: NodeJS.Platform, arch: string): string | undefined {
-  return artifacts[platform]?.[arch];
+function getArtifactDownloadName(process: NodeJS.Process) {
+  const artifactName = artifacts[process.platform]?.[process.arch];
+  if (!artifactName) {
+    throw Error(`Unsupported platform: ${process.platform}-${process.arch}`);
+  }
+  return artifactName;
 }
 
-function getExecutableName(platform: NodeJS.Platform, arch: string): string {
+function getExecutableName(process: NodeJS.Process): string {
   // E.g. cs-darwin-x64/arm64, cs-linux-x64, cs-win32-x64.exe
-  return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
-}
-
-function getArtifactDownloadUrl(artifactName: string): URL {
-  return new URL(`https://downloads.codescene.io/enterprise/cli/${artifactName}`);
+  return `cs-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`;
 }
 
 async function unzipFile(zipFilePath: string, extensionPath: string, executablePath: string): Promise<void> {
@@ -57,76 +60,10 @@ async function ensureExecutable(filePath: string) {
   await fs.promises.chmod(filePath, '755');
 }
 
-function checkRemoteLastModifiedDate(url: URL) {
-  // Issue a HTTP HEAD request to check the last-modified header of the artifact.
-  logOutputChannel.debug(`Checking last-modified header of ${url.href}`);
-
-  return new Promise<Date | null>((resolve) => {
-    https
-      .request(url, { method: 'HEAD' }, (response) => {
-        if (response.statusCode === 200) {
-          const lastModified = response.headers['last-modified'];
-          if (lastModified) {
-            resolve(new Date(lastModified));
-            return;
-          }
-        }
-        resolve(null);
-      })
-      .on('error', (e) => {
-        logOutputChannel.debug('Error while checking last-modified header:', e);
-        resolve(null);
-      })
-      .end();
-  });
-}
-
-// Read "cs.last-modified" file and return the date it contains.
-async function checkLocalLastModifiedDate(lastModifiedPath: string) {
-  try {
-    const contents = await fs.promises.readFile(lastModifiedPath);
-    return new Date(contents.toString());
-  } catch (e) {
-    return null;
-  }
-}
-
-async function isUpToDate(cliPath: string, lastModifiedPath: string, url: URL) {
-  // If the local copy does not exist, it's obviously not up to date.
-  if (!fs.existsSync(cliPath)) {
-    return false;
-  }
-
-  const remoteDate = await checkRemoteLastModifiedDate(url);
-  const localDate = await checkLocalLastModifiedDate(lastModifiedPath);
-
-  if (remoteDate === null) {
-    // We can't trust the remote, so we'll just assume the local version is up to date.
-    logOutputChannel.debug(
-      'Could not check last-modified header of remote artifact, assuming local copy is up to date'
-    );
-    return true;
-  }
-
-  if (localDate === null) {
-    // We don't have a local date, so the local copy can't be up to date.
-    logOutputChannel.debug(
-      'Could not check last-modified date of local artifact, assuming local copy is not up to date'
-    );
-    return false;
-  }
-
-  return localDate >= remoteDate;
-}
-
-async function updateLocalLastModifiedDate(filePath: string, date: Date) {
-  await fs.promises.writeFile(filePath, date.toString());
-}
-
 function download(url: URL, filePath: string) {
   outputChannel.appendLine(`Downloading ${url}`);
 
-  return new Promise<Date | null>((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     https
       .get(url, { headers: { 'cache-control': 'max-age=0' } }, (response) => {
         if (response.statusCode === 200) {
@@ -135,11 +72,7 @@ function download(url: URL, filePath: string) {
             .on('end', () => {
               writeStream.close();
               logOutputChannel.debug('CodeScene CLI artifact downloaded to', filePath);
-              const lastModified = response.headers['last-modified'];
-              if (lastModified) {
-                resolve(new Date(lastModified));
-              }
-              resolve(null);
+              resolve();
             })
             .pipe(writeStream);
         } else {
@@ -159,53 +92,47 @@ function download(url: URL, filePath: string) {
  * @param cliPath
  * @returns
  */
-async function ensureBinaryRuns(cliPath: string): Promise<string> {
-  const signResult = await new SimpleExecutor().execute({ command: cliPath, args: ['version'], ignoreError: true }, {});
+async function ensureBinaryRuns(cliPath: string) {
+  const result = await new SimpleExecutor().execute({ command: cliPath, args: ['version'], ignoreError: true }, {});
+  if (result.exitCode !== 0) throw new Error(`Error invoking the CLI binary: ${result.stderr}`);
+}
 
-  if (signResult.exitCode === 0) {
-    outputChannel.appendLine('The latest CodeScene CLI is in place, we are ready to go!');
-    return cliPath;
-  } else {
-    throw new Error(`Error invoking the downloaded CLI binary: ${signResult.stderr}`);
-  }
+/**
+ * Check the sha version using the version cmd, and compare with the currently expected cli version sha
+ */
+async function isExpectedCliVersion(cliPath: string) {
+  const result = await new SimpleExecutor().execute({
+    command: cliPath,
+    args: ['version', '--sha'],
+    ignoreError: true,
+  });
+  if (result.exitCode !== 0) return false;
+  return result.stdout.trim() === EXPECTED_CLI_VERSION;
 }
 
 /**
  * Download the CodeScene CLI artifact for the current platform and architecture.
  */
-export async function ensureLatestCompatibleCliExists(extensionPath: string): Promise<string> {
-  outputChannel.appendLine('Ensuring we have the latest CodeScene CLI version working on your system...');
+export async function ensureCompatibleCli(extensionPath: string): Promise<string> {
+  outputChannel.appendLine('Ensuring we have the current CodeScene CLI version working on your system...');
 
-  const executableName = getExecutableName(process.platform, process.arch);
+  const artifactName = getArtifactDownloadName(process);
+  const executableName = getExecutableName(process);
   const cliPath = path.join(extensionPath, executableName);
-  const lastModifiedPath = path.join(extensionPath, executableName + '.last-modified');
 
-  const artifactName = getArtifactDownloadName(process.platform, process.arch);
+  if (await isExpectedCliVersion(cliPath)) return cliPath;
 
-  if (!artifactName) {
-    throw Error(`Unsupported platform: ${process.platform}-${process.arch}`);
-  }
+  outputChannel.appendLine('CodeScene CLI missing or version mismatch, downloading required version');
 
-  const downloadUrl = getArtifactDownloadUrl(artifactName);
-
-  if (await isUpToDate(cliPath, lastModifiedPath, downloadUrl)) {
-    outputChannel.appendLine('CodeScene CLI already exists and is up to date');
-    return cliPath ;
-  }
-
-  outputChannel.appendLine('CodeScene CLI is not up to date, downloading latest version');
-
+  const downloadUrl = new URL(`https://downloads.codescene.io/enterprise/cli/${artifactName}`);
   const downloadPath = path.join(extensionPath, artifactName);
-  const lastModified = await download(downloadUrl, downloadPath);
+  await download(downloadUrl, downloadPath);
   await unzipFile(downloadPath, extensionPath, cliPath);
   await ensureExecutable(cliPath);
 
-  if (lastModified) {
-    await updateLocalLastModifiedDate(lastModifiedPath, lastModified);
-  }
-
   if (fs.existsSync(cliPath)) {
-    return await ensureBinaryRuns(cliPath);
+    await ensureBinaryRuns(cliPath);
+    return cliPath;
   } else {
     throw new Error(`The CodeScene CLI download "${cliPath}" does not exist`);
   }
