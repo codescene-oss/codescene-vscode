@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { DeltaTreeViewItem, countIssuesIn } from './tree-model';
+import { pluralize } from '../utils';
 
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new DeltaAnalysisDecorationProvider()));
@@ -53,7 +54,7 @@ class DeltaFnInfoDecorationProvider implements vscode.FileDecorationProvider {
       const queryParams = new URLSearchParams(uri.query);
       const refactorable = queryParams.get('refactorable') === 'true';
       const issues = queryParams.get('issues');
-      const issuesText = issues && `Contains ${issues} issue(s) degrading code health`;
+      const issuesText = issues && `Contains ${issues} ${pluralize('issue', Number(issues))} degrading code health`;
       const refactorableText = refactorable && 'Auto-refactor available';
       const tooltip = `${issuesText ? issuesText : ''}${refactorableText ? ` • ${refactorableText}` : ''}`;
       return {

@@ -1,6 +1,6 @@
 import path from 'path';
 import vscode from 'vscode';
-import { CsRefactoringRequest, ResolvedRefactoring } from '../refactoring/cs-refactoring-requests';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { roundScore } from '../review/utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
 import {
@@ -8,11 +8,10 @@ import {
   ChangeType,
   DeltaForFile,
   Location,
-  getEndLine,
   getStartLine,
   isDegradation,
   isImprovement,
-  toAbsoluteUri,
+  toAbsoluteUri
 } from './model';
 import { toDeltaAnalysisUri, toDeltaFunctionUri } from './presentation';
 
@@ -23,6 +22,16 @@ export function countIssuesIn(tree: Array<DeltaTreeViewItem | DeltaAnalysisState
       return prev + (isDegradation(curr.changeType) ? 1 : 0);
     }
     return prev + (curr.children ? countIssuesIn(curr.children) : 0);
+  }, 0);
+}
+
+export function refactoringsInTree(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): number {
+  return tree.reduce((prev, curr) => {
+    if (typeof curr === 'string') return prev;
+    if (curr instanceof DeltaFunctionInfo) {
+      return prev + (curr.refactoring ?  1 : 0);
+    }
+    return prev + (curr.children ? refactoringsInTree(curr.children) : 0);
   }, 0);
 }
 
@@ -127,7 +136,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly fnName: string;
   readonly position: vscode.Position;
   readonly children: DeltaIssue[] = [];
-  refactorable = false;
 
   constructor(readonly parent: FileWithIssues, location: Location, readonly refactoring?: CsRefactoringRequest) {
     this.fnName = location.function;
@@ -170,7 +178,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   }
 
   private presentAsRefactorable(item: vscode.TreeItem, issues: number) {
-    this.refactorable = true;
     item.resourceUri = toDeltaFunctionUri(issues, true);
     item.description = 'Auto-refactor available';
     item.contextValue = 'delta-refactorableFunction';

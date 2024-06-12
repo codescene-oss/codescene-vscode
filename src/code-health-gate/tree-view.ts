@@ -1,17 +1,17 @@
 import vscode from 'vscode';
+import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { AceAPI } from '../refactoring/addon';
-import { isDefined } from '../utils';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { isDefined, pluralize } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
 import {
   DeltaFunctionInfo,
   DeltaIssue,
   DeltaTreeViewItem,
   buildTree,
-  countIssuesIn,
   filesWithIssuesInTree,
+  refactoringsInTree
 } from './tree-model';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -29,10 +29,17 @@ export class CodeHealthGateView implements vscode.Disposable {
     this.disposables.push(
       this.treeDataProvider.onDidTreeUpdate((tree) => {
         const results = filesWithIssuesInTree(tree);
-        const issues = countIssuesIn(tree);
+        const refactorings = refactoringsInTree(tree);
+        const descriptionText =
+          refactorings > 0 ? `${pluralize('Auto-refactoring', refactorings)} available` : undefined;
+        this.view.description = descriptionText;
+        const resultsText =
+          results.length > 0
+            ? `Found ${results.length} ${pluralize('file', results.length)} with introduced code health issues`
+            : undefined;
         this.view.badge = {
           value: results.length,
-          tooltip: results.length > 0 ? `Found ${results.length} file(s) with introduced code health issues` : '',
+          tooltip: [resultsText, descriptionText].filter(isDefined).join(' • '),
         };
       })
     );

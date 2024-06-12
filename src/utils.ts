@@ -10,6 +10,10 @@ export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== undefined && value !== null;
 }
 
+export function pluralize(noun: string, count: number) {
+  return count === 1 ? noun : `${noun}s`;
+}
+
 let logoUrl: string | undefined;
 export async function getLogoUrl(extensionPath: string): Promise<string> {
   if (!logoUrl) {
