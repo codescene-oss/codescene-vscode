@@ -1,7 +1,7 @@
 import * as assert from 'assert';
-import { Range } from 'vscode';
+import { Range, Diagnostic } from 'vscode';
 import { EnclosingFn } from '../../codescene-interop';
-import { rangeFromEnclosingFn } from '../../refactoring/commands';
+import { codeSmellsFromDiagnostics, rangeFromEnclosingFn } from '../../refactoring/commands';
 
 const enclosingFn1: EnclosingFn = {
   name: 'anon',
@@ -26,13 +26,30 @@ const enclosingFn2: EnclosingFn = {
 };
 
 suite('Refactor commands Test Suite', () => {
-  test('Handle output from findEnclosingFunction call', async () => {
-    const range = rangeFromEnclosingFn(enclosingFn1);
-    assert.ok(range.isEqual(new Range(0, 0, 0, 19)));
+  test('Range and codeSmell lines calculations for simple function', async () => {
+    const enclosingFunctionRange = rangeFromEnclosingFn(enclosingFn1);
+    assert.ok(enclosingFunctionRange.isEqual(new Range(0, 0, 0, 19)));
+
+    const complexMethod = new Diagnostic(new Range(0, 0, 0, 0), 'message');
+    complexMethod.code = 'Complex Method';
+    const codeSmell = codeSmellsFromDiagnostics([complexMethod], enclosingFunctionRange)[0];
+    assert.equal(codeSmell.relativeStartLine, 0);
+    assert.equal(codeSmell.relativeEndLine, 0);
   });
 
-  test('Handle output from findEnclosingFunction call', async () => {
-    const range = rangeFromEnclosingFn(enclosingFn2);
-    assert.ok(range.isEqual(new Range(47, 0, 100, 1)));
+  test('Range and codeSmell lines calculations with more complex relative lines', async () => {
+    const enclosingFunctionRange = rangeFromEnclosingFn(enclosingFn2);
+    assert.ok(enclosingFunctionRange.isEqual(new Range(47, 0, 100, 1)));
+
+    const complexMethod = new Diagnostic(new Range(47, 0, 47, 0), 'message');
+    complexMethod.code = 'Complex Method';
+    const complexConditional = new Diagnostic(new Range(55, 0, 60, 0), 'message');
+    complexConditional.code = 'Complex Conditional';
+    const codeSmells = codeSmellsFromDiagnostics([complexMethod, complexConditional], enclosingFunctionRange);
+    assert.equal(codeSmells[0].relativeStartLine, 0);
+    assert.equal(codeSmells[0].relativeEndLine, 53);
+
+    assert.equal(codeSmells[1].relativeStartLine, 8);
+    assert.equal(codeSmells[1].relativeEndLine, 40);
   });
 });

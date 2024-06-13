@@ -1,4 +1,4 @@
-import vscode, { ViewColumn } from 'vscode';
+import vscode, { Diagnostic } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
 import { getCsDiagnosticCode } from '../review/utils';
@@ -38,7 +38,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
         commandId: 'codescene.presentRefactoring',
         handler: this.presentRefactoringRequestCmd,
         thisArg: this,
-        logArgs: (request?: CsRefactoringRequest) => ({ "trace-id": request?.traceId }),
+        logArgs: (request?: CsRefactoringRequest) => ({ 'trace-id': request?.traceId }),
       }),
       vscode.commands.registerCommand('codescene.getFunctionToRefactor', this.getFunctionToRefactorCmd, this),
       vscode.commands.registerCommand(
@@ -134,19 +134,8 @@ function toFnToRefactor(
   extension: string,
   supportedDiagnostics: vscode.Diagnostic[]
 ) {
-  const codeSmells: FnCodeSmell[] = supportedDiagnostics
-    .map((d) => {
-      const category = getCsDiagnosticCode(d.code);
-      if (!category) return;
-      return {
-        category,
-        relativeStartLine: d.range.start.line - enclosingFn['start-line'],
-        relativeEndLine: d.range.end.line - enclosingFn['start-line'],
-      };
-    })
-    .filter(isDefined);
-
   const range = rangeFromEnclosingFn(enclosingFn);
+  const codeSmells = codeSmellsFromDiagnostics(supportedDiagnostics, range);
   return {
     name: enclosingFn.name,
     range,
@@ -155,6 +144,26 @@ function toFnToRefactor(
     content: document.getText(range),
     codeSmells,
   } as FnToRefactor;
+}
+
+/**
+ * Returns the code smells for each diagnostic, with the relative start/end line being
+ * relative to the enclosing function range.
+ * 
+ * @returns 
+ */
+export function codeSmellsFromDiagnostics(diagnostics: Diagnostic[], fnRange: vscode.Range) {
+  return diagnostics
+    .map((d) => {
+      const category = getCsDiagnosticCode(d.code);
+      if (!category) return;
+      return {
+        category,
+        relativeStartLine: d.range.start.line - fnRange.start.line,
+        relativeEndLine: fnRange.end.line - d.range.end.line,
+      } as FnCodeSmell;
+    })
+    .filter(isDefined);
 }
 
 // Note that vscode.Range line numbers are zero-based, while the CodeScene API uses 1-based line numbers
