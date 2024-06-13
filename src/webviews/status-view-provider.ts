@@ -1,5 +1,6 @@
 import vscode, {
   CancellationToken,
+  Disposable,
   Uri,
   Webview,
   WebviewView,
@@ -13,6 +14,7 @@ import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
 import { isDefined } from '../utils';
 import { nonce } from './utils';
+import Telemetry from '../telemetry';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   const provider = new StatusViewProvider(context.extensionUri);
@@ -20,7 +22,8 @@ export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   return provider;
 }
 
-export class StatusViewProvider implements WebviewViewProvider {
+export class StatusViewProvider implements WebviewViewProvider, Disposable {
+  private disposables: Disposable[] = [];
   private stateProperties: CsStateProperties;
   private view?: vscode.WebviewView;
 
@@ -35,6 +38,16 @@ export class StatusViewProvider implements WebviewViewProvider {
   ): void | Thenable<void> {
     this.view = webviewView;
     const webView = this.view.webview;
+
+    // Log usage when the view is resolved and on each subsequent visibility change
+    Telemetry.instance.logUsage('statusView/show');
+    this.disposables.push(
+      webviewView.onDidChangeVisibility(() => {
+        if (webviewView.visible) {
+          Telemetry.instance.logUsage('statusView/show');
+        }
+      })
+    );
 
     webView.options = {
       enableScripts: true,
@@ -253,6 +266,10 @@ export class StatusViewProvider implements WebviewViewProvider {
 
   private getUri(webView: Webview, ...pathSegments: string[]) {
     return webView.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
   }
 }
 
