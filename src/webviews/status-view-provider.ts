@@ -7,6 +7,7 @@ import vscode, {
   WebviewViewResolveContext,
 } from 'vscode';
 import { CsExtensionState, CsFeatures, CsStateProperties } from '../cs-extension-state';
+import { DownloadError } from '../download';
 import { toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
@@ -15,13 +16,11 @@ import { nonce } from './utils';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   const provider = new StatusViewProvider(context.extensionUri);
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider(StatusViewProvider.viewId, provider));
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.statusView', provider));
   return provider;
 }
 
 export class StatusViewProvider implements WebviewViewProvider {
-  public static readonly viewId = 'codescene.statusView';
-
   private stateProperties: CsStateProperties;
   private view?: vscode.WebviewView;
 
@@ -117,15 +116,30 @@ export class StatusViewProvider implements WebviewViewProvider {
       `;
     }
     if (features?.codeHealthAnalysis instanceof Error) {
+      let actionableMessage;
+      if (features?.codeHealthAnalysis instanceof DownloadError) {
+        const err = features.codeHealthAnalysis;
+        actionableMessage = /*html*/ `<p>
+          Please try to installing the CodeScene devtools binary manually using these steps:
+          <ul>
+            <li>Download the required version manually from <a href="${err.url}">here</a></li>
+            <li>Unpack and move it to ${err.expectedCliPath}</li>
+            <li>Ensure it is executable, then restart the extension</li>
+          </ul>
+        </p>`;
+      }
       return /*html*/ `
       <h3><span class="codicon codicon-warning color-inactive"></span> Extension error</h3>
-      <p>There was an error when initiating the CodeScene CLI: ${features.codeHealthAnalysis.message}</p>
+      <p>There was an error when initiating the CodeScene devtools binary: <code>${
+        features.codeHealthAnalysis.message
+      }</code></p>
+      ${actionableMessage ? actionableMessage : ''}
     `;
     }
 
     return /*html*/ `
-    <h3><vscode-progress-ring class="progress-ring"></vscode-progress-ring>Initializing CodeScene CLI</h3>
-    <p>Ensuring we have the latest CodeScene CLI version working on your system...</p>
+    <h3><vscode-progress-ring class="progress-ring"></vscode-progress-ring>Initializing CodeScene devtools binary</h3>
+    <p>Ensuring we have the latest CodeScene devtools binary working on your system...</p>
     `;
   }
 

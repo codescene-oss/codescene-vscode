@@ -7,7 +7,7 @@ import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
-import { ensureCompatibleCli } from './download';
+import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { outputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
@@ -16,9 +16,9 @@ import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
+import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { registerCommandWithTelemetry } from './utils';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -34,9 +34,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   CsExtensionState.init(context);
 
-  ensureCompatibleCli(context.extensionPath)
+  ensureCompatibleBinary(context.extensionPath)
     .then((cliPath) => {
-      outputChannel.appendLine('CodeScene CLI is in place and working!');
+      outputChannel.appendLine('CodeScene devtools binary is in place and working!');
       CsExtensionState.setCliState(cliPath);
       startExtension(context);
     })
@@ -44,7 +44,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const { message } = error;
       CsExtensionState.setCliState(error);
       outputChannel.appendLine(message);
-      void vscode.window.showErrorMessage(`Error initiating the CodeScene CLI: ${message}`);
+      void vscode.commands.executeCommand('codescene.statusView.focus');
     });
 
   setupStatsCollector();

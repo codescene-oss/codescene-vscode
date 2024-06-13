@@ -52,7 +52,7 @@ export class CsExtensionState {
   static get cliPath(): string {
     const cliPath = CsExtensionState._instance.stateProperties.features?.codeHealthAnalysis;
     if (typeof cliPath !== 'string') {
-      throw new Error(`CodeScene CLI path not set (${cliPath})`);
+      throw new Error(`CodeScene devtools binary path not set (${cliPath})`);
     }
     return cliPath;
   }
