@@ -33,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Activating extension...');
 
   CsExtensionState.init(context);
+  Telemetry.init(context.extension);
 
   ensureCompatibleBinary(context.extensionPath)
     .then((cliPath) => {
@@ -59,7 +60,6 @@ function startExtension(context: vscode.ExtensionContext) {
   DeltaAnalyser.init();
   CsExtensionState.addListeners();
 
-  Telemetry.init(context.extension);
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
 
