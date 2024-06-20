@@ -84,7 +84,7 @@
       "explorer": [
         {
           "id": "codescene.codeHealthGateView",
-          "name": "Code Health Gate",
+          "name": "Code Health Gate [beta]",
           "icon": "$(lock)",
           "when": "config.codescene.previewCodeHealthGate"
         }
@@ -156,7 +156,7 @@
         "codescene.previewCodeHealthGate": {
           "type": "boolean",
           "default": false,
-          "description": "Preview the Code Health Gate view",
+          "description": "Preview the experimental Code Health Gate (beta)",
           "order": 5
         },
         "codescene.gitignore": {
