@@ -1,9 +1,24 @@
 import * as vscode from 'vscode';
 import { csSource } from '../diagnostics/cs-diagnostics';
 import { fnCoordinateToRange } from '../diagnostics/utils';
+import { isDefined } from '../utils';
 import { IssueDetails, ReviewIssue, ReviewResult } from './model';
 
-export const chScorePrefix = 'Code health score: ';
+const chScorePrefix = 'Code health score: ';
+const noApplicationCode = 'No application code detected for scoring';
+
+export function isGeneralDiagnostic(diagnostic: vscode.Diagnostic) {
+  const { message } = diagnostic;
+  return message.startsWith(chScorePrefix);
+}
+
+function createGeneralDiagnostic(reviewResult: ReviewResult) {
+  const scoreText =
+    reviewResult.score === 0
+      ? `${chScorePrefix}${noApplicationCode}`
+      : `${chScorePrefix}${formatScore(reviewResult.score)}`;
+  return new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
+}
 
 export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
   // File level issues
@@ -55,12 +70,8 @@ export function formatScore(score: number | void): string {
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
   let diagnostics = reviewResult.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
 
-  if (reviewResult.score > 0) {
-    const scoreDiagnostic = new vscode.Diagnostic(
-      new vscode.Range(0, 0, 0, 0),
-      `${chScorePrefix}${formatScore(reviewResult.score)}`,
-      vscode.DiagnosticSeverity.Information
-    );
+  if (isDefined(reviewResult.score)) {
+    const scoreDiagnostic = createGeneralDiagnostic(reviewResult);
     return [scoreDiagnostic, ...diagnostics];
   } else {
     return diagnostics;

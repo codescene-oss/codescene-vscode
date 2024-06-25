@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { chScorePrefix } from '../review/utils';
+import { isGeneralDiagnostic } from '../review/utils';
 
 export const csSource = 'CodeScene';
 
@@ -28,7 +28,7 @@ export default class CsDiagnostics {
 
     void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
       // Remove the diagnostic showing the code health score. It should only be shown as a codelens, not in the problems view.
-      const importantDiagnostics = diagnostics.filter((d) => !d.message.startsWith(chScorePrefix));
+      const importantDiagnostics = diagnostics.filter((d) => !isGeneralDiagnostic(d));
       CsDiagnostics.set(document.uri, importantDiagnostics);
     });
   }

@@ -4,7 +4,7 @@ import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer from './reviewer';
-import { chScorePrefix, getCsDiagnosticCode } from './utils';
+import { getCsDiagnosticCode, isGeneralDiagnostic } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -67,7 +67,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
     const diagnostic = codeLens.diagnostic;
     logOutputChannel.trace(`Resolving Review CodeLenses for ${diagnostic.message} ${rangeStr(diagnostic.range)}`);
 
-    if (diagnostic.message.startsWith(chScorePrefix)) {
+    if (isGeneralDiagnostic(diagnostic)) {
       codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
     } else {
       codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document.uri);
