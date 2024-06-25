@@ -58,7 +58,7 @@ function startExtension(context: vscode.ExtensionContext) {
   };
   Reviewer.init();
   DeltaAnalyser.init();
-  CsExtensionState.addListeners();
+  CsExtensionState.addListeners(context);
 
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');

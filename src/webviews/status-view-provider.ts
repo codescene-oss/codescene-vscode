@@ -7,14 +7,15 @@ import vscode, {
   WebviewViewProvider,
   WebviewViewResolveContext,
 } from 'vscode';
+import { getConfiguration } from '../configuration';
 import { CsExtensionState, CsFeatures, CsStateProperties } from '../cs-extension-state';
 import { DownloadError } from '../download';
 import { toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
+import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
 import { nonce } from './utils';
-import Telemetry from '../telemetry';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   const provider = new StatusViewProvider(context.extensionUri);
@@ -188,8 +189,12 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
         .map((codeSmells) => `<li>${codeSmells}</li>`)
         .join('\n');
 
+      const aceAvailableText = getConfiguration('previewCodeHealthGate')
+        ? `<p>ACE capabilities are available via codelens documentation and from the <a href="" id="code-health-gate-link">Code Quality Gate</a>.</p>`
+        : `<p>ACE capabilities are available via codelens documentation.</p>`;
+
       content += /*html*/ `
-      <p>ACE capabilities are available from the <a href="" id="code-health-gate-link">Code Quality Gate</a> view.</p>
+        ${aceAvailableText}
         <p>
         Supported languages:
         <ul>${languageIdList}</ul>

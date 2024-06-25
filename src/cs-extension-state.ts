@@ -10,6 +10,7 @@ import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
+import { onDidChangeConfiguration } from './configuration';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -68,12 +69,17 @@ export class CsExtensionState {
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners() {
-    Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent);
-    Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleError);
-    DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent);
-    DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleError);
-    CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError);
+  static addListeners(context: vscode.ExtensionContext) {
+    context.subscriptions.push(
+      Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
+      Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleError),
+      DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
+      DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleError),
+      CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError),
+      onDidChangeConfiguration('previewCodeHealthGate', (e) => {
+        CsExtensionState._instance.updateStatusViews();
+      })
+    );
   }
 
   static clearErrors() {
