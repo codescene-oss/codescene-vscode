@@ -25,6 +25,7 @@ export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vsc
   if (!reviewIssue.functions) {
     const range = new vscode.Range(0, 0, 0, 0);
     const diagnostic = new vscode.Diagnostic(range, reviewIssue.category, vscode.DiagnosticSeverity.Warning);
+    diagnostic.source = csSource;
     diagnostic.code = createDiagnosticCodeWithTarget(reviewIssue.category, range.start, document);
     return [diagnostic];
   }
