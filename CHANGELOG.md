@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.5...v0.7.6) (2024-06-26)
+
+
+### Features
+
+* **code-health-gate:** Delta analysis/code health gate initial commit ([74dd05f](https://github.com/codescene-oss/codescene-vscode/commit/74dd05fc933a9df24ebbaf78d7dca085eae73595))
+* **code-health-gate:** Enable ACE for code-health-gate issues ([3769cb7](https://github.com/codescene-oss/codescene-vscode/commit/3769cb78d876432b669e128c7dd7447ffb71d8f5))
+* **documentation:** Dynamic documentation panel initial commit ([76a89fe](https://github.com/codescene-oss/codescene-vscode/commit/76a89fe22b5892bbe5fd5809c2b284a2b8339936))
+* **documentation:** Go to function location in document ([1673e70](https://github.com/codescene-oss/codescene-vscode/commit/1673e70bb7a18688e8edab36afbf7e5d47ae6b67))
+* Reference a specific devtools binary version ([ff5c38e](https://github.com/codescene-oss/codescene-vscode/commit/ff5c38e0f06d340d56411af9342cb325308596b3))
+
+
+### Bug fixes
+
+* **code-health-gate:** Only show interactive docs for actual degradations ([8ccc356](https://github.com/codescene-oss/codescene-vscode/commit/8ccc356d00343a0a7b844d4261deaa5e4d57f9e8))
+* Correct relative start/end-lines for codeSmells sent to ACE ([7cf05e5](https://github.com/codescene-oss/codescene-vscode/commit/7cf05e5ecee99a485851eb158859eb04b5a0c2e7))
+* **diagnostics:** Add source to file level issues ([2ac8f3a](https://github.com/codescene-oss/codescene-vscode/commit/2ac8f3a28f232f64ac03ce63b4facd03afadf16b))
+* **review:** Add codelens for files with no scorable code ([c9b0218](https://github.com/codescene-oss/codescene-vscode/commit/c9b02188f688b7592bfd109962204edadec3128d))
+* Status view failing on startup with no binary nor internet connection ([7d8cc60](https://github.com/codescene-oss/codescene-vscode/commit/7d8cc6069430b82a445371ca9a7ff4c89163dd23))
+
 ### [0.7.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.4...v0.7.5) (2024-06-05)
 
 
