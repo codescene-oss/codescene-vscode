@@ -59,3 +59,20 @@ To unleash the full potential of the AI features you need to sign in to a CodeSc
 
 ![screenshot3](screenshots/sign-in-accounts-menu.gif)
 
+ACE supported languages:
+- javascript
+- typescript
+- javascriptreact
+- typescriptreact
+
+ACE supported code smells:
+- Complex Conditional
+- Bumpy Road Ahead
+- Complex Method
+- Deep, Nested Complexity
+- Large Method
+
+Also, only functions under 130 lines of code will be considered for refactoring (ignoring commented lines).
+
+
+
