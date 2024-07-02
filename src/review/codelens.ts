@@ -50,8 +50,8 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       return [];
     }
 
-    const cacheItem = Reviewer.instance.reviewCache.get(document.fileName);
-    const diagnostics = cacheItem && (await cacheItem.csReview.diagnostics);
+    const cacheItem = Reviewer.instance.reviewCache.get(document);
+    const diagnostics = cacheItem && (await cacheItem.review.diagnostics);
 
     if (!diagnostics || diagnostics.length === 0) {
       return [];

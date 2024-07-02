@@ -2,5 +2,6 @@ Code Health Gate [beta]
 
 **NOTE:** _This feature is experimental and subject to change._
 
-The Code Health Gate compares all changed files with the current ```HEAD``` commit, and presents the files where any code health issue has been introduced.
-The analysis is triggered on save and can also be run manually using the reload button.
+The Code Health Gate shows any introduced issues among the files being worked on. 
+It works by comparing the latest code review for a file with the first review (i.e. the review done when the file was opened)
+If any code health degradations are present in the file, they will be shown in this view along with any other issues or improvements.

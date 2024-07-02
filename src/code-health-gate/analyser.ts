@@ -1,5 +1,4 @@
-import path from 'path';
-import vscode, { workspace } from 'vscode';
+import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
 import { csSource } from '../diagnostics/cs-diagnostics';
@@ -7,23 +6,12 @@ import { fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { isDefined, registerCommandWithTelemetry } from '../utils';
+import { isDefined } from '../utils';
 import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
 
-export type DeltaAnalysisEvent = AnalysisEvent & { path?: string };
+export type DeltaAnalysisEvent = AnalysisEvent & { document?: vscode.TextDocument };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
-export type DeltaAnalysisResult = DeltaForFile[] | DeltaAnalysisState;
-
-export function registerDeltaCommand(context: vscode.ExtensionContext) {
-  context.subscriptions.push(
-    registerCommandWithTelemetry({
-      commandId: 'codescene.runDeltaAnalysis',
-      handler: () => {
-        return DeltaAnalyser.analyseWorkspace();
-      },
-    })
-  );
-}
+export type DeltaAnalysisResult = DeltaForFile | DeltaAnalysisState;
 
 export class DeltaAnalyser {
   private static _instance: DeltaAnalyser;
@@ -34,7 +22,7 @@ export class DeltaAnalyser {
   readonly onDidAnalyse = this.analysisEmitter.event;
   private analysesRunning = 0;
 
-  readonly analysisResults: Map<string, DeltaForFile[] | DeltaAnalysisResult> = new Map();
+  readonly analysisResults: Map<string, DeltaForFile | DeltaAnalysisResult> = new Map();
 
   constructor(private cliPath: string) {}
 
@@ -46,97 +34,89 @@ export class DeltaAnalyser {
     return DeltaAnalyser._instance;
   }
 
-  static analyseWorkspace() {
-    const rootPaths = workspace.workspaceFolders?.map((folder) => {
-      return folder.uri.fsPath;
-    });
-    if (!rootPaths || rootPaths.length === 0) {
-      throw new Error('The CodeScene delta command can only be executed if VS Code is opened on a workspace folder.');
-    }
-
-    rootPaths.forEach(async (rootPath) => {
-      void DeltaAnalyser.instance.runDeltaAnalysis(rootPath);
-    });
-  }
-
-  private startAnalysisEvent(path: string) {
+  private startAnalysisEvent(document: vscode.TextDocument) {
     this.analysesRunning++;
-    this.analysisEmitter.fire({ type: 'start', path });
+    this.analysisEmitter.fire({ type: 'start', document });
   }
 
-  private endAnalysisEvent(path: string) {
+  private endAnalysisEvent(document: vscode.TextDocument) {
     this.analysesRunning--;
-    this.analysisEmitter.fire({ type: 'end', path });
+    this.analysisEmitter.fire({ type: 'end', document });
     if (this.analysesRunning === 0) {
       this.analysisEmitter.fire({ type: 'idle' });
     }
   }
 
-  private async runDeltaAnalysis(rootPath: string) {
-    this.startAnalysisEvent(rootPath);
-    DeltaAnalyser.instance.analysisResults.set(rootPath, 'running');
+  /**
+   * Creates a valid input string for the delta command.
+   * Will return undefined if the old and new score are the same. Used to avoid invoking
+   * the delta command.
+   *
+   * @param oldScore
+   * @param newScore
+   * @returns
+   */
+  private jsonForScores(oldScore: any, newScore: any) {
+    const oldJson = JSON.stringify(oldScore);
+    const newJson = JSON.stringify(newScore);
+    if (oldJson === newJson) return;
+
+    if (isDefined(newScore)) {
+      return `{"old-score": ${oldJson}, "new-score": ${newJson}}`;
+    }
+    return `{"old-score": ${oldJson}}`;
+  }
+
+  async deltaForScores(document: vscode.TextDocument, oldScore: any, newScore: any) {
+    this.startAnalysisEvent(document);
+
+    const inputJsonString = this.jsonForScores(oldScore, newScore);
+    if (!inputJsonString) {
+      return;
+    }
+
     return new SimpleExecutor()
-      .execute({ command: this.cliPath, args: ['delta', '--output-format', 'json'] }, { cwd: rootPath })
+      .execute({ command: this.cliPath, args: ['delta'] }, undefined, inputJsonString)
       .then((result) => {
         if (result.stderr.trim() !== '') {
           logOutputChannel.debug(`Delta analysis debug output: ${result.stderr}`);
         }
-        if (result.stdout === '') {
-          DeltaAnalyser.instance.analysisResults.set(rootPath, []);
+        if (result.stdout.trim() === '') {
           return;
         }
-        const deltaResults = JSON.parse(result.stdout) as DeltaForFile[];
+        const deltaResult = JSON.parse(result.stdout) as DeltaForFile;
         if (CsExtensionState.acePreflight) {
-          requestRefactoringsForDegradations({
-            rootPath,
-            deltaForFiles: deltaResults,
+          requestRefactoringsForDegradation({
+            document,
+            deltaResult,
             supportedCodeSmells: CsExtensionState.acePreflight.supported['code-smells'],
           });
         }
-        DeltaAnalyser.instance.analysisResults.set(rootPath, deltaResults);
+        return deltaResult;
       })
       .catch((error) => {
-        DeltaAnalyser.instance.analysisResults.set(rootPath, 'failed');
         this.errorEmitter.fire(error);
       })
       .finally(() => {
-        this.endAnalysisEvent(rootPath);
+        this.endAnalysisEvent(document);
       });
   }
 }
 
 /**
- * Try to send refactoring requests for all supported degradations found in these files.
- * Mutates/decorates the deltaForFiles with the refactoring requests if applicable.
- *
- * @param deltaForFiles
+ * Try to send a refactoring request for all supported degradations found in the document.
  */
-function requestRefactoringsForDegradations({
-  rootPath,
-  deltaForFiles,
+function requestRefactoringsForDegradation({
+  document,
+  deltaResult,
   supportedCodeSmells,
 }: {
-  rootPath: string;
-  deltaForFiles: DeltaForFile[];
+  document: vscode.TextDocument;
+  deltaResult: DeltaForFile;
   supportedCodeSmells: string[];
 }) {
-  deltaForFiles.forEach((deltaForFile) => {
-    const absPath = path.join(rootPath, deltaForFile.name);
-    const uri = vscode.Uri.file(absPath);
-    vscode.workspace.openTextDocument(uri).then(
-      async (doc) => {
-        const diagnostics = diagnosticsForFile(doc, deltaForFile, supportedCodeSmells);
-        deltaForFile.refactorings = await vscode.commands.executeCommand<CsRefactoringRequest[]>(
-          'codescene.requestRefactorings',
-          doc,
-          diagnostics
-        );
-      },
-      (err) => {
-        logOutputChannel.error(`[Analyser] Failed to open ${uri.fsPath}: ${err}`);
-      }
-    );
-  });
+  const diagnostics = diagnosticsForFile(document, deltaResult, supportedCodeSmells);
+  void vscode.commands.executeCommand<CsRefactoringRequest[]>('codescene.requestRefactorings', document, diagnostics);
 }
 
 function diagnosticsForFile(document: vscode.TextDocument, delta: DeltaForFile, supportedCodeSmells: string[]) {
