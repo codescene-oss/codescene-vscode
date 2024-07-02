@@ -1,18 +1,20 @@
 import vscode from 'vscode';
 import { InteractiveDocsParams } from '../documentation/csdoc-provider';
-import { AceAPI } from '../refactoring/addon';
+import { AceAPI, AceRequestEvent } from '../refactoring/addon';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import Reviewer from '../review/reviewer';
 import { isDefined, pluralize } from '../utils';
-import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
+import { DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import {
   DeltaFunctionInfo,
   DeltaIssue,
   DeltaTreeViewItem,
-  buildTree,
+  FileWithIssues,
   filesWithIssuesInTree,
   refactoringsInTree,
 } from './tree-model';
+import { DeltaForFile } from './model';
 
 export class CodeHealthGateView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -30,9 +32,9 @@ export class CodeHealthGateView implements vscode.Disposable {
     });
 
     this.disposables.push(
-      this.treeDataProvider.onDidTreeUpdate((tree) => {
-        const results = filesWithIssuesInTree(tree);
-        const refactorings = refactoringsInTree(tree);
+      this.treeDataProvider.onDidChangeTreeData(() => {
+        const results = filesWithIssuesInTree(this.treeDataProvider.tree);
+        const refactorings = refactoringsInTree(this.treeDataProvider.tree);
         const descriptionText =
           refactorings > 0 ? `${pluralize('Auto-refactoring', refactorings)} available` : undefined;
         this.view.description = descriptionText;
@@ -48,19 +50,7 @@ export class CodeHealthGateView implements vscode.Disposable {
     );
 
     this.disposables.push(
-      this.view.onDidChangeVisibility((e) => {
-        if (e.visible) {
-          // This is our only automatic trigger of the analysis at the moment.
-          // Ignore promise rejection here, since this might be triggered on startup
-          // before the command has been registered properly.
-          DeltaAnalyser.analyseWorkspace();
-        }
-      })
-    );
-
-    this.disposables.push(this.view);
-
-    this.disposables.push(
+      this.view,
       vscode.commands.registerCommand('codescene.chGateTreeContext.presentRefactoring', (fnInfo: DeltaFunctionInfo) => {
         void vscode.commands.executeCommand('codescene.presentRefactoring', fnInfo.refactoring!.resolvedRefactoring());
       }),
@@ -95,26 +85,57 @@ class DeltaAnalysisTreeProvider
   readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | DeltaAnalysisState | void> =
     this.treeDataChangedEmitter.event;
 
-  private treeUpdateEmitter: vscode.EventEmitter<Array<DeltaTreeViewItem | DeltaAnalysisState>> =
-    new vscode.EventEmitter<Array<DeltaTreeViewItem | DeltaAnalysisState>>();
-  readonly onDidTreeUpdate = this.treeUpdateEmitter.event;
-
   private disposables: vscode.Disposable[] = [];
+
+  public tree: Array<FileWithIssues> = [];
 
   constructor(aceApi?: AceAPI) {
     this.disposables.push(
-      DeltaAnalyser.instance.onDidAnalyse((event) => {
-        if (event.type !== 'idle') this.treeDataChangedEmitter.fire();
+      Reviewer.instance.onDidDeltaAnalysis((event) => {
+        const { delta, review } = event;
+        this.syncTree(review.document, delta);
       })
     );
     if (aceApi) {
-      this.disposables.push(
-        aceApi.onDidChangeRequests(() => {
-          // TODO Maybe debounce this a couple of 100 ms
-          this.treeDataChangedEmitter.fire();
-        })
-      );
+      this.disposables.push(aceApi.onDidChangeRequests((e) => this.addRefactoringsToTree(e)));
     }
+  }
+
+  private addRefactoringsToTree(event: AceRequestEvent) {
+    const fileWithIssues = this.tree.find((f) => f.uri.fsPath === event.document.uri.fsPath);
+    if (isDefined(fileWithIssues)) {
+      if (event.type === 'start') {
+        fileWithIssues.children.forEach((child) => {
+          if (child instanceof DeltaFunctionInfo && event.requests) {
+            const fnReq = event.requests.find(
+              (r) => r.fnToRefactor.name === child.fnName && r.fnToRefactor.range.start.isEqual(child.position)
+            );
+            child.refactoring = fnReq;
+          }
+        });
+      }
+      // Fire and event on both start and end event to update the tree. Never when fileWithIssues is undefined, which 
+      // updates the entire tree.
+      this.treeDataChangedEmitter.fire(fileWithIssues); 
+    }
+  }
+
+  private syncTree(document: vscode.TextDocument, deltaForFile?: DeltaForFile) {
+    // Find the tree item matching the event document
+    const fileWithIssues = this.tree.find((f) => f.uri.fsPath === document.uri.fsPath);
+    if (fileWithIssues) {
+      if (deltaForFile) {
+        // Update the existing entry if there are changes
+        fileWithIssues.updateChildren(deltaForFile);
+      } else {
+        // If there are no longer any issues, remove the entry from the tree
+        this.tree = this.tree.filter((f) => f.uri.fsPath !== document.uri.fsPath);
+      }
+    } else if (deltaForFile) {
+      // No existing file entry found - add one if there are changes
+      this.tree.push(new FileWithIssues(deltaForFile, document.uri));
+    }
+    this.treeDataChangedEmitter.fire();
   }
 
   getTreeItem(element: DeltaTreeViewItem | DeltaAnalysisState): vscode.TreeItem {
@@ -135,9 +156,8 @@ class DeltaAnalysisTreeProvider
       if (typeof element === 'string') return []; // No children for DeltaAnalysisStates
       return element.children;
     }
-    const tree = buildTree();
-    this.treeUpdateEmitter.fire(tree);
-    return tree;
+
+    return this.tree;
   }
 
   dispose() {

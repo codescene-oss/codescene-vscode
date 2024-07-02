@@ -2,6 +2,8 @@
 export interface ReviewResult {
   score: number;
   review: ReviewIssue[];
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'raw-score': any;
 }
 
 export interface ReviewIssue {

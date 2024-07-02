@@ -43,11 +43,6 @@
         "title": "CodeScene: Check code health rule match for selected file"
       },
       {
-        "command": "codescene.runDeltaAnalysis",
-        "title": "CodeScene: Run delta analysis",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "codescene.codeHealthGateHelp",
         "title": "CodeScene: Code Health Gate help",
         "icon": "$(question)"
@@ -101,7 +96,7 @@
     "viewsWelcome": [
       {
         "view": "codescene.codeHealthGateView",
-        "contents": "Click the refresh button to initiate a CodeScene delta analysis. This will compare the current state of your code with the latest (HEAD) commit and present any introduced code smells."
+        "contents": "The code health gate compares the current state of your code with the initial code review and presents any introduced code smells."
       }
     ],
     "menus": {
@@ -118,11 +113,6 @@
         }
       ],
       "view/title": [
-        {
-          "command": "codescene.runDeltaAnalysis",
-          "when": "view === codescene.codeHealthGateView",
-          "group": "navigation@1"
-        },
         {
           "command": "codescene.codeHealthGateHelp",
           "when": "view === codescene.codeHealthGateView",

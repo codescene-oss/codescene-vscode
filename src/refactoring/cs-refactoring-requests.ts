@@ -7,6 +7,7 @@ import Telemetry from '../telemetry';
 import { isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './commands';
 import { RefactorConfidence, RefactorResponse } from './model';
+import { AceRequestEvent } from './addon';
 
 export interface ResolvedRefactoring {
   fnToRefactor: FnToRefactor;
@@ -88,7 +89,7 @@ function validConfidenceLevel(level: number) {
  * Used to get the proper requests when presenting the refactoring codelenses and codeactions.
  */
 export class CsRefactoringRequests {
-  private static readonly requestsChangedEmitter = new EventEmitter<void>();
+  private static readonly requestsChangedEmitter = new EventEmitter<AceRequestEvent>();
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsChangedEmitter.event;
 
   private static readonly errorEmitter = new EventEmitter<Error | AxiosError>();
@@ -113,13 +114,13 @@ export class CsRefactoringRequests {
           CsRefactoringRequests.errorEmitter.fire(error);
         })
         .finally(() => {
-          CsRefactoringRequests.requestsChangedEmitter.fire(); // Fire updates for all finished requests
+          CsRefactoringRequests.requestsChangedEmitter.fire({ document, type: 'end', request: req }); // Fire updates for all finished requests
         });
       requests.push(req);
     });
 
     if (requests.length > 0) {
-      CsRefactoringRequests.requestsChangedEmitter.fire();
+      CsRefactoringRequests.requestsChangedEmitter.fire({ document, type: 'start', requests });
     }
     return requests;
   }

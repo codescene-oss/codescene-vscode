@@ -1,6 +1,7 @@
 import { dirname } from 'path';
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
+import { DeltaAnalyser } from '../code-health-gate/analyser';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
@@ -9,6 +10,7 @@ import { StatsCollector } from '../stats';
 import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
+import { DeltaForFile } from '../code-health-gate/model';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
@@ -18,6 +20,10 @@ export default class Reviewer {
   static init(): void {
     outputChannel.appendLine('Initializing code Reviewer');
     Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.cliPath)));
+
+    vscode.commands.registerCommand('codescene.debugReviewCache', () => {
+      Reviewer.instance.debugCache(vscode.window.activeTextEditor?.document);
+    });
   }
 
   static get instance(): CachingReviewer {
@@ -32,7 +38,7 @@ export interface ReviewOpts {
 export class CsReview {
   readonly diagnostics: Promise<vscode.Diagnostic[]>;
   readonly score: Promise<void | number>;
-
+  readonly rawScore: Promise<void | any>;
   constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {
     this.score = reviewResult.then((reviewResult) => reviewResult?.score);
     this.diagnostics = reviewResult.then((reviewResult) => {
@@ -41,6 +47,7 @@ export class CsReview {
       }
       return reviewResultToDiagnostics(reviewResult, document);
     });
+    this.rawScore = reviewResult.then((reviewResult) => reviewResult?.['raw-score']);
   }
 
   get scorePresentation() {
@@ -48,20 +55,80 @@ export class CsReview {
   }
 }
 
-// Cache the results of the 'cs review' command so that we don't have to run it again
-export interface ReviewCacheItem {
-  document: vscode.TextDocument;
-  documentVersion: number;
-  csReview: CsReview;
+class ReviewCacheItem {
+  private baselineScore: any;
+  public documentVersion: number;
+  public delta?: DeltaForFile;
+
+  constructor(private document: vscode.TextDocument, public review: CsReview) {
+    this.documentVersion = document.version;
+    void this.review.rawScore.then((score) => (this.baselineScore = score));
+  }
+
+  setReview(document: vscode.TextDocument, review: CsReview) {
+    this.review = review;
+    this.documentVersion = document.version;
+  }
+
+  /**
+   * Runs the delta analysis using the raw scores, then sets the result if there were any.
+   */
+  async runDeltaAnalysis() {
+    const oldScore = this.baselineScore;
+    const newScore = await this.review.rawScore;
+    return DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore).then((delta) => {
+      delta ? (this.delta = delta) : (this.delta = undefined);
+    });
+  }
+}
+
+/**
+ * Cache for review results and subsequent analyses.
+ */
+class ReviewCache {
+  readonly reviewCache = new Map<string, ReviewCacheItem>();
+
+  /**
+   * Get the current review for this document given the document.version matches the review item version.
+   */
+  getExactVersion(document: vscode.TextDocument): CsReview | undefined {
+    // If we have a cached promise for this document, return it.
+    const reviewItem = this.get(document);
+    if (reviewItem && reviewItem.documentVersion === document.version) {
+      return reviewItem.review;
+    }
+  }
+
+  /**
+   * Get review cache item. (note that fileName is same as uri.fsPath)
+   */
+  get(document: vscode.TextDocument): ReviewCacheItem | undefined {
+    return this.reviewCache.get(document.fileName);
+  }
+
+  set(document: vscode.TextDocument, review: CsReview) {
+    this.reviewCache.set(document.fileName, new ReviewCacheItem(document, review));
+  }
+
+  delete(document: vscode.TextDocument) {
+    this.reviewCache.delete(document.fileName);
+  }
 }
 
 class CachingReviewer {
-  readonly reviewCache = new Map<string, ReviewCacheItem>();
+  readonly reviewCache = new ReviewCache();
 
   private readonly errorEmitter = new vscode.EventEmitter<Error>();
   readonly onDidReviewFail = this.errorEmitter.event;
   private readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
   readonly onDidReview = this.reviewEmitter.event;
+
+  private readonly deltaEmitter = new vscode.EventEmitter<ReviewCacheItem>();
+  /**
+   * Emits events when a delta analysis has been completed. The emitted item
+   * is the ReviewCacheItem that was analysed, and depending on result  - TODO say what?
+   */
+  readonly onDidDeltaAnalysis = this.deltaEmitter.event;
 
   private reviewsRunning = 0;
 
@@ -80,6 +147,10 @@ class CachingReviewer {
     }
   }
 
+  debugCache(document?: vscode.TextDocument) {
+    console.log('Cache size: ' + this.reviewCache.reviewCache.size);
+  }
+
   /**
    * ReviewErrors with exit !== 1 are reported separately (or not at all),
    * as they are not considered fatal.
@@ -93,7 +164,7 @@ class CachingReviewer {
         case 'ABORT_ERR':
           // Delete the cache entry for this document if the review was aborted (document closed)
           // Otherwise it won't be reviewed immediately when the document is opened again
-          this.reviewCache.delete(document.fileName);
+          this.reviewCache.delete(document);
           return;
         default:
           logOutputChannel.error(e.message);
@@ -104,20 +175,18 @@ class CachingReviewer {
   }
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): CsReview {
-    // If we have a cached promise for this document, return it.
     if (!reviewOpts.skipCache) {
-      const cachedResults = this.reviewCache.get(document.fileName);
-      if (cachedResults && cachedResults.documentVersion === document.version) {
-        return cachedResults.csReview;
-      }
+      // If we have a cached CsReview for this document/version combination, return it.
+      const review = this.reviewCache.getExactVersion(document);
+      if (review) return review;
     }
 
     this.startReviewEvent(document);
     const reviewPromise = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
-        // Don't cache reviews of ignored files
-        if (!reviewResult) this.reviewCache.delete(document.fileName);
+        // Clear cache of void reviews (ignored files probably)
+        if (!reviewResult) this.reviewCache.delete(document);
         return reviewResult;
       })
       .catch((e) => this.handleReviewError(e, document))
@@ -127,13 +196,26 @@ class CachingReviewer {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    // Store the diagnostics promise in the cache
-    this.reviewCache.set(document.fileName, {
-      document,
-      documentVersion: document.version,
-      csReview,
-    });
+    this.setOrUpdate(document, csReview);
+
     return csReview;
+  }
+
+  /**
+   * Store the diagnostics promise in the cache, or update it with the
+   * @param document
+   * @param review
+   */
+  setOrUpdate(document: vscode.TextDocument, review: CsReview) {
+    const reviewItem = this.reviewCache.get(document);
+    if (reviewItem) {
+      reviewItem.setReview(document, review);
+      void reviewItem.runDeltaAnalysis().finally(() => {
+        this.deltaEmitter.fire(reviewItem);
+      });
+    } else {
+      this.reviewCache.set(document, review);
+    }
   }
 
   abort(document: vscode.TextDocument): void {
@@ -172,7 +254,7 @@ class SimpleReviewer implements InternalReviewer {
     const { stdout, stderr, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
-        args: ['review', '--file-type', extension, '--output-format', 'json'],
+        args: ['review', '--file-type', extension],
         taskId: taskId(document),
         ignoreError: true, // Ignore executor errors and handle exitCode/stderr here instead
       },

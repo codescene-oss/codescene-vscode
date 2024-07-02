@@ -7,7 +7,7 @@ import { CsRestApi } from '../cs-rest-api';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
 import { CsRefactoringCommands } from './commands';
-import { CsRefactoringRequests } from './cs-refactoring-requests';
+import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
 
 /**
@@ -17,9 +17,16 @@ import { PreFlightResponse } from './model';
 export interface AceAPI {
   enableACE: (context: vscode.ExtensionContext) => Promise<PreFlightResponse>;
   disableACE: () => void;
-  onDidChangeRequests: vscode.Event<void>;
+  onDidChangeRequests: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
 }
+
+export type AceRequestEvent = {
+  document: vscode.TextDocument;
+  type: 'start' | 'end';
+  request?: CsRefactoringRequest;
+  requests?: CsRefactoringRequest[];
+};
 
 /**
  * Aside from the AceAPI, this "addon" also contributes these commands from commands.ts:

@@ -2,24 +2,15 @@ import path from 'path';
 import vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { roundScore } from '../review/utils';
-import { DeltaAnalyser, DeltaAnalysisResult, DeltaAnalysisState } from './analyser';
-import {
-  ChangeDetails,
-  ChangeType,
-  DeltaForFile,
-  Location,
-  getStartLine,
-  isDegradation,
-  isImprovement,
-  toAbsoluteUri
-} from './model';
+import { DeltaAnalysisState } from './analyser';
+import { ChangeDetails, DeltaForFile, Location, getStartLine, isDegradation, isImprovement } from './model';
 import { toDeltaAnalysisUri, toDeltaFunctionUri } from './presentation';
 
 export function countIssuesIn(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): number {
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaIssue) {
-      return prev + (isDegradation(curr.changeType) ? 1 : 0);
+      return prev + (isDegradation(curr.changeDetails['change-type']) ? 1 : 0);
     }
     return prev + (curr.children ? countIssuesIn(curr.children) : 0);
   }, 0);
@@ -29,7 +20,7 @@ export function refactoringsInTree(tree: Array<DeltaTreeViewItem | DeltaAnalysis
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaFunctionInfo) {
-      return prev + (curr.refactoring ?  1 : 0);
+      return prev + (curr.refactoring ? 1 : 0);
     }
     return prev + (curr.children ? refactoringsInTree(curr.children) : 0);
   }, 0);
@@ -38,10 +29,6 @@ export function refactoringsInTree(tree: Array<DeltaTreeViewItem | DeltaAnalysis
 export function filesWithIssuesInTree(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): FileWithIssues[] {
   const deltaResults: FileWithIssues[] = [];
   tree.forEach((item) => {
-    if (item instanceof GitRoot) {
-      deltaResults.push(...filesWithIssuesInTree(item.children));
-      return;
-    }
     if (item instanceof FileWithIssues) {
       deltaResults.push(item);
       return;
@@ -55,60 +42,14 @@ export interface DeltaTreeViewItem {
   children?: Array<DeltaTreeViewItem | DeltaAnalysisState>;
 }
 
-export function buildTree(): Array<DeltaTreeViewItem | DeltaAnalysisState> {
-  // Skip the GitRoot level if there's only one workspace
-  if (DeltaAnalyser.instance.analysisResults.size === 1) {
-    const [rootPath, analysis] = DeltaAnalyser.instance.analysisResults.entries().next().value as [
-      string,
-      DeltaAnalysisResult
-    ];
-    return gitRootChildren(analysis, new GitRoot(rootPath, analysis));
+export class FileWithIssues implements DeltaTreeViewItem {
+  public children: Array<DeltaFunctionInfo | DeltaIssue> = [];
+  constructor(readonly result: DeltaForFile, readonly uri: vscode.Uri) {
+    this.updateChildren(result);
   }
 
-  const items: Array<GitRoot | FileWithIssues> = [];
-  DeltaAnalyser.instance.analysisResults.forEach((value, key) => {
-    items.push(new GitRoot(key, value));
-  });
-  return items;
-}
-
-function gitRootChildren(
-  analysis: DeltaAnalysisResult,
-  parent: GitRoot
-): Array<DeltaTreeViewItem | DeltaAnalysisState> {
-  if (typeof analysis === 'string') {
-    return [analysis];
-  }
-
-  if (analysis.length === 0) return ['no-issues-found'];
-
-  const items: FileWithIssues[] = [];
-  analysis.forEach((deltaForFile) => {
-    items.push(new FileWithIssues(deltaForFile, parent));
-  });
-  return items.sort((a, b) => a.uri.path.localeCompare(b.uri.path));
-}
-
-class GitRoot implements DeltaTreeViewItem {
-  readonly children: Array<DeltaTreeViewItem | DeltaAnalysisState> = [];
-  constructor(readonly rootPath: string, analysis: DeltaAnalysisResult) {
-    this.children = gitRootChildren(analysis, this);
-  }
-
-  toTreeItem(): vscode.TreeItem {
-    return new vscode.TreeItem(
-      this.rootPath.split('/').pop() || 'Unknown',
-      this.children.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
-    );
-  }
-}
-
-class FileWithIssues implements DeltaTreeViewItem {
-  readonly children: Array<DeltaFunctionInfo | DeltaIssue> = [];
-  readonly uri: vscode.Uri;
-  constructor(readonly result: DeltaForFile, readonly parent: GitRoot) {
-    this.uri = toAbsoluteUri(parent.rootPath, result.name);
-    this.children = fileAndFunctionLevelIssues(this, result);
+  updateChildren(deltaAnalysis: DeltaForFile) {
+    this.children = fileAndFunctionLevelIssues(this, deltaAnalysis);
   }
 
   toTreeItem(): vscode.TreeItem {
@@ -137,7 +78,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly position: vscode.Position;
   readonly children: DeltaIssue[] = [];
 
-  constructor(readonly parent: FileWithIssues, location: Location, readonly refactoring?: CsRefactoringRequest) {
+  constructor(readonly parent: FileWithIssues, location: Location, public refactoring?: CsRefactoringRequest) {
     this.fnName = location.function;
     this.position = locationToPos(location);
   }
@@ -185,16 +126,14 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 }
 
 export class DeltaIssue implements DeltaTreeViewItem {
-  readonly changeType: ChangeType;
   readonly position: vscode.Position;
 
   constructor(
     readonly parent: DeltaFunctionInfo | FileWithIssues,
     readonly category: string,
-    changeDetails: ChangeDetails,
+    readonly changeDetails: ChangeDetails,
     location?: Location
   ) {
-    this.changeType = changeDetails['change-type'];
     this.position = locationToPos(location);
   }
 
@@ -202,8 +141,8 @@ export class DeltaIssue implements DeltaTreeViewItem {
     const item = new vscode.TreeItem(this.category, vscode.TreeItemCollapsibleState.None);
     item.iconPath = this.iconPath;
     item.command = this.command;
-    item.tooltip = `${capitalizeFirstLetter(this.changeType)} ${this.category}`;
-    item.contextValue = isDegradation(this.changeType) ? 'delta-degradation' : 'delta-improvement';
+    item.tooltip = this.changeDetails.description;
+    item.contextValue = isDegradation(this.changeDetails['change-type']) ? 'delta-degradation' : 'delta-improvement';
     return item;
   }
 
@@ -218,9 +157,9 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get iconPath() {
-    if (isDegradation(this.changeType)) {
+    if (isDegradation(this.changeDetails['change-type'])) {
       return new vscode.ThemeIcon('warning', new vscode.ThemeColor('codescene.codeHealth.unhealthy'));
-    } else if (isImprovement(this.changeType)) {
+    } else if (isImprovement(this.changeDetails['change-type'])) {
       return new vscode.ThemeIcon('pass', new vscode.ThemeColor('codescene.codeHealth.healthy'));
     }
     return undefined;
@@ -269,7 +208,10 @@ function fileAndFunctionLevelIssues(
   const functionLevelIssues = Array.from(functions.values()).sort((a, b) => a.position.line - b.position.line);
   // Then sort their children on Improvement status
   functionLevelIssues.forEach((fnInfo) => {
-    fnInfo.children.sort((a, b) => Number(isImprovement(a.changeType)) - Number(isImprovement(b.changeType)));
+    fnInfo.children.sort(
+      (a, b) =>
+        Number(isImprovement(a.changeDetails['change-type'])) - Number(isImprovement(b.changeDetails['change-type']))
+    );
   });
 
   return [...fileLevelIssues, ...functionLevelIssues];

@@ -2,7 +2,7 @@ import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { checkCodeHealthRules } from './check-rules';
 import { activate as activateCodeHealthGate } from './code-health-gate/addon';
-import { DeltaAnalyser, registerDeltaCommand } from './code-health-gate/analyser';
+import { DeltaAnalyser } from './code-health-gate/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -120,8 +120,6 @@ function setupStatsCollector() {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  registerDeltaCommand(context);
-
   const openCodeHealthDocsCmd = registerCommandWithTelemetry({
     commandId: 'codescene.openCodeHealthDocs',
     handler: () => {
