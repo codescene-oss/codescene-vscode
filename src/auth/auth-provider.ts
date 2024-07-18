@@ -16,6 +16,7 @@ import {
 } from 'vscode';
 import { getServerUrl } from '../configuration';
 import { outputChannel } from '../log';
+import { CsServerVersion, ServerVersion } from '../server-version';
 import Telemetry from '../telemetry';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
@@ -36,6 +37,11 @@ interface LoginResponse {
   userId: string;
 }
 
+export interface CodeSceneAuthenticationSession extends AuthenticationSession {
+  url: string;
+  version: ServerVersion;
+}
+
 export class CsAuthenticationProvider implements AuthenticationProvider, Disposable {
   private static runningLogin?: CancellationTokenSource;
   private sessionChangeEmitter = new EventEmitter<AuthenticationProviderAuthenticationSessionsChangeEvent>();
@@ -44,7 +50,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
   constructor(private context: ExtensionContext) {
     this.disposable = Disposable.from(
-      authentication.registerAuthenticationProvider(AUTH_TYPE, 'CodeScene Cloud', this, {
+      authentication.registerAuthenticationProvider(AUTH_TYPE, 'CodeScene Tools', this, {
         supportsMultipleAccounts: false,
       }),
       window.registerUriHandler(this.uriHandler)
@@ -64,7 +70,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
     const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
 
     if (allSessions) {
-      return JSON.parse(allSessions) as AuthenticationSession[];
+      return JSON.parse(allSessions) as CodeSceneAuthenticationSession[];
     }
 
     return [];
@@ -82,7 +88,9 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       throw new Error('Login failure');
     }
 
-    const session: AuthenticationSession = {
+    const info = await CsServerVersion.info;
+
+    const session: CodeSceneAuthenticationSession = {
       id: uuid(), // Do we need a "static" id here?
       accessToken: loginResponse.token,
       account: {
@@ -90,6 +98,8 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         id: loginResponse.userId || uuid(), // Do we need a "static" id here?
       },
       scopes: [],
+      version: info.version,
+      url: info.url
     };
 
     await this.context.secrets.store(SESSIONS_STORAGE_KEY, JSON.stringify([session]));
@@ -126,6 +136,21 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
     this.disposable.dispose();
   }
 
+  private async loginUrl(): Promise<Uri> {
+    let info = await CsServerVersion.info;
+    if (info.version.server === 'cloud') {
+      const tokenParams = new URLSearchParams({
+        next: `/configuration/devtools-tokens/add/vscode`,
+      });
+      return Uri.parse(`${getServerUrl()}/login?${tokenParams.toString()}`);
+    } else {
+      const tokenParams = new URLSearchParams({
+        vscode: 'true',
+      });
+      return Uri.parse(`${getServerUrl()}/configuration/user/token?${tokenParams.toString()}`);
+    }
+  }
+
   /**
    * Log in to CodeScene
    */
@@ -139,10 +164,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         cancellable: true,
       },
       async (_, cancelButtonToken) => {
-        const tokenParams = new URLSearchParams({
-          next: `/configuration/devtools-tokens/add/vscode`,
-        });
-        const loginUrl = Uri.parse(`${getServerUrl()}/login?${tokenParams.toString()}`);
+        const loginUrl = await this.loginUrl();
         outputChannel.appendLine(`Opening ${loginUrl.toString()}`);
 
         await env.openExternal(loginUrl);

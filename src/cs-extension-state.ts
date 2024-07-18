@@ -7,10 +7,12 @@ import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse, isPreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
+import { CsServerVersion } from './server-version';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
 import { onDidChangeConfiguration } from './configuration';
+import { logOutputChannel } from './log';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -78,6 +80,22 @@ export class CsExtensionState {
       CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError),
       onDidChangeConfiguration('previewCodeHealthGate', (e) => {
         CsExtensionState._instance.updateStatusViews();
+      }),
+      onDidChangeConfiguration('serverUrl', (e) => {
+        logOutputChannel.info("Server URL changed, refetching the version data.");
+        CsServerVersion.init().reloadVersion().then(
+          changed => {
+            if (changed.serverChanged) {
+              logOutputChannel.info("Server changed, logging out the user.");
+              if (CsExtensionState.session?.id) {
+                // TODO this doesn't actually log out the user in VSCode itself, it just affects
+                // some of our extension things
+                CsExtensionState.setSession(undefined);
+              }
+            }
+          },
+          () => {}
+        );
       })
     );
   }
