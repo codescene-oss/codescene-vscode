@@ -199,7 +199,7 @@ export class RefactoringPanel {
         }
 
         let { code } = response;
-        const title = response.confidence.title;
+        const title = response.confidence.level === 0 ? 'Refactoring failure' : response.confidence.title;
         const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
         this.currentRefactorState.code = decoratedCode;
 
@@ -277,10 +277,26 @@ export class RefactoringPanel {
 `;
   }
 
+  private unsuitableRefactoring() {
+
+    return /*html*/ `<h2>Refactoring failed</h2>
+    <p>Sorry, we were unable to find a suitable refactoring. Please check the documentation for the code smell at the top of the method.</p>
+    <div class="bottom-controls">
+      <div></div> <!-- Spacer, making sure close button is right aligned -->
+      <div class="button-group right">
+        <vscode-button id="close-button" appearance="primary">Close</vscode-button>
+      </div>
+    </div>
+`;
+  }
+
+
   private autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: Code) {
     const { level } = response.confidence;
     if (level >= 2) {
       return this.autoRefactorContent(response, code);
+    } else if (level === 0) {
+      return this.unsuitableRefactoring();
     }
     return this.codeImprovementContent(response, code);
   }
