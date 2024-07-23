@@ -37,6 +37,7 @@ interface SourceSnippet {
 export interface RefactorRequest {
   review: Review[];
   'source-snippet': SourceSnippet;
+  'device-id': string;
 }
 
 export interface RefactorConfidence {
