@@ -33,6 +33,13 @@ export function getServerUrl() {
   return getConfiguration<string>('serverUrl');
 }
 
+/**
+ * Get the configured URL of the CodeScene Devtool Portal server.
+ */
+export function getPortalUrl() {
+  return getConfiguration<string>('devtoolsPortalUrl');
+}
+
 export function reviewCodeLensesEnabled() {
   return getConfiguration<boolean>('enableReviewCodeLenses');
 }

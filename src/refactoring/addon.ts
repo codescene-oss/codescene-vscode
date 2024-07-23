@@ -2,7 +2,6 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
-import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi } from '../cs-rest-api';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
@@ -58,12 +57,6 @@ async function enableACE(context: vscode.ExtensionContext) {
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
     return Promise.reject('Auto-refactor disabled in configuration');
-  }
-
-  if (!CsExtensionState.stateProperties.session) {
-    const message = 'Not signed in';
-    void vscode.window.showErrorMessage(`Unable to enable refactoring capabilities. ${message}`);
-    return Promise.reject(message);
   }
 
   return CsRestApi.instance.fetchRefactorPreflight().then((preflightResponse) => {
