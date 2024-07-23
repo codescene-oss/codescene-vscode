@@ -116,7 +116,7 @@ export class CsExtensionState {
     CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      CsExtensionState.setACEState('Not signed in'); // Ace cannot be active if not signed in
+      // CsExtensionState.setACEState('Not signed in'); // Ace cannot be active if not signed in
       return;
     }
 

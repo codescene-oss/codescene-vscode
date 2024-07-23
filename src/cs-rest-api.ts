@@ -7,6 +7,7 @@ import { FnToRefactor } from './refactoring/commands';
 import { CsServerVersion } from './server-version';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
 import { getFileExtension } from './utils';
+import { getPortalUrl } from './configuration';
 
 const defaultTimeout = 10000;
 const refactoringTimeout = 60000;
@@ -126,22 +127,22 @@ export class CsRestApi {
   }
 
   async fetchRefactorPreflight() {
-    const serverUrl = await this.getServerApiUrl();
-    const refactorUrl = `${serverUrl}/v2/refactor/preflight`;
-    return this.fetchJson<PreFlightResponse>(refactorUrl);
+    const preflightUrl = `${getPortalUrl()}/api/refactor/preflight`;
+    return this.fetchJson<PreFlightResponse>(preflightUrl);
   }
 
-  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
-    const serverUrl = await this.getServerApiUrl();
-    const config: AxiosRequestConfig = {
-      headers: {
-        'x-codescene-trace-id': traceId,
-      },
-      timeout: refactoringTimeout,
-      signal,
-    };
-    const refactorUrl = `${serverUrl}/v2/refactor/`;
+  private refactorUrl() {
+    let isCloudSession = false;
+    if (this.session && this.isCodeSceneSession(this.session)) {
+      let session = this.session as CodeSceneAuthenticationSession;
+      if (session.version.server === 'cloud') {
+        isCloudSession = true;
+      }
+    }
+    return isCloudSession ? `${getPortalUrl()}/api/refactor` : `${getPortalUrl()}/api/refactor/anon`;
+  }
 
+  private refactorRequest(fnToRefactor: FnToRefactor) {
     const reviews = fnToRefactor.codeSmells.map((codeSmell) => {
       return {
         category: codeSmell.category,
@@ -157,8 +158,21 @@ export class CsRestApi {
         'function-type': fnToRefactor.functionType,
         body: fnToRefactor.content,
       },
+      'device-id': vscode.env.machineId,
     };
-    return await this.postForJson<RefactorResponse>(refactorUrl, request, config);
+
+    return request;
+  }
+
+  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
+    const config: AxiosRequestConfig = {
+      headers: {
+        'x-codescene-trace-id': traceId,
+      },
+      timeout: refactoringTimeout,
+      signal,
+    };
+    return await this.postForJson<RefactorResponse>(this.refactorUrl(), this.refactorRequest(fnToRefactor), config);
   }
 }
 

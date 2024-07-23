@@ -136,6 +136,11 @@
           "type": "string",
           "default": "https://codescene.io",
           "order": 19
+        },
+        "codescene.devtoolsPortalUrl": {
+          "type": "string",
+          "default": "https://devtools.codescene.io",
+          "order": 25
         }
       }
     },

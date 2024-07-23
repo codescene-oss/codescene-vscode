@@ -5,6 +5,7 @@ import { sign } from './codescene-interop';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult } from './executor';
 import { logOutputChannel } from './log';
+import { getPortalUrl } from './configuration';
 
 export default class Telemetry {
   private static _instance: Telemetry;
@@ -75,7 +76,7 @@ export default class Telemetry {
       },
     };
 
-    return this.axiosInstance.post('https://devtools.codescene.io/api/analytics/events/ide', jsonData, config);
+    return this.axiosInstance.post(`${getPortalUrl()}/api/analytics/events/ide`, jsonData, config);
   }
 
   setSession(session?: vscode.AuthenticationSession) {
