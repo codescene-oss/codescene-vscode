@@ -65,6 +65,7 @@ function startExtension(context: vscode.ExtensionContext) {
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
+  enableOrDisableACECapabilities(context, csContext);
   registerCommands(context, csContext);
   registerCsDoc(context);
   addReviewListeners(context);
@@ -84,6 +85,12 @@ function startExtension(context: vscode.ExtensionContext) {
   const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
+      debouncedEnableOrDisableACECapabilities(context, csContext);
+    })
+  );
+
+  context.subscriptions.push(
+    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
       debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
@@ -172,11 +179,13 @@ function addReviewListeners(context: vscode.ExtensionContext) {
  * Activate functionality that requires signing in to a CodeScene server.
  */
 function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
-  enableOrDisableACECapabilities(context, csContext);
+  //
+  // enableOrDisableACECapabilities(context, csContext);
 }
 
 function disableRemoteFeatures(aceApi: AceAPI) {
-  aceApi.disableACE();
+  // anonymous access is now available
+  // aceApi.disableACE();
 }
 
 function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {

@@ -49,6 +49,15 @@ export class CsRefactoringRequest {
     this.abortController.abort();
   }
 
+  markRefactoringApplied() {
+    void this.promise.then(() => {
+        if (this.response) {
+          CsRestApi.instance.acceptRefactoring(this.fnToRefactor, this.traceId);
+        }
+      }
+    );
+  }
+
   /**
    * @returns Object conforming to the ResolvedRefactoring interface if the response is
    * resolved, undefined otherwise
