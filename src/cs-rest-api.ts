@@ -89,7 +89,7 @@ export class CsRestApi {
   }
 
   async fetchRefactorPreflight() {
-    const refactorUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
+    const refactorUrl = this.session ? `${getServerApiUrl()}/v2/refactor/preflight` : `${getServerApiUrl()}/v2/refactor-anon/preflight`;
     return this.fetchJson<PreFlightResponse>(refactorUrl);
   }
 
@@ -101,7 +101,7 @@ export class CsRestApi {
       timeout: refactoringTimeout,
       signal,
     };
-    const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
+    const refactorUrl = this.session ? `${getServerApiUrl()}/v2/refactor` : `${getServerApiUrl()}/v2/refactor-anon`;
 
     const reviews = fnToRefactor.codeSmells.map((codeSmell) => {
       return {
@@ -118,6 +118,7 @@ export class CsRestApi {
         'function-type': fnToRefactor.functionType,
         body: fnToRefactor.content,
       },
+      'device-id': vscode.env.machineId,
     };
     return await this.postForJson<RefactorResponse>(refactorUrl, request, config);
   }
