@@ -171,16 +171,10 @@
           "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
           "order": 15
         },
-        "codescene.cloudUrl": {
+        "codescene.serverUrl": {
           "type": "string",
           "default": "https://codescene.io",
-          "order": 20
-        },
-        "codescene.cloudApiUrl": {
-          "type": "string",
-          "default": "https://api.codescene.io",
-          "description": "The API URL of the CodeScene Cloud service",
-          "order": 22
+          "order": 19
         }
       }
     },

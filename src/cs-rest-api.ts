@@ -1,9 +1,10 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import vscode from 'vscode';
-import { getServerApiUrl } from './configuration';
+import { CodeSceneAuthenticationSession } from './auth/auth-provider';
 import { Coupling } from './coupling/model';
 import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
+import { CsServerVersion } from './server-version';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
 
 const defaultTimeout = 10000;
@@ -26,6 +27,7 @@ export class CsRestApi {
     this.axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       logOutputChannel.debug(`[${config.method}] ${config.url}`);
       if (this.session) {
+        logOutputChannel.info(`adding auth ${this.session.accessToken}`);
         config.headers['Authorization'] = `Bearer ${this.session.accessToken}`;
       }
       return config;
@@ -58,7 +60,38 @@ export class CsRestApi {
     this.session = session;
   }
 
+  private isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
+    return (<CodeSceneAuthenticationSession>x).url !== undefined;
+  }
+
+  private async getServerApiUrl() {
+    let url: string;
+    let serverType: string;
+    if (this.session && this.isCodeSceneSession(this.session)) {
+      let session = this.session as CodeSceneAuthenticationSession;
+      url = session.url;
+      serverType = session.version.server;
+    } else {
+      const info = await CsServerVersion.info
+      url = info.url;
+      serverType = info.version.server;
+    }
+    if (serverType === 'cloud') {
+      if (url === 'https://staging.codescene.io') {
+        return 'https://api-staging.codescene.io';
+      } else if (url === 'https://codescene.io') {
+        return 'https://api.codescene.io';
+      } else {
+        return url;
+      }
+    } else {
+      // onprem
+      return url + '/api';
+    }
+  }
+
   private async fetchJson<T>(url: string, config?: AxiosRequestConfig) {
+    logOutputChannel.info(`fetching url ${url} with `);
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.get(url, conf);
     return response.data as T;
@@ -71,7 +104,8 @@ export class CsRestApi {
   }
 
   async fetchCouplings(projectId: number) {
-    const couplingsUrl = `${getServerApiUrl()}/v2/devtools/projects/${projectId}/couplings`;
+    const serverUrl = await this.getServerApiUrl();
+    const couplingsUrl = `${serverUrl}/v2/devtools/projects/${projectId}/couplings`;
 
     const rawData = await this.fetchJson<{ [key: string]: any }[]>(couplingsUrl);
 
@@ -84,16 +118,19 @@ export class CsRestApi {
   }
 
   async fetchProjects() {
-    const projectsUrl = getServerApiUrl() + '/v2/devtools/projects';
+    const serverUrl = await this.getServerApiUrl();
+    const projectsUrl = serverUrl + '/v2/devtools/projects';
     return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
   }
 
   async fetchRefactorPreflight() {
-    const refactorUrl = `${getServerApiUrl()}/v2/refactor/preflight`;
+    const serverUrl = await this.getServerApiUrl();
+    const refactorUrl = `${serverUrl}/v2/refactor/preflight`;
     return this.fetchJson<PreFlightResponse>(refactorUrl);
   }
 
   async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
+    const serverUrl = await this.getServerApiUrl();
     const config: AxiosRequestConfig = {
       headers: {
         'x-codescene-trace-id': traceId,
@@ -101,7 +138,7 @@ export class CsRestApi {
       timeout: refactoringTimeout,
       signal,
     };
-    const refactorUrl = `${getServerApiUrl()}/v2/refactor/`;
+    const refactorUrl = `${serverUrl}/v2/refactor/`;
 
     const reviews = fnToRefactor.codeSmells.map((codeSmell) => {
       return {

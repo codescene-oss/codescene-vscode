@@ -15,6 +15,7 @@ import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
 import { StatsCollector } from './stats';
+import { CsServerVersion } from './server-version';
 import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
@@ -58,6 +59,7 @@ function startExtension(context: vscode.ExtensionContext) {
   };
   Reviewer.init();
   DeltaAnalyser.init();
+  CsServerVersion.init();
   CsExtensionState.addListeners(context);
 
   // send telemetry on activation (gives us basic usage stats)

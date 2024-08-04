@@ -17,18 +17,7 @@ export function onDidChangeConfiguration(
 
 /**
  * Get the configured URL of the CodeScene server.
- *
- * TODO: it should be able to adapt to the user's choice of cloud or on-premises server.
  */
 export function getServerUrl() {
-  return getConfiguration<string>('cloudUrl');
-}
-
-/**
- * Get the configured API URL of the CodeScene server.
- *
- * TODO: it should be able to adapt to the user's choice of cloud or on-premises server.
- */
-export function getServerApiUrl() {
-  return getConfiguration<string>('cloudApiUrl');
+  return getConfiguration<string>('serverUrl');
 }
