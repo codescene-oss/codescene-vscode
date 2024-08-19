@@ -9,13 +9,13 @@ import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
-import { outputChannel } from './log';
+import { logOutputChannel, outputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { createRulesTemplate } from './rules-template';
-import { StatsCollector } from './stats';
 import { CsServerVersion } from './server-version';
+import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
@@ -245,7 +245,18 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       onGetSessionSuccess(context, csContext)(e.added[0]);
     }
   });
-  context.subscriptions.push(authProvider);
+
+  const serverUrlChangedDisposable = onDidChangeConfiguration('serverUrl', async (e) => {
+    const changed = await CsServerVersion.reloadVersion();
+    if (changed.serverChanged) {
+      if (CsExtensionState.session?.id) {
+        logOutputChannel.info('Server changed while signed in, removing obsolete auth session.');
+        void authProvider.removeSession(CsExtensionState.session.id);
+      }
+    }
+  });
+
+  context.subscriptions.push(authProvider, serverUrlChangedDisposable);
 }
 
 // This method is called when your extension is deactivated

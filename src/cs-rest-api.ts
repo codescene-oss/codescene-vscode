@@ -27,7 +27,7 @@ export class CsRestApi {
     this.axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       logOutputChannel.debug(`[${config.method}] ${config.url}`);
       if (this.session) {
-        logOutputChannel.info(`adding auth ${this.session.accessToken}`);
+        logOutputChannel.debug(`adding auth ${this.session.accessToken}`);
         config.headers['Authorization'] = `Bearer ${this.session.accessToken}`;
       }
       return config;
@@ -72,26 +72,28 @@ export class CsRestApi {
       url = session.url;
       serverType = session.version.server;
     } else {
-      const info = await CsServerVersion.info
+      const info = await CsServerVersion.info;
       url = info.url;
       serverType = info.version.server;
     }
+    let apiUrl;
     if (serverType === 'cloud') {
       if (url === 'https://staging.codescene.io') {
-        return 'https://api-staging.codescene.io';
+        apiUrl = 'https://api-staging.codescene.io';
       } else if (url === 'https://codescene.io') {
-        return 'https://api.codescene.io';
+        apiUrl = 'https://api.codescene.io';
       } else {
-        return url;
+        apiUrl = url;
       }
     } else {
       // onprem
-      return url + '/api';
+      apiUrl = url + '/api';
     }
+    logOutputChannel.trace(`Using API URL: ${apiUrl}`);
+    return apiUrl;
   }
 
   private async fetchJson<T>(url: string, config?: AxiosRequestConfig) {
-    logOutputChannel.info(`fetching url ${url} with `);
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.get(url, conf);
     return response.data as T;
