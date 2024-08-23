@@ -2,17 +2,15 @@ import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-gate/analyser';
+import { onDidChangeConfiguration } from './configuration';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
 import { PreFlightResponse, isPreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
-import { CsServerVersion } from './server-version';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
 import { StatusViewProvider, registerStatusViewProvider } from './webviews/status-view-provider';
-import { onDidChangeConfiguration } from './configuration';
-import { logOutputChannel } from './log';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;

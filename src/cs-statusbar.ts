@@ -37,6 +37,7 @@ export class CsStatusBar {
   }
 
   private textContent(stateProperties?: CsStateProperties) {
+    if (!isDefined(stateProperties?.features?.codeHealthAnalysis)) return '$(loading~spin) Initializing...';
     if (this.isAnalysing(stateProperties)) return '$(loading~spin) Analysing';
     return `$(cs-logo) ${this.isOnline(stateProperties) ? 'Active/Online' : 'Active'}`;
   }
