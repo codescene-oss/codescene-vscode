@@ -2,7 +2,7 @@ import vscode, { Diagnostic } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { logOutputChannel } from '../log';
 import { getCsDiagnosticCode } from '../review/utils';
-import { getFileExtension, isDefined, registerCommandWithTelemetry } from '../utils';
+import { isDefined, registerCommandWithTelemetry } from '../utils';
 import { toRefactoringDocumentSelector } from './addon';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
@@ -12,7 +12,7 @@ export interface FnToRefactor {
   name: string;
   range: vscode.Range;
   content: string;
-  fileType: string;
+  fileName: string;
   functionType: string;
   codeSmells: FnCodeSmell[];
 }
@@ -91,9 +91,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
       .filter((diag, i, diags) => diags.findIndex((d) => d.range.isEqual(diag.range)) === i)
       .map((d) => d.range);
 
-    const extension = getFileExtension(document.fileName);
     const lineNumbers = distinctRanges.map((r) => r.start.line + 1); // range.start.line is zero-based
-    const enclosingFns = await findEnclosingFunctions(extension, lineNumbers, document.getText());
+    const enclosingFns = await findEnclosingFunctions(document.fileName, lineNumbers, document.getText());
 
     return enclosingFns
       .filter((enclosingFn) => {
@@ -104,7 +103,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
         );
         return false;
       })
-      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, extension, supported))
+      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, supported))
       .sort((a, b) => linesOfCode(a.range) - linesOfCode(b.range));
   }
 
@@ -131,7 +130,6 @@ function linesOfCode(range: vscode.Range) {
 function toFnToRefactor(
   enclosingFn: EnclosingFn,
   document: vscode.TextDocument,
-  extension: string,
   supportedDiagnostics: vscode.Diagnostic[]
 ) {
   const range = rangeFromEnclosingFn(enclosingFn);
@@ -140,7 +138,7 @@ function toFnToRefactor(
     name: enclosingFn.name,
     range,
     functionType: enclosingFn['function-type'],
-    fileType: extension,
+    fileName: document.fileName,
     content: document.getText(range),
     codeSmells,
   } as FnToRefactor;
@@ -149,8 +147,8 @@ function toFnToRefactor(
 /**
  * Returns the code smells for each diagnostic, with the relative start/end line being
  * relative to the enclosing function range.
- * 
- * @returns 
+ *
+ * @returns
  */
 export function codeSmellsFromDiagnostics(diagnostics: Diagnostic[], fnRange: vscode.Range) {
   return diagnostics

@@ -1,16 +1,15 @@
-import { dirname } from 'path';
+import path, { dirname } from 'path';
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-gate/analyser';
+import { DeltaForFile } from '../code-health-gate/model';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
-import { getFileExtension } from '../utils';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
-import { DeltaForFile } from '../code-health-gate/model';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
@@ -244,7 +243,7 @@ class SimpleReviewer implements InternalReviewer {
   constructor(private cliPath: string) {}
 
   async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult> {
-    const extension = getFileExtension(document.fileName);
+    const fileName = path.basename(document.fileName);
 
     // Get the fsPath of the current document because we want to execute the
     // 'cs review' command in the same directory as the current document
@@ -254,7 +253,7 @@ class SimpleReviewer implements InternalReviewer {
     const { stdout, stderr, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
-        args: ['review', '--file-type', extension],
+        args: ['review', '--file-name', fileName],
         taskId: taskId(document),
         ignoreError: true, // Ignore executor errors and handle exitCode/stderr here instead
       },
@@ -266,7 +265,7 @@ class SimpleReviewer implements InternalReviewer {
       throw new ReviewError(exitCode, `CodeScene review failed: '${stderr.trim()}' (exit ${exitCode})`);
     }
 
-    StatsCollector.instance.recordAnalysis(extension, duration);
+    StatsCollector.instance.recordAnalysis(document.fileName, duration);
     return JSON.parse(stdout) as ReviewResult;
   }
 

@@ -1,3 +1,5 @@
+import { getFileExtension } from "./utils";
+
 export interface Stats {
   analysis: AnalysisStats[];
 }
@@ -15,9 +17,11 @@ export class StatsCollector {
     analysis: [],
   };
 
-  recordAnalysis(language: string, time: number) {
+  recordAnalysis(fileName: string, time: number) {
     // Skip record if time is negative or zero. Must be some kind of error.
     if (time <= 0) return;
+
+    const language = getFileExtension(fileName);
 
     const analysis = this.stats.analysis.find((a) => a.language === language);
     if (analysis) {
