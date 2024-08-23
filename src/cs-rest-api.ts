@@ -6,6 +6,7 @@ import { logOutputChannel, outputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 import { CsServerVersion } from './server-version';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
+import { getFileExtension } from './utils';
 
 const defaultTimeout = 10000;
 const refactoringTimeout = 60000;
@@ -153,7 +154,7 @@ export class CsRestApi {
     const request: RefactorRequest = {
       review: reviews,
       'source-snippet': {
-        'file-type': fnToRefactor.fileType,
+        'file-type': getFileExtension(fnToRefactor.fileName),
         'function-type': fnToRefactor.functionType,
         body: fnToRefactor.content,
       },

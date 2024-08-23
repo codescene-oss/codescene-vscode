@@ -14,7 +14,7 @@ suite('Stats Test Suite', () => {
   });
 
   test('handles one analysis', () => {
-    statsCollector.recordAnalysis('java', 100);
+    statsCollector.recordAnalysis('file.java', 100);
     assert.ok(statsCollector.stats.analysis.length === 1);
     assert.ok(statsCollector.stats.analysis[0].language === 'java');
     assert.ok(statsCollector.stats.analysis[0].runs === 1);
@@ -23,8 +23,8 @@ suite('Stats Test Suite', () => {
   });
 
   test('handles averages', () => {
-    statsCollector.recordAnalysis('java', 100);
-    statsCollector.recordAnalysis('java', 200);
+    statsCollector.recordAnalysis('file.java', 100);
+    statsCollector.recordAnalysis('file.java', 200);
     assert.ok(statsCollector.stats.analysis.length === 1);
     assert.ok(statsCollector.stats.analysis[0].language === 'java');
     assert.ok(statsCollector.stats.analysis[0].runs === 2);
@@ -33,9 +33,9 @@ suite('Stats Test Suite', () => {
   });
 
   test('handles multiple languages', () => {
-    statsCollector.recordAnalysis('java', 100);
-    statsCollector.recordAnalysis('java', 200);
-    statsCollector.recordAnalysis('python', 300);
+    statsCollector.recordAnalysis('file.java', 100);
+    statsCollector.recordAnalysis('file.java', 200);
+    statsCollector.recordAnalysis('file.python', 300);
     assert.ok(statsCollector.stats.analysis.length === 2);
     assert.ok(statsCollector.stats.analysis[0].language === 'java');
     assert.ok(statsCollector.stats.analysis[0].runs === 2);
@@ -48,15 +48,15 @@ suite('Stats Test Suite', () => {
   });
 
   test('clear', () => {
-    statsCollector.recordAnalysis('java', 100);
-    statsCollector.recordAnalysis('java', 200);
-    statsCollector.recordAnalysis('python', 300);
+    statsCollector.recordAnalysis('file.java', 100);
+    statsCollector.recordAnalysis('file.java', 200);
+    statsCollector.recordAnalysis('file.python', 300);
     statsCollector.clear();
     assert.ok(statsCollector.stats.analysis.length === 0);
   });
 
   test('negative time', () => {
-    statsCollector.recordAnalysis('java', -100);
+    statsCollector.recordAnalysis('file.java', -100);
     assert.ok(statsCollector.stats.analysis.length === 0);
   });
 });
