@@ -159,6 +159,7 @@ class CachingReviewer {
       switch (e.exitCode) {
         case 2:
           logOutputChannel.warn(e.message);
+          void vscode.window.showWarningMessage(e.message);
           return;
         case 'ABORT_ERR':
           // Delete the cache entry for this document if the review was aborted (document closed)
