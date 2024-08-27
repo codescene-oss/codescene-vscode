@@ -61,10 +61,11 @@ export class DeltaAnalyser {
     const newJson = JSON.stringify(newScore);
     if (oldJson === newJson) return;
 
-    if (isDefined(newScore)) {
-      return `{"old-score": ${oldJson}, "new-score": ${newJson}}`;
+    // The devtools binary handles either being undef, but not both
+    if (isDefined(oldScore) || isDefined(newScore)) {
+      // Make sure not to put "undefined" in the json string - it is an invalid json token while null is
+      return `{"old-score": ${oldJson || null}, "new-score": ${newJson || null}}`;
     }
-    return `{"old-score": ${oldJson}}`;
   }
 
   async deltaForScores(document: vscode.TextDocument, oldScore: any, newScore: any) {
@@ -72,6 +73,7 @@ export class DeltaAnalyser {
 
     const inputJsonString = this.jsonForScores(oldScore, newScore);
     if (!inputJsonString) {
+      this.endAnalysisEvent(document);
       return;
     }
 
