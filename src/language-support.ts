@@ -11,6 +11,9 @@ const extToLanguageId = new Map<string, string | string[]>([
   ['ts', 'typescript'],
   ['tsx', 'typescriptreact'],
 
+  ['brs', 'brightscript'],
+  ['bs', 'brighterscript'],
+
   ['cls', 'apex'],
   ['tgr', 'apex'],
   ['trigger', 'apex'],
