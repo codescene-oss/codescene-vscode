@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.8](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.7...v0.7.8) (2024-08-29)
+
+
+### Features
+
+* **code-health-gate:** Support for live updates on code changes ([a1f0d6e](https://github.com/codescene-oss/codescene-vscode/commit/a1f0d6e3313b37f9ffa91d62afffe4f7bb61ae28))
+* **enterprise:** Use authProvider to sign out when changing serverUrl ([34e63b4](https://github.com/codescene-oss/codescene-vscode/commit/34e63b4378854f8b7e91b62cc2b7aad673e6531e))
+* **language:** Add support for Bright[er]Script ([df409f1](https://github.com/codescene-oss/codescene-vscode/commit/df409f1938f030b62e0da21f2865151bb8d5abb7))
+
+
+### Bug fixes
+
+* **code-health-gate:** Stop analysis spinner when review scores are the same (or both are undefined) ([f5155a0](https://github.com/codescene-oss/codescene-vscode/commit/f5155a08460d108ea8f1a253cf42ff3629cedc1f))
+* **code-health-rules:** Improved support for more intricate "matching_content_path"s ([cac3b9c](https://github.com/codescene-oss/codescene-vscode/commit/cac3b9cb0b06c2f1ac04765a02222ec1ff90ab5e))
+* Notify by warning popup when review fails due to too long lines ([2821239](https://github.com/codescene-oss/codescene-vscode/commit/282123933be4631df406f6cb1872abef3d2730c6))
+
 ### [0.7.7](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.6...v0.7.7) (2024-06-28)
 
 ### [0.7.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.5...v0.7.6) (2024-06-26)
