@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
-import { DeltaAnalyser } from './code-health-gate/analyser';
+import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
@@ -76,7 +76,7 @@ export class CsExtensionState {
       DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
       DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleError),
       CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError),
-      onDidChangeConfiguration('previewCodeHealthGate', (e) => {
+      onDidChangeConfiguration('previewCodeHealthMonitoring', (e) => {
         CsExtensionState._instance.updateStatusViews();
       })
     );

@@ -60,8 +60,8 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
         case 'open-settings':
           void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
           return;
-        case 'focus-code-health-gate-view':
-          void vscode.commands.executeCommand('codescene.codeHealthGateView.focus');
+        case 'focus-code-health-monitor-view':
+          void vscode.commands.executeCommand('codescene.codeHealthMonitorView.focus');
           return;
         case 'focus-problems-view':
           void vscode.commands.executeCommand('workbench.action.problems.focus');
@@ -189,8 +189,8 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
         .map((codeSmells) => `<li>${codeSmells}</li>`)
         .join('\n');
 
-      const aceAvailableText = getConfiguration('previewCodeHealthGate')
-        ? `<p>ACE capabilities are available via codelens documentation and from the <a href="" id="code-health-gate-link">Code Quality Gate</a>.</p>`
+      const aceAvailableText = getConfiguration('previewCodeHealthMonitoring')
+        ? `<p>ACE capabilities are available via codelens documentation and from the <a href="" id="code-health-monitor-link">Code Health Monitor</a> panel.</p>`
         : `<p>ACE capabilities are available via codelens documentation.</p>`;
 
       content += /*html*/ `

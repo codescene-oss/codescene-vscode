@@ -1,8 +1,8 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { checkCodeHealthRules } from './check-rules';
-import { activate as activateCodeHealthGate } from './code-health-gate/addon';
-import { DeltaAnalyser } from './code-health-gate/analyser';
+import { activate as activateCHMonitor } from './code-health-monitor/addon';
+import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -73,7 +73,7 @@ function startExtension(context: vscode.ExtensionContext) {
   addReviewListeners(context);
   addTmpDiffUriScheme(context);
 
-  activateCodeHealthGate(context, csContext.aceApi);
+  activateCHMonitor(context, csContext.aceApi);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
