@@ -14,8 +14,8 @@ function main() {
   document.getElementById('open-settings-button')?.addEventListener('click', () => sendMessage('open-settings'));
   document.getElementById('open-settings-link')?.addEventListener('click', () => sendMessage('open-settings'));
   document
-    .getElementById('code-health-gate-link')
-    ?.addEventListener('click', () => sendMessage('focus-code-health-gate-view'));
+    .getElementById('code-health-monitor-link')
+    ?.addEventListener('click', () => sendMessage('focus-code-health-monitor-view'));
   document.getElementById('problems-panel-link')?.addEventListener('click', () => sendMessage('focus-problems-view'));
   document.getElementById('clear-errors-button')?.addEventListener('click', () => sendMessage('clear-errors'));
   document

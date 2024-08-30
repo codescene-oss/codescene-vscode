@@ -1,8 +1,8 @@
 import path, { dirname } from 'path';
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
-import { DeltaAnalyser } from '../code-health-gate/analyser';
-import { DeltaForFile } from '../code-health-gate/model';
+import { DeltaAnalyser } from '../code-health-monitor/analyser';
+import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';

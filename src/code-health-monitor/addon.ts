@@ -1,19 +1,19 @@
 import vscode from 'vscode';
 import { AceAPI } from '../refactoring/addon';
 import { registerCommandWithTelemetry } from '../utils';
-import { CodeHealthGateView } from './tree-view';
+import { CodeHealthMonitorView } from './tree-view';
 
 export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
-  const codeHealthGateView = new CodeHealthGateView(context, aceApi);
+  const codeHealthMonitorView = new CodeHealthMonitorView(context, aceApi);
 
   context.subscriptions.push(
-    codeHealthGateView,
+    codeHealthMonitorView,
     registerCommandWithTelemetry({
-      commandId: 'codescene.codeHealthGateHelp',
+      commandId: 'codescene.codeHealthMonitorHelp',
       handler: () => {
         void vscode.commands.executeCommand(
           'markdown.showPreviewToSide',
-          vscode.Uri.parse(`csdoc:code-health-gate.md`)
+          vscode.Uri.parse(`csdoc:code-health-monitor.md`)
         );
       },
     })

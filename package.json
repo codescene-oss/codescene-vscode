@@ -43,8 +43,8 @@
         "title": "CodeScene: Check code health rule match for selected file"
       },
       {
-        "command": "codescene.codeHealthGateHelp",
-        "title": "CodeScene: Code Health Gate help",
+        "command": "codescene.codeHealthMonitorHelp",
+        "title": "CodeScene: Code Health Monitoring help",
         "icon": "$(question)"
       },
       {
@@ -56,14 +56,9 @@
         "title": "View in ACE panel"
       },
       {
-        "command": "codescene.chGateTreeContext.presentRefactoring",
+        "command": "codescene.chMonitorTreeContext.presentRefactoring",
         "title": "View Auto-refactoring",
         "icon": "$(sparkle)"
-      },
-      {
-        "command": "codescene.chGateTreeContext.openDocumentation",
-        "title": "Open documentation",
-        "icon": "$(info)"
       }
     ],
     "viewsContainers": {
@@ -76,46 +71,39 @@
       ]
     },
     "views": {
-      "explorer": [
-        {
-          "id": "codescene.codeHealthGateView",
-          "name": "Code Health Gate [beta]",
-          "icon": "$(lock)",
-          "when": "config.codescene.previewCodeHealthGate"
-        }
-      ],
       "codescene-activity-bar": [
         {
           "id": "codescene.statusView",
           "name": "Status",
           "type": "webview",
           "icon": "assets/cs-logo.svg"
+        },
+        {
+          "id": "codescene.codeHealthMonitorView",
+          "name": "Code Health Monitoring [beta]",
+          "icon": "$(lock)",
+          "when": "config.codescene.previewCodeHealthMonitoring"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "codescene.codeHealthGateView",
-        "contents": "The code health gate compares the current state of your code with the initial code review and presents any introduced code smells."
+        "view": "codescene.codeHealthMonitorView",
+        "contents": "The Code Health Monitor view compares the current state of your code with the latest commit and presents any introduced code smells."
       }
     ],
     "menus": {
       "view/item/context": [
         {
-          "command": "codescene.chGateTreeContext.presentRefactoring",
-          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-refactorableFunction'",
-          "group": "inline@1"
-        },
-        {
-          "command": "codescene.chGateTreeContext.openDocumentation",
-          "when": "view == codescene.codeHealthGateView && viewItem === 'delta-degradation'",
+          "command": "codescene.chMonitorTreeContext.presentRefactoring",
+          "when": "view == codescene.codeHealthMonitorView && viewItem === 'delta-refactorableFunction'",
           "group": "inline@1"
         }
       ],
       "view/title": [
         {
-          "command": "codescene.codeHealthGateHelp",
-          "when": "view === codescene.codeHealthGateView",
+          "command": "codescene.codeHealthMonitorHelp",
+          "when": "view === codescene.codeHealthMonitorView",
           "group": "navigation@2"
         }
       ],
@@ -125,11 +113,7 @@
           "when": "false"
         },
         {
-          "command": "codescene.chGateTreeContext.presentRefactoring",
-          "when": "false"
-        },
-        {
-          "command": "codescene.chGateTreeContext.openDocumentation",
+          "command": "codescene.chMonitorTreeContext.presentRefactoring",
           "when": "false"
         }
       ]
@@ -143,10 +127,10 @@
           "description": "Enable CodeScene code lenses",
           "order": 1
         },
-        "codescene.previewCodeHealthGate": {
+        "codescene.previewCodeHealthMonitoring": {
           "type": "boolean",
           "default": false,
-          "description": "Preview the experimental Code Health Gate (beta)",
+          "description": "Preview the experimental Code Health Monitoring (beta)",
           "order": 5
         },
         "codescene.gitignore": {
@@ -176,41 +160,7 @@
           "fontCharacter": "\\e900"
         }
       }
-    },
-    "colors": [
-      {
-        "id": "codescene.codeHealth.healthy",
-        "description": "Color for indicating healthy code",
-        "defaults": {
-          "light": "#4f9f78",
-          "dark": "#72b293"
-        }
-      },
-      {
-        "id": "codescene.codeHealth.problematic",
-        "description": "Color for indicating problematic code that needs attention",
-        "defaults": {
-          "light": "#f19367",
-          "dark": "#f4a985"
-        }
-      },
-      {
-        "id": "codescene.codeHealth.unhealthy",
-        "description": "Color for indicating unhealthy code with high risk for defects",
-        "defaults": {
-          "light": "#e0525c",
-          "dark": "#e6757d"
-        }
-      },
-      {
-        "id": "codescene.codeHealth.undefined",
-        "description": "Color for indicating unknown code health",
-        "defaults": {
-          "light": "#b3bccd",
-          "dark": "#cfd7e7"
-        }
-      }
-    ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
