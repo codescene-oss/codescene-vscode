@@ -4,7 +4,7 @@ import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer from './reviewer';
-import { getCsDiagnosticCode, isGeneralDiagnostic } from './utils';
+import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -88,8 +88,11 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
       },
       documentUri,
     };
+
+    const title = `$(warning) ${removeDetails(diagnostic.message)}`;
+
     return {
-      title: diagnostic.message,
+      title,
       command: 'codescene.openInteractiveDocsPanel',
       arguments: [params],
     };
@@ -97,7 +100,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
 
   private showCodeHealthDocsCommand(message: string) {
     return {
-      title: message,
+      title: `$(pulse) ${message}`,
       command: 'markdown.showPreviewToSide',
       arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
     };

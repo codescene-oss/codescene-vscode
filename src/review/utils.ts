@@ -36,7 +36,7 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   
   let message;
   if (codeSmell.details) {
-    message = `${category} (${codeSmell.details})`;
+    message = addDetails(category, codeSmell.details);
   } else {
     message = category;
   }
@@ -51,6 +51,19 @@ export function roundScore(score: number): number {
 }
 export function formatScore(score: number | void): string {
   return score ? `${roundScore(score)}/10` : 'n/a';
+}
+
+const detailSeparator = ' (';
+function addDetails(category: string, details: string) {
+  return `${category}${detailSeparator}${details})`;
+}
+
+export function removeDetails(diagnosticMessage: string) {
+  const ix = diagnosticMessage.indexOf(detailSeparator);
+  if (ix > 0) {
+    return diagnosticMessage.substring(0, ix);
+  }
+  return diagnosticMessage;
 }
 
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
