@@ -19,10 +19,6 @@ export default class Reviewer {
   static init(): void {
     outputChannel.appendLine('Initializing code Reviewer');
     Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.cliPath)));
-
-    vscode.commands.registerCommand('codescene.debugReviewCache', () => {
-      Reviewer.instance.debugCache(vscode.window.activeTextEditor?.document);
-    });
   }
 
   static get instance(): CachingReviewer {
@@ -144,10 +140,6 @@ class CachingReviewer {
     if (this.reviewsRunning === 0) {
       this.reviewEmitter.fire({ type: 'idle' });
     }
-  }
-
-  debugCache(document?: vscode.TextDocument) {
-    console.log('Cache size: ' + this.reviewCache.reviewCache.size);
   }
 
   /**
