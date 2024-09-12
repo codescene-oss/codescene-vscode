@@ -254,7 +254,7 @@ class SimpleReviewer implements InternalReviewer {
     const { stdout, stderr, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
-        args: ['review', '--file-name', fileName],
+        args: ['review', '--ide-api','--file-name', fileName],
         taskId: taskId(document),
         ignoreError: true, // Ignore executor errors and handle exitCode/stderr here instead
       },
