@@ -177,6 +177,9 @@
     "release:patch": "standard-version --release-as patch",
     "release:major": "standard-version --release-as major"
   },
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "devDependencies": {
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",

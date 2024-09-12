@@ -1,8 +1,7 @@
-import path, { dirname } from 'path';
+import { basename, dirname } from 'path';
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
-import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
@@ -33,7 +32,7 @@ export interface ReviewOpts {
 export class CsReview {
   readonly diagnostics: Promise<vscode.Diagnostic[]>;
   readonly score: Promise<void | number>;
-  readonly rawScore: Promise<void | any>;
+  readonly rawScore: Promise<void | string>;
   constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {
     this.score = reviewResult.then((reviewResult) => reviewResult?.score);
     this.diagnostics = reviewResult.then((reviewResult) => {
@@ -51,13 +50,12 @@ export class CsReview {
 }
 
 class ReviewCacheItem {
-  private baselineScore: any;
+  private baselineScore?: Promise<void | string>;
   public documentVersion: number;
-  public delta?: DeltaForFile;
 
   constructor(private document: vscode.TextDocument, public review: CsReview) {
     this.documentVersion = document.version;
-    void this.review.rawScore.then((score) => (this.baselineScore = score));
+    this.resetBaseline();
   }
 
   setReview(document: vscode.TextDocument, review: CsReview) {
@@ -66,14 +64,17 @@ class ReviewCacheItem {
   }
 
   /**
-   * Runs the delta analysis using the raw scores, then sets the result if there were any.
+   * Triggers a delta analysis using the raw scores. The analyser will trigger an event on completion
    */
   async runDeltaAnalysis() {
-    const oldScore = this.baselineScore;
+    const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
-    return DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore).then((delta) => {
-      delta ? (this.delta = delta) : (this.delta = undefined);
-    });
+    void DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
+  }
+
+  resetBaseline() {
+    this.baselineScore = Reviewer.instance.baselineScore(this.document);
+    void this.runDeltaAnalysis();
   }
 }
 
@@ -81,7 +82,7 @@ class ReviewCacheItem {
  * Cache for review results and subsequent analyses.
  */
 class ReviewCache {
-  readonly reviewCache = new Map<string, ReviewCacheItem>();
+  private _cache = new Map<string, ReviewCacheItem>();
 
   /**
    * Get the current review for this document given the document.version matches the review item version.
@@ -98,15 +99,19 @@ class ReviewCache {
    * Get review cache item. (note that fileName is same as uri.fsPath)
    */
   get(document: vscode.TextDocument): ReviewCacheItem | undefined {
-    return this.reviewCache.get(document.fileName);
+    return this._cache.get(document.fileName);
   }
 
-  set(document: vscode.TextDocument, review: CsReview) {
-    this.reviewCache.set(document.fileName, new ReviewCacheItem(document, review));
+  add(document: vscode.TextDocument, review: CsReview) {
+    this._cache.set(document.fileName, new ReviewCacheItem(document, review));
   }
 
   delete(document: vscode.TextDocument) {
-    this.reviewCache.delete(document.fileName);
+    this._cache.delete(document.fileName);
+  }
+
+  resetBaseline(fsPath: string) {
+    this._cache.get(fsPath)?.resetBaseline();
   }
 }
 
@@ -117,13 +122,6 @@ class CachingReviewer {
   readonly onDidReviewFail = this.errorEmitter.event;
   private readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
   readonly onDidReview = this.reviewEmitter.event;
-
-  private readonly deltaEmitter = new vscode.EventEmitter<ReviewCacheItem>();
-  /**
-   * Emits events when a delta analysis has been completed. The emitted item
-   * is the ReviewCacheItem that was analysed, and depending on result  - TODO say what?
-   */
-  readonly onDidDeltaAnalysis = this.deltaEmitter.event;
 
   private reviewsRunning = 0;
 
@@ -194,6 +192,24 @@ class CachingReviewer {
   }
 
   /**
+   * Review a baseline score and return the raw score - to be used by the delta analysis
+   * @param document
+   * @returns
+   */
+  async baselineScore(document: vscode.TextDocument) {
+    this.startReviewEvent(document);
+    return this.reviewer
+      .review(document, { baseline: true })
+      .then((reviewResult) => {
+        return reviewResult && reviewResult['raw-score'];
+      })
+      .catch((e) => this.handleReviewError(e, document))
+      .finally(() => {
+        this.endReviewEvent(document);
+      });
+  }
+
+  /**
    * Store the diagnostics promise in the cache, or update it with the
    * @param document
    * @param review
@@ -202,11 +218,9 @@ class CachingReviewer {
     const reviewItem = this.reviewCache.get(document);
     if (reviewItem) {
       reviewItem.setReview(document, review);
-      void reviewItem.runDeltaAnalysis().finally(() => {
-        this.deltaEmitter.fire(reviewItem);
-      });
+      void reviewItem.runDeltaAnalysis();
     } else {
-      this.reviewCache.set(document, review);
+      this.reviewCache.add(document, review);
     }
   }
 
@@ -235,20 +249,47 @@ class SimpleReviewer implements InternalReviewer {
 
   constructor(private cliPath: string) {}
 
-  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult> {
-    const fileName = path.basename(document.fileName);
+  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult | void> {
+    if (reviewOpts.baseline) {
+      return this.baselineReview(document);
+    } else {
+      return this.contentReview(document);
+    }
+  }
 
-    // Get the fsPath of the current document because we want to execute the
-    // 'cs review' command in the same directory as the current document
-    // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
-    const documentDirectory = dirname(document.uri.fsPath);
+  private async baselineReview(document: vscode.TextDocument): Promise<ReviewResult | void> {
+    const { fileName, documentDirectory } = this.fileParts(document);
+    const headPath = `HEAD:./${fileName}`;
+    const { stdout, stderr, exitCode, duration } = await this.executor.execute(
+      {
+        command: this.cliPath,
+        args: ['review', '--ide-api', headPath],
+        taskId: taskId(document) + '-baseline',
+        ignoreError: true,
+      },
+      { cwd: documentDirectory }
+    );
+
+    if (exitCode === 0 && stdout.trim() !== '') {
+      logOutputChannel.trace(`Baseline review for ${headPath} succeeded`);
+      StatsCollector.instance.recordAnalysis(document.fileName, duration);
+      return JSON.parse(stdout) as ReviewResult;
+    }
+    // Just return void otherwise - this just means that we don't have any baseline to compare to
+    logOutputChannel.trace(
+      `Baseline review for ${headPath} failed: ${stderr.trim()} (exit ${exitCode}) - no baseline available`
+    );
+  }
+
+  private async contentReview(document: vscode.TextDocument): Promise<ReviewResult> {
+    const { fileName, documentDirectory } = this.fileParts(document);
 
     const { stdout, stderr, exitCode, duration } = await this.executor.execute(
       {
         command: this.cliPath,
-        args: ['review', '--ide-api','--file-name', fileName],
+        args: ['review', '--ide-api', '--file-name', fileName],
         taskId: taskId(document),
-        ignoreError: true, // Ignore executor errors and handle exitCode/stderr here instead
+        ignoreError: true, // Set to true so executor won't reject promises. Handle exitCode/stderr below instead
       },
       { cwd: documentDirectory },
       document.getText()
@@ -260,6 +301,16 @@ class SimpleReviewer implements InternalReviewer {
 
     StatsCollector.instance.recordAnalysis(document.fileName, duration);
     return JSON.parse(stdout) as ReviewResult;
+  }
+
+  private fileParts(document: vscode.TextDocument) {
+    const fileName = basename(document.fileName);
+
+    // Get the fsPath of the current document because we want to execute the
+    // 'cs review' command in the same directory as the current document
+    // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
+    const documentDirectory = dirname(document.fileName);
+    return { fileName, documentDirectory };
   }
 
   abort(document: vscode.TextDocument): void {
