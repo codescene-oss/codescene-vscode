@@ -1,8 +1,7 @@
 import vscode from 'vscode';
 import { AceAPI, AceRequestEvent } from '../refactoring/addon';
-import Reviewer from '../review/reviewer';
 import { isDefined, pluralize } from '../utils';
-import { DeltaAnalysisResult } from './analyser';
+import { DeltaAnalyser, DeltaAnalysisResult } from './analyser';
 import { DeltaForFile } from './model';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import {
@@ -83,9 +82,11 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   constructor(aceApi?: AceAPI) {
     this.disposables.push(
-      Reviewer.instance.onDidDeltaAnalysis((event) => {
-        const { delta, review } = event;
-        this.syncTree(review.document, delta);
+      DeltaAnalyser.instance.onDidAnalyse((event) => {
+        if (event.type === 'end') {
+          const { document, result } = event;
+          this.syncTree(document, result);
+        }
       })
     );
     if (aceApi) {
@@ -94,7 +95,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   }
 
   update() {
-    this.treeDataChangedEmitter.fire(); // Fire to refresh the tree view
+    this.treeDataChangedEmitter.fire(); // Fire this to refresh the tree view
   }
 
   private addRefactoringsToTree(event: AceRequestEvent) {
@@ -136,21 +137,24 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       this.fileIssueMap.set(document.uri.fsPath, new FileWithIssues(deltaForFile, document.uri));
     }
 
-    if (this.fileIssueMap.size === 0) return;
+    if (this.fileIssueMap.size > 0) {
+      const statusTreeItem = new vscode.TreeItem('Declining changes');
+      statusTreeItem.iconPath = new vscode.ThemeIcon('error', errorColor);
+      statusTreeItem.tooltip = 'Files with changes declining code health';
+      const statusItem = new DeltaInfoItem(statusTreeItem);
 
-    const statusTreeItem = new vscode.TreeItem('Declining changes');
-    statusTreeItem.iconPath = new vscode.ThemeIcon('error', errorColor);
-    statusTreeItem.tooltip = 'Files with changes declining code health';
-    const statusItem = new DeltaInfoItem(statusTreeItem);
+      const filesWithIssues = Array.from(this.fileIssueMap.values());
+      const { label, tooltip } = this.aceInfoContent(filesWithIssues);
+      const aceTreeItem = new vscode.TreeItem(label);
+      aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
+      aceTreeItem.tooltip = tooltip;
+      const aceInfoItem = new DeltaInfoItem(aceTreeItem);
 
-    const filesWithIssues = Array.from(this.fileIssueMap.values());
-    const { label, tooltip } = this.aceInfoContent(filesWithIssues);
-    const aceTreeItem = new vscode.TreeItem(label);
-    aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
-    aceTreeItem.tooltip = tooltip;
-    const aceInfoItem = new DeltaInfoItem(aceTreeItem);
+      this.tree = [statusItem, aceInfoItem, ...filesWithIssues];
+    } else {
+      this.tree = [];
+    }
 
-    this.tree = [statusItem, aceInfoItem, ...filesWithIssues];
     this.update();
   }
 

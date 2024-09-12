@@ -9,7 +9,7 @@ import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
 import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
 
-export type DeltaAnalysisEvent = AnalysisEvent & { document?: vscode.TextDocument };
+export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
 export type DeltaAnalysisResult = DeltaForFile | DeltaAnalysisState;
 
@@ -39,11 +39,11 @@ export class DeltaAnalyser {
     this.analysisEmitter.fire({ type: 'start', document });
   }
 
-  private endAnalysisEvent(document: vscode.TextDocument) {
+  private endAnalysisEvent(document: vscode.TextDocument, result?: DeltaForFile) {
     this.analysesRunning--;
-    this.analysisEmitter.fire({ type: 'end', document });
+    this.analysisEmitter.fire({ type: 'end', document, result });
     if (this.analysesRunning === 0) {
-      this.analysisEmitter.fire({ type: 'idle' });
+      this.analysisEmitter.fire({ type: 'idle', document, result });
     }
   }
 
@@ -52,23 +52,27 @@ export class DeltaAnalyser {
    * Will return undefined if the old and new score are the same. Used to avoid invoking
    * the delta command.
    *
-   * @param oldScore
-   * @param newScore
+   * @param oldScore raw base64 encoded score
+   * @param newScore raw base64 encoded score
    * @returns
    */
-  private jsonForScores(oldScore: any, newScore: any) {
-    const oldJson = JSON.stringify(oldScore);
-    const newJson = JSON.stringify(newScore);
-    if (oldJson === newJson) return;
+  private jsonForScores(oldScore?: string | void, newScore?: string | void) {
+    if (oldScore === newScore) return; // No need to run the delta command if the scores are the same
 
-    // The devtools binary handles either being undef, but not both
-    if (isDefined(oldScore) || isDefined(newScore)) {
-      // Make sure not to put "undefined" in the json string - it is an invalid json token while null is
-      return `{"old-score": ${oldJson || null}, "new-score": ${newJson || null}}`;
+    const scoreObject = {};
+    if (isDefined(oldScore)) {
+      Object.assign(scoreObject, { 'old-score': oldScore });
     }
+    if (isDefined(newScore)) {
+      Object.assign(scoreObject, { 'new-score': newScore });
+    }
+
+    if (Object.keys(scoreObject).length === 0) return; // if both are undefined the delta command will fail
+
+    return JSON.stringify(scoreObject);
   }
 
-  async deltaForScores(document: vscode.TextDocument, oldScore: any, newScore: any) {
+  async deltaForScores(document: vscode.TextDocument, oldScore?: string | void, newScore?: string | void) {
     this.startAnalysisEvent(document);
 
     const inputJsonString = this.jsonForScores(oldScore, newScore);
@@ -77,6 +81,7 @@ export class DeltaAnalyser {
       return;
     }
 
+    let deltaResult: DeltaForFile | undefined;
     return new SimpleExecutor()
       .execute({ command: this.cliPath, args: ['delta', '--ide-api'] }, undefined, inputJsonString)
       .then((result) => {
@@ -86,7 +91,7 @@ export class DeltaAnalyser {
         if (result.stdout.trim() === '') {
           return;
         }
-        const deltaResult = JSON.parse(result.stdout) as DeltaForFile;
+        deltaResult = JSON.parse(result.stdout) as DeltaForFile;
         if (CsExtensionState.acePreflight) {
           requestRefactoringsForDegradation({
             document,
@@ -100,7 +105,7 @@ export class DeltaAnalyser {
         this.errorEmitter.fire(error);
       })
       .finally(() => {
-        this.endAnalysisEvent(document);
+        this.endAnalysisEvent(document, deltaResult);
       });
   }
 }
