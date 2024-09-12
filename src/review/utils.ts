@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { csSource } from '../diagnostics/cs-diagnostics';
 import { fnCoordinateToRange } from '../diagnostics/utils';
 import { isDefined } from '../utils';
-import { IssueDetails, ReviewIssue, ReviewResult } from './model';
+import { ReviewFunction, ReviewResult, CodeSmell } from './model';
 
 const chScorePrefix = 'Code health score: ';
 const noApplicationCode = 'No application code detected for scoring';
@@ -20,45 +20,30 @@ function createGeneralDiagnostic(reviewResult: ReviewResult) {
   return new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
 }
 
-export function reviewIssueToDiagnostics(reviewIssue: ReviewIssue, document: vscode.TextDocument) {
-  // File level issues
-  if (!reviewIssue.functions) {
-    const range = new vscode.Range(0, 0, 0, 0);
-    const diagnostic = new vscode.Diagnostic(range, reviewIssue.category, vscode.DiagnosticSeverity.Warning);
-    diagnostic.source = csSource;
-    diagnostic.code = createDiagnosticCodeWithTarget(reviewIssue.category, range.start, document);
-    return [diagnostic];
-  }
-
-  // Function level issues
-  return reviewIssue.functions.map((func: IssueDetails) => {
-    const category = reviewIssue.category;
-    const range = fnCoordinateToRange(
-      reviewIssue.category,
-      { name: func.title, startLine: func['start-line'], endLine: func['end-line'] },
-      document
-    );
-
-    let message;
-    if (func.details) {
-      message = `${category} (${func.details})`;
-    } else {
-      message = category;
+export function reviewFunctionToDiagnostics(reviewFunction: ReviewFunction, document: vscode.TextDocument) {
+    let diagnostics: vscode.Diagnostic[] = [];
+    for (const codeSmell of reviewFunction['code-smells']) {
+        const diagnostic = reviewCodeSmellToDiagnostics(codeSmell, document);
+        diagnostics.push(diagnostic);
     }
-    const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
-    diagnostic.source = csSource;
-    diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document);
-    return diagnostic;
-  });
+    return diagnostics;
 }
 
-export function fileAndFunctionLevelIssueCount(reviewResult: ReviewResult) {
-  return reviewResult.review.reduce((prev, curr) => {
-    if (curr.functions) {
-      return prev + curr.functions.length; // a bunch of function level issues
-    }
-    return prev + 1; // a file level issue
-  }, 0);
+export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vscode.TextDocument) {
+  const category = codeSmell.category;
+  const codeSmellRange = codeSmell.range;
+  const range = new vscode.Range(codeSmellRange['start-line']-1, codeSmellRange['start-column']-1, codeSmellRange['end-line']-1, codeSmellRange['end-column']-1);
+  
+  let message;
+  if (codeSmell.details) {
+    message = `${category} (${codeSmell.details})`;
+  } else {
+    message = category;
+  }
+  const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+  diagnostic.source = csSource;
+  diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document); 
+  return diagnostic; 
 }
 
 export function roundScore(score: number): number {
@@ -69,7 +54,18 @@ export function formatScore(score: number | void): string {
 }
 
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
-  let diagnostics = reviewResult.review.flatMap((reviewIssue) => reviewIssueToDiagnostics(reviewIssue, document));
+  let diagnostics: vscode.Diagnostic[] = [];
+  for(const fun of reviewResult['function-level-code-smells']) {
+    diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
+  }
+
+  for(const codeSmell of reviewResult['expression-level-code-smells']) {
+    diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
+  }
+  
+  for(const codeSmell of reviewResult['file-level-code-smells']) {
+    diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
+  }
 
   if (isDefined(reviewResult.score)) {
     const scoreDiagnostic = createGeneralDiagnostic(reviewResult);
