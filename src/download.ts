@@ -19,7 +19,7 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '150efa5a3fe1b96f609289be4d89233c3bf9449e';
+const REQUIRED_DEVTOOLS_VERSION = 'a05ebfcd9f68ea94a8e7644397beca20851cea72';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
