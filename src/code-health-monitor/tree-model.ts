@@ -134,7 +134,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
 export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly fnName: string;
   readonly position: vscode.Position;
-  readonly children: Array<DeltaTreeViewItem> = [];
+  readonly children: Array<DeltaIssue> = [];
 
   constructor(readonly parent: FileWithIssues, readonly location: Location, public refactoring?: CsRefactoringRequest) {
     this.fnName = location.function;
@@ -161,12 +161,10 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   }
 
   private get command() {
-    const uri = this.parent.uri;
-    const location = new vscode.Location(uri, this.position);
     return {
-      command: 'editor.action.goToLocations',
-      title: 'Go to location',
-      arguments: [uri, this.position, [location]],
+      command: 'codescene.monitorCodeLens.showFunction',
+      title: 'Show function with code lens menu',
+      arguments: [this],
     };
   }
 
@@ -191,7 +189,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 
   private presentAsRefactorable(item: vscode.TreeItem) {
     item.tooltip = this.tooltip(true);
-    item.contextValue = 'delta-refactorableFunction';
     item.iconPath = new vscode.ThemeIcon('sparkle');
   }
 }

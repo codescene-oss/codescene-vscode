@@ -93,13 +93,6 @@
       }
     ],
     "menus": {
-      "view/item/context": [
-        {
-          "command": "codescene.chMonitorTreeContext.presentRefactoring",
-          "when": "view == codescene.codeHealthMonitorView && viewItem === 'delta-refactorableFunction'",
-          "group": "inline@1"
-        }
-      ],
       "view/title": [
         {
           "command": "codescene.codeHealthMonitorHelp",

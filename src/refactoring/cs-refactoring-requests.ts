@@ -84,10 +84,6 @@ function validConfidenceLevel(level: number) {
   return level > 0;
 }
 
-/**
- * Map of diagnostics to refactoring requests - per document.
- * Used to get the proper requests when presenting the refactoring codelenses and codeactions.
- */
 export class CsRefactoringRequests {
   private static readonly requestsChangedEmitter = new EventEmitter<AceRequestEvent>();
   static readonly onDidChangeRequests = CsRefactoringRequests.requestsChangedEmitter.event;

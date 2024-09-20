@@ -4,7 +4,7 @@ import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined, rangeStr } from '../utils';
 import Reviewer from './reviewer';
-import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
+import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails, roundScore } from './utils';
 
 /**
  * A CS CodeLens is a CodeLens that is associated with a Diagnostic.
@@ -20,7 +20,7 @@ export class CsReviewCodeLens extends vscode.CodeLens {
   }
 }
 
-export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsReviewCodeLens>, vscode.Disposable {
+export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.CodeLens>, vscode.Disposable {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
   private disposables: vscode.Disposable[] = [];
 
@@ -45,64 +45,32 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<CsRevie
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
-    // Return empty set if code lenses are disabled.
-    if (!getConfiguration('enableCodeLenses') || !isDefined(Reviewer.instance)) {
-      return [];
-    }
+    // Return early if code lenses are disabled or reviewer uninitialized.
+    if (!isDefined(Reviewer.instance)) return;
 
     const cacheItem = Reviewer.instance.reviewCache.get(document);
-    const diagnostics = cacheItem && (await cacheItem.review.diagnostics);
+    if (!cacheItem) return;
 
-    if (!diagnostics || diagnostics.length === 0) {
-      return [];
-    }
+    const delta = cacheItem.delta;
 
-    return diagnostics.map((d) => new CsReviewCodeLens(d.range, d, document));
-  }
-
-  resolveCodeLens?(
-    codeLens: CsReviewCodeLens,
-    token: vscode.CancellationToken
-  ): vscode.ProviderResult<CsReviewCodeLens> {
-    const diagnostic = codeLens.diagnostic;
-    logOutputChannel.trace(`Resolving Review CodeLenses for ${diagnostic.message} ${rangeStr(diagnostic.range)}`);
-
-    if (isGeneralDiagnostic(diagnostic)) {
-      codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
+    const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
+    if (isDefined(delta)) {
+      const oldScore = delta['old-score'] ? roundScore(delta['old-score']) : 'n/a';
+      const newScore = roundScore(delta['new-score']);
+      codeLens.command = {
+        title: `$(pulse) Code Health: ${oldScore} → ${newScore}`,
+        command: 'codescene.codeHealthMonitorView.focus',
+      };
+      return [codeLens];
     } else {
-      codeLens.command = this.openInteractiveDocsCommand(diagnostic, codeLens.document.uri);
+      return cacheItem.review.scorePresentation.then((scorePresentation) => {
+        codeLens.command = {
+          title: `$(pulse) Code Health: ${scorePresentation}`,
+          command: 'markdown.showPreviewToSide',
+          arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
+        };
+        return [codeLens];
+      });
     }
-    return codeLens;
-  }
-
-  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, documentUri: vscode.Uri) {
-    const category = getCsDiagnosticCode(diagnostic.code);
-    if (!category) {
-      logOutputChannel.warn(`Unknown diagnostic code "${diagnostic.code}"`);
-      return;
-    }
-    const params: InteractiveDocsParams = {
-      codeSmell: {
-        category,
-        position: diagnostic.range.start,
-      },
-      documentUri,
-    };
-
-    const title = `$(warning) ${removeDetails(diagnostic.message)}`;
-
-    return {
-      title,
-      command: 'codescene.openInteractiveDocsPanel',
-      arguments: [params],
-    };
-  }
-
-  private showCodeHealthDocsCommand(message: string) {
-    return {
-      title: `$(pulse) ${message}`,
-      command: 'markdown.showPreviewToSide',
-      arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
-    };
   }
 }
