@@ -3,6 +3,7 @@ import { Branch, GitExtension, Repository } from '../../types/git';
 import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
 import { registerCommandWithTelemetry } from '../utils';
+import { register as registerCodeLens } from './codelens';
 import { CodeHealthMonitorView } from './tree-view';
 
 export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
 
   const gitApi = gitExtension.getAPI(1);
   const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
+  registerCodeLens(context);
 
   context.subscriptions.push(
     codeHealthMonitorView,

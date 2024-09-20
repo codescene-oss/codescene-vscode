@@ -9,6 +9,8 @@ import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
+import { DeltaForFile } from '../code-health-monitor/model';
+import { isDefined } from '../utils';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
@@ -52,6 +54,7 @@ export class CsReview {
 class ReviewCacheItem {
   private baselineScore?: Promise<void | string>;
   public documentVersion: number;
+  public delta?: DeltaForFile;
 
   constructor(private document: vscode.TextDocument, public review: CsReview) {
     this.documentVersion = document.version;
@@ -69,7 +72,8 @@ class ReviewCacheItem {
   async runDeltaAnalysis() {
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
-    void DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
+    const delta = await DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
+    if (delta) this.delta = delta;
   }
 
   resetBaseline() {
