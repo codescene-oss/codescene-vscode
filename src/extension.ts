@@ -20,6 +20,7 @@ import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { register as registerCodeActionProvider } from './review/codeaction';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -79,6 +80,8 @@ function startExtension(context: vscode.ExtensionContext) {
   const codeLensProvider = new CsReviewCodeLensProvider();
   context.subscriptions.push(codeLensProvider);
   context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
+
+  registerCodeActionProvider(context, csContext.aceApi);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
   const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
