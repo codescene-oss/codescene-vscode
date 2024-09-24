@@ -59,7 +59,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         new vscode.CodeLens(fnRange, {
           title: '$(sparkle) CodeScene ACE',
           command: 'codescene.presentRefactoring',
-          arguments: [functionInfo.refactoring.resolvedRefactoring()],
+          arguments: [functionInfo.refactoring],
         })
       );
     }
