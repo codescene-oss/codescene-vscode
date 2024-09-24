@@ -51,7 +51,7 @@ export class CsReview {
   }
 }
 
-class ReviewCacheItem {
+export class ReviewCacheItem {
   private baselineScore?: Promise<void | string>;
   public documentVersion: number;
   public delta?: DeltaForFile;

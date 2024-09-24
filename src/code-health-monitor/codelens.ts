@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { onDidChangeConfiguration } from '../configuration';
 import { InteractiveDocsParams } from '../documentation/csdoc-provider';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './tree-model';
@@ -43,6 +44,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     this.clear();
     const documentUri = functionInfo.parent.uri;
     this.disposables = [
+      onDidChangeConfiguration('previewCodeHealthMonitoring', () => this.dismiss()),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri !== documentUri) return;
         this.dismiss();
