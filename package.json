@@ -50,15 +50,6 @@
       {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
-      },
-      {
-        "command": "codescene.gotoAndPresentRefactoring",
-        "title": "View in ACE panel"
-      },
-      {
-        "command": "codescene.chMonitorTreeContext.presentRefactoring",
-        "title": "View Auto-refactoring",
-        "icon": "$(sparkle)"
       }
     ],
     "viewsContainers": {
@@ -81,7 +72,14 @@
         {
           "id": "codescene.codeHealthMonitorView",
           "name": "Code Health Monitoring [beta]",
-          "icon": "$(lock)",
+          "icon": "$(cs-logo)",
+          "when": "config.codescene.previewCodeHealthMonitoring"
+        },
+        {
+          "id": "codescene.codeHealthDetailsView",
+          "name": "Code Health Details [beta]",
+          "icon": "$(cs-logo)",
+          "type": "webview",
           "when": "config.codescene.previewCodeHealthMonitoring"
         }
       ]

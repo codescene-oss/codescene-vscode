@@ -4,20 +4,33 @@ import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
 import { registerCommandWithTelemetry } from '../utils';
 import { register as registerCodeLens } from './codelens';
+import { register as registerCodeHealthDetailsView } from './details/view';
 import { CodeHealthMonitorView } from './tree-view';
+import { DeltaFunctionInfo } from './tree-model';
 
 export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
   if (!gitExtension) {
-    void vscode.window.showErrorMessage('Unable to load Git extension. Code Health Monitor will be unavailable.');
+    void vscode.window.showErrorMessage(
+      'Unable to load vscode.git extension. Code Health Monitor will be unavailable.'
+    );
     return;
   }
 
+  const selectFunctionDisposable = vscode.commands.registerCommand(
+    'codescene.codeHealthMonitor.selectFunction',
+    (functionInfo: DeltaFunctionInfo) => {
+      void vscode.commands.executeCommand('codescene.monitorCodeLens.showFunction', functionInfo);
+      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', functionInfo);
+    }
+  );
+
   const codeHealthMonitorView = new CodeHealthMonitorView(context, aceApi);
+  registerCodeLens(context);
+  registerCodeHealthDetailsView(context);
 
   const gitApi = gitExtension.getAPI(1);
   const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
-  registerCodeLens(context);
 
   context.subscriptions.push(
     codeHealthMonitorView,
@@ -30,7 +43,8 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
           vscode.Uri.parse(`csdoc:code-health-monitor.md`)
         );
       },
-    })
+    }),
+    selectFunctionDisposable
   );
 }
 

@@ -1,3 +1,5 @@
+import { Uri, Webview } from 'vscode';
+
 export function nonce() {
   let text = '';
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -5,4 +7,8 @@ export function nonce() {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
   return text;
+}
+
+export function getUri(webView: Webview, extensionUri: Uri, ...pathSegments: string[]) {
+  return webView.asWebviewUri(Uri.joinPath(extensionUri, ...pathSegments));
 }

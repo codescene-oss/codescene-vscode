@@ -162,8 +162,8 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 
   private get command() {
     return {
-      command: 'codescene.monitorCodeLens.showFunction',
-      title: 'Show function with code lens menu',
+      command: 'codescene.codeHealthMonitor.selectFunction',
+      title: 'Show function for code health monitoring',
       arguments: [this],
     };
   }

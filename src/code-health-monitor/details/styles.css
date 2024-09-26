@@ -1,0 +1,46 @@
+body {
+  line-height: 20px;
+}
+
+.flex-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.large {
+  font-size: var(--type-ramp-plus1-font-size);
+  gap: 8px;
+}
+
+.block {
+  margin-bottom: 20px;
+}
+
+.function-info {
+  margin-top: 20px;
+}
+
+.function-name {
+  font-size: var(--type-ramp-plus1-font-size);
+  font-weight: bold;
+}
+
+.function-coordinate {
+  gap: 10px;
+}
+
+.issue {
+  margin-bottom: 14px;
+}
+
+.issue-details {
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  padding-top: 20px;
+}
+
+.issue-icon-link {
+  color: var(--vscode-foreground);
+  line-height: 0;
+}
