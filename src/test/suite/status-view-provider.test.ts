@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { PreFlightResponse } from '../../refactoring/model';
-import { aceEnabled, codeHealthAnalysisEnabled } from '../../webviews/status-view-provider';
+import { aceEnabled, codeHealthAnalysisEnabled } from '../../status-view/status-view-provider';
 
 suite('Status view provider test suite', () => {
   test('Code health enabled/disabled', () => {
