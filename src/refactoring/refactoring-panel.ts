@@ -84,7 +84,7 @@ export class RefactoringPanel {
             return;
         }
       },
-      null,
+      this,
       this.disposables
     );
   }

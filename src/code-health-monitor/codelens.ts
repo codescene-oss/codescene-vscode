@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { onDidChangeConfiguration } from '../configuration';
-import { InteractiveDocsParams } from '../documentation/csdoc-provider';
+import { issueToDocsParams } from '../documentation/csdoc-provider';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './tree-model';
 
@@ -68,20 +68,11 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
 
     functionInfo.children.forEach((issue) => {
       const issueRange = new vscode.Range(issue.position, issue.position);
-
-      const params: InteractiveDocsParams = {
-        codeSmell: {
-          category: issue.category,
-          position: issue.position,
-        },
-        documentUri: issue.parentUri,
-      };
-
       this.codeLenses.push(
         new vscode.CodeLens(issueRange, {
           title: `$(warning) ${issue.category}`,
           command: 'codescene.openInteractiveDocsPanel',
-          arguments: [params],
+          arguments: [issueToDocsParams(issue)],
         })
       );
     });

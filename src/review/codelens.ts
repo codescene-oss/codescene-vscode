@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
-import { InteractiveDocsParams } from '../documentation/csdoc-provider';
+import { toDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel, outputChannel } from '../log';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
@@ -96,20 +96,11 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
       logOutputChannel.warn(`Unknown diagnostic code "${diagnostic.code}"`);
       return;
     }
-    const params: InteractiveDocsParams = {
-      codeSmell: {
-        category,
-        position: diagnostic.range.start,
-      },
-      documentUri,
-    };
-
     const title = `$(warning) ${removeDetails(diagnostic.message)}`;
-
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [params],
+      arguments: [toDocsParams(category, diagnostic.range.start, documentUri)],
     };
   }
 

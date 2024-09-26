@@ -15,7 +15,7 @@ import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
 import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
-import { nonce } from './utils';
+import { getUri, nonce } from './utils';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   const provider = new StatusViewProvider(context.extensionUri);
@@ -93,9 +93,9 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
   }
 
   private getContent(webView: Webview, htmlContent: string) {
-    const webviewScript = this.getUri(webView, 'out', 'webviews', 'status-webview-script.js');
-    const statusViewStyle = this.getUri(webView, 'assets', 'status-view.css');
-    const codiconsUri = this.getUri(webView, 'out', 'codicons', 'codicon.css');
+    const webviewScript = getUri(webView, this.extensionUri, 'out', 'webviews', 'status-webview-script.js');
+    const statusViewStyle = getUri(webView, this.extensionUri, 'assets', 'status-view.css');
+    const codiconsUri = getUri(webView, this.extensionUri, 'out', 'codicons', 'codicon.css');
 
     return /*html*/ `
       <!DOCTYPE html>
@@ -267,10 +267,6 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
     <p>Please check <a href="" id="show-codescene-log-link">the logs</a> for details, and include any details if 
     opening a support issue.</p>  
   `;
-  }
-
-  private getUri(webView: Webview, ...pathSegments: string[]) {
-    return webView.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
   }
 
   dispose() {

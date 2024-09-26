@@ -1,7 +1,7 @@
-import vscode from 'vscode';
+import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
 import { AceAPI, AceRequestEvent } from '../refactoring/addon';
 import { isDefined, pluralize } from '../utils';
-import { DeltaAnalyser, DeltaAnalysisResult } from './analyser';
+import { DeltaAnalyser } from './analyser';
 import { DeltaForFile } from './model';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import {
@@ -17,7 +17,7 @@ import {
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: DeltaAnalysisTreeProvider;
-  private view: vscode.TreeView<DeltaTreeViewItem | DeltaAnalysisResult>;
+  private view: vscode.TreeView<DeltaTreeViewItem>;
 
   constructor(context: vscode.ExtensionContext, aceApi?: AceAPI) {
     registerDeltaAnalysisDecorations(context);
@@ -27,37 +27,39 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
+      canSelectMany: false,
     });
 
-    this.disposables.push(
-      this.treeDataProvider.onDidChangeTreeData(() => {
-        const filesWithIssueCount = this.treeDataProvider.fileIssueMap.size;
-        const resultsText =
-          filesWithIssueCount > 0
-            ? `Found ${filesWithIssueCount} ${pluralize(
-                'file',
-                filesWithIssueCount
-              )} with introduced code health issues`
-            : undefined;
-        this.view.badge = {
-          value: filesWithIssueCount,
-          tooltip: [resultsText].filter(isDefined).join(' • '),
-        };
-      })
-    );
+    this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
+    this.view.onDidChangeSelection(this.handleSelectionChange, this, this.disposables);
+    this.disposables.push(this.view);
+  }
 
-    this.disposables.push(
-      this.view,
-      vscode.commands.registerCommand(
-        'codescene.chMonitorTreeContext.presentRefactoring',
-        (fnInfo: DeltaFunctionInfo) => {
-          void vscode.commands.executeCommand(
-            'codescene.presentRefactoring',
-            fnInfo.refactoring!.resolvedRefactoring()
-          );
-        }
-      )
-    );
+  private handleTreeDataChange() {
+    const filesWithIssueCount = this.treeDataProvider.fileIssueMap.size;
+    const resultsText =
+      filesWithIssueCount > 0
+        ? `Found ${filesWithIssueCount} ${pluralize('file', filesWithIssueCount)} with introduced code health issues`
+        : undefined;
+    this.view.badge = {
+      value: filesWithIssueCount,
+      tooltip: [resultsText].filter(isDefined).join(' • '),
+    };
+
+    this.updateFunctionInfoDetails(this.view.selection[0]);
+  }
+
+  private handleSelectionChange(e: TreeViewSelectionChangeEvent<DeltaTreeViewItem>) {
+    this.updateFunctionInfoDetails(e.selection[0]);
+  }
+
+  private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
+    if (selection instanceof DeltaFunctionInfo) {
+      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
+    } else {
+      // else just clear the view
+      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
+    }
   }
 
   isVisible() {
@@ -105,6 +107,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
         fileWithIssues.functionLevelIssues.forEach((child) => {
           if (event.requests) {
             const fnReq = event.requests.find(
+              // TODO - child position does not contain a column, so it fntoRefactor.range starts at column > 0 it won't be found!
               (r) => r.fnToRefactor.name === child.fnName && r.fnToRefactor.range.contains(child.position)
             );
             child.refactoring = fnReq;

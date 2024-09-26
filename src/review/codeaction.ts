@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { InteractiveDocsParams } from '../documentation/csdoc-provider';
+import { toDocsParams } from '../documentation/csdoc-provider';
 import { reviewDocumentSelector } from '../language-support';
 import { AceAPI } from '../refactoring/addon';
+import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { getCsDiagnosticCode } from './utils';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 
 export function register(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   const codeActionProvider = new ReviewCodeActionProvider(aceApi);
@@ -49,21 +49,13 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .map((diagnostic) => {
         const category = getCsDiagnosticCode(diagnostic.code);
         if (!category) return;
-
-        const params: InteractiveDocsParams = {
-          codeSmell: {
-            category,
-            position: diagnostic.range.start,
-          },
-          documentUri: document.uri,
-        };
         const title = `Explain ${category}`;
         const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
         action.diagnostics = [diagnostic];
         action.command = {
           command: 'codescene.openInteractiveDocsPanel',
           title,
-          arguments: [params],
+          arguments: [toDocsParams(category, diagnostic.range.start, document.uri)],
         };
         return action;
       })

@@ -123,7 +123,7 @@ function requestRefactoringsForDegradation({
   supportedCodeSmells: string[];
 }) {
   const diagnostics = diagnosticsForFile(document, deltaResult, supportedCodeSmells);
-  void vscode.commands.executeCommand<CsRefactoringRequest[]>('codescene.requestRefactorings', document, diagnostics);
+  void vscode.commands.executeCommand('codescene.requestRefactorings', document, diagnostics);
 }
 
 function diagnosticsForFile(document: vscode.TextDocument, delta: DeltaForFile, supportedCodeSmells: string[]) {

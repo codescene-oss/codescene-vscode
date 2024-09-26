@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
+import { DeltaIssue } from '../code-health-monitor/tree-model';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { getLogoUrl, registerCommandWithTelemetry } from '../utils';
 import { CategoryWithPosition, DocumentationPanel } from './documentation-panel';
@@ -26,7 +27,7 @@ export function register(context: vscode.ExtensionContext) {
 
   const openInteractiveDocsPanel = registerCommandWithTelemetry({
     commandId: 'codescene.openInteractiveDocsPanel',
-    handler: (params: InteractiveDocsParams) => {
+    handler: (params) => {
       const panelParams = Object.assign({ extensionUri: context.extensionUri }, params);
       DocumentationPanel.createOrShow(panelParams);
     },
@@ -36,10 +37,22 @@ export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(openInteractiveDocsPanel);
 }
 
-export interface InteractiveDocsParams {
+interface InteractiveDocsParams {
   codeSmell: CategoryWithPosition;
   documentUri: vscode.Uri;
   request?: CsRefactoringRequest;
+}
+
+export function issueToDocsParams(issue: DeltaIssue) {
+  return toDocsParams(issue.category, issue.position, issue.parentUri);
+}
+
+export function toDocsParams(
+  category: string,
+  position: vscode.Position,
+  documentUri: vscode.Uri
+): InteractiveDocsParams {
+  return { codeSmell: { category, position }, documentUri };
 }
 
 export function categoryToDocsCode(issueCategory: string) {
