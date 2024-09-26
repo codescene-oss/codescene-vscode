@@ -66,7 +66,7 @@
         {
           "id": "codescene-activity-bar",
           "title": "CodeScene",
-          "icon": "assets/cs-logo.svg"
+          "icon": "$(cs-logo)"
         }
       ]
     },
@@ -76,7 +76,7 @@
           "id": "codescene.statusView",
           "name": "Status",
           "type": "webview",
-          "icon": "assets/cs-logo.svg"
+          "icon": "$(cs-logo)"
         },
         {
           "id": "codescene.codeHealthMonitorView",
@@ -100,16 +100,7 @@
           "group": "navigation@2"
         }
       ],
-      "commandPalette": [
-        {
-          "command": "codescene.gotoAndPresentRefactoring",
-          "when": "false"
-        },
-        {
-          "command": "codescene.chMonitorTreeContext.presentRefactoring",
-          "when": "false"
-        }
-      ]
+      "commandPalette": []
     },
     "configuration": {
       "title": "CodeScene",
