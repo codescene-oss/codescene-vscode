@@ -13,7 +13,7 @@ import vscode, {
 import { categoryToDocsCode } from '../documentation/csdoc-provider';
 import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
-import { nonce } from '../webviews/utils';
+import { getUri, nonce } from '../webviews/utils';
 import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { RefactorResponse } from './model';
@@ -215,7 +215,7 @@ export class RefactoringPanel {
   }
 
   private async updateContent(title: string, content: string) {
-    const refactorStylesCss = this.getUri('assets', 'refactor-styles.css');
+    const refactorStylesCss = this.getUri('out', 'refactoring', 'styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
     const highlightCss = this.getUri('assets', 'highlight.css');
     const webviewScript = this.getUri('out', 'refactoring', 'webview-script.js');
@@ -253,7 +253,7 @@ export class RefactoringPanel {
   }
 
   private getUri(...pathSegments: string[]) {
-    return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
+    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments);
   }
 
   private loadingContent() {
@@ -278,7 +278,6 @@ export class RefactoringPanel {
   }
 
   private unsuitableRefactoring() {
-
     return /*html*/ `<h2>Refactoring failed</h2>
     <p>Sorry, we were unable to find a suitable refactoring. Please check the documentation for the code smell at the top of the method.</p>
     <div class="bottom-controls">
@@ -289,7 +288,6 @@ export class RefactoringPanel {
     </div>
 `;
   }
-
 
   private autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: Code) {
     const { level } = response.confidence;

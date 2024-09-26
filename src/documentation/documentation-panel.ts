@@ -6,7 +6,7 @@ import { FnToRefactor } from '../refactoring/commands';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import Reviewer from '../review/reviewer';
 import { getLogoUrl, isDefined } from '../utils';
-import { nonce } from '../webviews/utils';
+import { getUri, nonce } from '../webviews/utils';
 import { categoryToDocsCode } from './csdoc-provider';
 
 export interface CategoryWithPosition {
@@ -97,8 +97,9 @@ export class DocumentationPanel implements Disposable {
     this.webViewPanel.title = `CodeScene - ${title}`;
 
     const webviewScript = this.getUri('out', 'documentation', 'webview-script.js');
+    const documentationCss = this.getUri('out', 'documentation', 'styles.css');
     const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
-    const documentationCss = this.getUri('assets', 'documentation-styles.css');
+    const highlightCss = this.getUri('assets', 'highlight.css');
     const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
     const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
 
@@ -126,6 +127,7 @@ export class DocumentationPanel implements Disposable {
           style-src 'unsafe-inline' ${webView.cspSource};"
         />
         <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
+        <link href="${highlightCss}" type="text/css" rel="stylesheet" />
         <link href="${documentationCss}" type="text/css" rel="stylesheet" />
         <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
     </head>
@@ -213,7 +215,7 @@ export class DocumentationPanel implements Disposable {
   }
 
   private getUri(...pathSegments: string[]) {
-    return this.webViewPanel.webview.asWebviewUri(Uri.joinPath(this.extensionUri, ...pathSegments));
+    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments); 
   }
 
   dispose() {

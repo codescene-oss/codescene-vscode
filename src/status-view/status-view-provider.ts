@@ -15,7 +15,7 @@ import { logOutputChannel } from '../log';
 import { PreFlightResponse } from '../refactoring/model';
 import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
-import { getUri, nonce } from './utils';
+import { getUri, nonce } from '../webviews/utils';
 
 export function registerStatusViewProvider(context: vscode.ExtensionContext) {
   const provider = new StatusViewProvider(context.extensionUri);
@@ -93,8 +93,8 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
   }
 
   private getContent(webView: Webview, htmlContent: string) {
-    const webviewScript = getUri(webView, this.extensionUri, 'out', 'webviews', 'status-webview-script.js');
-    const statusViewStyle = getUri(webView, this.extensionUri, 'assets', 'status-view.css');
+    const webviewScript = getUri(webView, this.extensionUri, 'out', 'status-view', 'webview-script.js');
+    const statusViewStyle = getUri(webView, this.extensionUri, 'out', 'status-view', 'styles.css');
     const codiconsUri = getUri(webView, this.extensionUri, 'out', 'codicons', 'codicon.css');
 
     return /*html*/ `
