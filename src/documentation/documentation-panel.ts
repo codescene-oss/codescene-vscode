@@ -3,24 +3,17 @@ import path, { join } from 'path';
 import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../refactoring/commands';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import Reviewer from '../review/reviewer';
 import { getLogoUrl, isDefined } from '../utils';
 import { getUri, nonce } from '../webviews/utils';
-import { categoryToDocsCode } from './csdoc-provider';
+import { categoryToDocsCode, InteractiveDocsParams } from './csdoc-provider';
 
 export interface CategoryWithPosition {
   category: string;
   position: vscode.Position;
 }
 
-interface DocPanelParams {
-  codeSmell: CategoryWithPosition;
-  documentUri: Uri;
-  request?: CsRefactoringRequest; // If there already is a refactoring available?
-}
-
-type DocPanelState = DocPanelParams & {
+type DocPanelState = InteractiveDocsParams & {
   fnToRefactor?: FnToRefactor; // The function to refactor if applicable
   document?: vscode.TextDocument; // The opened document containing a fn to refactor
 };
@@ -80,13 +73,13 @@ export class DocumentationPanel implements Disposable {
     void vscode.commands.executeCommand('editor.action.goToLocations', uri, position, [location]);
   }
 
-  private async updateWebView(params: DocPanelParams) {
+  private async updateWebView(params: InteractiveDocsParams) {
     const {
       codeSmell: { category, position },
       documentUri,
     } = params;
 
-    // Set webview state
+    // Set webview state (including request if available)
     this.state = params;
     if (this.state.request) {
       this.state.document = this.state.request.document;
@@ -215,7 +208,7 @@ export class DocumentationPanel implements Disposable {
   }
 
   private getUri(...pathSegments: string[]) {
-    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments); 
+    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments);
   }
 
   dispose() {
@@ -224,7 +217,12 @@ export class DocumentationPanel implements Disposable {
     this.disposables.forEach((d) => d.dispose());
   }
 
-  static createOrShow({ codeSmell, documentUri, request, extensionUri }: DocPanelParams & { extensionUri: Uri }) {
+  static createOrShow({
+    codeSmell,
+    documentUri,
+    request,
+    extensionUri,
+  }: InteractiveDocsParams & { extensionUri: Uri }) {
     if (DocumentationPanel.currentPanel) {
       void DocumentationPanel.currentPanel.updateWebView({ codeSmell, documentUri, request });
       DocumentationPanel.currentPanel.webViewPanel.reveal(undefined, true);

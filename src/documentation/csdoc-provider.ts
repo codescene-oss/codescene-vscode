@@ -37,22 +37,23 @@ export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(openInteractiveDocsPanel);
 }
 
-interface InteractiveDocsParams {
+export interface InteractiveDocsParams {
   codeSmell: CategoryWithPosition;
   documentUri: vscode.Uri;
   request?: CsRefactoringRequest;
 }
 
-export function issueToDocsParams(issue: DeltaIssue) {
-  return toDocsParams(issue.category, issue.position, issue.parentUri);
+export function issueToDocsParams(issue: DeltaIssue, request?: CsRefactoringRequest) {
+  return toDocsParams(issue.category, issue.position, issue.parentUri, request);
 }
 
 export function toDocsParams(
   category: string,
   position: vscode.Position,
-  documentUri: vscode.Uri
+  documentUri: vscode.Uri,
+  request?: CsRefactoringRequest
 ): InteractiveDocsParams {
-  return { codeSmell: { category, position }, documentUri };
+  return { codeSmell: { category, position }, documentUri, request };
 }
 
 export function categoryToDocsCode(issueCategory: string) {

@@ -44,6 +44,8 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
 
     const diagnostics: vscode.Diagnostic[] = await review.review.diagnostics;
 
+    const refactoringRequests = this.requestsForDocument.get(document.uri.toString());
+    const matchingRequest = refactoringRequests?.find((request) => request.fnToRefactor.range.contains(range));
     const actions = diagnostics
       .filter((diagnostic) => diagnostic.range.contains(range))
       .map((diagnostic) => {
@@ -55,7 +57,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
         action.command = {
           command: 'codescene.openInteractiveDocsPanel',
           title,
-          arguments: [toDocsParams(category, diagnostic.range.start, document.uri)],
+          arguments: [toDocsParams(category, diagnostic.range.start, document.uri, matchingRequest)],
         };
         return action;
       })
@@ -63,8 +65,6 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
 
     if (actions.length === 0) return;
 
-    const refactoringRequests = this.requestsForDocument.get(document.uri.toString());
-    const matchingRequest = refactoringRequests?.find((request) => request.fnToRefactor.range.contains(range));
     if (matchingRequest) {
       const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
       refactorAction.command = {

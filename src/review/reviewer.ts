@@ -2,6 +2,7 @@ import { basename, dirname } from 'path';
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
+import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
@@ -9,8 +10,6 @@ import { logOutputChannel, outputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
-import { DeltaForFile } from '../code-health-monitor/model';
-import { isDefined } from '../utils';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 

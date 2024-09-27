@@ -22,8 +22,6 @@ export class DeltaAnalyser {
   readonly onDidAnalyse = this.analysisEmitter.event;
   private analysesRunning = 0;
 
-  readonly analysisResults: Map<string, DeltaForFile | DeltaAnalysisResult> = new Map();
-
   constructor(private cliPath: string) {}
 
   static init() {
