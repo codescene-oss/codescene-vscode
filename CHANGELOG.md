@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.7.10](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.9...v0.7.10) (2024-09-27)
+
+
+### Features
+
+* Add code action for ACE and interactive docs ([4b4b858](https://github.com/codescene-oss/codescene-vscode/commit/4b4b858eaa8435d5754b78ed15c5cfa2f721be21))
+* **code-health-monitor:** Always compare changes to the current HEAD of the file ([85ccb89](https://github.com/codescene-oss/codescene-vscode/commit/85ccb897b1e0a935613579188947ed78b50832be))
+* **code-health-monitor:** Code health monitor rename and new UX ([63d3f13](https://github.com/codescene-oss/codescene-vscode/commit/63d3f13f72e1ee15c3a2aab4090941cf31b86ff7))
+* **codelens:** Implement a menu codelens triggered from functions in the code-health-monitor ([812d668](https://github.com/codescene-oss/codescene-vscode/commit/812d6689bda8f4389c652edd156a6ddc82cc9b6e))
+
+
+### Bug fixes
+
+* **codelens:** Correct argument for presentRefactoring command ([3336bbd](https://github.com/codescene-oss/codescene-vscode/commit/3336bbdff5c66d8cee6d4329f955e6def0d06d27))
+
 ### [0.7.9](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.8...v0.7.9) (2024-09-12)
 
 ### [0.7.8](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.7...v0.7.8) (2024-08-29)
