@@ -1,7 +1,6 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Uri, Webview, WebviewViewProvider } from 'vscode';
 import { issueToDocsParams } from '../../documentation/csdoc-provider';
-import { logOutputChannel } from '../../log';
 import { CsRefactoringRequest } from '../../refactoring/cs-refactoring-requests';
 import { pluralize } from '../../utils';
 import { getUri, nonce } from '../../webviews/utils';
@@ -50,10 +49,12 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         void vscode.commands.executeCommand('codescene.presentRefactoring', this.functionInfo?.refactoring);
         return;
       case 'interactive-docs':
-        logOutputChannel.info('Interactive docs command received');
         const issue = this.functionInfo?.children[message.issueIndex];
         if (issue) {
-          void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', issueToDocsParams(issue));
+          void vscode.commands.executeCommand(
+            'codescene.openInteractiveDocsPanel',
+            issueToDocsParams(issue, this.functionInfo?.refactoring)
+          );
         }
         return;
     }
