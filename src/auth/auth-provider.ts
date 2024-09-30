@@ -15,7 +15,7 @@ import {
   window,
 } from 'vscode';
 import { getServerUrl } from '../configuration';
-import { outputChannel } from '../log';
+import { logOutputChannel } from '../log';
 import { CsServerVersion, ServerVersion } from '../server-version';
 import Telemetry from '../telemetry';
 import { PromiseAdapter, promiseFromEvent } from './util';
@@ -106,7 +106,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
     this.sessionChangeEmitter.fire({ added: [session], removed: [], changed: [] });
 
-    outputChannel.appendLine(`Created session ${session.id} for ${session.account.label}`);
+    logOutputChannel.info(`Created session ${session.id} for ${session.account.label}`);
 
     void window.showInformationMessage(`Signed in to CodeScene as ${session.account.label}`);
 
@@ -165,7 +165,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       },
       async (_, cancelButtonToken) => {
         const loginUrl = await this.loginUrl();
-        outputChannel.appendLine(`Opening ${loginUrl.toString()}`);
+        logOutputChannel.debug(`Opening ${loginUrl.toString()}`);
 
         await env.openExternal(loginUrl);
 

@@ -1,3 +1,4 @@
+const { error } = require('console');
 const { build, context } = require('esbuild');
 const { copy } = require('esbuild-plugin-copy');
 
@@ -13,9 +14,8 @@ function buildCounter(counterName) {
     setup: (build) => {
       let count = 0;
       build.onEnd((result) => {
-        console.log(`${new Date().toLocaleTimeString()} [${counterName}] build #${count}`);
-        result.errors.length > 0 && console.log(`   Warnings ${result.errors}`);
-        result.warnings.length > 0 && console.log(`   Errors ${result.warnings}`);
+        const warningOrError = result.errors.length > 0 || result.warnings.length > 0 ? '❌' : '';
+        console.log(`${new Date().toLocaleTimeString()} [${counterName}] build #${count} ${warningOrError}`);
         count++;
       });
     },

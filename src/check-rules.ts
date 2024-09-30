@@ -1,7 +1,6 @@
 import path from 'path';
 import { window } from 'vscode';
 import { codeHealthRulesCheck } from './codescene-interop';
-import { outputChannel } from './log';
 
 /**
  * Function to show matching code health rule for currently opened file.
@@ -14,15 +13,15 @@ export async function checkCodeHealthRules() {
     const fileName = path.basename(absoluteFilePath);
     const folder = path.dirname(absoluteFilePath);
     const result = await codeHealthRulesCheck(folder, fileName);
-    const msg = result.stdout;
-    const error = result.stderr;
-    outputChannel.appendLine('----------');
-    if (error.trim() !== '') {
-      outputChannel.append(error);
+    const error = result.stderr.trim();
+    if (error !== '') {
+      void window.showErrorMessage(error);
     }
-    outputChannel.append(msg);
-    outputChannel.appendLine('----------');
-    outputChannel.show();
+    const msgParts = result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== '');
+    void window.showInformationMessage('Code Health Rules', { modal: true, detail: msgParts.join('\n\n') });
   } else {
     void window.showErrorMessage('No file is currently selected.');
   }

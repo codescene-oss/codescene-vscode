@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { sign } from './codescene-interop';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult } from './executor';
-import { logOutputChannel, outputChannel } from './log';
+import { logOutputChannel } from './log';
 
 export default class Telemetry {
   private static _instance: Telemetry;
@@ -36,7 +36,7 @@ export default class Telemetry {
   }
 
   static init(extension: vscode.Extension<any>): void {
-    outputChannel.appendLine('Initializing telemetry logger');
+    logOutputChannel.info('Initializing telemetry logger');
     Telemetry._instance = new Telemetry(extension);
   }
 
