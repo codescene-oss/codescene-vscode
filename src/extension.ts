@@ -9,7 +9,7 @@ import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
-import { logOutputChannel, outputChannel } from './log';
+import { logOutputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -32,21 +32,20 @@ interface CsContext {
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
-  outputChannel.appendLine('Activating extension...');
+  logOutputChannel.info('⚙️ Activating extension...');
 
   CsExtensionState.init(context);
   Telemetry.init(context.extension);
 
   ensureCompatibleBinary(context.extensionPath)
     .then((cliPath) => {
-      outputChannel.appendLine('CodeScene devtools binary is in place and working!');
       CsExtensionState.setCliState(cliPath);
       startExtension(context);
     })
     .catch((error: Error) => {
       const { message } = error;
       CsExtensionState.setCliState(error);
-      outputChannel.appendLine(message);
+      logOutputChannel.error(message);
       void vscode.commands.executeCommand('codescene.statusView.focus');
     });
 
@@ -90,8 +89,6 @@ function startExtension(context: vscode.ExtensionContext) {
       debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
-
-  outputChannel.appendLine('Extension is now active!');
 }
 
 // Use this scheme for the virtual documents when diffing the refactoring
@@ -188,7 +185,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
-    outputChannel.appendLine(`code-health-rules.json changed, updating diagnostics`);
+    logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       CsDiagnostics.review(document, { skipCache: true });
     });
@@ -213,12 +210,12 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   aceApi.enableACE(context).then(
     (result) => {
       CsExtensionState.setACEState(result);
-      outputChannel.appendLine('Auto-refactor enabled!');
+      logOutputChannel.info('Auto-refactor enabled!');
     },
     (error: Error | string) => {
       if (error instanceof Error) {
         const message = `Unable to enable refactoring capabilities. ${error.message}`;
-        outputChannel.appendLine(message);
+        logOutputChannel.error(message);
         void vscode.window.showErrorMessage(message);
       }
       CsExtensionState.setACEState(error);

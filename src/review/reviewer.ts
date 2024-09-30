@@ -6,7 +6,7 @@ import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
-import { logOutputChannel, outputChannel } from '../log';
+import { logOutputChannel } from '../log';
 import { StatsCollector } from '../stats';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
@@ -17,8 +17,8 @@ export default class Reviewer {
   private static _instance: CachingReviewer;
 
   static init(): void {
-    outputChannel.appendLine('Initializing code Reviewer');
     Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.cliPath)));
+    logOutputChannel.info('Code reviewer initialized');
   }
 
   static get instance(): CachingReviewer {

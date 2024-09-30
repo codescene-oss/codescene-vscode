@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { toDocsParams } from '../documentation/csdoc-provider';
-import { logOutputChannel, outputChannel } from '../log';
+import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails, roundScore } from './utils';
@@ -11,7 +11,6 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
-    outputChannel.appendLine('Creating Review CodeLens provider');
     this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
     this.disposables.push(
       Reviewer.instance.onDidReview((event) => {

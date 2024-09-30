@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosR
 import vscode from 'vscode';
 import { CodeSceneAuthenticationSession } from './auth/auth-provider';
 import { Coupling } from './coupling/model';
-import { logOutputChannel, outputChannel } from './log';
+import { logOutputChannel } from './log';
 import { FnToRefactor } from './refactoring/commands';
 import { CsServerVersion } from './server-version';
 import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
@@ -48,10 +48,9 @@ export class CsRestApi {
       const extension = vscode.extensions.getExtension('codescene.codescene-vscode');
       if (!extension) {
         const msg = 'Could not initiate Rest API!';
-        outputChannel.appendLine(msg);
+        logOutputChannel.error(msg);
         throw new Error(msg);
       }
-      outputChannel.appendLine('Initializing Rest API');
       CsRestApi._instance = new CsRestApi(extension);
     }
     return CsRestApi._instance;

@@ -9,7 +9,7 @@
 import * as vscode from 'vscode';
 import { CsRestApi } from '../cs-rest-api';
 import { Git } from '../git';
-import { outputChannel } from '../log';
+import { logOutputChannel } from '../log';
 import { CsWorkspace } from '../workspace';
 import { Coupling } from './model';
 import { difference } from './utils';
@@ -108,19 +108,19 @@ export class CouplingDataProvider {
     if (remoteRepoRootNames.size === 1 && localRepoRootNames.size === 1) {
       // When there's exactly one of both local and remote repo roots, we can assume it's intentional,
       // even if the root names don't match. Will go down the simple path resolution code-path.
-      outputChannel.appendLine(`Info: Change Coupling assuming one-to-one mapping of remote CodeScene repo "
+      logOutputChannel.info(`Change Coupling assuming one-to-one mapping of remote CodeScene repo "
       ${Array.from(remoteRepoRootNames)[0]}" and local git root "${Array.from(localRepoRootNames)[0]}".`);
       return true;
     }
 
     if (unmappedLocalRepos.size > 0 && unmappedRemoteRepos.size > 0) {
-      outputChannel.appendLine(
+      logOutputChannel.warn(
         'Warning: The following local workspace folders are not mapped to a repository in the CodeScene project:'
       );
-      unmappedLocalRepos.forEach((workspace) => outputChannel.appendLine(`  ${workspace}`));
-      outputChannel.appendLine('These are the unmapped repositories in the remote CodeScene project:');
-      unmappedRemoteRepos.forEach((repository) => outputChannel.appendLine(`  ${repository}`));
-      outputChannel.appendLine('Please make sure that the workspace folders and repositories names match.');
+      unmappedLocalRepos.forEach((workspace) => logOutputChannel.info(`  ${workspace}`));
+      logOutputChannel.info('These are the unmapped repositories in the remote CodeScene project:');
+      unmappedRemoteRepos.forEach((repository) => logOutputChannel.info(`  ${repository}`));
+      logOutputChannel.info('Please make sure that the workspace folders and repositories names match.');
     }
     return false;
   }

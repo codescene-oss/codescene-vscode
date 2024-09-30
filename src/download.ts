@@ -10,7 +10,7 @@ import { https } from 'follow-redirects';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SimpleExecutor } from './executor';
-import { logOutputChannel, outputChannel } from './log';
+import { logOutputChannel } from './log';
 
 export class DownloadError extends Error {
   constructor(message: string, readonly url: URL, readonly expectedCliPath: string) {
@@ -77,7 +77,7 @@ async function ensureExecutable(filePath: string) {
 
 function download({ artifactName: artifactDownloadName, absoluteDownloadPath, absoluteBinaryPath }: ArtifactInfo) {
   const url = new URL(`https://downloads.codescene.io/enterprise/cli/${artifactDownloadName}`);
-  outputChannel.appendLine(`Downloading ${url}`);
+  logOutputChannel.info(`Downloading ${url}`);
 
   return new Promise<void>((resolve, reject) => {
     https
@@ -136,14 +136,14 @@ async function verifyBinaryVersion({
  * Download the CodeScene devtools artifact for the current platform and architecture.
  */
 export async function ensureCompatibleBinary(extensionPath: string): Promise<string> {
-  outputChannel.appendLine('Ensuring we have the current CodeScene devtools binary working on your system...');
+  logOutputChannel.info('Ensuring we have the current CodeScene devtools binary working on your system...');
 
   const artifactInfo = new ArtifactInfo(extensionPath);
   const binaryPath = artifactInfo.absoluteBinaryPath;
 
   if (await verifyBinaryVersion({ binaryPath })) return binaryPath;
 
-  outputChannel.appendLine('Failed verifying CodeScene devtools binary, re-downloading...');
+  logOutputChannel.info('Failed verifying CodeScene devtools binary, re-downloading...');
 
   await download(artifactInfo);
   await unzipFile(artifactInfo);
