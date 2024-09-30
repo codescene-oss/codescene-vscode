@@ -11,6 +11,7 @@ import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
+import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
@@ -19,7 +20,6 @@ import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { register as registerCodeActionProvider } from './review/codeaction';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -87,6 +87,17 @@ function startExtension(context: vscode.ExtensionContext) {
       debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
+
+  finalizeActivation();
+}
+
+/**
+ * This function finalizes the activation of the extension by setting a context variable.
+ * The context variable is used in package.json to conditionally enable/disable views that could
+ * point to commands that haven't been fully initialized.
+ */
+function finalizeActivation() {
+  void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
 // Use this scheme for the virtual documents when diffing the refactoring
