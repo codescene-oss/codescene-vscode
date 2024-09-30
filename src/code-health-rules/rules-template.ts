@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { QuickPickItem, Uri, WorkspaceFolder, window, workspace } from 'vscode';
-import { codeHealthRulesJson } from './codescene-interop';
+import { codeHealthRulesJson } from '../codescene-interop';
 
 const rulesPathAndFile: string = '.codescene/code-health-rules.json';
 

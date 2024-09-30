@@ -1,8 +1,8 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { checkCodeHealthRules } from './check-rules';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
+import { register as registerCHRulesCommands } from './code-health-rules';
 import { onDidChangeConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -13,7 +13,6 @@ import { logOutputChannel } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
-import { createRulesTemplate } from './rules-template';
 import { CsServerVersion } from './server-version';
 import { StatsCollector } from './stats';
 import Telemetry from './telemetry';
@@ -128,23 +127,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   });
   context.subscriptions.push(openCodeHealthDocsCmd);
 
-  const createRulesTemplateCmd = registerCommandWithTelemetry({
-    commandId: 'codescene.createRulesTemplate',
-    handler: () => {
-      createRulesTemplate().catch((error: Error) => {
-        void vscode.window.showErrorMessage(error.message);
-      });
-    },
-  });
-  context.subscriptions.push(createRulesTemplateCmd);
-
-  const createCheckRules = registerCommandWithTelemetry({
-    commandId: 'codescene.checkRules',
-    handler: () => {
-      void checkCodeHealthRules();
-    },
-  });
-  context.subscriptions.push(createCheckRules);
+  registerCHRulesCommands(context);
 }
 
 /**
