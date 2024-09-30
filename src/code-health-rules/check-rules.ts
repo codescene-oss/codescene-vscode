@@ -1,6 +1,6 @@
 import path from 'path';
 import { window } from 'vscode';
-import { codeHealthRulesCheck } from './codescene-interop';
+import { codeHealthRulesCheck } from '../codescene-interop';
 
 /**
  * Function to show matching code health rule for currently opened file.
