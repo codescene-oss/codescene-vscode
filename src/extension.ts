@@ -14,7 +14,7 @@ import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
-import { StatsCollector } from './stats';
+import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
@@ -47,8 +47,6 @@ export async function activate(context: vscode.ExtensionContext) {
       logOutputChannel.error(message);
       void vscode.commands.executeCommand('codescene.statusView.focus');
     });
-
-  setupStatsCollector();
 }
 
 function startExtension(context: vscode.ExtensionContext) {
@@ -71,6 +69,7 @@ function startExtension(context: vscode.ExtensionContext) {
   registerCsDoc(context);
   addReviewListeners(context);
   addTmpDiffUriScheme(context);
+  setupStatsCollector(context);
 
   activateCHMonitor(context, csContext.aceApi);
 
@@ -98,24 +97,6 @@ function addTmpDiffUriScheme(context: vscode.ExtensionContext) {
     }
   })();
   context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider));
-}
-
-/**
- * Setup a scheduled event for sending usage statistics
- */
-function setupStatsCollector() {
-  setInterval(() => {
-    const stats = StatsCollector.instance.stats;
-
-    // Send execution stats by language
-    if (stats.analysis.length > 0) {
-      for (const byLanguage of stats.analysis) {
-        Telemetry.instance.logUsage('stats', { stats: { analysis: byLanguage } });
-      }
-    }
-
-    StatsCollector.instance.clear();
-  }, 1800 * 1000);
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
