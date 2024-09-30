@@ -40,7 +40,8 @@
       },
       {
         "command": "codescene.checkRules",
-        "title": "CodeScene: Check code health rule match for selected file"
+        "title": "CodeScene: Check code health rule match for selected file",
+        "when": "codescene.asyncActivationFinished"
       },
       {
         "command": "codescene.codeHealthMonitorHelp",
@@ -73,14 +74,14 @@
           "id": "codescene.codeHealthMonitorView",
           "name": "Code Health Monitoring [beta]",
           "icon": "$(cs-logo)",
-          "when": "config.codescene.previewCodeHealthMonitoring"
+          "when": "config.codescene.previewCodeHealthMonitoring && codescene.asyncActivationFinished"
         },
         {
           "id": "codescene.codeHealthDetailsView",
           "name": "Code Health Details [beta]",
           "icon": "$(cs-logo)",
           "type": "webview",
-          "when": "config.codescene.previewCodeHealthMonitoring"
+          "when": "config.codescene.previewCodeHealthMonitoring && codescene.asyncActivationFinished"
         }
       ]
     },
