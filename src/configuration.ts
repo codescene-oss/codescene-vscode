@@ -21,3 +21,10 @@ export function onDidChangeConfiguration(
 export function getServerUrl() {
   return getConfiguration<string>('serverUrl');
 }
+
+/**
+ * Get the configured URL of the CodeScene Devtool Portal server.
+ */
+export function getPortalUrl() {
+  return getConfiguration<string>('devtoolsPortalUrl');
+}

@@ -125,6 +125,7 @@ export class RefactoringPanel {
   }
 
   private async applyRefactoring(refactoringState: CurrentRefactorState) {
+    refactoringState.refactoring.markRefactoringApplied();
     const {
       refactoring: { document },
       range,
