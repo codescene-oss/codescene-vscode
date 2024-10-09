@@ -3,7 +3,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
-import { onDidChangeConfiguration } from './configuration';
+import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
@@ -117,7 +117,11 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
       void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
     },
   });
-  context.subscriptions.push(openCodeHealthDocsCmd);
+
+  const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
+    toggleReviewCodeLenses();
+  });
+  context.subscriptions.push(openCodeHealthDocsCmd, toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
 }
