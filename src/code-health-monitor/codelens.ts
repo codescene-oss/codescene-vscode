@@ -10,9 +10,10 @@ export function register(context: vscode.ExtensionContext) {
     vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider),
     vscode.commands.registerCommand('codescene.monitorCodeLens.showFunction', (functionInfo: DeltaFunctionInfo) => {
       const uri = functionInfo.parent.uri;
-      const location = new vscode.Location(uri, functionInfo.position);
+      const pos = functionInfo.range.start;
+      const location = new vscode.Location(uri, pos);
       codeLensProvider.showFor(functionInfo);
-      void vscode.commands.executeCommand('editor.action.goToLocations', uri, functionInfo.position, [location]);
+      void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
     }),
     vscode.commands.registerCommand('codescene.monitorCodeLens.dismiss', () => {
       codeLensProvider.dismiss();
@@ -55,22 +56,25 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
       }),
     ];
 
-    const fnRange = new vscode.Range(functionInfo.position, functionInfo.position);
+    // To define the order of the code lenses on the same line, use the order to set and increment the column/character position
+    let order = 0;
+    const lensRange = (pos: vscode.Position) =>
+      new vscode.Range(pos.with({ character: order++ }), pos.with({ character: order++ }));
+
     if (functionInfo.refactoring) {
       this.codeLenses.push(
-        new vscode.CodeLens(fnRange, {
+        new vscode.CodeLens(lensRange(functionInfo.range.start), {
           title: '$(sparkle) CodeScene ACE',
           command: 'codescene.presentRefactoring',
           arguments: [functionInfo.refactoring],
         })
       );
     }
-
     functionInfo.children.forEach((issue) => {
-      const issueRange = new vscode.Range(issue.position, issue.position);
+      const range = lensRange(issue.position);
       this.codeLenses.push(
-        new vscode.CodeLens(issueRange, {
-          title: `$(warning) ${issue.category}`,
+        new vscode.CodeLens(range, {
+          title: `$(warning) ${issue.changeDetail.category}`,
           command: 'codescene.openInteractiveDocsPanel',
           arguments: [issueToDocsParams(issue, functionInfo.refactoring)],
         })
@@ -78,7 +82,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     });
 
     this.codeLenses.push(
-      new vscode.CodeLens(fnRange, {
+      new vscode.CodeLens(lensRange(functionInfo.range.start), {
         title: '$(circle-slash) Dismiss',
         command: 'codescene.monitorCodeLens.dismiss',
         arguments: [documentUri],

@@ -1,7 +1,7 @@
 import assert from 'assert';
 import vscode from 'vscode';
-import { ReviewFunction, Range, CodeSmell, ReviewResult} from '../../review/model';
-import { reviewResultToDiagnostics, reviewFunctionToDiagnostics} from '../../review/utils';
+import { CodeSmell, Range, ReviewFunction, ReviewResult } from '../../review/model';
+import { reviewFunctionToDiagnostics, reviewResultToDiagnostics } from '../../review/utils';
 
 suite('reviewIssueToDiagnostics', () => {
   const fileCodeSmellRange: Range = {
@@ -14,7 +14,7 @@ suite('reviewIssueToDiagnostics', () => {
   const fileCodeSmell: CodeSmell = {
     category: 'Large number of lines',
     details: 'test details',
-    range: fileCodeSmellRange
+    'highlight-range': fileCodeSmellRange,
   };
 
   const functionCodeSmellRange: Range = {
@@ -31,9 +31,9 @@ suite('reviewIssueToDiagnostics', () => {
       {
         category: 'Primitive Obsession',
         details: 'cc = 3',
-        range: functionCodeSmellRange
-      }
-    ]
+        'highlight-range': functionCodeSmellRange,
+      },
+    ],
   };
 
   const expressionCodeSmellRange: Range = {
@@ -46,9 +46,8 @@ suite('reviewIssueToDiagnostics', () => {
   const expressionCodeSmell: CodeSmell = {
     category: 'Complex Conditional',
     details: '2 complex conditional expressions',
-    range: expressionCodeSmellRange
+    'highlight-range': expressionCodeSmellRange,
   };
-
 
   test('returns info diagnostic for document level issues', async () => {
     const document = await vscode.workspace.openTextDocument({
@@ -60,20 +59,19 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning);
     assert.strictEqual(diagnostics[0].message, 'Primitive Obsession (cc = 3)');
-    assert.strictEqual(diagnostics[0].range.start.line, functionCodeSmellRange['start-line']-1);
-    assert.strictEqual(diagnostics[0].range.end.line, functionCodeSmellRange['end-line']-1);
-    assert.strictEqual(diagnostics[0].range.start.character, functionCodeSmellRange['start-column']-1);
-    assert.strictEqual(diagnostics[0].range.end.character, functionCodeSmellRange['end-column']-1);
+    assert.strictEqual(diagnostics[0].range.start.line, functionCodeSmellRange['start-line'] - 1);
+    assert.strictEqual(diagnostics[0].range.end.line, functionCodeSmellRange['end-line'] - 1);
+    assert.strictEqual(diagnostics[0].range.start.character, functionCodeSmellRange['start-column'] - 1);
+    assert.strictEqual(diagnostics[0].range.end.character, functionCodeSmellRange['end-column'] - 1);
   });
 
   test('handles multi-line complex conditional', async () => {
-    
     const reviewResult: ReviewResult = {
       score: 9.81,
       'file-level-code-smells': [],
       'function-level-code-smells': [],
       'expression-level-code-smells': [expressionCodeSmell],
-      'raw-score': "",
+      'raw-score': '',
     };
 
     const document = await vscode.workspace.openTextDocument({
@@ -93,17 +91,15 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics[0].range.end.line, 0);
     assert.strictEqual(diagnostics[0].range.start.character, 0);
     assert.strictEqual(diagnostics[0].range.end.character, 0);
-    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Information, "Wrong severity");
+    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Information, 'Wrong severity');
 
     assert.strictEqual(diagnostics[1].message, 'Complex Conditional (2 complex conditional expressions)');
-    assert.strictEqual(diagnostics[1].range.start.line, expressionCodeSmellRange['start-line']-1);
-    assert.strictEqual(diagnostics[1].range.end.line, expressionCodeSmellRange['end-line']-1);
-    assert.strictEqual(diagnostics[1].range.start.character, expressionCodeSmellRange['start-column']-1);
-    assert.strictEqual(diagnostics[1].range.end.character, expressionCodeSmellRange['end-column']-1);
-    assert.strictEqual(diagnostics[1].severity, vscode.DiagnosticSeverity.Warning, "Wrong severity");
-
+    assert.strictEqual(diagnostics[1].range.start.line, expressionCodeSmellRange['start-line'] - 1);
+    assert.strictEqual(diagnostics[1].range.end.line, expressionCodeSmellRange['end-line'] - 1);
+    assert.strictEqual(diagnostics[1].range.start.character, expressionCodeSmellRange['start-column'] - 1);
+    assert.strictEqual(diagnostics[1].range.end.character, expressionCodeSmellRange['end-column'] - 1);
+    assert.strictEqual(diagnostics[1].severity, vscode.DiagnosticSeverity.Warning, 'Wrong severity');
   });
-
 
   test('handles file, funcition and expression level code smells', async () => {
     const reviewResult: ReviewResult = {
@@ -111,7 +107,7 @@ suite('reviewIssueToDiagnostics', () => {
       'file-level-code-smells': [fileCodeSmell],
       'function-level-code-smells': [functionCodeSmell],
       'expression-level-code-smells': [expressionCodeSmell],
-      'raw-score': "",
+      'raw-score': '',
     };
     const document = await vscode.workspace.openTextDocument({
       content: `function foo() {
@@ -124,7 +120,7 @@ suite('reviewIssueToDiagnostics', () => {
     });
 
     const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-    console.log("Diagnostics length " + diagnostics.length);
+    console.log('Diagnostics length ' + diagnostics.length);
     assert.strictEqual(diagnostics.length, 4);
 
     for (const d of diagnostics) {
@@ -144,13 +140,16 @@ suite('reviewIssueToDiagnostics', () => {
         expectedRange = fileCodeSmellRange;
         expectedSeverity = vscode.DiagnosticSeverity.Warning;
       }
-      assert.ok(expectedRange, "Range should be defined if it matches any of the expected message: " + d.message);
-      assert.ok(expectedSeverity, "Severity should be defined if it matches any of the expected messages: " + d.message);
+      assert.ok(expectedRange, 'Range should be defined if it matches any of the expected message: ' + d.message);
+      assert.ok(
+        expectedSeverity,
+        'Severity should be defined if it matches any of the expected messages: ' + d.message
+      );
 
-      assert.strictEqual(d.range.start.line, expectedRange['start-line']-1);
-      assert.strictEqual(d.range.end.line, expectedRange['end-line']-1);
-      assert.strictEqual(d.range.start.character, expectedRange['start-column']-1);
-      assert.strictEqual(d.range.end.character, expectedRange['end-column']-1);
+      assert.strictEqual(d.range.start.line, expectedRange['start-line'] - 1);
+      assert.strictEqual(d.range.end.line, expectedRange['end-line'] - 1);
+      assert.strictEqual(d.range.start.character, expectedRange['start-column'] - 1);
+      assert.strictEqual(d.range.end.character, expectedRange['end-column'] - 1);
       assert.strictEqual(d.severity, expectedSeverity);
     }
   });

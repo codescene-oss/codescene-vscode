@@ -1,12 +1,10 @@
-import path from 'path';
 import vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { roundScore } from '../review/utils';
+import { vscodeRange } from '../review/utils';
 import { pluralize } from '../utils';
 import { DeltaAnalysisState } from './analyser';
-import { ChangeDetails, DeltaForFile, Location, getStartLine, isDegradation, isImprovement } from './model';
+import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
 import { toFileWithIssuesUri } from './presentation';
-import { error } from 'console';
 
 const fgColor = new vscode.ThemeColor('foreground');
 const okColor = new vscode.ThemeColor('terminal.ansiGreen');
@@ -17,7 +15,7 @@ export function issuesCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>)
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaIssue) {
-      return prev + (isDegradation(curr.changeDetails['change-type']) ? 1 : 0);
+      return prev + (isDegradation(curr.changeDetail['change-type']) ? 1 : 0);
     }
     return prev + (curr.children ? issuesCount(curr.children) : 0);
   }, 0);
@@ -50,13 +48,12 @@ export class FileWithIssues implements DeltaTreeViewItem {
   }
 
   private createCodeHealthInfo(deltaForFile: DeltaForFile) {
-    const scoreLabel = `Code Health: ${
-      deltaForFile['old-score'] ? roundScore(deltaForFile['old-score']) : 'n/a'
-    } → ${roundScore(deltaForFile['new-score'])}`;
+    const scoreLabel = `Code Health: ${scorePresentation(deltaForFile)}`;
     const scoreInfo = new vscode.TreeItem(scoreLabel);
     scoreInfo.tooltip = 'The Code health for this file is declining. Explore the functions below for more details.';
 
-    const iconByScore = (score: number) => {
+    const iconByScore = (score?: number) => {
+      if (!score) return;
       if (score >= 9) {
         return new vscode.ThemeIcon('info', okColor);
       } else if (score >= 4) {
@@ -72,47 +69,27 @@ export class FileWithIssues implements DeltaTreeViewItem {
 
   updateChildren(deltaForFile: DeltaForFile) {
     this.codeHealthInfo = this.createCodeHealthInfo(deltaForFile);
-
-    const functions: Map<string, DeltaFunctionInfo> = new Map();
-    this.fileLevelIssues = [];
-    deltaForFile.findings.forEach((finding) => {
-      // Find all functions with locations and create DeltaFunctionInfo for them
-      finding['change-details'].forEach((changeDetail) => {
-        // File level issues
-        if (!changeDetail.locations) {
-          this.fileLevelIssues.push(new DeltaIssue(this, finding.category, changeDetail));
-          return;
-        }
-
-        // Function "locations" might be nested under several different "findings"
-        // We'll save them in a map to easily retreive them before adding the DeltaIssues
-        changeDetail.locations.forEach((location) => {
-          const key = location.function;
-          let fnInfo = functions.get(key);
-          if (!fnInfo) {
-            fnInfo = new DeltaFunctionInfo(
-              this,
-              location,
-              refactoringFromLocation(location, deltaForFile.refactorings)
-            );
-            functions.set(key, fnInfo);
-          }
-
-          fnInfo.children.push(new DeltaIssue(fnInfo, finding.category, changeDetail, location));
-        });
-      });
+    this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
+    this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
+      const refactoring = refactoringFromFunction(finding.function, deltaForFile.refactorings);
+      const functionInfo = new DeltaFunctionInfo(this, finding.function, refactoring);
+      finding['change-details'].forEach((changeDetail) =>
+        functionInfo.children.push(new DeltaIssue(functionInfo, changeDetail))
+      );
+      return functionInfo;
     });
-
-    // Collect all values in the functions map and sort them by line number, then refactorability
-    this.functionLevelIssues = Array.from(functions.values());
-
     this.sortAndSetChildren();
   }
 
+  /**
+   * Sort function level issues by line number, then refactorability.
+   * After that, set the children array with the code health info first,
+   * then file level and function level issues.
+   */
   sortAndSetChildren() {
     this.functionLevelIssues
-      .sort((a, b) => a.position.line - b.position.line)
-      .sort((a, b) => (a.refactoring?.shouldPresent() ? -1 : 1));
+      .sort((a, b) => a.range.start.line - b.range.start.line)
+      .sort((a) => (a.refactoring?.shouldPresent() ? -1 : 1));
 
     this.children = this.codeHealthInfo ? [this.codeHealthInfo] : [];
     this.children.push(...this.fileLevelIssues, ...this.functionLevelIssues);
@@ -133,12 +110,12 @@ export class FileWithIssues implements DeltaTreeViewItem {
 
 export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly fnName: string;
-  readonly position: vscode.Position;
+  readonly range: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
-  constructor(readonly parent: FileWithIssues, readonly location: Location, public refactoring?: CsRefactoringRequest) {
-    this.fnName = location.function;
-    this.position = locationToPos(location);
+  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public refactoring?: CsRefactoringRequest) {
+    this.fnName = fnMeta.name;
+    this.range = vscodeRange(fnMeta.range);
   }
 
   toTreeItem(): vscode.TreeItem {
@@ -203,20 +180,15 @@ export class DeltaInfoItem implements DeltaTreeViewItem {
 export class DeltaIssue implements DeltaTreeViewItem {
   readonly position: vscode.Position;
 
-  constructor(
-    readonly parent: DeltaFunctionInfo | FileWithIssues,
-    readonly category: string,
-    readonly changeDetails: ChangeDetails,
-    location?: Location
-  ) {
-    this.position = locationToPos(location);
+  constructor(readonly parent: DeltaFunctionInfo | FileWithIssues, readonly changeDetail: ChangeDetail) {
+    this.position = new vscode.Position(changeDetail.position.line - 1, changeDetail.position.column - 1);
   }
 
   toTreeItem(): vscode.TreeItem {
-    const item = new vscode.TreeItem(this.category, vscode.TreeItemCollapsibleState.None);
+    const item = new vscode.TreeItem(this.changeDetail.category, vscode.TreeItemCollapsibleState.None);
     item.iconPath = this.iconPath;
     item.command = this.command;
-    item.tooltip = this.changeDetails.description;
+    item.tooltip = this.changeDetail.description;
     return item;
   }
 
@@ -231,9 +203,9 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get iconPath() {
-    if (isDegradation(this.changeDetails['change-type'])) {
+    if (isDegradation(this.changeDetail['change-type'])) {
       return new vscode.ThemeIcon('warning', warningColor);
-    } else if (isImprovement(this.changeDetails['change-type'])) {
+    } else if (isImprovement(this.changeDetail['change-type'])) {
       return new vscode.ThemeIcon('pass', okColor);
     }
     return undefined;
@@ -244,15 +216,11 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 }
 
-function refactoringFromLocation(location: Location, refactorings?: CsRefactoringRequest[]) {
+function refactoringFromFunction(functionInfo: FunctionInfo, refactorings?: CsRefactoringRequest[]) {
   if (!refactorings) return;
   return refactorings.find(
     (refactoring) =>
-      refactoring.fnToRefactor.name === location.function &&
-      refactoring.fnToRefactor.range.start.line === getStartLine(location) - 1
+      refactoring.fnToRefactor.name === functionInfo.name &&
+      refactoring.fnToRefactor.range.start.line === functionInfo.range['start-line'] - 1
   );
-}
-
-function locationToPos(location?: Location) {
-  return location ? new vscode.Position(getStartLine(location) - 1, 0) : new vscode.Position(0, 0);
 }

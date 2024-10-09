@@ -129,14 +129,14 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         <div class="function-name flex-row large"><span class="codicon codicon-symbol-method"></span><span>${functionInfo.fnName}</span></div>
         <div class="function-coordinate flex-row">
           <div class="flex-row">${fileName}</div> <!-- TODO seti file type theme icon ? -->
-          <div class="flex-row"><span class="codicon codicon-list-flat"></span> Line:${functionInfo.position.line}</div>
+          <div class="flex-row"><span class="codicon codicon-list-flat"></span> Line:${functionInfo.range.start.line}</div>
         </div>
       </div>
     `;
   }
 
   private functionDescription(functionInfo: DeltaFunctionInfo) {
-    const categories = functionInfo.children.map((issue) => issue.category);
+    const categories = functionInfo.children.map((issue) => issue.changeDetail.category);
     const description =
       categories.length > 0 &&
       /*html*/ `
@@ -183,10 +183,10 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
       <div class="issue">
         <div class="flex-row">
           <span class="codicon codicon-warning"></span> 
-          <strong>${issue.category}</strong>
+          <strong>${issue.changeDetail.category}</strong>
           <a href="" class="issue-icon-link" issue-index="${ix}"><span class="codicon codicon-link-external"></span></a>
         </div>
-        ${issue.changeDetails.description}
+        ${issue.changeDetail.description}
       </div>
       `
     );

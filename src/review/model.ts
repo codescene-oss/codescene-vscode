@@ -1,37 +1,28 @@
 // This details the structure of the JSON output from the 'cs review' command
+/* eslint-disable @typescript-eslint/naming-convention */
 export interface ReviewResult {
-    score: number;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'file-level-code-smells': CodeSmell[];
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'function-level-code-smells': ReviewFunction[];
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'expression-level-code-smells': CodeSmell[];
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'raw-score': string;
-  }
+  score: number;
+  'file-level-code-smells': CodeSmell[];
+  'function-level-code-smells': ReviewFunction[];
+  'expression-level-code-smells': CodeSmell[];
+  'raw-score': string;
+}
 
-  export interface Range {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'start-line': number;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'start-column': number;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'end-line': number;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'end-column': number;
-  }
+export interface Range {
+  'start-line': number;
+  'start-column': number;
+  'end-line': number;
+  'end-column': number;
+}
 
-  export interface CodeSmell { 
-    category: string;
-    details: string;
-    range: Range;
-  }
-  
-  export interface ReviewFunction {
-    function: string;
-    range: Range;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'code-smells': CodeSmell[];
-  }
-  
+export interface CodeSmell {
+  category: string;
+  details: string;
+  'highlight-range': Range;
+}
+
+export interface ReviewFunction {
+  function: string;
+  range: Range;
+  'code-smells': CodeSmell[];
+}

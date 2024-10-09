@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import { scorePresentation } from '../code-health-monitor/model';
 import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { toDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
-import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails, roundScore } from './utils';
+import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
 
 export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.CodeLens>, vscode.Disposable {
   private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
@@ -48,10 +49,8 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
 
     const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
     if (isDefined(delta)) {
-      const oldScore = delta['old-score'] ? roundScore(delta['old-score']) : 'n/a';
-      const newScore = roundScore(delta['new-score']);
       codeLens.command = {
-        title: `$(pulse) Code Health: ${oldScore} → ${newScore}`,
+        title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
         command: 'codescene.codeHealthMonitorView.focus',
       };
       return [codeLens];

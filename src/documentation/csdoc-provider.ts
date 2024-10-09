@@ -44,7 +44,7 @@ export interface InteractiveDocsParams {
 }
 
 export function issueToDocsParams(issue: DeltaIssue, request?: CsRefactoringRequest) {
-  return toDocsParams(issue.category, issue.position, issue.parentUri, request);
+  return toDocsParams(issue.changeDetail.category, issue.position, issue.parentUri, request);
 }
 
 export function toDocsParams(
