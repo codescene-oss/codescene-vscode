@@ -90,11 +90,11 @@ class ReviewCache {
   /**
    * Get the current review for this document given the document.version matches the review item version.
    */
-  getExactVersion(document: vscode.TextDocument): CsReview | undefined {
+  getExactVersion(document: vscode.TextDocument): ReviewCacheItem | undefined {
     // If we have a cached promise for this document, return it.
     const reviewItem = this.get(document);
     if (reviewItem && reviewItem.documentVersion === document.version) {
-      return reviewItem.review;
+      return reviewItem;
     }
   }
 
@@ -170,8 +170,8 @@ class CachingReviewer {
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): CsReview {
     if (!reviewOpts.skipCache) {
       // If we have a cached CsReview for this document/version combination, return it.
-      const review = this.reviewCache.getExactVersion(document);
-      if (review) return review;
+      const reviewCacheItem = this.reviewCache.getExactVersion(document);
+      if (reviewCacheItem) return reviewCacheItem.review;
     }
 
     this.startReviewEvent(document);
