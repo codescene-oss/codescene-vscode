@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { onDidChangeConfiguration } from '../configuration';
+import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { issueToDocsParams } from '../documentation/csdoc-provider';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './tree-model';
@@ -46,6 +46,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     const documentUri = functionInfo.parent.uri;
     this.disposables = [
       onDidChangeConfiguration('previewCodeHealthMonitoring', () => this.dismiss()),
+      onDidChangeConfiguration('enableReviewCodeLenses', () => this.showFor(functionInfo)),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri !== documentUri) return;
         this.dismiss();
@@ -56,40 +57,52 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
       }),
     ];
 
-    // To define the order of the code lenses on the same line, use the order to set and increment the column/character position
-    let order = 0;
-    const lensRange = (pos: vscode.Position) =>
-      new vscode.Range(pos.with({ character: order++ }), pos.with({ character: order++ }));
-
-    if (functionInfo.refactoring) {
-      this.codeLenses.push(
-        new vscode.CodeLens(lensRange(functionInfo.range.start), {
-          title: '$(sparkle) CodeScene ACE',
-          command: 'codescene.presentRefactoring',
-          arguments: [functionInfo.refactoring],
-        })
-      );
+    const refactorCodeLenses = this.refactorCodeLenses(functionInfo);
+    const issueCodeLenses: vscode.CodeLens[] = [];
+    if (!reviewCodeLensesEnabled()) {
+      let order = 1;
+      functionInfo.children.forEach((issue) => {
+        const range = this.lensRange(issue.position, order++);
+        issueCodeLenses.push(
+          new vscode.CodeLens(range, {
+            title: `$(warning) ${issue.changeDetail.category}`,
+            command: 'codescene.openInteractiveDocsPanel',
+            arguments: [issueToDocsParams(issue, functionInfo.refactoring)],
+          })
+        );
+      });
+      if (refactorCodeLenses.length === 2) {
+        refactorCodeLenses[1].range = this.lensRange(refactorCodeLenses[1].range.start, order++);
+      }
     }
-    functionInfo.children.forEach((issue) => {
-      const range = lensRange(issue.position);
-      this.codeLenses.push(
-        new vscode.CodeLens(range, {
-          title: `$(warning) ${issue.changeDetail.category}`,
-          command: 'codescene.openInteractiveDocsPanel',
-          arguments: [issueToDocsParams(issue, functionInfo.refactoring)],
-        })
-      );
-    });
 
-    this.codeLenses.push(
-      new vscode.CodeLens(lensRange(functionInfo.range.start), {
+    this.codeLenses = refactorCodeLenses ? [...refactorCodeLenses, ...issueCodeLenses] : issueCodeLenses;
+    this.update();
+  }
+
+  /**
+   * The order of the code lenses on the same line (and from the same provider) is decided by the start character in
+   * the range
+   * */
+  private lensRange(pos: vscode.Position, character: number) {
+    return new vscode.Range(pos.with({ character }), pos.with({ character }));
+  }
+
+  private refactorCodeLenses(functionInfo: DeltaFunctionInfo): [vscode.CodeLens, vscode.CodeLens] | [] {
+    if (!functionInfo.refactoring) return [];
+
+    const startOfLine = functionInfo.range.start.with({ character: 0 });
+    return [
+      new vscode.CodeLens(new vscode.Range(startOfLine, startOfLine), {
+        title: '$(sparkle) CodeScene ACE',
+        command: 'codescene.presentRefactoring',
+        arguments: [functionInfo.refactoring],
+      }),
+      new vscode.CodeLens(new vscode.Range(startOfLine.with({ character: 1 }), startOfLine.with({ character: 1 })), {
         title: '$(circle-slash) Dismiss',
         command: 'codescene.monitorCodeLens.dismiss',
-        arguments: [documentUri],
-      })
-    );
-
-    this.update();
+      }),
+    ];
   }
 
   private clear() {

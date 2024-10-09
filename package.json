@@ -51,6 +51,10 @@
       {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
+      },
+      {
+        "command": "codescene.toggleReviewCodeLenses",
+        "title": "CodeScene: Toggle Review CodeLenses"
       }
     ],
     "viewsContainers": {
@@ -104,10 +108,10 @@
     "configuration": {
       "title": "CodeScene",
       "properties": {
-        "codescene.enableCodeLenses": {
+        "codescene.enableReviewCodeLenses": {
           "type": "boolean",
           "default": true,
-          "description": "Enable CodeScene code lenses",
+          "description": "Show CodeLenses for review diagnostics",
           "order": 1
         },
         "codescene.previewCodeHealthMonitoring": {

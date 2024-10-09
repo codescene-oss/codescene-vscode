@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { scorePresentation } from '../code-health-monitor/model';
-import { getConfiguration, onDidChangeConfiguration } from '../configuration';
+import { getConfiguration, onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { toDocsParams } from '../documentation/csdoc-provider';
 import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
@@ -8,22 +8,20 @@ import Reviewer, { ReviewCacheItem } from './reviewer';
 import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
 
 export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.CodeLens>, vscode.Disposable {
-  private onDidChangeCodeLensesEmitter = new vscode.EventEmitter<void>();
+  private changeCodeLensesEmitter = new vscode.EventEmitter<void>();
+  onDidChangeCodeLenses = this.changeCodeLensesEmitter.event;
+
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
-    this.disposables.push(onDidChangeConfiguration('enableCodeLenses', () => this.onDidChangeCodeLensesEmitter.fire()));
     this.disposables.push(
+      onDidChangeConfiguration('enableReviewCodeLenses', () => this.changeCodeLensesEmitter.fire()),
       Reviewer.instance.onDidReview((event) => {
         if (event.type === 'end') {
-          this.onDidChangeCodeLensesEmitter.fire();
+          this.changeCodeLensesEmitter.fire();
         }
       })
     );
-  }
-
-  get onDidChangeCodeLenses(): vscode.Event<void> {
-    return this.onDidChangeCodeLensesEmitter.event;
   }
 
   dispose() {
@@ -31,61 +29,53 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
-    // Return early if code lenses are disabled or reviewer uninitialized.
-    if (!isDefined(Reviewer.instance)) return;
-
     const cacheItem = Reviewer.instance.reviewCache.get(document);
     if (!cacheItem) return;
 
-    if (getConfiguration('previewCodeHealthMonitoring')) {
-      return this.codeHealthMonitorLenses(cacheItem);
-    } else {
-      return this.legacyCodeLenses(cacheItem);
-    }
+    const scoreLens = this.provideScoreLens(cacheItem);
+    const diagnosticsLenses = this.provideDiagnosticsLenses(cacheItem);
+    return Promise.all([scoreLens, diagnosticsLenses]).then(([scoreLens, diagnosticsLenses]) => {
+      return [scoreLens, ...diagnosticsLenses];
+    });
   }
 
-  private async codeHealthMonitorLenses(cacheItem: ReviewCacheItem) {
+  private async provideScoreLens(cacheItem: ReviewCacheItem) {
     const delta = cacheItem.delta;
 
     const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
-    if (isDefined(delta)) {
+    if (isDefined(delta) && getConfiguration('previewCodeHealthMonitoring')) {
       codeLens.command = {
         title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
         command: 'codescene.codeHealthMonitorView.focus',
       };
-      return [codeLens];
+      return codeLens;
     } else {
-      return cacheItem.review.scorePresentation.then((scorePresentation) => {
-        codeLens.command = {
-          title: `$(pulse) Code Health: ${scorePresentation}`,
-          command: 'markdown.showPreviewToSide',
-          arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
-        };
-        return [codeLens];
-      });
+      const scorePresentation = await cacheItem.review.scorePresentation;
+      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`);
+      return codeLens;
     }
   }
 
-  private async legacyCodeLenses(cacheItem: ReviewCacheItem) {
-    if (!getConfiguration('enableCodeLenses')) {
+  private async provideDiagnosticsLenses(cacheItem: ReviewCacheItem) {
+    if (!reviewCodeLensesEnabled()) {
       return [];
     }
-
     const diagnostics = await cacheItem.review.diagnostics;
 
     if (!diagnostics || diagnostics.length === 0) {
       return [];
     }
 
-    return diagnostics.map((diagnostic) => {
-      const codeLens = new vscode.CodeLens(diagnostic.range);
-      if (isGeneralDiagnostic(diagnostic)) {
-        codeLens.command = this.showCodeHealthDocsCommand(diagnostic.message);
-      } else {
-        codeLens.command = this.openInteractiveDocsCommand(diagnostic, cacheItem.review.document.uri);
-      }
-      return codeLens;
-    });
+    return diagnostics
+      .map((diagnostic) => {
+        if (!isGeneralDiagnostic(diagnostic)) {
+          return new vscode.CodeLens(
+            diagnostic.range,
+            this.openInteractiveDocsCommand(diagnostic, cacheItem.review.document.uri)
+          );
+        }
+      })
+      .filter(isDefined);
   }
 
   private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, documentUri: vscode.Uri) {
