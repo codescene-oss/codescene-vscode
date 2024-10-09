@@ -2,8 +2,7 @@ import { readFile } from 'fs/promises';
 import path, { join } from 'path';
 import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { FnToRefactor } from '../refactoring/commands';
-import Reviewer from '../review/reviewer';
+import { FnToRefactor, RefactoringTarget } from '../refactoring/commands';
 import { getLogoUrl, isDefined } from '../utils';
 import { getUri, nonce } from '../webviews/utils';
 import { categoryToDocsCode, InteractiveDocsParams } from './csdoc-provider';
@@ -74,10 +73,7 @@ export class DocumentationPanel implements Disposable {
   }
 
   private async updateWebView(params: InteractiveDocsParams) {
-    const {
-      codeSmell: { category, position },
-      documentUri,
-    } = params;
+    const { codeSmell, documentUri } = params;
 
     // Set webview state (including request if available)
     this.state = params;
@@ -86,7 +82,7 @@ export class DocumentationPanel implements Disposable {
       this.state.fnToRefactor = this.state.request.fnToRefactor;
     }
 
-    const title = category;
+    const title = codeSmell.category;
     this.webViewPanel.title = `CodeScene - ${title}`;
 
     const webviewScript = this.getUri('out', 'documentation', 'webview-script.js');
@@ -100,10 +96,10 @@ export class DocumentationPanel implements Disposable {
     if (this.state.document && this.state.fnToRefactor) {
       hideRefactorButton = false;
     } else {
-      this.attemptRefactoring(documentUri, position);
+      this.attemptRefactoring(documentUri, codeSmell);
     }
 
-    const docsContent = await this.docsForCategory(category);
+    const docsContent = await this.docsForCategory(codeSmell.category);
 
     const webView = this.webViewPanel.webview;
     webView.html = /*html*/ `
@@ -129,7 +125,7 @@ export class DocumentationPanel implements Disposable {
         <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
         <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
 
-        ${this.documentationHeaderContent(hideRefactorButton, documentUri, position)}
+        ${this.documentationHeaderContent(hideRefactorButton, documentUri,  codeSmell.position)}
         <br>
         ${docsContent}
     </body>
@@ -159,12 +155,12 @@ export class DocumentationPanel implements Disposable {
    * If found, it will post for a refactoring, save the request reference, and at the same time
    * send a message to the webview to show the refactor button.
    */
-  private attemptRefactoring(documentUri: Uri, position: vscode.Position) {
+  private attemptRefactoring(documentUri: Uri, codeSmell: CategoryWithPosition) {
     if (CsExtensionState.acePreflight) {
       // Asynchronously open doc and find refactorable function, then posting a message back to the
       // webview to show the refactor button. (see webview-script.ts)
       void vscode.workspace.openTextDocument(documentUri).then((document) => {
-        void this.findRefactorableFunction(document, position.line).then((fnToRefactor) => {
+        void this.findRefactorableFunction(document, codeSmell).then((fnToRefactor) => {
           if (!this.state) return;
           this.state.document = document;
           this.state.fnToRefactor = fnToRefactor;
@@ -178,14 +174,12 @@ export class DocumentationPanel implements Disposable {
     }
   }
 
-  private async findRefactorableFunction(document: vscode.TextDocument, lineNo: number) {
-    const diagnostics = await Reviewer.instance.review(document).diagnostics;
-    const diagnosticsAtLine = diagnostics.filter((d) => d.range.start.line === lineNo);
+  private async findRefactorableFunction(document: vscode.TextDocument, codeSmell: CategoryWithPosition) {
+    const refactoringTarget: RefactoringTarget = { category: codeSmell.category, line: codeSmell.position.line + 1 };
     const fnToRefactor = await vscode.commands.executeCommand<FnToRefactor | undefined>(
       'codescene.getFunctionToRefactor',
       document,
-      diagnosticsAtLine,
-      lineNo
+      [refactoringTarget]
     );
     return fnToRefactor;
   }

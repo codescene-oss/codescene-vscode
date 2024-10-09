@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 import { csSource } from '../diagnostics/cs-diagnostics';
-import { fnCoordinateToRange } from '../diagnostics/utils';
 import { isDefined } from '../utils';
-import { ReviewFunction, ReviewResult, CodeSmell } from './model';
+import { CodeSmell, Range, ReviewFunction, ReviewResult } from './model';
 
 const chScorePrefix = 'Code health score: ';
 const noApplicationCode = 'No application code detected for scoring';
@@ -21,19 +20,27 @@ function createGeneralDiagnostic(reviewResult: ReviewResult) {
 }
 
 export function reviewFunctionToDiagnostics(reviewFunction: ReviewFunction, document: vscode.TextDocument) {
-    let diagnostics: vscode.Diagnostic[] = [];
-    for (const codeSmell of reviewFunction['code-smells']) {
-        const diagnostic = reviewCodeSmellToDiagnostics(codeSmell, document);
-        diagnostics.push(diagnostic);
-    }
-    return diagnostics;
+  let diagnostics: vscode.Diagnostic[] = [];
+  for (const codeSmell of reviewFunction['code-smells']) {
+    const diagnostic = reviewCodeSmellToDiagnostics(codeSmell, document);
+    diagnostics.push(diagnostic);
+  }
+  return diagnostics;
+}
+
+export function vscodeRange(modelRange: Range) {
+  return new vscode.Range(
+    modelRange['start-line'] - 1,
+    modelRange['start-column'] - 1,
+    modelRange['end-line'] - 1,
+    modelRange['end-column'] - 1
+  );
 }
 
 export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vscode.TextDocument) {
   const category = codeSmell.category;
-  const codeSmellRange = codeSmell.range;
-  const range = new vscode.Range(codeSmellRange['start-line']-1, codeSmellRange['start-column']-1, codeSmellRange['end-line']-1, codeSmellRange['end-column']-1);
-  
+  const range = vscodeRange(codeSmell['highlight-range']);
+
   let message;
   if (codeSmell.details) {
     message = addDetails(category, codeSmell.details);
@@ -42,8 +49,8 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   }
   const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
   diagnostic.source = csSource;
-  diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document); 
-  return diagnostic; 
+  diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document);
+  return diagnostic;
 }
 
 export function roundScore(score: number): number {
@@ -68,15 +75,15 @@ export function removeDetails(diagnosticMessage: string) {
 
 export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
   let diagnostics: vscode.Diagnostic[] = [];
-  for(const fun of reviewResult['function-level-code-smells']) {
+  for (const fun of reviewResult['function-level-code-smells']) {
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
   }
 
-  for(const codeSmell of reviewResult['expression-level-code-smells']) {
+  for (const codeSmell of reviewResult['expression-level-code-smells']) {
     diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
   }
-  
-  for(const codeSmell of reviewResult['file-level-code-smells']) {
+
+  for (const codeSmell of reviewResult['file-level-code-smells']) {
     diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
   }
 

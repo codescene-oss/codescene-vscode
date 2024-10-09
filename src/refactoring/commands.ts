@@ -23,6 +23,11 @@ interface FnCodeSmell {
   relativeEndLine: number;
 }
 
+export interface RefactoringTarget {
+  line: number; // 1-indexed line numbers (from Devtools API)
+  category: string;
+}
+
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private extensionUri: vscode.Uri;
@@ -58,20 +63,20 @@ export class CsRefactoringCommands implements vscode.Disposable {
     });
   }
 
-  private async requestRefactoringsCmd(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    const distinctFns = await this.supportedDistinctFnsToRefactor(document, diagnostics);
+  private async requestRefactoringsCmd(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
+    const distinctFns = await this.supportedDistinctFnsToRefactor(document, refactoringTargets);
     if (!distinctFns) return;
     return CsRefactoringRequests.initiate(document, distinctFns);
   }
 
-  private async getFunctionToRefactorCmd(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
-    const distinctFns = await this.supportedDistinctFnsToRefactor(document, diagnostics);
+  private async getFunctionToRefactorCmd(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
+    const distinctFns = await this.supportedDistinctFnsToRefactor(document, refactoringTargets);
     return distinctFns?.[0];
   }
 
-  private async supportedDistinctFnsToRefactor(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+  private async supportedDistinctFnsToRefactor(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
     if (vscode.languages.match(this.documentSelector, document) === 0) return;
-    return await this.findFunctionsToRefactor(document, diagnostics);
+    return await this.findFunctionsToRefactor(document, refactoringTargets);
   }
 
   private initiateRefactoringForFunction(document: vscode.TextDocument, fnToRefactor: FnToRefactor) {
@@ -80,20 +85,19 @@ export class CsRefactoringCommands implements vscode.Disposable {
     return requests[0];
   }
 
-  private async findFunctionsToRefactor(document: vscode.TextDocument, diagnostics: vscode.Diagnostic[]) {
+  private async findFunctionsToRefactor(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
+    const supportedTargets = refactoringTargets.filter((d: RefactoringTarget) =>
+      this.preflightResponse.supported['code-smells'].includes(d.category)
+    );
+
+    const distinctSupportedLines = new Set(supportedTargets.map((d: RefactoringTarget) => d.line));
+    const enclosingFns = await findEnclosingFunctions(
+      document.fileName,
+      [...distinctSupportedLines],
+      document.getText()
+    );
+
     const maxInputLoc = this.preflightResponse['max-input-loc'];
-
-    // Filter diagnostics that are currently supported by ACE
-    const supported = this.supportedDiagnostics(diagnostics);
-
-    // Get distinct ranges so we don't have to run findFunctionToRefactor for the same range multiple times
-    const distinctRanges = supported
-      .filter((diag, i, diags) => diags.findIndex((d) => d.range.isEqual(diag.range)) === i)
-      .map((d) => d.range);
-
-    const lineNumbers = distinctRanges.map((r) => r.start.line + 1); // range.start.line is zero-based
-    const enclosingFns = await findEnclosingFunctions(document.fileName, lineNumbers, document.getText());
-
     return enclosingFns
       .filter((enclosingFn) => {
         const activeLoc = enclosingFn['active-code-size'];
@@ -103,17 +107,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
         );
         return false;
       })
-      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, supported))
+      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, supportedTargets))
       .sort((a, b) => linesOfCode(a.range) - linesOfCode(b.range));
-  }
-
-  private supportedDiagnostics(diagnostics: vscode.Diagnostic[]) {
-    return diagnostics.filter((d: vscode.Diagnostic) => {
-      if (typeof d.code === 'string') return this.preflightResponse.supported['code-smells'].includes(d.code);
-      if (typeof d.code === 'object') {
-        return this.preflightResponse.supported['code-smells'].includes(d.code.value.toString());
-      }
-    });
   }
 
   dispose() {
@@ -130,10 +125,10 @@ function linesOfCode(range: vscode.Range) {
 function toFnToRefactor(
   enclosingFn: EnclosingFn,
   document: vscode.TextDocument,
-  supportedDiagnostics: vscode.Diagnostic[]
+  refactoringTargets: RefactoringTarget[]
 ) {
   const range = rangeFromEnclosingFn(enclosingFn);
-  const codeSmells = codeSmellsFromDiagnostics(supportedDiagnostics, range);
+  const codeSmells = targetsInRange(refactoringTargets, range);
   return {
     name: enclosingFn.name,
     range,
@@ -144,24 +139,16 @@ function toFnToRefactor(
   } as FnToRefactor;
 }
 
-/**
- * Returns the code smells for each diagnostic, with the relative start/end line being
- * relative to the enclosing function range.
- *
- * @returns
- */
-export function codeSmellsFromDiagnostics(diagnostics: Diagnostic[], fnRange: vscode.Range) {
-  return diagnostics
-    .map((d) => {
-      const category = getCsDiagnosticCode(d.code);
-      if (!category) return;
+export function targetsInRange(refactoringTargets: RefactoringTarget[], fnRange: vscode.Range) {
+  return refactoringTargets
+    .filter((target) => target.line >= fnRange.start.line + 1 && target.line <= fnRange.end.line + 1)
+    .map((target) => {
       return {
-        category,
-        relativeStartLine: d.range.start.line - fnRange.start.line,
-        relativeEndLine: fnRange.end.line - d.range.end.line,
+        category: target.category,
+        relativeStartLine: target.line - (fnRange.start.line + 1),
+        relativeEndLine: fnRange.end.line + 1 - target.line,
       } as FnCodeSmell;
-    })
-    .filter(isDefined);
+    });
 }
 
 // Note that vscode.Range line numbers are zero-based, while the CodeScene API uses 1-based line numbers

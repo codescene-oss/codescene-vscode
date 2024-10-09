@@ -1,13 +1,11 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
-import { csSource } from '../diagnostics/cs-diagnostics';
-import { fnCoordinateToRange } from '../diagnostics/utils';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { RefactoringTarget } from '../refactoring/commands';
 import { isDefined } from '../utils';
-import { DeltaForFile, Finding, getEndLine, getStartLine, isDegradation } from './model';
+import { DeltaForFile, isDegradation } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -91,15 +89,12 @@ export class DeltaAnalyser {
         }
         deltaResult = JSON.parse(result.stdout) as DeltaForFile;
         if (CsExtensionState.acePreflight) {
-          requestRefactoringsForDegradation({
-            document,
-            deltaResult,
-            supportedCodeSmells: CsExtensionState.acePreflight.supported['code-smells'],
-          });
+          requestRefactoringsForDegradation({ document, deltaResult });
         }
         return deltaResult;
       })
       .catch((error) => {
+        logOutputChannel.error('Error during delta analysis:', error);
         this.errorEmitter.fire(error);
       })
       .finally(() => {
@@ -109,55 +104,25 @@ export class DeltaAnalyser {
 }
 
 /**
- * Try to send a refactoring request for all supported degradations found in the document.
+ * Try to send a refactoring request for all degradations found in the document.
  */
 function requestRefactoringsForDegradation({
   document,
   deltaResult,
-  supportedCodeSmells,
 }: {
   document: vscode.TextDocument;
   deltaResult: DeltaForFile;
-  supportedCodeSmells: string[];
 }) {
-  const diagnostics = diagnosticsForFile(document, deltaResult, supportedCodeSmells);
-  void vscode.commands.executeCommand('codescene.requestRefactorings', document, diagnostics);
-}
-
-function diagnosticsForFile(document: vscode.TextDocument, delta: DeltaForFile, supportedCodeSmells: string[]) {
-  return (
-    delta.findings
-      // Include only supported codesmells
-      .filter((finding) => supportedCodeSmells.includes(finding.category))
-      .flatMap((finding) => {
-        return diagnosticsFromFinding(document, finding);
-      })
-  );
-}
-
-function diagnosticsFromFinding(document: vscode.TextDocument, finding: Finding) {
-  return (
-    finding['change-details']
-      // Only consider degradations
+  const linesAndCategories: RefactoringTarget[] = [];
+  deltaResult['function-level-findings'].flatMap((finding) => {
+    return finding['change-details']
       .filter((changeDetail) => isDegradation(changeDetail['change-type']))
-      .flatMap((changeDetail) => {
-        // function-level issues (file level issues have no locations)
-        return changeDetail.locations?.map((location) => {
-          const range = fnCoordinateToRange(
-            finding.category,
-            {
-              name: location.function,
-              startLine: getStartLine(location),
-              endLine: getEndLine(location),
-            },
-            document
-          );
-          const diagnostic = new vscode.Diagnostic(range, finding.category, vscode.DiagnosticSeverity.Warning);
-          diagnostic.source = csSource;
-          diagnostic.code = finding.category;
-          return diagnostic;
-        });
-      })
-      .filter(isDefined)
-  );
+      .forEach((changeDetail) =>
+        linesAndCategories.push({
+          line: changeDetail.position.line,
+          category: changeDetail.category,
+        })
+      );
+  });
+  void vscode.commands.executeCommand('codescene.requestRefactorings', document, linesAndCategories);
 }

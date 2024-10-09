@@ -58,7 +58,7 @@ export class StatusViewProvider implements WebviewViewProvider, Disposable {
     webView.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case 'open-settings':
-          void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', 'codescene');
+          void vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode');
           return;
         case 'focus-code-health-monitor-view':
           void vscode.commands.executeCommand('codescene.codeHealthMonitorView.focus');

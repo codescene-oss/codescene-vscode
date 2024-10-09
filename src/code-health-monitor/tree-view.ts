@@ -107,8 +107,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
         fileWithIssues.functionLevelIssues.forEach((child) => {
           if (event.requests) {
             const fnReq = event.requests.find(
-              // TODO - child position does not contain a column, so it fntoRefactor.range starts at column > 0 it won't be found!
-              (r) => r.fnToRefactor.name === child.fnName && r.fnToRefactor.range.contains(child.position)
+              (r) => r.fnToRefactor.name === child.fnName && r.fnToRefactor.range.intersection(child.range)
             );
             child.refactoring = fnReq;
           }

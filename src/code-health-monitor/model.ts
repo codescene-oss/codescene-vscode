@@ -1,37 +1,42 @@
-import vscode from 'vscode';
-import path from 'path';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { Range } from '../review/model';
+import { roundScore } from '../review/utils';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface DeltaForFile {
-  name: string;
-  findings: Finding[];
-  'old-score': number | null;
-  'new-score': number;
-  refactorings?: CsRefactoringRequest[]; // Ace specific
+  'old-score'?: number;
+  'new-score'?: number;
+  'file-level-findings': ChangeDetail[];
+  'function-level-findings': FunctionFinding[];
+  refactorings?: CsRefactoringRequest[]; // Added for ACE
 }
 
-export interface Finding {
+export function scorePresentation(delta: DeltaForFile) {
+  const oldScorePresentation = delta['old-score'] ? roundScore(delta['old-score']) : 'n/a';
+  const newScorePresentation = delta['new-score'] ? roundScore(delta['new-score']) : 'n/a';
+  return `${oldScorePresentation} → ${newScorePresentation}`;
+}
+
+export interface FunctionFinding {
+  function: FunctionInfo;
+  'change-details': ChangeDetail[];
+}
+
+export interface ChangeDetail {
+  'change-type': ChangeType;
   category: string;
-  'change-type': ChangeType;
-  'new-pp': number;
-  'change-details': ChangeDetails[];
-  threshold: number;
-}
-
-export interface ChangeDetails {
-  'change-type': ChangeType;
   description: string;
-  value: number;
-  locations?: Location[];
+  position: Position;
 }
 
-export interface Location {
-  'start-line'?: number;
-  'end-line'?: number;
-  'start-line-before'?: number;
-  'end-line-before'?: number;
-  function: string;
+export interface Position {
+  line: number;
+  column: number;
+}
+
+export interface FunctionInfo {
+  name: string;
+  range: Range;
 }
 
 export type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';
@@ -41,17 +46,4 @@ export function isImprovement(changeType: ChangeType) {
 }
 export function isDegradation(changeType: ChangeType) {
   return changeType === 'degraded' || changeType === 'introduced';
-}
-
-export function getStartLine(location: Location) {
-  const lineNo = location['start-line'] || location['start-line-before'];
-  return lineNo || 1;
-}
-export function getEndLine(location: Location) {
-  const lineNo = location['end-line'] || location['end-line-before'];
-  return lineNo || 1;
-}
-
-export function toAbsoluteUri(rootPath: string, relativePath: string) {
-  return vscode.Uri.file(path.join(rootPath, relativePath));
 }
