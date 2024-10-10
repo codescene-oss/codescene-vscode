@@ -62,7 +62,7 @@ async function enableACE(context: vscode.ExtensionContext) {
   if (!CsExtensionState.stateProperties.session) {
     const message = 'Not signed in';
     void vscode.window.showErrorMessage(`Unable to enable refactoring capabilities. ${message}`);
-    return Promise.reject(message);
+    return Promise.reject(new Error(message));
   }
 
   return CsRestApi.instance.fetchRefactorPreflight().then((preflightResponse) => {
