@@ -3,6 +3,7 @@ import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { onDidChangeConfiguration } from './configuration';
+import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
 import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
@@ -10,7 +11,6 @@ import { PreFlightResponse, isPreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
 import Telemetry from './telemetry';
 import { isDefined } from './utils';
-import { StatusViewProvider, registerStatusViewProvider } from './status-view/status-view-provider';
 
 export interface CsFeatures {
   codeHealthAnalysis?: string | Error;
@@ -33,11 +33,11 @@ export interface CsStateProperties {
  */
 export class CsExtensionState {
   readonly stateProperties: CsStateProperties = {};
-  readonly statusViewProvider: StatusViewProvider;
+  readonly controlCenterView: ControlCenterViewProvider;
   readonly statusBar: CsStatusBar;
 
   constructor(context: vscode.ExtensionContext) {
-    this.statusViewProvider = registerStatusViewProvider(context);
+    this.controlCenterView = registerControlCenterViewProvider(context);
     this.statusBar = new CsStatusBar();
   }
 
@@ -99,8 +99,7 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    // TODO - statusviews can read from stateProperties directly
-    CsExtensionState._instance.statusViewProvider.update(CsExtensionState.stateProperties);
+    CsExtensionState._instance.controlCenterView.update(CsExtensionState.stateProperties);
     CsExtensionState._instance.statusBar.update(CsExtensionState.stateProperties);
   }
 
