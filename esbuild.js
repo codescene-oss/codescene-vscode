@@ -43,6 +43,7 @@ function webviewConfig(watch = false) {
       './src/documentation/webview-script.ts',
       './src/status-view/webview-script.ts',
       './src/code-health-monitor/details/webview-script.ts',
+      './src/control-center/webview-script.ts',
     ],
     outdir: './out',
     plugins: [

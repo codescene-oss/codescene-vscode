@@ -55,6 +55,10 @@
       {
         "command": "codescene.toggleReviewCodeLenses",
         "title": "CodeScene: Toggle Review CodeLenses"
+      },
+      {
+        "command": "codescene.showLogOutput",
+        "title": "CodeScene: Show output log"
       }
     ],
     "viewsContainers": {
@@ -72,7 +76,8 @@
           "id": "codescene.statusView",
           "name": "Status",
           "type": "webview",
-          "icon": "$(cs-logo)"
+          "icon": "$(cs-logo)",
+          "when": "false"
         },
         {
           "id": "codescene.codeHealthMonitorView",
@@ -86,6 +91,12 @@
           "icon": "$(cs-logo)",
           "type": "webview",
           "when": "config.codescene.previewCodeHealthMonitoring && codescene.asyncActivationFinished"
+        },
+        {
+          "id": "codescene.controlCenterView",
+          "name": "Control Center",
+          "icon": "$(cs-logo)",
+          "type": "webview"
         }
       ]
     },

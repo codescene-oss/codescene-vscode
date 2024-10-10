@@ -24,7 +24,7 @@ export class CsStatusBar {
     this.statusBarItem.name = 'CodeScene status bar';
     this.statusBarItem.text = this.textContent(stateProperties);
     this.statusBarItem.tooltip = this.tooltipContent(stateProperties);
-    this.statusBarItem.command = 'codescene.statusView.focus';
+    this.statusBarItem.command = 'codescene.controlCenterView.focus';
     this.statusBarItem.backgroundColor = undefined;
   }
 
@@ -54,12 +54,14 @@ export class CsStatusBar {
       // Indicates an error in d/l or verifying the CLI
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
-      this.statusBarItem.tooltip = 'Click to open the status view.';
+      this.statusBarItem.tooltip = 'Click to open the output log.';
+      this.statusBarItem.command = 'codescene.showLogOutput';
     } else if (isDefined(stateProperties.serviceErrors) && stateProperties.serviceErrors.length > 0) {
       // Indicates a service/reviewer error
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
-      this.statusBarItem.tooltip = 'Click to open the status view.';
+      this.statusBarItem.tooltip = 'Click to open the output log.';
+      this.statusBarItem.command = 'codescene.showLogOutput';
     }
   }
 }
