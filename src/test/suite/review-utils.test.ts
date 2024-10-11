@@ -120,7 +120,6 @@ suite('reviewIssueToDiagnostics', () => {
     });
 
     const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-    console.log('Diagnostics length ' + diagnostics.length);
     assert.strictEqual(diagnostics.length, 4);
 
     for (const d of diagnostics) {

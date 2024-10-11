@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+import vscode, { Uri } from 'vscode';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { issueToDocsParams } from '../documentation/csdoc-provider';
 import { reviewDocumentSelector } from '../language-support';
@@ -15,8 +15,8 @@ export function register(context: vscode.ExtensionContext) {
       codeLensProvider.showFor(functionInfo);
       void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
     }),
-    vscode.commands.registerCommand('codescene.monitorCodeLens.dismiss', () => {
-      codeLensProvider.dismiss();
+    vscode.commands.registerCommand('codescene.monitorCodeLens.dismiss', (documentUri: Uri) => {
+      codeLensProvider.dismiss(documentUri);
     })
   );
 }
@@ -25,7 +25,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
   private changeCodeLensesEmitter = new vscode.EventEmitter<void>();
   onDidChangeCodeLenses = this.changeCodeLensesEmitter.event;
 
-  codeLenses: vscode.CodeLens[] = [];
+  private codeLensesMap: Map<Uri, vscode.CodeLens[]> = new Map<Uri, vscode.CodeLens[]>();
 
   // Listeners to dismiss the menu code lenses when the document is changed or closed
   private disposables: vscode.Disposable[] = [];
@@ -34,7 +34,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     document: vscode.TextDocument,
     token: vscode.CancellationToken
   ): vscode.ProviderResult<vscode.CodeLens[]> {
-    return this.codeLenses;
+    return this.codeLensesMap.get(document.uri);
   }
 
   update() {
@@ -42,41 +42,55 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
   }
 
   showFor(functionInfo: DeltaFunctionInfo) {
-    this.clear();
     const documentUri = functionInfo.parent.uri;
+    this.clear(documentUri);
     this.disposables = [
-      onDidChangeConfiguration('previewCodeHealthMonitoring', () => this.dismiss()),
+      onDidChangeConfiguration('previewCodeHealthMonitoring', () => this.dismiss(documentUri)),
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.showFor(functionInfo)),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri !== documentUri) return;
-        this.dismiss();
-      }),
-      vscode.workspace.onDidCloseTextDocument((doc) => {
-        if (doc.uri !== documentUri) return;
-        this.dismiss();
+        this.dismiss(documentUri);
       }),
     ];
 
-    const refactorCodeLenses = this.refactorCodeLenses(functionInfo);
-    const issueCodeLenses: vscode.CodeLens[] = [];
+    const codeLenses = [];
+    const functionStartLine = functionInfo.range.start.with({ character: 0 });
+    if (functionInfo.refactoring) {
+      codeLenses.push(
+        new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
+          title: '$(sparkle) CodeScene ACE',
+          command: 'codescene.presentRefactoring',
+          arguments: [functionInfo.refactoring],
+        })
+      );
+    }
+    let order = 1;
     if (!reviewCodeLensesEnabled()) {
-      let order = 1;
       functionInfo.children.forEach((issue) => {
-        const range = this.lensRange(issue.position, order++);
-        issueCodeLenses.push(
-          new vscode.CodeLens(range, {
+        codeLenses.push(
+          new vscode.CodeLens(this.lensRange(issue.position, order++), {
             title: `$(warning) ${issue.changeDetail.category}`,
             command: 'codescene.openInteractiveDocsPanel',
             arguments: [issueToDocsParams(issue, functionInfo.refactoring)],
           })
         );
       });
-      if (refactorCodeLenses.length === 2) {
-        refactorCodeLenses[1].range = this.lensRange(refactorCodeLenses[1].range.start, order++);
-      }
     }
+    codeLenses.push(
+      new vscode.CodeLens(
+        new vscode.Range(
+          functionStartLine.with({ character: order++ }),
+          functionStartLine.with({ character: order++ })
+        ),
+        {
+          title: '$(circle-slash) Dismiss',
+          command: 'codescene.monitorCodeLens.dismiss',
+          arguments: [functionInfo.parent.uri],
+        }
+      )
+    );
 
-    this.codeLenses = refactorCodeLenses ? [...refactorCodeLenses, ...issueCodeLenses] : issueCodeLenses;
+    this.codeLensesMap.set(documentUri, codeLenses);
     this.update();
   }
 
@@ -88,30 +102,17 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     return new vscode.Range(pos.with({ character }), pos.with({ character }));
   }
 
-  private refactorCodeLenses(functionInfo: DeltaFunctionInfo): [vscode.CodeLens, vscode.CodeLens] | [] {
-    if (!functionInfo.refactoring) return [];
-
-    const startOfLine = functionInfo.range.start.with({ character: 0 });
-    return [
-      new vscode.CodeLens(new vscode.Range(startOfLine, startOfLine), {
-        title: '$(sparkle) CodeScene ACE',
-        command: 'codescene.presentRefactoring',
-        arguments: [functionInfo.refactoring],
-      }),
-      new vscode.CodeLens(new vscode.Range(startOfLine.with({ character: 1 }), startOfLine.with({ character: 1 })), {
-        title: '$(circle-slash) Dismiss',
-        command: 'codescene.monitorCodeLens.dismiss',
-      }),
-    ];
-  }
-
-  private clear() {
+  /**
+   *
+   * @param documentUri The document uri to clear the code lenses for. If not provided, all code lenses are cleared.
+   */
+  private clear(documentUri: Uri) {
+    this.codeLensesMap.delete(documentUri);
     this.disposables.forEach((l) => l.dispose());
-    this.codeLenses = [];
   }
 
-  dismiss() {
-    this.clear();
+  dismiss(documentUri: Uri) {
+    this.clear(documentUri);
     this.update();
   }
 }
