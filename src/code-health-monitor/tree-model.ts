@@ -82,14 +82,19 @@ export class FileWithIssues implements DeltaTreeViewItem {
   }
 
   /**
-   * Sort function level issues by line number, then refactorability.
+   * Sort function level issues by refactorability, then by line number.
    * After that, set the children array with the code health info first,
-   * then file level and function level issues.
+   * then file level and last function level issues.
    */
   sortAndSetChildren() {
-    this.functionLevelIssues
-      .sort((a, b) => a.range.start.line - b.range.start.line)
-      .sort((a) => (a.refactoring?.shouldPresent() ? -1 : 1));
+    this.functionLevelIssues.sort((a, b) => {
+      // Refactorability first
+      const aRef = a.refactoring?.shouldPresent() ? -1 : 1;
+      const bRef = b.refactoring?.shouldPresent() ? -1 : 1;
+      if (aRef !== bRef) return aRef - bRef;
+      // ...then by line number
+      return a.range.start.line - b.range.start.line;
+    });
 
     this.children = this.codeHealthInfo ? [this.codeHealthInfo] : [];
     this.children.push(...this.fileLevelIssues, ...this.functionLevelIssues);
