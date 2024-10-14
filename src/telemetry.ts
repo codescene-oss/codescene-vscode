@@ -60,6 +60,10 @@ export default class Telemetry {
     if (this.session) {
       data['user-id'] = this.session.account.id;
     }
+    if (process.env.X_CODESCENE_INTERNAL) {
+      data['internal?'] = true;
+    }
+
     // To ensure we are sending exactly the same data to the sign command as we are sending in the body of the request,
     // we stringify the data manually.
     const jsonData = JSON.stringify(data);
