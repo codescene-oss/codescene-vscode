@@ -1,13 +1,13 @@
 import vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { vscodeRange } from '../review/utils';
-import { pluralize } from '../utils';
+import { isDefined, pluralize } from '../utils';
 import { DeltaAnalysisState } from './analyser';
 import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
 import { toFileWithIssuesUri } from './presentation';
 
 const fgColor = new vscode.ThemeColor('foreground');
-const okColor = new vscode.ThemeColor('terminal.ansiGreen');
+export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
 const warningColor = new vscode.ThemeColor('editorWarning.foreground');
 export const errorColor = new vscode.ThemeColor('errorForeground');
 
@@ -43,8 +43,8 @@ export class FileWithIssues implements DeltaTreeViewItem {
   private fileLevelIssues: DeltaIssue[] = [];
   public functionLevelIssues: DeltaFunctionInfo[] = [];
 
-  constructor(readonly deltaForFile: DeltaForFile, readonly uri: vscode.Uri) {
-    this.updateChildren(deltaForFile);
+  constructor(public deltaForFile: DeltaForFile, public uri: vscode.Uri) {
+    this.update(deltaForFile, uri);
   }
 
   private createCodeHealthInfo(deltaForFile: DeltaForFile) {
@@ -67,7 +67,21 @@ export class FileWithIssues implements DeltaTreeViewItem {
     return new DeltaInfoItem(scoreInfo);
   }
 
-  updateChildren(deltaForFile: DeltaForFile) {
+  get scoreChange() {
+    const oldScore = this.deltaForFile['old-score'];
+    const newScore = this.deltaForFile['new-score'];
+    if (isDefined(newScore) && isDefined(oldScore)) {
+      return newScore - oldScore;
+    }
+    if (isDefined(newScore)) {
+      return newScore - 10;
+    }
+    return 0;
+  }
+
+  update(deltaForFile: DeltaForFile, uri: vscode.Uri) {
+    this.deltaForFile = deltaForFile;
+    this.uri = uri;
     this.codeHealthInfo = this.createCodeHealthInfo(deltaForFile);
     this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
     this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
