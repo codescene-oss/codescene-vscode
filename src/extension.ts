@@ -9,7 +9,7 @@ import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
-import { logOutputChannel } from './log';
+import { logOutputChannel, registerShowLogCommand } from './log';
 import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
@@ -35,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   CsExtensionState.init(context);
   Telemetry.init(context.extension);
+  registerShowLogCommand(context);
 
   ensureCompatibleBinary(context.extensionPath)
     .then((cliPath) => {
