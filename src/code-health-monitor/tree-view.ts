@@ -11,6 +11,7 @@ import {
   errorColor,
   FileWithIssues,
   issuesCount,
+  okColor,
   refactoringsCount,
 } from './tree-model';
 
@@ -129,7 +130,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     if (fileWithIssues) {
       if (deltaForFile) {
         // Update the existing entry if there are changes
-        fileWithIssues.updateChildren(deltaForFile);
+        fileWithIssues.update(deltaForFile, document.uri);
       } else {
         // If there are no longer any issues, remove the entry from the tree
         this.fileIssueMap.delete(document.uri.fsPath);
@@ -140,11 +141,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
 
     if (this.fileIssueMap.size > 0) {
-      const statusTreeItem = new vscode.TreeItem('Declining changes');
-      statusTreeItem.iconPath = new vscode.ThemeIcon('error', errorColor);
-      statusTreeItem.tooltip = 'Files with changes declining code health';
-      const statusItem = new DeltaInfoItem(statusTreeItem);
-
+      const statusItem = this.statusTreeItem();
       const filesWithIssues = Array.from(this.fileIssueMap.values());
       const { label, tooltip } = this.aceInfoContent(filesWithIssues);
       const aceTreeItem = new vscode.TreeItem(label);
@@ -158,6 +155,30 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
 
     this.update();
+  }
+
+  private statusTreeItem() {
+    const totalScoreChange = Array.from(this.fileIssueMap.values())
+      .map((f) => f.scoreChange)
+      .reduce((acc, score) => acc + score, 0);
+
+    let label = 'Code Health unchanged';
+    let iconPath = new vscode.ThemeIcon('circle-large');
+    let tooltip = 'No changes in code health found';
+    if (totalScoreChange > 0) {
+      label = 'Code Health improving';
+      iconPath = new vscode.ThemeIcon('pass', okColor);
+      tooltip = 'Total code health improved';
+    } else if (totalScoreChange < 0) {
+      label = 'Code Health declining';
+      iconPath = new vscode.ThemeIcon('error', errorColor);
+      tooltip = 'Total code health declined';
+    }
+
+    const statusTreeItem = new vscode.TreeItem(label);
+    statusTreeItem.iconPath = iconPath;
+    statusTreeItem.tooltip = tooltip;
+    return new DeltaInfoItem(statusTreeItem);
   }
 
   private aceInfoContent(files: FileWithIssues[]) {
