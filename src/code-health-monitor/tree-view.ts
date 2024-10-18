@@ -1,4 +1,5 @@
 import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
+import { logOutputChannel } from '../log';
 import { AceAPI, AceRequestEvent } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
 import { isDefined, pluralize } from '../utils';
@@ -13,7 +14,7 @@ import {
   FileWithIssues,
   issuesCount,
   okColor,
-  refactoringsCount,
+  refactoringsCount
 } from './tree-model';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
@@ -34,7 +35,12 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
     this.view.onDidChangeSelection(this.handleSelectionChange, this, this.disposables);
-    this.disposables.push(this.view);
+    this.disposables.push(
+      this.view,
+      vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
+        this.revealAutoRefactorings()
+      )
+    );
   }
 
   private handleTreeDataChange() {
@@ -64,6 +70,17 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     }
   }
 
+  private revealAutoRefactorings() {
+    this.treeDataProvider.tree.forEach((treeItem) => {
+      if (treeItem instanceof FileWithIssues && treeItem.functionLevelIssues.some((issue) => issue.refactoring)) {
+        this.view.reveal(treeItem, { expand: true, select: false, focus: false }).then(
+          () => {},
+          (error) => logOutputChannel.error(`Failed to reveal auto-refactorings: ${error}`)
+        );
+      }
+    });
+  }
+
   isVisible() {
     return this.view.visible;
   }
@@ -79,10 +96,8 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | void> = this.treeDataChangedEmitter.event;
 
   private disposables: vscode.Disposable[] = [];
-
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
-
-  private tree: Array<DeltaTreeViewItem> = [];
+  public tree: Array<DeltaTreeViewItem> = [];
 
   constructor(aceApi?: AceAPI) {
     this.disposables.push(
@@ -107,6 +122,15 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   }
 
   update() {
+    if (this.fileIssueMap.size > 0) {
+      // const statusItem = this.statusTreeItem();
+      const filesWithIssues = Array.from(this.fileIssueMap.values());
+      // const summaryItem = this.issueSummaryItem(filesWithIssues);
+      const aceInfoItem = this.aceSummaryItem(filesWithIssues);
+      this.tree = aceInfoItem ? [aceInfoItem, ...filesWithIssues] : filesWithIssues;
+    } else {
+      this.tree = [];
+    }
     this.treeDataChangedEmitter.fire(); // Fire this to refresh the tree view
   }
 
@@ -133,11 +157,6 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
             child.refactoring = fnReq;
           }
         });
-      } else if (event.type === 'end') {
-        const aceInfo = this.tree[1] as DeltaInfoItem;
-        const { label, tooltip } = this.aceInfoContent(Array.from(this.fileIssueMap.values()));
-        aceInfo.treeItem.label = label;
-        aceInfo.treeItem.tooltip = tooltip;
       }
       fileWithIssues.sortAndSetChildren();
       this.update();
@@ -158,20 +177,6 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     } else if (deltaForFile) {
       // No existing file entry found - add one if there are changes
       this.fileIssueMap.set(document.uri.fsPath, new FileWithIssues(deltaForFile, document.uri));
-    }
-
-    if (this.fileIssueMap.size > 0) {
-      const statusItem = this.statusTreeItem();
-      const filesWithIssues = Array.from(this.fileIssueMap.values());
-      const { label, tooltip } = this.aceInfoContent(filesWithIssues);
-      const aceTreeItem = new vscode.TreeItem(label);
-      aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
-      aceTreeItem.tooltip = tooltip;
-      const aceInfoItem = new DeltaInfoItem(aceTreeItem);
-
-      this.tree = [statusItem, aceInfoItem, ...filesWithIssues];
-    } else {
-      this.tree = [];
     }
 
     this.update();
@@ -201,19 +206,37 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     return new DeltaInfoItem(statusTreeItem);
   }
 
-  private aceInfoContent(files: FileWithIssues[]) {
-    const issues = issuesCount(files);
-    const refactorings = refactoringsCount(files);
-    const label = `${issues} ${pluralize('issue', issues)}, ${refactorings} ${pluralize(
-      'auto-refactor',
-      refactorings
-    )} available`;
+  private issueSummaryItem(filesWithIssues: FileWithIssues[]) {
+    const issues = issuesCount(filesWithIssues);
+    const nFiles = filesWithIssues.length;
+    const label = `Found ${issues} ${pluralize('issue', issues)} in ${nFiles} ${pluralize('file', nFiles)}`;
 
-    const tooltip = `CodeScene found ${issues} ${pluralize('issue', issues)} across ${files.length} ${pluralize(
+    const tooltip = `CodeScene found ${issues} ${pluralize('issue', issues)} across ${nFiles} ${pluralize(
       'file',
-      files.length
-    )}. ${refactorings} ${pluralize('auto-refactoring', refactorings)} is available.`;
-    return { label, tooltip };
+      nFiles
+    )}.`;
+
+    const treeItem = new vscode.TreeItem(label);
+    treeItem.iconPath = new vscode.ThemeIcon('sparkle');
+    treeItem.tooltip = tooltip;
+    return new DeltaInfoItem(treeItem);
+  }
+
+  private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
+    const refactorings = refactoringsCount(filesWithIssues);
+    if (refactorings === 0) {
+      return;
+    }
+    const label = `${refactorings} ${pluralize('auto-refactor', refactorings)} available`;
+    const tooltip = `Click to expand available refactorings`;
+    const aceTreeItem = new vscode.TreeItem(label);
+    aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
+    aceTreeItem.tooltip = tooltip;
+    aceTreeItem.command = {
+      command: 'codescene.codeHealthMonitor.revealAutoRefactorings',
+      title: 'Expand Auto-Refactorings',
+    };
+    return new DeltaInfoItem(aceTreeItem);
   }
 
   getTreeItem(element: DeltaTreeViewItem): vscode.TreeItem {
@@ -225,8 +248,11 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       if (element instanceof DeltaFunctionInfo) return []; // Don't render DeltaIssues when showing functions
       return element.children;
     }
-
     return this.tree;
+  }
+
+  getParent(element: DeltaTreeViewItem): vscode.ProviderResult<DeltaTreeViewItem> {
+    return element.parent;
   }
 
   dispose() {
