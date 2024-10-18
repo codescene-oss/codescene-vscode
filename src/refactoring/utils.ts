@@ -1,5 +1,5 @@
-import { TextDocument, window } from 'vscode';
-import { ReasonsWithDetails } from '../refactoring/model';
+import vscode, { TextDocument, Uri, window } from 'vscode';
+import { RefactorResponse } from '../refactoring/model';
 import { isDefined } from '../utils';
 
 function singleLineCommentSeparator(languageId: string) {
@@ -14,7 +14,8 @@ function singleLineCommentSeparator(languageId: string) {
   }
 }
 
-export function decorateCode(code: string, languageId: string, reasonsWithDetails: ReasonsWithDetails[]) {
+export function decorateCode(refactorResponse: RefactorResponse, languageId: string) {
+  const { code, 'reasons-with-details': reasonsWithDetails } = refactorResponse;
   const allDetails = reasonsWithDetails.flatMap((reason) => reason.details).filter(isDefined);
   if (allDetails.length === 0) return code;
 
@@ -47,4 +48,28 @@ export function targetEditor(document: TextDocument) {
       }
     }
   }
+}
+
+// Use this scheme for the virtual documents when diffing the refactoring
+export function createTmpDiffUriScheme() {
+  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
+    provideTextDocumentContent(uri: vscode.Uri): string {
+      return uri.query;
+    }
+  })();
+  return vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider);
+}
+
+export type CodeWithLangId = {
+  content: string;
+  languageId: string;
+};
+/**
+ * Create a virtual document used for tmp diffing in the editor.
+ * The scheme is registered with a content provider in extension.ts
+ */
+export async function createTempDocument(name: string, code: CodeWithLangId) {
+  const tmpUri = Uri.from({ scheme: 'tmp-diff', path: name, query: code.content });
+  const tmpDoc = await vscode.workspace.openTextDocument(tmpUri);
+  return vscode.languages.setTextDocumentLanguage(tmpDoc, code.languageId);
 }
