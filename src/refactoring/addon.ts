@@ -9,6 +9,7 @@ import { toDistinctLanguageIds } from '../language-support';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
+import { createTmpDiffUriScheme } from './utils';
 
 /**
  * Work in progress API just to keep us from creating too many contact points between
@@ -68,6 +69,7 @@ async function enableACE(context: vscode.ExtensionContext) {
   return CsRestApi.instance.fetchRefactorPreflight().then((preflightResponse) => {
     const commandDisposable = new CsRefactoringCommands(context.extensionUri, preflightResponse);
     aceDisposables.push(commandDisposable);
+    aceDisposables.push(createTmpDiffUriScheme());
 
     /* Add disposables to both subscription context and the extension state list
      * of disposables. This is to ensure they're disposed either when the extension

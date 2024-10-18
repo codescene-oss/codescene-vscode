@@ -1,12 +1,14 @@
-import vscode, { Diagnostic } from 'vscode';
+import vscode, { Position, Range, Selection, TextEditorRevealType, ViewColumn, WorkspaceEdit } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { logOutputChannel } from '../log';
-import { getCsDiagnosticCode } from '../review/utils';
 import { isDefined, registerCommandWithTelemetry } from '../utils';
 import { toRefactoringDocumentSelector } from './addon';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
 import { RefactoringPanel } from './refactoring-panel';
+import { createTempDocument, decorateCode, targetEditor } from './utils';
+import Telemetry from '../telemetry';
 
 export interface FnToRefactor {
   name: string;
@@ -50,7 +52,9 @@ export class CsRefactoringCommands implements vscode.Disposable {
         'codescene.initiateRefactoringForFunction',
         this.initiateRefactoringForFunction,
         this
-      )
+      ),
+      vscode.commands.registerCommand('codescene.applyRefactoring', this.applyRefactoringCmd, this),
+      vscode.commands.registerCommand('codescene.showDiffForRefactoring', this.showDiffForRefactoringCmd, this)
     );
   }
 
@@ -111,10 +115,88 @@ export class CsRefactoringCommands implements vscode.Disposable {
       .sort((a, b) => linesOfCode(a.range) - linesOfCode(b.range));
   }
 
+  private async applyRefactoringCmd(refactoring: CsRefactoringRequest) {
+    const {
+      document,
+      fnToRefactor,
+      fnToRefactor: { range },
+    } = refactoring;
+
+    return refactoring.promise.then(async (response) => {
+      const { level } = response.confidence;
+      if (level < 2) {
+        throw new Error(
+          `Don't apply refactoring for function "${fnToRefactor.name}" - confidence level too low (${response.confidence}).`
+        );
+      }
+      const workSpaceEdit = new WorkspaceEdit();
+      workSpaceEdit.replace(document.uri, range, response.code);
+      await vscode.workspace.applyEdit(workSpaceEdit);
+      // Select the replaced code in the editor, starting from the original position
+      void selectCode(document, response.code, range.start);
+
+      // Immediately trigger a re-review of the new file-content
+      // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
+      CsDiagnostics.review(document);
+      Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoring.traceId });
+    });
+  }
+
+  private async showDiffForRefactoringCmd(refactoring: CsRefactoringRequest) {
+    const {
+      document,
+      fnToRefactor: { range },
+    } = refactoring;
+
+    const response = await refactoring.promise;
+    const decoratedCode = decorateCode(response, document.languageId);
+    // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
+    // imposes a save dialog on the user when closing the diff.
+    const originalCodeTmpDoc = await createTempDocument('Original', {
+      content: document.getText(range),
+      languageId: document.languageId,
+    });
+    const refactoringTmpDoc = await createTempDocument('Refactoring', {
+      content: decoratedCode,
+      languageId: document.languageId,
+    });
+
+    // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
+    // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
+    const editor = targetEditor(document);
+    await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
+    await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
+
+    Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoring.traceId });
+  }
+
   dispose() {
     this.disposables.forEach((d) => d.dispose());
     this.disposables = [];
   }
+}
+
+function rangeFromCode(position: Position, code: string) {
+  const lines = code.split(/\r\n|\r|\n/);
+  const lineDelta = lines.length - 1;
+  const characterDelta = lines[lines.length - 1].length;
+  return new Range(position, position.translate({ lineDelta, characterDelta }));
+}
+
+/**
+ * Opens the document if not already opened, and selects the code at a position in the
+ * editor containing the document
+ */
+async function selectCode(document: vscode.TextDocument, code: string, position: vscode.Position) {
+  const newRange = rangeFromCode(position, code);
+  const editor =
+    targetEditor(document) ||
+    (await vscode.window.showTextDocument(document.uri, {
+      preview: false,
+      viewColumn: ViewColumn.One,
+    }));
+  editor.selection = new Selection(newRange.start, newRange.end);
+  editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 function linesOfCode(range: vscode.Range) {

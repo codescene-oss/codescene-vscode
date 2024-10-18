@@ -68,7 +68,6 @@ function startExtension(context: vscode.ExtensionContext) {
   registerCommands(context, csContext);
   registerCsDoc(context);
   addReviewListeners(context);
-  addTmpDiffUriScheme(context);
   setupStatsCollector(context);
 
   activateCHMonitor(context, csContext.aceApi);
@@ -98,16 +97,6 @@ function startExtension(context: vscode.ExtensionContext) {
  */
 function finalizeActivation() {
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
-}
-
-// Use this scheme for the virtual documents when diffing the refactoring
-function addTmpDiffUriScheme(context: vscode.ExtensionContext) {
-  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {
-    provideTextDocumentContent(uri: vscode.Uri): string {
-      return uri.query;
-    }
-  })();
-  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider));
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
@@ -146,13 +135,13 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   );
 
   // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(CsDiagnostics.review, 2000);
+  const debouncedRun = debounce(CsDiagnostics.review, 1200);
+  const docSelector = reviewDocumentSelector();
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-      // avoid debouncing 'output' documents etc.
-      if (e.document.uri.scheme === 'file') {
-        debouncedRun(e.document);
-      }
+      // avoid debouncing non-matching documents
+      if (vscode.languages.match(docSelector, e.document) === 0) return;
+      debouncedRun(e.document);
     })
   );
 
