@@ -1,10 +1,11 @@
 import vscode from 'vscode';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
-import { vscodeRange } from '../review/utils';
+import { roundScore, vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalysisState } from './analyser';
 import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
 import { toFileWithIssuesUri } from './presentation';
+import { issueToDocsParams } from '../documentation/csdoc-provider';
 
 const fgColor = new vscode.ThemeColor('foreground');
 export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
@@ -33,6 +34,7 @@ export function refactoringsCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisS
 
 export interface DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem;
+  parent?: DeltaTreeViewItem;
   children?: Array<DeltaTreeViewItem>;
 }
 
@@ -52,31 +54,33 @@ export class FileWithIssues implements DeltaTreeViewItem {
     const scoreInfo = new vscode.TreeItem(scoreLabel);
     scoreInfo.tooltip = 'The Code health for this file is declining. Explore the functions below for more details.';
 
-    const iconByScore = (score?: number) => {
-      if (!score) return;
-      if (score >= 9) {
-        return new vscode.ThemeIcon('info', okColor);
-      } else if (score >= 4) {
-        return new vscode.ThemeIcon('warning', warningColor);
-      } else if (score >= 1) {
-        return new vscode.ThemeIcon('warning', errorColor);
+    const iconFn = () => {
+      if (this.scoreChange > 0) {
+        return new vscode.ThemeIcon('arrow-up', okColor);
+      } else if (this.scoreChange < 0) {
+        return new vscode.ThemeIcon('arrow-down', errorColor);
+      } else {
+        return new vscode.ThemeIcon('arrow-right', fgColor);
       }
     };
 
-    scoreInfo.iconPath = iconByScore(deltaForFile['new-score']);
+    scoreInfo.description = `(${roundScore(this.scorePercentageChange)}%)`;
+    scoreInfo.iconPath = iconFn();
     return new DeltaInfoItem(scoreInfo);
   }
 
   get scoreChange() {
-    const oldScore = this.deltaForFile['old-score'];
+    const oldScore = this.deltaForFile['old-score'] || 10;
     const newScore = this.deltaForFile['new-score'];
-    if (isDefined(newScore) && isDefined(oldScore)) {
+    if (isDefined(newScore)) {
       return newScore - oldScore;
     }
-    if (isDefined(newScore)) {
-      return newScore - 10;
-    }
     return 0;
+  }
+
+  get scorePercentageChange() {
+    const oldScore = this.deltaForFile['old-score'] || 10;
+    return (this.scoreChange / oldScore) * 100;
   }
 
   update(deltaForFile: DeltaForFile, uri: vscode.Uri) {
@@ -212,12 +216,10 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get command() {
-    const uri = this.parentUri;
-    const location = new vscode.Location(uri, this.position);
     return {
-      command: 'editor.action.goToLocations',
-      title: 'Go to location',
-      arguments: [uri, this.position, [location]],
+      command: 'codescene.openInteractiveDocsPanel',
+      title: 'Open interactive documentation',
+      arguments: [issueToDocsParams(this, this.parent instanceof FileWithIssues ? undefined : this.parent.refactoring)],
     };
   }
 

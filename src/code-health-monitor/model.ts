@@ -14,6 +14,7 @@ export interface DeltaForFile {
 export function scorePresentation(delta: DeltaForFile) {
   const oldScorePresentation = delta['old-score'] ? roundScore(delta['old-score']) : 'n/a';
   const newScorePresentation = delta['new-score'] ? roundScore(delta['new-score']) : 'n/a';
+  if (oldScorePresentation === newScorePresentation) return oldScorePresentation;
   return `${oldScorePresentation} → ${newScorePresentation}`;
 }
 
