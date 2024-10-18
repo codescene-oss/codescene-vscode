@@ -1,30 +1,15 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import vscode, {
-  Disposable,
-  Range,
-  Selection,
-  TextEditorRevealType,
-  Uri,
-  ViewColumn,
-  WebviewPanel,
-  WorkspaceEdit,
-} from 'vscode';
+import vscode, { Disposable, Selection, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { categoryToDocsCode } from '../documentation/csdoc-provider';
+import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { getLogoUrl } from '../utils';
 import { getUri, nonce } from '../webviews/utils';
 import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { CsRefactoringRequest } from './cs-refactoring-requests';
 import { RefactorResponse } from './model';
-import { decorateCode, targetEditor } from './utils';
-import { AxiosError } from 'axios';
-
-interface CurrentRefactorState {
-  refactoring: CsRefactoringRequest;
-  range: Range; // Range of code to be refactored
-  code: string; // The code to replace the range with
-}
+import { CodeWithLangId, decorateCode, targetEditor } from './utils';
 
 interface RefactorPanelParams {
   refactoring: CsRefactoringRequest;
@@ -43,7 +28,7 @@ export class RefactoringPanel {
   private readonly webViewPanel: WebviewPanel;
   private disposables: Disposable[] = [];
 
-  private currentRefactorState: CurrentRefactorState | undefined;
+  private currentRefactoring?: CsRefactoringRequest;
 
   public constructor(private extensionUri: Uri, viewColumn?: ViewColumn) {
     this.webViewPanel = vscode.window.createWebviewPanel(
@@ -59,28 +44,32 @@ export class RefactoringPanel {
     this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.webViewPanel.webview.onDidReceiveMessage(
       async (message) => {
-        if (!this.currentRefactorState) {
+        if (!this.currentRefactoring) {
           return;
         }
-        const refactoringState = this.currentRefactorState;
+        const refactoring = this.currentRefactoring;
         switch (message.command) {
           case 'apply':
-            await this.applyRefactoring(refactoringState);
-            Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoringState.refactoring.traceId });
-            vscode.window.setStatusBarMessage(`$(sparkle) Successfully applied refactoring`, 3000);
-            this.dispose();
+            vscode.commands.executeCommand('codescene.applyRefactoring', refactoring).then(
+              () => {
+                this.dispose();
+              },
+              (error) => {
+                logOutputChannel.error(error);
+              }
+            );
             return;
           case 'close':
-            await this.deselectRefactoring(refactoringState);
+            await this.deselectRefactoring(refactoring);
             this.dispose();
             return;
           case 'copy-code':
-            vscode.window.setStatusBarMessage(`$(clippy) Copied refactoring suggestion to clipboard`, 3000);
-            await vscode.env.clipboard.writeText(refactoringState.code);
+            const decoratedCode = decorateCode(await refactoring.promise, refactoring.document.languageId);
+            await vscode.env.clipboard.writeText(decoratedCode);
+            void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
             return;
           case 'show-diff':
-            await this.showDiff(refactoringState);
-            Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoringState.refactoring.traceId });
+            void vscode.commands.executeCommand('codescene.showDiffForRefactoring', refactoring);
             return;
         }
       },
@@ -89,125 +78,35 @@ export class RefactoringPanel {
     );
   }
 
-  /**
-   * Create a virtual document used for tmp diffing in the editor.
-   * The scheme is registered with a content provider in extension.ts
-   */
-  private async createTempDocument(name: string, code: Code) {
-    const tmpUri = vscode.Uri.from({ scheme: 'tmp-diff', path: name, query: code.content });
-    const tmpDoc = await vscode.workspace.openTextDocument(tmpUri);
-    return vscode.languages.setTextDocumentLanguage(tmpDoc, code.languageId);
-  }
-
-  private async showDiff(refactoringState: CurrentRefactorState) {
-    const {
-      refactoring: { document },
-      range,
-      code,
-    } = refactoringState;
-
-    // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
-    // imposes a save dialog on the user when closing the diff.
-    const originalCodeTmpDoc = await this.createTempDocument('Original', {
-      content: document.getText(range),
-      languageId: document.languageId,
-    });
-    const refactoringTmpDoc = await this.createTempDocument('Refactoring', {
-      content: code,
-      languageId: document.languageId,
-    });
-
-    // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
-    // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
-    const editor = targetEditor(document);
-    await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
-    await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
-  }
-
-  private async applyRefactoring(refactoringState: CurrentRefactorState) {
-    const {
-      refactoring: { document },
-      range,
-      code,
-    } = refactoringState;
-    const workSpaceEdit = new WorkspaceEdit();
-    workSpaceEdit.replace(document.uri, range, code);
-    await vscode.workspace.applyEdit(workSpaceEdit);
-    await this.selectCurrentRefactoring(refactoringState);
-  }
-
-  /**
-   * Returns a new range locating the code relative the original range.
-   * @param range
-   * @param code
-   */
-  private relativeRangeFromCode(range: Range, code: string) {
-    const lines = code.split(/\r\n|\r|\n/);
-    const lineDelta = lines.length - 1;
-    const characterDelta = lines[lines.length - 1].length;
-    return new Range(range.start, range.start.translate({ lineDelta, characterDelta }));
-  }
-
-  /**
-   * Selects the current refactoring in the target editor. If no target editor is found
-   * (manually closed), a new editor is opened for showing the applied refactoring.
-   */
-  private async selectCurrentRefactoring(refactoringState: CurrentRefactorState) {
-    const { range, code, refactoring } = refactoringState;
-    const newRange = this.relativeRangeFromCode(range, code);
-
-    const editor =
-      targetEditor(refactoring.document) ||
-      (await vscode.window.showTextDocument(refactoring.document.uri, {
-        preview: false,
-        viewColumn: ViewColumn.One,
-      }));
-    editor.selection = new Selection(newRange.start, newRange.end);
-    editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
-  }
-
-  private async deselectRefactoring(refactoringState: CurrentRefactorState) {
-    // Get original document and deselect the function to refactor.
-    const { range, refactoring } = refactoringState;
+  private async deselectRefactoring(refactoring: CsRefactoringRequest) {
     const editor = targetEditor(refactoring.document);
     if (editor) {
-      editor.selection = new Selection(range.start, range.start);
+      editor.selection = new Selection(0, 0, 0, 0);
     }
   }
 
   private async updateWebView({ refactoring }: RefactorPanelParams) {
     const { fnToRefactor, promise, document } = refactoring;
 
-    const range = fnToRefactor.range;
-    this.currentRefactorState = {
-      refactoring,
-      code: 'n/a',
-      range,
-    };
+    this.currentRefactoring = refactoring;
 
     await this.updateContent('Refactoring...', this.loadingContent());
 
     promise
       .then(async (response) => {
-        if (!this.currentRefactorState) {
+        if (!this.currentRefactoring) {
           return;
         }
-        const highlightCode = toConfidenceSymbol(response.confidence.level) === refactoringSymbol;
+        const {
+          confidence: { level, title },
+        } = response;
+        const highlightCode = toConfidenceSymbol(level) === refactoringSymbol;
         const editor = targetEditor(document);
         if (highlightCode && editor) {
           editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
         }
-
-        let { code } = response;
-        const title = response.confidence.level === 0 ? 'Refactoring failure' : response.confidence.title;
-        const decoratedCode = decorateCode(code, document.languageId, response['reasons-with-details']);
-        this.currentRefactorState.code = decoratedCode;
-
-        const content = await this.autoRefactorOrCodeImprovementContent(response, {
-          content: decoratedCode,
-          languageId: document.languageId,
-        });
-        await this.updateContent(title, content);
+        const content = await this.autoRefactorOrCodeImprovementContent(response, document.languageId);
+        await this.updateContent(level === 0 ? 'Refactoring failure' : title, content);
       })
       .catch(async (error) => {
         await this.updateContent('Auto-refactor error', this.errorContent(error));
@@ -289,7 +188,9 @@ export class RefactoringPanel {
 `;
   }
 
-  private autoRefactorOrCodeImprovementContent(response: RefactorResponse, code: Code) {
+  private autoRefactorOrCodeImprovementContent(response: RefactorResponse, languageId: string) {
+    const decoratedCode = decorateCode(response, languageId);
+    const code = { content: decoratedCode, languageId };
     const { level } = response.confidence;
     if (level >= 2) {
       return this.autoRefactorContent(response, code);
@@ -309,7 +210,7 @@ export class RefactoringPanel {
     </div>`;
   }
 
-  private async codeContainerContent(code: Code) {
+  private async codeContainerContent(code: CodeWithLangId) {
     // Use built in  markdown extension for rendering code
     const mdRenderedCode = await vscode.commands.executeCommand(
       'markdown.api.render',
@@ -324,7 +225,7 @@ export class RefactoringPanel {
     </div>`;
   }
 
-  private async autoRefactorContent(response: RefactorResponse, code: Code) {
+  private async autoRefactorContent(response: RefactorResponse, code: CodeWithLangId) {
     const { confidence } = response;
     const {
       level,
@@ -403,10 +304,7 @@ export class RefactoringPanel {
     RefactoringPanel.currentPanel = undefined;
     this.webViewPanel.dispose();
     while (this.disposables.length) {
-      const x = this.disposables.pop();
-      if (x) {
-        x.dispose();
-      }
+      this.disposables.pop()?.dispose();
     }
   }
 

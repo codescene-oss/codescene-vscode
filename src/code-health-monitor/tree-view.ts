@@ -1,5 +1,6 @@
 import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
 import { AceAPI, AceRequestEvent } from '../refactoring/addon';
+import Reviewer from '../review/reviewer';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalyser } from './analyser';
 import { DeltaForFile } from './model';
@@ -90,6 +91,14 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
           const { document, result } = event;
           this.syncTree(document, result);
         }
+      }),
+      Reviewer.instance.onDidReview((event) => {
+        // When a file starts being reviewed, we need to remove any refactorings
+        // associated with that file since they are no longer valid.
+        // Refactorings will be re-populated after the following review and delta analysis is complete.
+        if (event.type === 'start' && isDefined(event.document)) {
+          this.invalidateRefactorings(event.document);
+        }
       })
     );
     if (aceApi) {
@@ -99,6 +108,17 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   update() {
     this.treeDataChangedEmitter.fire(); // Fire this to refresh the tree view
+  }
+
+  private invalidateRefactorings(document: vscode.TextDocument) {
+    const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
+    if (isDefined(fileWithIssues)) {
+      fileWithIssues.functionLevelIssues.forEach((child) => {
+        child.refactoring = undefined;
+      });
+      fileWithIssues.sortAndSetChildren();
+      this.update();
+    }
   }
 
   private addRefactoringsToTree(event: AceRequestEvent) {
