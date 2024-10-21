@@ -71,7 +71,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
           new vscode.CodeLens(this.lensRange(issue.position, order++), {
             title: `$(warning) ${issue.changeDetail.category}`,
             command: 'codescene.openInteractiveDocsPanel',
-            arguments: [issueToDocsParams(issue, functionInfo.refactoring)],
+            arguments: [issueToDocsParams(issue, functionInfo)],
           })
         );
       });

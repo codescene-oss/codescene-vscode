@@ -1,10 +1,10 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import * as vscode from 'vscode';
-import { DeltaIssue } from '../code-health-monitor/tree-model';
+import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { getLogoUrl, registerCommandWithTelemetry } from '../utils';
-import { CategoryWithPosition, DocumentationPanel } from './documentation-panel';
+import { IssueInfo, DocumentationPanel } from './documentation-panel';
 
 class CsDocProvider implements vscode.TextDocumentContentProvider {
   constructor(private extensionPath: string) {}
@@ -31,29 +31,31 @@ export function register(context: vscode.ExtensionContext) {
       const panelParams = Object.assign({ extensionUri: context.extensionUri }, params);
       DocumentationPanel.createOrShow(panelParams);
     },
-    logArgs: (params: InteractiveDocsParams) => ({ category: params.codeSmell.category }),
+    logArgs: (params: InteractiveDocsParams) => ({ category: params.issueInfo.category }),
   });
 
   context.subscriptions.push(openInteractiveDocsPanel);
 }
 
 export interface InteractiveDocsParams {
-  codeSmell: CategoryWithPosition;
+  issueInfo: IssueInfo;
   documentUri: vscode.Uri;
   request?: CsRefactoringRequest;
 }
 
-export function issueToDocsParams(issue: DeltaIssue, request?: CsRefactoringRequest) {
-  return toDocsParams(issue.changeDetail.category, issue.position, issue.parentUri, request);
+export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
+  const params = toDocsParams(issue.changeDetail.category, issue.position, issue.parentUri);
+  params.issueInfo.fnName = fnInfo?.fnName;
+  params.request = fnInfo?.refactoring;
+  return params;
 }
 
 export function toDocsParams(
   category: string,
   position: vscode.Position,
-  documentUri: vscode.Uri,
-  request?: CsRefactoringRequest
+  documentUri: vscode.Uri
 ): InteractiveDocsParams {
-  return { codeSmell: { category, position }, documentUri, request };
+  return { issueInfo: { category, position }, documentUri };
 }
 
 export function categoryToDocsCode(issueCategory: string) {
