@@ -53,7 +53,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         if (issue) {
           void vscode.commands.executeCommand(
             'codescene.openInteractiveDocsPanel',
-            issueToDocsParams(issue, this.functionInfo?.refactoring)
+            issueToDocsParams(issue, this.functionInfo)
           );
         }
         return;

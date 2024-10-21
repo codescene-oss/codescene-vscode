@@ -53,11 +53,12 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
         if (!category) return;
         const title = `Explain ${category}`;
         const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
+        const params = toDocsParams(category, diagnostic.range.start, document.uri);
         action.diagnostics = [diagnostic];
         action.command = {
           command: 'codescene.openInteractiveDocsPanel',
           title,
-          arguments: [toDocsParams(category, diagnostic.range.start, document.uri, matchingRequest)],
+          arguments: [{ ...params, request: matchingRequest }],
         };
         return action;
       })
@@ -80,5 +81,6 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+    this.requestsForDocument.clear();
   }
 }

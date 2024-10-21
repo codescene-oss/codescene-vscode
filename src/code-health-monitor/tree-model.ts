@@ -1,11 +1,11 @@
 import vscode from 'vscode';
+import { issueToDocsParams } from '../documentation/csdoc-provider';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { roundScore, vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalysisState } from './analyser';
 import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
 import { toFileWithIssuesUri } from './presentation';
-import { issueToDocsParams } from '../documentation/csdoc-provider';
 
 const fgColor = new vscode.ThemeColor('foreground');
 export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
@@ -216,10 +216,11 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get command() {
+    const fnInfo = this.parent instanceof DeltaFunctionInfo ? this.parent : undefined;
     return {
       command: 'codescene.openInteractiveDocsPanel',
       title: 'Open interactive documentation',
-      arguments: [issueToDocsParams(this, this.parent instanceof FileWithIssues ? undefined : this.parent.refactoring)],
+      arguments: [issueToDocsParams(this, fnInfo)],
     };
   }
 
