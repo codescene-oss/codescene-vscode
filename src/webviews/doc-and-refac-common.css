@@ -1,0 +1,60 @@
+h2.cs-common {
+  border: none;
+  margin-bottom: 2px;
+}
+
+.hidden {
+  display: none;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.flex-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+#function-location {
+  display: inline-flex;
+  font-size: smaller;
+  cursor: pointer;
+  padding: 0 4px;
+  margin: 4px 0;
+  border-radius: 4px;
+
+  span.file-name {
+    margin-right: 4px;
+  }
+
+  span.line-no {
+    color: var(--vscode-disabledForeground);
+    /* color: var(--vscode-foreground); */
+  }
+}
+
+#function-location:hover {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.expand-indicator {
+  transition: all 0.2s;
+  transform: rotate(0deg);
+  font-size: large;
+}
+
+.rotated {
+  transform: rotate(-90deg);
+}
+
+.collapsed {
+  height: 0;
+  transition: height 0.2s;
+}
+
+.container {
+  overflow: hidden;
+}

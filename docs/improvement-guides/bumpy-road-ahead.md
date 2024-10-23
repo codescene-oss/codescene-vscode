@@ -1,4 +1,4 @@
-**Problem**: Bumpy Roads are functions with multiple chunks of nested conditional logic, often indicating too many responsibilities in the same function.
+Bumpy Roads are functions with multiple chunks of nested conditional logic, often indicating too many responsibilities in the same function.
 
 ## Solution
 

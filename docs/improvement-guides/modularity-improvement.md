@@ -1,4 +1,4 @@
-**Problem**: Most code smells stem from a lack of modularity. Often, a single function does too many things and contain too much logic. This overwhelms a human reader. A lack of modularity also makes the code harder to refactor.
+Most code smells stem from a lack of modularity. Often, a single function does too many things and contain too much logic. This overwhelms a human reader. A lack of modularity also makes the code harder to refactor.
 
 ## Solution
 

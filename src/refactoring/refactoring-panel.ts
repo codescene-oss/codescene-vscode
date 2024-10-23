@@ -1,5 +1,5 @@
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import path, { join } from 'path';
 import vscode, { Disposable, Selection, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { categoryToDocsCode } from '../documentation/csdoc-provider';
 import { logOutputChannel } from '../log';
@@ -10,6 +10,12 @@ import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands'
 import { CsRefactoringRequest } from './cs-refactoring-requests';
 import { RefactorResponse } from './model';
 import { CodeWithLangId, decorateCode, targetEditor } from './utils';
+import {
+  collapsibleContent,
+  readRawMarkdownDocs,
+  renderedSegment,
+  renderHtmlTemplate,
+} from '../webviews/doc-and-refac-common';
 
 interface RefactorPanelParams {
   refactoring: CsRefactoringRequest;
@@ -59,7 +65,7 @@ export class RefactoringPanel {
               }
             );
             return;
-          case 'close':
+          case 'reject':
             await this.deselectRefactoring(refactoring);
             this.dispose();
             return;
@@ -92,6 +98,8 @@ export class RefactoringPanel {
 
     await this.updateContent('Refactoring...', this.loadingContent());
 
+    const fnLocContent = this.functionLocationContent(this.currentRefactoring.fnToRefactor);
+
     promise
       .then(async (response) => {
         if (!this.currentRefactoring) {
@@ -100,59 +108,31 @@ export class RefactoringPanel {
         const {
           confidence: { level, title },
         } = response;
+
         const highlightCode = toConfidenceSymbol(level) === refactoringSymbol;
         const editor = targetEditor(document);
         if (highlightCode && editor) {
           editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
         }
-        const content = await this.autoRefactorOrCodeImprovementContent(response, document.languageId);
-        await this.updateContent(level === 0 ? 'Refactoring failure' : title, content);
+
+        await this.updateContent(title, [
+          fnLocContent,
+          this.refactoringSummary(response), // TODO - change title and texts in the service
+          await this.autoRefactorOrCodeImprovementContent(response, document.languageId),
+        ]);
       })
       .catch(async (error) => {
-        await this.updateContent('Auto-refactor error', this.errorContent(error));
+        await this.updateContent('Auto-refactor error', [fnLocContent, this.errorContent(error)]);
       });
   }
 
-  private async updateContent(title: string, content: string) {
-    const refactorStylesCss = this.getUri('out', 'refactoring', 'styles.css');
-    const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
-    const highlightCss = this.getUri('assets', 'highlight.css');
-    const webviewScript = this.getUri('out', 'refactoring', 'webview-script.js');
-    const csLogoUrl = await getLogoUrl(this.extensionUri.fsPath);
-    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
-    const webView = this.webViewPanel.webview;
-    // Note, the html "typehint" is used by the es6-string-html extension to enable highlighting of the html-string
-    webView.html = /*html*/ `
-    <!DOCTYPE html>
-    <html lang="en">
-
-    <head>
-        <meta charset="UTF-8">
-        <meta
-          http-equiv="Content-Security-Policy"
-          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; font-src ${
-      webView.cspSource
-    };
-          style-src 'unsafe-inline' ${webView.cspSource};"
-        />
-        <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
-        <link href="${highlightCss}" type="text/css" rel="stylesheet" />
-        <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
-        <link href="${refactorStylesCss}" type="text/css" rel="stylesheet" />
-    </head>
-
-    <body>
-        <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
-        <h1><img src="data:image/png;base64,${csLogoUrl}" width="64" height="64" align="center"/>&nbsp; ${title}</h1>
-        ${content}
-    </body>
-
-    </html>
-    `;
-  }
-
-  private getUri(...pathSegments: string[]) {
-    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments);
+  private async updateContent(title: string, content: string | string[]) {
+    renderHtmlTemplate(this.webViewPanel, this.extensionUri, {
+      title,
+      bodyContent: content,
+      cssPaths: [['out', 'refactoring', 'styles.css']],
+      scriptPaths: [['out', 'refactoring', 'webview-script.js']],
+    });
   }
 
   private loadingContent() {
@@ -176,14 +156,13 @@ export class RefactoringPanel {
 `;
   }
 
-  private unsuitableRefactoring() {
-    return /*html*/ `<h2>Refactoring failed</h2>
-    <p>Sorry, we were unable to find a suitable refactoring. Please check the documentation for the code smell at the top of the method.</p>
-    <div class="bottom-controls">
-      <div></div> <!-- Spacer, making sure close button is right aligned -->
-      <div class="button-group right">
-        <vscode-button id="close-button" appearance="primary">Close</vscode-button>
-      </div>
+  private refactoringUnavailable() {
+    return /*html*/ `
+    <div>
+      <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement 
+      guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
+      <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a> 
+      for best practices and guidance on improving your code.</p>
     </div>
 `;
   }
@@ -192,74 +171,119 @@ export class RefactoringPanel {
     const decoratedCode = decorateCode(response, languageId);
     const code = { content: decoratedCode, languageId };
     const { level } = response.confidence;
-    if (level >= 2) {
-      return this.autoRefactorContent(response, code);
-    } else if (level === 0) {
-      return this.unsuitableRefactoring();
+    if (level === 0) {
+      return this.refactoringUnavailable();
+    } else if (level === 1) {
+      return this.codeImprovementContent(response, code);
     }
-    return this.codeImprovementContent(response, code);
+    return this.autoRefactorContent(response, code);
   }
 
-  private functionInfoContent(fnToRefactor: FnToRefactor) {
-    const { range } = fnToRefactor;
+  private functionLocationContent(fnToRefactor: FnToRefactor) {
+    const { range, filePath, name } = fnToRefactor;
+    const fileName = path.basename(filePath);
+
     return /*html*/ `
-    <div class="function-info">
-      <strong>Target function:</strong> <code>${fnToRefactor.name} [Ln ${range.start.line + 1}, Col ${
-      range.start.character
-    }]</code>
-    </div>`;
+      <div id="function-location" class="flex-row">
+        <span class="file-name">${fileName}</span>
+        <span class="codicon codicon-symbol-method"></span>
+        ${name}
+        <span class="line-no">[Ln ${range.start.line + 1}]</span>
+      </div>
+      <hr>
+      `;
   }
 
-  private async codeContainerContent(code: CodeWithLangId) {
-    // Use built in  markdown extension for rendering code
-    const mdRenderedCode = await vscode.commands.executeCommand(
-      'markdown.api.render',
-      '```' + code.languageId + '\n' + code.content + '\n```'
-    );
-    return /*html*/ `
-    <div class="code-container">
-      <vscode-button id="copy-to-clipboard" appearance="icon" aria-label="Copy code" title="Copy code">
-        <span class="codicon codicon-clippy"></span>
-      </vscode-button>
-      ${mdRenderedCode}
-    </div>`;
-  }
-
-  private async autoRefactorContent(response: RefactorResponse, code: CodeWithLangId) {
+  private refactoringSummary(response: RefactorResponse) {
     const { confidence } = response;
     const {
       level,
       'recommended-action': { details: actionDetails, description: action },
     } = confidence;
-    const actionBadgeClass = `action-badge level-${level > 2 ? 'green' : level}`;
+    const levelClass = `level-${level > 2 ? 'ok' : level}`;
+    return /*html*/ `
+      <div class="refactoring-summary ${levelClass}">
+        <div class="refactoring-summary-header ${levelClass}">${action}</div>
+        <span>${actionDetails}</span>
+      </div>
+    `;
+  }
 
-    const reasonsList = this.getReasonsList(response);
-    const reasonsText = reasonsList ? `<h4>Reasons for detailed review</h4>\n${reasonsList}` : '';
+  private reasonsContent(response: RefactorResponse) {
+    const { 'reasons-with-details': reasonsWithDetails } = response;
+    let reasonsList;
+    if (reasonsWithDetails && reasonsWithDetails.length > 0) {
+      const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
+      reasonsList = /*html*/ `
+          <ul>${reasonText}</ul>
+        `;
+    }
+    return collapsibleContent('Reasons for detailed review', reasonsList);
+  }
 
+  private async autoRefactorContent(response: RefactorResponse, code: CodeWithLangId) {
     const content = /*html*/ `
-        <p> 
-          <span class="${actionBadgeClass}">${action}</span> ${actionDetails}
-        </p>  
-        ${reasonsText}
-        ${await this.codeContainerContent(code)}
-        <div class="bottom-controls">
-          <div class="button-group left">
-            <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
-          </div>
-          <div class="button-group right">
-            <vscode-button id="close-button" appearance="secondary" aria-label="Close" title="Close">Close</vscode-button>
-            <vscode-button id="apply-button" appearance="primary" aria-label="Apply and close" title="Apply and close">Apply</vscode-button>
-          </div>
-        </div>
-  `;
+        ${this.acceptAndRejectButtons()}
+        ${this.reasonsContent(response)}
+        ${collapsibleContent('Refactored code', await this.codeContainerContent(code))}
+    `;
     return content;
   }
 
+  private acceptAndRejectButtons() {
+    return /* html */ `
+      <div class="accept-reject-buttons">
+        <vscode-button id="apply-button" appearance="primary" aria-label="Accept Auto-Refactor" title="Accept Auto-Refactor">
+          <span slot="start" class="codicon codicon-check"></span>
+          Accept Auto-Refactor
+        </vscode-button>
+        <vscode-button id="reject-button" appearance="secondary" aria-label="Reject" title="Reject">
+          <span slot="start" class="codicon codicon-circle-slash"></span>
+          Reject
+        </vscode-button>
+      </div>
+  `;
+  }
+
+  private async codeContainerContent(code: CodeWithLangId, showDiff = true) {
+    // Use built in  markdown extension for rendering code
+    const mdRenderedCode = await vscode.commands.executeCommand(
+      'markdown.api.render',
+      '```' + code.languageId + '\n' + code.content + '\n```'
+    );
+
+    const diffButton = showDiff
+      ? /*html*/ `
+          <vscode-button id="diff-button" appearance="secondary" aria-label="Show diff">
+            <span slot="start" class="codicon codicon-diff"></span>
+            Show diff
+          </vscode-button>
+        `
+      : '';
+
+    return /*html*/ `
+      <div class="code-container">
+        <div class="code-container-buttons">
+          ${diffButton}
+        <!-- slot="start" ? -->
+          <vscode-button id="copy-to-clipboard-button" appearance="secondary" aria-label="Copy code" title="Copy code">
+            <span slot="start" class="codicon codicon-clippy"></span>
+            Copy
+          </vscode-button>
+        </div>      
+        ${mdRenderedCode}
+      </div>
+    `;
+  }
+
   private async codeSmellsGuide(codeSmell: string) {
-    const docsPath = categoryToDocsCode(codeSmell) + '-guide.md';
-    const path = join(this.extensionUri.fsPath, 'docs', 'improvement-guides', docsPath);
-    const docsGuide = await readFile(path);
-    return vscode.commands.executeCommand<string>('markdown.api.render', docsGuide.toString());
+    const docsGuide = readRawMarkdownDocs(codeSmell, 'improvement-guides', this.extensionUri);
+    const [problem, solution] = docsGuide.split('## Solution');
+
+    return `
+      ${await renderedSegment('Problem', problem)}
+      ${await renderedSegment('Solution', solution)}
+    `;
   }
 
   private async codeImprovementContent(response: RefactorResponse, code: Code) {
@@ -274,30 +298,10 @@ export class RefactoringPanel {
       solutionContent = await this.codeSmellsGuide('modularity-improvement');
     }
 
-    const content = /*html*/ `
-        ${solutionContent}
-        <h4>Example from your code</h4>
-        ${await this.codeContainerContent(code)}
-        <div class="bottom-controls">
-          <div class="button-group left">
-            <vscode-button id="diff-button" aria-label="Show diff">Show diff</vscode-button>
-          </div>
-          <div class="button-group right">
-            <vscode-button id="close-button" appearance="primary" aria-label="Close" title="Close">Close</vscode-button>
-          </div>
-        </div>
-  `;
-    return content;
-  }
-
-  private getReasonsList(response: RefactorResponse) {
-    const { 'reasons-with-details': reasonsWithDetails } = response;
-    if (reasonsWithDetails && reasonsWithDetails.length > 0) {
-      const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
-      return /*html*/ `
-          <ul>${reasonText}</ul>
-        `;
-    }
+    return /*html*/ `
+      ${solutionContent}
+      ${collapsibleContent('Example code', await this.codeContainerContent(code, false))}
+    `;
   }
 
   public dispose() {

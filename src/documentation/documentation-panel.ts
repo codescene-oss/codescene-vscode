@@ -6,6 +6,7 @@ import { FnToRefactor, RefactoringTarget } from '../refactoring/commands';
 import { isDefined } from '../utils';
 import { getUri, nonce } from '../webviews/utils';
 import { categoryToDocsCode, InteractiveDocsParams } from './csdoc-provider';
+import { collapsibleContent, readRawMarkdownDocs, renderedSegment, renderHtmlTemplate } from '../webviews/doc-and-refac-common';
 
 export interface IssueInfo {
   category: string;
@@ -45,6 +46,7 @@ export class DocumentationPanel implements Disposable {
     switch (message.command) {
       case 'show-refactoring':
         this.showRefactoring(this.state);
+        this.dispose();
         return;
       case 'goto-function-location':
         this.goToFunctionLocation(this.state);
@@ -84,13 +86,6 @@ export class DocumentationPanel implements Disposable {
     }
 
     const title = issueInfo.category;
-    this.webViewPanel.title = title;
-
-    const webviewScript = this.getUri('out', 'documentation', 'webview-script.js');
-    const documentationCss = this.getUri('out', 'documentation', 'styles.css');
-    const markdownLangCss = this.getUri('assets', 'markdown-languages.css');
-    const highlightCss = this.getUri('assets', 'highlight.css');
-    const codiconsUri = this.getUri('out', 'codicons', 'codicon.css');
 
     let hideRefactorButton = true;
     if (this.state.document && this.state.fnToRefactor) {
@@ -99,37 +94,15 @@ export class DocumentationPanel implements Disposable {
       this.attemptRefactoring(documentUri, issueInfo);
     }
 
+    const docsHeader = this.documentationHeaderContent(hideRefactorButton, documentUri, issueInfo);
     const docsContent = await this.docsForCategory(issueInfo.category);
 
-    const webView = this.webViewPanel.webview;
-    webView.html = /*html*/ `
-    <!DOCTYPE html>
-    <html lang="en">
-
-    <head>
-        <meta charset="UTF-8">
-        <meta
-          http-equiv="Content-Security-Policy"
-          content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; font-src ${
-      webView.cspSource
-    };
-          style-src 'unsafe-inline' ${webView.cspSource};"
-        />
-        <link href="${markdownLangCss}" type="text/css" rel="stylesheet" />
-        <link href="${highlightCss}" type="text/css" rel="stylesheet" />
-        <link href="${documentationCss}" type="text/css" rel="stylesheet" />
-        <link href="${codiconsUri}" type="text/css" rel="stylesheet" />
-    </head>
-
-    <body>
-        <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
-        <h2>${title}</h2>
-        ${this.documentationHeaderContent(hideRefactorButton, documentUri, issueInfo)}
-        ${docsContent}
-    </body>
-
-    </html>
-    `;
+    renderHtmlTemplate(this.webViewPanel, this.extensionUri, {
+      title,
+      bodyContent: [docsHeader, docsContent],
+      cssPaths: [['out', 'documentation', 'styles.css']],
+      scriptPaths: [['out', 'documentation', 'webview-script.js']],
+    });
   }
 
   private documentationHeaderContent(hideRefactorButton: boolean, uri: Uri, issueInfo: IssueInfo) {
@@ -204,16 +177,14 @@ export class DocumentationPanel implements Disposable {
   /**
    * This relies on the docs being in the correct format, with the following sections (in order!):
    * - Description text
-   * - ## Example (optional)
-   * - ## Solution (optional)
-   * 
+   * - \#\# Example (optional)
+   * - \#\# Solution (optional)
+   *
    * @param category Used for getting correct .md documentation from docs
-   * @returns 
+   * @returns
    */
   private async docsForCategory(category: string) {
-    const docsPath = categoryToDocsCode(category);
-    const path = join(this.extensionUri.fsPath, 'docs', 'issues', `${docsPath}.md`);
-    const docsGuide = (await readFile(path)).toString().trim();
+    const docsGuide = readRawMarkdownDocs(category, 'issues', this.extensionUri);
 
     let description = docsGuide,
       exampleAndSolution,
@@ -229,25 +200,9 @@ export class DocumentationPanel implements Disposable {
     }
 
     return /*html*/ `
-    <div>
-      ${await vscode.commands.executeCommand<string>('markdown.api.render', description)}
-      ${await this.renderedSegment('Example', example)}
-      ${await this.renderedSegment('Solution', solution)}
-      </div>
-    `;
-  }
-
-  private async renderedSegment(title: string, markdown?: string) {
-    if (!markdown) return '';
-    const html = await vscode.commands.executeCommand<string>('markdown.api.render', markdown.trim());
-    return /*html*/ `
-      <h3 class="${title.toLowerCase()}-header clickable">
-        <span class="codicon codicon-chevron-down expand-indicator"></span>
-        ${title}
-      </h3>
-      <div class="container ${title.toLowerCase()}-container">
-        ${html}
-      </div>
+      ${await renderedSegment(category, description)}
+      ${await renderedSegment('Example', example)}
+      ${await renderedSegment('Solution', solution)}
     `;
   }
 

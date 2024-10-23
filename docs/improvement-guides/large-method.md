@@ -1,4 +1,4 @@
-**Problem**: Large methods containing an excessive number of code lines are generally harder to understand compared to code that has been broken up into smaller logical chunks.
+Large methods containing an excessive number of code lines are generally harder to understand compared to code that has been broken up into smaller logical chunks.
 
 ## Solution
 

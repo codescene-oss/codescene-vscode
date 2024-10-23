@@ -18,9 +18,9 @@ function sendMessage(command: string) {
 
 function main() {
   document.getElementById('diff-button')?.addEventListener('click', () => sendMessage('show-diff'));
-  document.getElementById('close-button')?.addEventListener('click', () => sendMessage('close'));
+  document.getElementById('reject-button')?.addEventListener('click', () => sendMessage('reject'));
   document.getElementById('apply-button')?.addEventListener('click', () => sendMessage('apply'));
-  document.getElementById('copy-to-clipboard')?.addEventListener('click', () => sendMessage('copy-code'));
+  document.getElementById('copy-to-clipboard-button')?.addEventListener('click', () => sendMessage('copy-code'));
 
   const loadingEl = document.getElementById('loading-span');
   if (loadingEl) {
