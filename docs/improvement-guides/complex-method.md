@@ -1,4 +1,4 @@
-**Problem**: Complex methods contain too many logical branches such as `if` and `for`/`while` loops. It's measured using the [Cyclomatic Complexity metric](https://en.wikipedia.org/wiki/Cyclomatic_complexity). 
+Complex methods contain too many logical branches such as `if` and `for`/`while` loops. It's measured using the [Cyclomatic Complexity metric](https://en.wikipedia.org/wiki/Cyclomatic_complexity). 
 
 ## Solution
 

@@ -1,67 +1,20 @@
-body {
-  font-family: sans-serif;
-}
-
-h2 {
-  border: none;
+:root {
+  --codeScene-green: #73c991;
+  --codeScene-orange: #ee9d28;
+  --codeScene-red: #f14c4c;
+  --codeScene-blue: #66a8f5;
 }
 
 .code-container {
   position: relative;
-  margin-bottom: 54px;
 }
 
-#copy-to-clipboard {
+.code-container-buttons {
   position: absolute;
-  top: 0.5em;
-  right: 0.5em;
-}
-
-.bottom-controls {
+  top: 14px;
+  right: 14px;
   display: flex;
-  position: fixed;
-  justify-content: space-between;
-  width: 100%;
-  bottom: 0;
-  left: 0;
-  background-color: var(--background);
-}
-
-.button-group {
-  display: inline-flex;
-  gap: 12px;
-  margin: 12px 0;
-}
-.button-group.left {
-  margin-left: 52px;
-}
-.button-group.right {
-  margin-right: 52px;
-}
-
-.action-badge {
-  display: inline-block;
-  font-family: var(--font-family);
-  font-size: var(--type-ramp-minus1-font-size);
-  line-height: var(--type-ramp-minus1-line-height);
-  border: calc(var(--border-width) * 1px) solid var(--button-border);
-  border-radius: var(--tag-corner-radius);
-  color: var(--badge-foreground);
-  padding: calc(var(--design-unit) * 0.5px) calc(var(--design-unit) * 1px);
-  text-transform: uppercase;
-}
-
-.action-badge.level-1 {
-  color: #f9dcde;
-  background-color: #863137;
-}
-.action-badge.level-2 {
-  color: #fce9e1;
-  background-color: #91583e;
-}
-.action-badge.level-green {
-  color: #dcece4;
-  background-color: #2f5f48;
+  gap: 10px;
 }
 
 .loading-content {
@@ -79,4 +32,49 @@ h2 {
 
 .function-info {
   margin: 1.3em 0;
+}
+
+.refactoring-summary {
+  background-color: var(--vscode-textCodeBlock-background);
+  border-left: 2px solid var(--vscode-textCodeBlock-background);
+  font-size: 12px;
+  padding: 10px 14px;
+  margin-top: 14px;
+}
+
+.refactoring-summary.level-0 {
+  border-left-color: var(--codeScene-red);
+}
+.refactoring-summary.level-1 {
+  border-left-color: var(--codeScene-blue);
+}
+.refactoring-summary.level-2 {
+  border-left-color: var(--codeScene-orange);
+}
+.refactoring-summary.level-ok {
+  border-left-color: var(--codeScene-green);
+}
+
+.refactoring-summary-header {
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.refactoring-summary-header.level-0 {
+  color: var(--codeScene-red);
+}
+.refactoring-summary-header.level-1 {
+  color: var(--codeScene-blue);
+}
+.refactoring-summary-header.level-2 {
+  color: var(--codeScene-orange);
+}
+.refactoring-summary-header.level-ok {
+  color: var(--codeScene-green);
+}
+
+.accept-reject-buttons {
+  display: inline-flex;
+  gap: 10px;
+  margin: 12px 0;
 }

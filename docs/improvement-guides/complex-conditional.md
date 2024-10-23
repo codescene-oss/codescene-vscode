@@ -1,4 +1,4 @@
-**Problem**: Complex conditionals are expressions with multiple logical operators (e.g. `&&`, `||`), making the code harder to read.
+Complex conditionals are expressions with multiple logical operators (e.g. `&&`, `||`), making the code harder to read.
 
 ## Solution
 

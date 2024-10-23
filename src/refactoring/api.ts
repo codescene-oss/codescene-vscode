@@ -56,7 +56,7 @@ export class RefactoringAPI {
     const request: RefactorRequest = {
       review: reviews,
       'source-snippet': {
-        'file-type': getFileExtension(fnToRefactor.fileName),
+        'file-type': getFileExtension(fnToRefactor.filePath),
         'function-type': fnToRefactor.functionType,
         body: fnToRefactor.content,
       },

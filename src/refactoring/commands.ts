@@ -14,7 +14,7 @@ export interface FnToRefactor {
   name: string;
   range: vscode.Range;
   content: string;
-  fileName: string;
+  filePath: string;
   functionType: string;
   codeSmells: FnCodeSmell[];
 }
@@ -215,7 +215,7 @@ function toFnToRefactor(
     name: enclosingFn.name,
     range,
     functionType: enclosingFn['function-type'],
-    fileName: document.fileName,
+    filePath: document.fileName,
     content: document.getText(range),
     codeSmells,
   } as FnToRefactor;
