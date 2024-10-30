@@ -17,7 +17,7 @@ import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
-import { registerCommandWithTelemetry } from './utils';
+import { isError, registerCommandWithTelemetry } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
@@ -37,22 +37,20 @@ export async function activate(context: vscode.ExtensionContext) {
   Telemetry.init(context.extension);
   registerShowLogCommand(context);
 
-  ensureCompatibleBinary(context.extensionPath)
-    .then((binaryPath) => {
-      CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
-      startExtension(context);
-    })
-    .catch((error) => {
-      CsExtensionState.setAnalysisState({ state: 'error', error });
+  try {
+    const binaryPath = await ensureCompatibleBinary(context.extensionPath);
+    CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
+    await startExtension(context);
+  } catch (unknownErr) {
+    const error = assertError(unknownErr);
+    if (!error) return;
 
-      const { message } = error;
-      logOutputChannel.error(message);
-      void vscode.window.showErrorMessage(message);
-      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
-    });
+    CsExtensionState.setAnalysisState({ state: 'error', error });
+    reportError('Unable to start extension', error);
+  }
 }
 
-function startExtension(context: vscode.ExtensionContext) {
+async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
     aceApi: activateAce(),
@@ -68,7 +66,7 @@ function startExtension(context: vscode.ExtensionContext) {
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
-  enableOrDisableACECapabilities(context, csContext);
+  await enableOrDisableACECapabilities(context, csContext);
   registerCommands(context, csContext);
   registerCsDoc(context);
   addReviewListeners(context);
@@ -86,14 +84,14 @@ function startExtension(context: vscode.ExtensionContext) {
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
   const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
   context.subscriptions.push(
-    onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableOrDisableACECapabilities(context, csContext);
+    onDidChangeConfiguration('enableAutoRefactor', async (e) => {
+      await debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
 
   context.subscriptions.push(
-    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
-      debouncedEnableOrDisableACECapabilities(context, csContext);
+    onDidChangeConfiguration('devtoolsPortalUrl', async (e) => {
+      await debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
 
@@ -178,7 +176,7 @@ function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsCon
 
 function disableRemoteFeatures() {}
 
-function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
+async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { aceApi } = csContext;
 
   const enableACE = getConfiguration('enableAutoRefactor');
@@ -188,18 +186,34 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
   }
 
   CsExtensionState.setACEState({ state: 'loading' });
-  aceApi.enableACE(context).then(
-    (result) => {
-      CsExtensionState.setACEState({ preFlight: result, state: 'enabled' });
-      logOutputChannel.info('Auto-refactor enabled!');
-    },
-    (error) => {
-      CsExtensionState.setACEState({ state: 'error', error });
-      const message = `Unable to enable refactoring capabilities. ${error.message}`;
-      logOutputChannel.error(message);
-      void vscode.window.showErrorMessage(message);
-    }
-  );
+
+  try {
+    const preFlight = await aceApi.enableACE(context);
+    CsExtensionState.setACEState({ preFlight, state: 'enabled' });
+    logOutputChannel.info('Auto-refactor enabled!');
+  } catch (unknownErr) {
+    const error = assertError(unknownErr);
+    if (!error) return;
+
+    CsExtensionState.setACEState({ state: 'error', error });
+    reportError('Unable to enable refactoring capabilities', error);
+  }
+}
+
+function assertError(val: unknown): Error | undefined {
+  if (!isError(val)) {
+    logOutputChannel.error(`Unknown error: ${val}`);
+    return;
+  }
+  return val;
+}
+
+function reportError(pre: string, error: Error) {
+  const message = `${pre}. ${error.message}`;
+  delete error.stack;
+  logOutputChannel.error(`${message}: ${JSON.stringify(error)}`);
+  void vscode.window.showErrorMessage(message);
+  void vscode.commands.executeCommand('codescene.controlCenterView.focus');
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
