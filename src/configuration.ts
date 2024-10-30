@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { logOutputChannel } from './log';
 
-export function getConfiguration<T>(section: string): T | undefined {
-  return vscode.workspace.getConfiguration('codescene').get<T>(section);
+export function getConfiguration<T>(section: string, defaultValue?: T): T | undefined {
+  if (!defaultValue) return vscode.workspace.getConfiguration('codescene').get<T>(section);
+  return vscode.workspace.getConfiguration('codescene').get<T>(section, defaultValue);
 }
 
 export function setConfiguration(section: string, value: any) {
@@ -30,14 +31,14 @@ export function onDidChangeConfiguration(
  * Get the configured URL of the CodeScene server.
  */
 export function getServerUrl() {
-  return getConfiguration<string>('serverUrl');
+  return getConfiguration<string>('serverUrl', 'https://codescene.io');
 }
 
 /**
  * Get the configured URL of the CodeScene Devtool Portal server.
  */
 export function getPortalUrl() {
-  return getConfiguration<string>('devtoolsPortalUrl');
+  return getConfiguration<string>('devtoolsPortalUrl', 'https://devtools.codescene.io');
 }
 
 export function reviewCodeLensesEnabled() {
