@@ -2,18 +2,17 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import * as vscode from 'vscode';
 import { sign } from './codescene-interop';
+import { getPortalUrl } from './configuration';
+import { CsExtensionState } from './cs-extension-state';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult } from './executor';
 import { logOutputChannel } from './log';
-import { getPortalUrl } from './configuration';
 
 export default class Telemetry {
   private static _instance: Telemetry;
 
   private telemetryLogger: vscode.TelemetryLogger;
   private axiosInstance: AxiosInstance;
-
-  private session?: vscode.AuthenticationSession;
 
   constructor(extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
@@ -58,8 +57,8 @@ export default class Telemetry {
       'process-platform': process.platform,
       'process-arch': process.arch,
     };
-    if (this.session) {
-      data['user-id'] = this.session.account.id;
+    if (CsExtensionState.stateProperties.session) {
+      data['user-id'] = CsExtensionState.stateProperties.session.account.id;
     }
     if (process.env.X_CODESCENE_INTERNAL) {
       data['internal?'] = true;
@@ -77,9 +76,5 @@ export default class Telemetry {
     };
 
     return this.axiosInstance.post(`${getPortalUrl()}/api/analytics/events/ide`, jsonData, config);
-  }
-
-  setSession(session?: vscode.AuthenticationSession) {
-    this.session = session;
   }
 }

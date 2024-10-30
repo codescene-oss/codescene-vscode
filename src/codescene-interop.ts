@@ -6,7 +6,7 @@ import { ExecResult, SimpleExecutor } from './executor';
  * Executes the command for creating a code health rules template.
  */
 export function codeHealthRulesJson() {
-  return new SimpleExecutor().execute({ command: CsExtensionState.cliPath, args: ['code-health-rules-template'] });
+  return new SimpleExecutor().execute({ command: CsExtensionState.binaryPath, args: ['code-health-rules-template'] });
 }
 
 /**
@@ -14,7 +14,7 @@ export function codeHealthRulesJson() {
  */
 export function codeHealthRulesCheck(rootPath: string, filePath: string) {
   return new SimpleExecutor().execute(
-    { command: CsExtensionState.cliPath, args: ['check-rules', filePath] },
+    { command: CsExtensionState.binaryPath, args: ['check-rules', filePath] },
     { cwd: rootPath }
   );
 }
@@ -23,7 +23,7 @@ export function codeHealthRulesCheck(rootPath: string, filePath: string) {
  * Executes the command for signing a payload.
  */
 export function sign(payload: string) {
-  return new SimpleExecutor().execute({ command: CsExtensionState.cliPath, args: ['sign'] }, {}, payload);
+  return new SimpleExecutor().execute({ command: CsExtensionState.binaryPath, args: ['sign'] }, {}, payload);
 }
 
 export interface EnclosingFn {
@@ -44,7 +44,7 @@ export async function findEnclosingFunctions(fileName: string, lineNos: number[]
   if (lineNos.length === 0) return [];
   const result: ExecResult = await new SimpleExecutor().execute(
     {
-      command: CsExtensionState.cliPath,
+      command: CsExtensionState.binaryPath,
       args: ['enclosing-functions', '--file-name', fileName, '--line-no', lineNos.join(',')],
     },
     {},

@@ -23,7 +23,7 @@ export class DeltaAnalyser {
   constructor(private cliPath: string) {}
 
   static init() {
-    DeltaAnalyser._instance = new DeltaAnalyser(CsExtensionState.cliPath);
+    DeltaAnalyser._instance = new DeltaAnalyser(CsExtensionState.binaryPath);
   }
 
   static get instance() {

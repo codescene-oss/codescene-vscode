@@ -12,7 +12,7 @@ export function isDefined<T>(value: T | null | undefined): value is T {
 }
 
 export function pluralize(noun: string, count: number) {
-  return count === 1 ? noun : `${noun}s`;
+  return Math.abs(count) <= 1 ? noun : `${noun}s`;
 }
 
 let logoUrl: string | undefined;

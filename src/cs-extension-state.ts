@@ -1,29 +1,38 @@
-import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { onDidChangeConfiguration } from './configuration';
 import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
-import { CsRestApi } from './cs-rest-api';
 import { CsStatusBar } from './cs-statusbar';
-import { CsRefactoringRequests } from './refactoring/cs-refactoring-requests';
-import { PreFlightResponse, isPreFlightResponse } from './refactoring/model';
+import { logOutputChannel } from './log';
+import { AceAPI } from './refactoring/addon';
+import { PreFlightResponse } from './refactoring/model';
 import Reviewer from './review/reviewer';
-import Telemetry from './telemetry';
 import { isDefined } from './utils';
 
-export interface CsFeatures {
-  codeHealthAnalysis?: string | Error;
-  ace?: PreFlightResponse | Error | string;
+export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
+
+/**
+ * state - indicates the state of the feature
+ * error - holds the last error the feature has thrown. Note that error can be set even
+ *    if state itself is not 'error'. This just indicates that there was a runtime error
+ *    in the feature. It may very well be considered 'enabled' anyway.
+ */
+export interface CsFeature {
+  state: FeatureState;
+  error?: Error;
 }
 
-export type RunnerState = 'running' | 'idle';
+type RunnerState = 'running' | 'idle';
+
+interface CsFeatures {
+  analysis: CsFeature & { binaryPath?: string; analysisState?: RunnerState };
+  ace: CsFeature & { preFlight?: PreFlightResponse };
+}
 
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
-  features?: CsFeatures;
-  analysisState?: RunnerState;
-  serviceErrors?: Array<Error | AxiosError>;
+  features: CsFeatures;
 }
 
 /**
@@ -32,13 +41,25 @@ export interface CsStateProperties {
  * when the user signs in and out of CodeScene.
  */
 export class CsExtensionState {
-  readonly stateProperties: CsStateProperties = {};
+  readonly stateProperties: CsStateProperties;
   readonly controlCenterView: ControlCenterViewProvider;
   readonly statusBar: CsStatusBar;
 
   constructor(context: vscode.ExtensionContext) {
+    this.stateProperties = {
+      features: {
+        analysis: { state: 'loading' },
+        ace: { state: 'loading' },
+      },
+    };
     this.controlCenterView = registerControlCenterViewProvider(context);
-    this.statusBar = new CsStatusBar();
+    context.subscriptions.push(
+      vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
+        CsExtensionState.clearErrors();
+        logOutputChannel.show();
+      })
+    );
+    this.statusBar = new CsStatusBar(this.stateProperties);
   }
 
   private static _instance: CsExtensionState;
@@ -46,61 +67,74 @@ export class CsExtensionState {
   static init(context: vscode.ExtensionContext) {
     CsExtensionState._instance = new CsExtensionState(context);
   }
+
   static get stateProperties() {
     return CsExtensionState._instance.stateProperties;
   }
 
-  static get cliPath(): string {
-    const cliPath = CsExtensionState._instance.stateProperties.features?.codeHealthAnalysis;
-    if (typeof cliPath !== 'string') {
-      throw new Error(`CodeScene devtools binary path not set (${cliPath})`);
+  static get binaryPath(): string {
+    const path = CsExtensionState._instance.stateProperties.features.analysis.binaryPath;
+    if (!isDefined(path)) {
+      throw new Error(`CodeScene devtools binary path not set (${path})`);
     }
-    return cliPath;
+    return path;
   }
 
   /**
    * Returns the preflight response if ACE is enabled, otherwise undefined.
    */
   static get acePreflight(): PreFlightResponse | undefined {
-    const ace = CsExtensionState._instance.stateProperties.features?.ace;
-    return isPreFlightResponse(ace) ? ace : undefined;
+    return CsExtensionState._instance.stateProperties.features.ace.preFlight;
   }
 
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners(context: vscode.ExtensionContext) {
+  static addListeners(context: vscode.ExtensionContext, aceApi?: AceAPI) {
     context.subscriptions.push(
       Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
-      Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleError),
+      Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
       DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
-      DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleError),
-      CsRefactoringRequests.onDidRequestFail(CsExtensionState._instance.handleError),
-      onDidChangeConfiguration('previewCodeHealthMonitoring', (e) => {
-        CsExtensionState._instance.updateStatusViews();
-      })
+      DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
+    aceApi &&
+      context.subscriptions.push(
+        aceApi.onDidRequestFail((error) => {
+          CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
+        }),
+        aceApi.onDidChangeRequests(async (evt) => {
+          // Reset credits error state when a request succeeds again
+          if (evt.type === 'end' && isDefined(evt.request)) {
+            try {
+              const okResponse = await evt.request.promise;
+              CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
+            } catch (error) {}
+          }
+        }),
+        onDidChangeConfiguration('previewCodeHealthMonitoring', (e) => {
+          CsExtensionState._instance.updateStatusViews();
+        })
+      );
   }
 
   static clearErrors() {
-    CsExtensionState.stateProperties.serviceErrors = undefined;
+    CsExtensionState.stateProperties.features.analysis.error = undefined;
+    CsExtensionState.stateProperties.features.ace.error = undefined;
     CsExtensionState._instance.updateStatusViews();
   }
 
   private handleAnalysisEvent(event: AnalysisEvent) {
-    CsExtensionState.stateProperties.analysisState = event.type === 'idle' ? 'idle' : 'running';
+    CsExtensionState.stateProperties.features.analysis.analysisState = event.type === 'idle' ? 'idle' : 'running';
     CsExtensionState._instance.updateStatusViews(); // TODO - flag to update status bar only
   }
 
-  private handleError(error: Error) {
-    if (!CsExtensionState.stateProperties.serviceErrors) CsExtensionState.stateProperties.serviceErrors = [];
-    CsExtensionState.stateProperties.serviceErrors.push(error);
-    CsExtensionState._instance.updateStatusViews();
+  private handleAnalysisError(error: Error) {
+    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, error });
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update(CsExtensionState.stateProperties);
-    CsExtensionState._instance.statusBar.update(CsExtensionState.stateProperties);
+    CsExtensionState._instance.controlCenterView.update();
+    CsExtensionState._instance.statusBar.update();
   }
 
   /**
@@ -110,8 +144,6 @@ export class CsExtensionState {
   static setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
-    CsRestApi.instance.setSession(session);
-    Telemetry.instance.setSession(session);
     CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
@@ -126,16 +158,27 @@ export class CsExtensionState {
     return CsExtensionState.stateProperties.session;
   }
 
-  static setCliState(cliState: string | Error) {
+  static setAnalysisState({ binaryPath, error, state }: { binaryPath?: string; error?: Error; state: FeatureState }) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      codeHealthAnalysis: cliState,
+      analysis: { binaryPath, state, error },
     };
     CsExtensionState._instance.updateStatusViews();
   }
 
-  static setACEState(aceState: PreFlightResponse | Error | string) {
-    CsExtensionState.stateProperties.features = { ...CsExtensionState.stateProperties.features, ace: aceState };
+  static setACEState({
+    preFlight,
+    state,
+    error,
+  }: {
+    preFlight?: PreFlightResponse;
+    error?: Error;
+    state: FeatureState;
+  }) {
+    CsExtensionState.stateProperties.features = {
+      ...CsExtensionState.stateProperties.features,
+      ace: { preFlight, state, error },
+    };
     CsExtensionState._instance.updateStatusViews();
   }
 }

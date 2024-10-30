@@ -1,10 +1,9 @@
 // Functions for handling enabling and disabling the ACE "addon" components
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
-import { getConfiguration } from '../configuration';
-import { CsRestApi } from '../cs-rest-api';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
+import { RefactoringAPI } from './api';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
@@ -54,28 +53,22 @@ async function enableACE(context: vscode.ExtensionContext) {
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
   disableACE();
 
-  const enableACE = getConfiguration('enableAutoRefactor');
-  if (!enableACE) {
-    return Promise.reject('Auto-refactor disabled in configuration');
-  }
+  const preflightResponse = await RefactoringAPI.instance.preFlight();
 
-  return CsRestApi.instance.fetchRefactorPreflight().then((preflightResponse) => {
-    const commandDisposable = new CsRefactoringCommands(context.extensionUri, preflightResponse);
-    aceDisposables.push(commandDisposable);
-    aceDisposables.push(createTmpDiffUriScheme());
+  const commandDisposable = new CsRefactoringCommands(context.extensionUri, preflightResponse);
+  aceDisposables.push(commandDisposable);
+  aceDisposables.push(createTmpDiffUriScheme());
 
-    /* Add disposables to both subscription context and the extension state list
-     * of disposables. This is to ensure they're disposed either when the extension
-     * is deactivated or if the online features are disabled */
-    context.subscriptions.push(...aceDisposables);
+  /* Add disposables to both subscription context and the extension state list
+   * of disposables. This is to ensure they're disposed either when the extension
+   * is deactivated or if the online features are disabled */
+  context.subscriptions.push(...aceDisposables);
 
-    // Force update diagnosticCollection to request initial refactorings
-    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document);
-    });
-
-    return preflightResponse;
+  // Force update diagnosticCollection to request initial refactorings
+  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+    CsDiagnostics.review(document);
   });
+  return preflightResponse;
 }
 
 function disableACE() {
