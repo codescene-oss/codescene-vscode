@@ -92,7 +92,7 @@ export class RefactoringAPI {
           const msg = getErrorString(error);
           const creditInfo = toCreditInfo(error.response?.headers);
           // The refactoring API is designed to return 403 with some specific headers if the user has run out of credits
-          // Throw a specific error in this case, to be able to handle separately in CsExtensionState 
+          // Throw a specific error in this case, to be able to handle separately in CsExtensionState
           if (isDefined(creditInfo)) {
             throw new ACECreditsError(msg, creditInfo);
           }

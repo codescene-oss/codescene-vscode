@@ -151,30 +151,32 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   private refactoringButton(refactoring?: CsRefactoringRequest) {
-    const buttonWithProps = (iconClass = 'codicon-sparkle', appearance = 'primary', disabled = false) => {
+    const buttonBlock = (iconClass = 'codicon-sparkle', appearance = 'primary', disabled = false) => {
       return /*html*/ `
-        <vscode-button id="auto-refactor" appearance="${appearance}" ${disabled ? 'disabled' : ''}>
-          <span slot="start" class="codicon ${iconClass}"></span>
-          Auto-refactor
-        </vscode-button>`;
+        <div class="block">
+          <vscode-button id="refactoring-button" appearance="${appearance}" ${disabled ? 'disabled' : ''}>
+            <span slot="start" class="codicon ${iconClass}"></span>
+            Auto-refactor
+          </vscode-button>
+        </div>`;
     };
-    let refacButton = buttonWithProps();
 
-    if (!refactoring?.shouldPresent()) {
-      refacButton = buttonWithProps('codicon-circle-slash', 'secondary', true);
+    if (!refactoring) {
+      return buttonBlock('codicon-circle-slash', 'secondary', true);
     }
-
-    if (refactoring?.isPending()) {
-      refacButton = buttonWithProps('codicon-loading codicon-modifier-spin');
-      void refactoring.promise.then(() => {
-        this.update(this.functionInfo);
+    const webView = this.view?.webview;
+    refactoring?.promise
+      .then(() => {
+        void webView?.postMessage({
+          command: 'refactoring-ok',
+        });
+      })
+      .catch(() => {
+        void webView?.postMessage({
+          command: 'refactoring-failed',
+        });
       });
-    }
-    return /*html*/ `
-    <div class="block">
-      ${refacButton}
-      <!-- <vscode-button id="cancel" appearance="secondary"><span class="codicon codicon-circle-slash"></span></vscode-button> -->
-    </div>`;
+    return buttonBlock('codicon-loading codicon-modifier-spin');
   }
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {
