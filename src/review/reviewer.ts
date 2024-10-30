@@ -17,7 +17,7 @@ export default class Reviewer {
   private static _instance: CachingReviewer;
 
   static init(): void {
-    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.cliPath)));
+    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.binaryPath)));
     logOutputChannel.info('Code reviewer initialized');
   }
 

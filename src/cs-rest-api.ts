@@ -2,21 +2,18 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosR
 import vscode from 'vscode';
 import { CodeSceneAuthenticationSession } from './auth/auth-provider';
 import { Coupling } from './coupling/model';
+import { CsExtensionState } from './cs-extension-state';
 import { logOutputChannel } from './log';
-import { FnToRefactor } from './refactoring/commands';
+import { RefactorRequest } from './refactoring/model';
 import { CsServerVersion } from './server-version';
-import { PreFlightResponse, RefactorRequest, RefactorResponse } from './refactoring/model';
-import { getFileExtension } from './utils';
-import { getPortalUrl } from './configuration';
 
 const defaultTimeout = 10000;
-const refactoringTimeout = 60000;
 
+// TODO - rename, this is basically just an axios wrapper (after cleaning up the fetchprojects and couplings)
 export class CsRestApi {
   private static _instance: CsRestApi;
 
   private axiosInstance: AxiosInstance;
-  private session?: vscode.AuthenticationSession;
 
   constructor(extension: vscode.Extension<any>) {
     this.axiosInstance = axios.create({
@@ -28,18 +25,12 @@ export class CsRestApi {
 
     this.axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
       logOutputChannel.debug(`[${config.method}] ${config.url}`);
-      if (this.session) {
-        logOutputChannel.debug(`adding auth ${this.session.accessToken}`);
-        config.headers['Authorization'] = `Bearer ${this.session.accessToken}`;
+      if (CsExtensionState.stateProperties.session) {
+        logOutputChannel.debug(`adding auth ${CsExtensionState.stateProperties.session.accessToken}`);
+        config.headers['Authorization'] = `Bearer ${CsExtensionState.stateProperties.session.accessToken}`;
       }
       return config;
     });
-
-    const logResponse = (response: AxiosResponse) => {
-      const { config, status, statusText } = response;
-      logOutputChannel.debug(`${config.url} [${status}] ${statusText}`);
-      return response;
-    };
 
     this.axiosInstance.interceptors.response.use(logResponse, logAxiosError);
   }
@@ -57,19 +48,11 @@ export class CsRestApi {
     return CsRestApi._instance;
   }
 
-  setSession(session?: vscode.AuthenticationSession) {
-    this.session = session;
-  }
-
-  private isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
-    return (<CodeSceneAuthenticationSession>x).url !== undefined;
-  }
-
   private async getServerApiUrl() {
     let url: string;
     let serverType: string;
-    if (this.session && this.isCodeSceneSession(this.session)) {
-      let session = this.session as CodeSceneAuthenticationSession;
+    if (CsExtensionState.stateProperties.session && isCodeSceneSession(CsExtensionState.stateProperties.session)) {
+      let session = CsExtensionState.stateProperties.session as CodeSceneAuthenticationSession;
       url = session.url;
       serverType = session.version.server;
     } else {
@@ -94,23 +77,24 @@ export class CsRestApi {
     return apiUrl;
   }
 
-  private async fetchJson<T>(url: string, config?: AxiosRequestConfig) {
+  public async getRequest<T>(url: string, config?: AxiosRequestConfig) {
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.get(url, conf);
     return response.data as T;
   }
 
-  private async postForJson<T>(url: string, data: RefactorRequest, config?: AxiosRequestConfig) {
+  public async postRequest<T>(url: string, data: RefactorRequest, config?: AxiosRequestConfig) {
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.post(url, data, conf);
     return response.data as T;
   }
 
+  /** deprecated - TODO, remove */
   async fetchCouplings(projectId: number) {
     const serverUrl = await this.getServerApiUrl();
     const couplingsUrl = `${serverUrl}/v2/devtools/projects/${projectId}/couplings`;
 
-    const rawData = await this.fetchJson<{ [key: string]: any }[]>(couplingsUrl);
+    const rawData = await this.getRequest<{ [key: string]: any }[]>(couplingsUrl);
 
     rawData.forEach((entity) => {
       entity.averageRevs = entity['average_revs'];
@@ -120,67 +104,27 @@ export class CsRestApi {
     return rawData as Coupling[];
   }
 
+  /** deprecated - TODO, remove along with /couplings */
   async fetchProjects() {
     const serverUrl = await this.getServerApiUrl();
     const projectsUrl = serverUrl + '/v2/devtools/projects';
-    return await this.fetchJson<{ id: number; name: string }[]>(projectsUrl);
+    return await this.getRequest<{ id: number; name: string }[]>(projectsUrl);
   }
+}
 
-  async fetchRefactorPreflight() {
-    const preflightUrl = `${getPortalUrl()}/api/refactor/preflight`;
-    return this.fetchJson<PreFlightResponse>(preflightUrl);
-  }
-
-  private refactorUrl() {
-    let isCloudSession = false;
-    if (this.session && this.isCodeSceneSession(this.session)) {
-      let session = this.session as CodeSceneAuthenticationSession;
-      if (session.version.server === 'cloud') {
-        isCloudSession = true;
-      }
-    }
-    return isCloudSession ? `${getPortalUrl()}/api/refactor` : `${getPortalUrl()}/api/refactor/anon`;
-  }
-
-  private refactorRequest(fnToRefactor: FnToRefactor) {
-    const reviews = fnToRefactor.codeSmells.map((codeSmell) => {
-      return {
-        category: codeSmell.category,
-        'start-line': codeSmell.relativeStartLine,
-        'end-line': codeSmell.relativeEndLine,
-      };
-    });
-
-    const request: RefactorRequest = {
-      review: reviews,
-      'source-snippet': {
-        'file-type': getFileExtension(fnToRefactor.fileName),
-        'function-type': fnToRefactor.functionType,
-        body: fnToRefactor.content,
-      },
-      'device-id': vscode.env.machineId,
-    };
-
-    return request;
-  }
-
-  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
-    const config: AxiosRequestConfig = {
-      headers: {
-        'x-codescene-trace-id': traceId,
-      },
-      timeout: refactoringTimeout,
-      signal,
-    };
-    return await this.postForJson<RefactorResponse>(this.refactorUrl(), this.refactorRequest(fnToRefactor), config);
-  }
+function logResponse(response: AxiosResponse) {
+  const { config, status, statusText } = response;
+  logOutputChannel.debug(`${config.url} [${status}] ${statusText}`);
+  return response;
 }
 
 export function logAxiosError(error: any) {
   if (error.response) {
-    const { config, status, statusText } = error.response;
+    const { config, status, statusText, data } = error.response;
     // The request was made and the server responded with a status code != 2xx
-    logOutputChannel.error(`[${config.method}] ${config.url} [${status}] ${statusText}`);
+    logOutputChannel.error(
+      `[${config.method}] ${config.url} [${status}] ${statusText} ${data ? JSON.stringify(data) : ''}`
+    );
   } else if (error.request) {
     // The request was made but no response was received
     logOutputChannel.error(`Error in request - no response received: ${error}`);
@@ -189,4 +133,8 @@ export function logAxiosError(error: any) {
     logOutputChannel.error(`Request error: ${error.message}`);
   }
   return Promise.reject(error);
+}
+
+export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
+  return (<CodeSceneAuthenticationSession>x).url !== undefined;
 }

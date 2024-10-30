@@ -1,5 +1,3 @@
-import { isDefined } from "../utils";
-
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface RefactoringSupport {
   'file-types': string[];
@@ -14,7 +12,7 @@ export interface PreFlightResponse {
 
 export function isPreFlightResponse(obj: unknown): obj is PreFlightResponse {
   return (
-    obj !== null && 
+    obj !== null &&
     typeof obj === 'object' &&
     obj.hasOwnProperty('supported') &&
     obj.hasOwnProperty('max-input-tokens') &&
@@ -67,4 +65,10 @@ export interface RefactorResponse {
   'reasons-with-details': ReasonsWithDetails[];
   'refactoring-properties': RefactorProperties;
   code: string;
+}
+
+export interface AceCredits {
+  resetTime?: Date;
+  limit: number;
+  used: number;
 }

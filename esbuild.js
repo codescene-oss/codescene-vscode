@@ -41,7 +41,6 @@ function webviewConfig(watch = false) {
     entryPoints: [
       './src/refactoring/webview-script.ts',
       './src/documentation/webview-script.ts',
-      './src/status-view/webview-script.ts',
       './src/code-health-monitor/details/webview-script.ts',
       './src/control-center/webview-script.ts',
     ],

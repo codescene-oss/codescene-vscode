@@ -3,7 +3,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
-import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
+import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerCsDoc } from './documentation/csdoc-provider';
@@ -38,15 +38,17 @@ export async function activate(context: vscode.ExtensionContext) {
   registerShowLogCommand(context);
 
   ensureCompatibleBinary(context.extensionPath)
-    .then((cliPath) => {
-      CsExtensionState.setCliState(cliPath);
+    .then((binaryPath) => {
+      CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
       startExtension(context);
     })
-    .catch((error: Error) => {
+    .catch((error) => {
+      CsExtensionState.setAnalysisState({ state: 'error', error });
+
       const { message } = error;
-      CsExtensionState.setCliState(error);
       logOutputChannel.error(message);
-      void vscode.commands.executeCommand('codescene.statusView.focus');
+      void vscode.window.showErrorMessage(message);
+      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
     });
 }
 
@@ -58,7 +60,7 @@ function startExtension(context: vscode.ExtensionContext) {
   Reviewer.init();
   DeltaAnalyser.init();
   CsServerVersion.init();
-  CsExtensionState.addListeners(context);
+  CsExtensionState.addListeners(context, csContext.aceApi);
 
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.instance.logUsage('onActivateExtension');
@@ -172,31 +174,30 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 /**
  * Activate functionality that requires signing in to a CodeScene server.
  */
-function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {
-  //
-  // enableOrDisableACECapabilities(context, csContext);
-}
+function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {}
 
-function disableRemoteFeatures(aceApi: AceAPI) {
-  // anonymous access is now available
-  // aceApi.disableACE();
-}
+function disableRemoteFeatures() {}
 
 function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
   const { aceApi } = csContext;
-  CsExtensionState.setACEState('Loading ACE capabilities...');
+
+  const enableACE = getConfiguration('enableAutoRefactor');
+  if (!enableACE) {
+    CsExtensionState.setACEState({ state: 'disabled' });
+    return;
+  }
+
+  CsExtensionState.setACEState({ state: 'loading' });
   aceApi.enableACE(context).then(
     (result) => {
-      CsExtensionState.setACEState(result);
+      CsExtensionState.setACEState({ preFlight: result, state: 'enabled' });
       logOutputChannel.info('Auto-refactor enabled!');
     },
-    (error: Error | string) => {
-      if (error instanceof Error) {
-        const message = `Unable to enable refactoring capabilities. ${error.message}`;
-        logOutputChannel.error(message);
-        void vscode.window.showErrorMessage(message);
-      }
-      CsExtensionState.setACEState(error);
+    (error) => {
+      CsExtensionState.setACEState({ state: 'error', error });
+      const message = `Unable to enable refactoring capabilities. ${error.message}`;
+      logOutputChannel.error(message);
+      void vscode.window.showErrorMessage(message);
     }
   );
 }
@@ -204,16 +205,27 @@ function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csCont
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
-  // If there's already a session we enable the remote features, otherwise a badge will appear in the
-  // accounts menu - see AuthenticationGetSessionOptions.createIfNone?: boolean
-  vscode.authentication.getSession(AUTH_TYPE, []).then(onGetSessionSuccess(context, csContext), onGetSessionError());
+  // Register manual sign in command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codescene.signIn', async () => {
+      vscode.authentication
+        .getSession(AUTH_TYPE, [], { createIfNone: true })
+        .then(onGetSessionSuccess(context, csContext), onGetSessionError());
+    })
+  );
+
+  // If there's already a session we enable the remote features, otherwise silently add an option to
+  // sign in in the accounts menu - see AuthenticationGetSessionOptions
+  vscode.authentication
+    .getSession(AUTH_TYPE, [], { silent: true })
+    .then(onGetSessionSuccess(context, csContext), onGetSessionError());
 
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
     if (e.removed && e.removed.length > 0) {
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
-      void vscode.authentication.getSession(AUTH_TYPE, []);
+      void vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
       onGetSessionSuccess(context, csContext)(undefined); // removed a session
     }
     if (e.added && e.added.length > 0) {
@@ -244,7 +256,7 @@ function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsCont
     if (session) {
       enableRemoteFeatures(context, csContext);
     } else {
-      disableRemoteFeatures(csContext.aceApi);
+      disableRemoteFeatures();
     }
   };
 }

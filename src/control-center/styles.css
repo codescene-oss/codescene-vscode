@@ -8,6 +8,7 @@
 .row {
   display: flex;
   align-items: center;
+  cursor: default;
   justify-content: space-between;
 }
 
@@ -27,7 +28,6 @@
   font-size: 10px;
   border-radius: 4px;
   padding: 4px;
-  cursor: default;
   color: var(--vscode-foreground);
   background-color: var(--vscode-button-secondaryBackground);
 }
@@ -39,7 +39,6 @@
 .badge-error {
   color: var(--vscode-errorForeground);
   background-color: var(--vscode-debugExceptionWidget-background);
-  cursor: pointer;
 }
 
 #machine-id {
@@ -50,4 +49,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.out-of-credits-banner {
+  background-color: var(--vscode-button-secondaryBackground);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 10px 2px;
+}
+
+.warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.bold {
+  font-weight: 600;
 }

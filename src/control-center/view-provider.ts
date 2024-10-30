@@ -7,11 +7,12 @@ import vscode, {
   WebviewViewResolveContext,
   window,
 } from 'vscode';
+import { CsExtensionState } from '../cs-extension-state';
+import { logOutputChannel } from '../log';
+import { ACECreditsError } from '../refactoring/api';
+import { AceCredits } from '../refactoring/model';
+import { pluralize } from '../utils';
 import { getUri, nonce } from '../webviews/utils';
-import { CsFeatures, CsStateProperties } from '../cs-extension-state';
-import { DownloadError } from '../download';
-import { isDefined } from '../utils';
-import { getConfiguration } from '../configuration';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
   const provider = new ControlCenterViewProvider(context.extensionUri);
@@ -21,7 +22,6 @@ export function registerControlCenterViewProvider(context: ExtensionContext) {
 
 export class ControlCenterViewProvider implements WebviewViewProvider /* , Disposable */ {
   private view?: WebviewView;
-  private stateProperties: CsStateProperties = {};
 
   constructor(private readonly extensionUri: Uri) {}
 
@@ -39,7 +39,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
 
     webView.onDidReceiveMessage(this.handleMessages, this);
 
-    this.update(this.stateProperties);
+    this.update();
   }
 
   private handleMessages(message: any) {
@@ -52,7 +52,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
         return;
       case 'show-code-health-analysis-error':
       case 'show-ace-error':
-        void vscode.commands.executeCommand('codescene.showLogOutput');
+        logOutputChannel.show();
         return;
       case 'open-documentation':
         void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs'));
@@ -71,8 +71,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     }
   }
 
-  update(stateProperties: CsStateProperties) {
-    this.stateProperties = stateProperties;
+  update() {
     if (!this.view) {
       return;
     }
@@ -101,8 +100,8 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
       </head>
 
       <body>
-          ${bodyContent ? bodyContent : ''}
-          <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
+        <script type="module" nonce="${nonce()}" src="${webviewScript}"></script>
+        ${bodyContent ? bodyContent : ''}
       </body>
 
       </html>
@@ -123,10 +122,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     <div class="group">
         <div class="header">ACCOUNT</div>
         <div class="row">
-            <div class="icon-and-text"><span class="codicon codicon-verified"></span><span>ACE Credits</span></div>
-            <div class="badge badge-activated">available</div>
-        </div>
-        <div class="row">
             <div class="icon-and-text"><span class="codicon codicon-star"></span><span>Upgrade</span></div>
             <div class="badge">coming soon</div>
         </div>
@@ -138,31 +133,38 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     return /*html*/ `
     <div class="group">
         <div class="header">STATUS</div>
-        ${this.codeHealthStatusRow()}
+        ${this.codeHealthAnalysisRow()}
         ${this.aceStatusRow()}
     </div>  
     `;
   }
 
-  private codeHealthStatusRow() {
-    const features = this.stateProperties.features;
-
-    let meta = { iconClass: 'codicon-loading codicon-modifier-spin', text: 'initializing', badgeClass: '' };
-    if (typeof features?.codeHealthAnalysis === 'string') {
-      meta = { iconClass: 'codicon-pulse', text: 'activated', badgeClass: 'badge-activated' };
-    } else if (features?.codeHealthAnalysis instanceof Error) {
-      if (features?.codeHealthAnalysis instanceof DownloadError) {
-        const err = features.codeHealthAnalysis;
-        const actionableMessage = /*html*/ `<p>
-        Please try to installing the CodeScene devtools binary manually using these steps:
-        <ul>
-          <li>Download the required version manually from <a href="${err.url}">here</a></li>
-          <li>Unpack and move it to ${err.expectedCliPath}</li>
-          <li>Ensure it is executable, then restart the extension</li>
-        </ul>
-      </p>`;
-      }
-      meta = { iconClass: 'codicon-error', text: 'error', badgeClass: 'badge-error' };
+  private codeHealthAnalysisRow() {
+    const analysisFeature = CsExtensionState.stateProperties.features.analysis;
+    let meta = { iconClass: '', text: '', badgeClass: '' };
+    switch (analysisFeature.state) {
+      case 'loading':
+        meta = { iconClass: 'codicon-loading codicon-modifier-spin', text: 'initializing', badgeClass: '' };
+        break;
+      case 'enabled':
+        meta = { iconClass: 'codicon-pulse', text: 'activated', badgeClass: 'badge-activated' };
+        break;
+      case 'error':
+        meta = { iconClass: 'codicon-error', text: 'error', badgeClass: 'badge-error' };
+        /* TODO - restore this in new UX somehow
+          if (analysisState.error instanceof DownloadError) {
+            const err = analysisState.error;
+            const actionableMessage = `<p>
+            Please try to installing the CodeScene devtools binary manually using these steps:
+            <ul>
+              <li>Download the required version manually from <a href="${err.url}">here</a></li>
+              <li>Unpack and move it to ${err.expectedCliPath}</li>
+              <li>Ensure it is executable, then restart the extension</li>
+            </ul>
+          </p>`;
+          }
+        */
+        break;
     }
 
     return /*html*/ `
@@ -178,33 +180,77 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
   }
 
   private aceStatusRow() {
-    const features = this.stateProperties.features;
-    const preflight = features?.ace;
+    const aceFeature = CsExtensionState.stateProperties.features.ace;
 
-    let meta = { iconClass: 'codicon-loading codicon-modifier-spin', text: 'initializing', badgeClass: '' };
-    if (features?.codeHealthAnalysis instanceof Error) {
-      meta = { iconClass: 'codicon-error', text: 'error', badgeClass: 'badge-error' };
+    let iconClass = 'codicon-sparkle',
+      text = '',
+      tooltip,
+      outOfCreditsBanner;
+
+    switch (aceFeature.state) {
+      case 'loading':
+        iconClass = 'codicon-loading codicon-modifier-spin';
+        text = 'initializing';
+        break;
+      case 'enabled':
+        iconClass = 'codicon-sparkle';
+        text = 'activated';
+        break;
+      case 'disabled':
+        iconClass = 'codicon-circle-slash';
+        text = 'deactivated';
+        tooltip = 'Disabled in configuration';
+        break;
+      case 'error':
+        iconClass = 'codicon-error';
+        text = 'error';
+        break;
     }
-    if (!getConfiguration('enableAutoRefactor')) {
-      meta = { iconClass: 'codicon-loading codicon-disabled', text: 'deactivated', badgeClass: '' };
+
+    // Custom presentation if we're out of credits
+    if (aceFeature.error instanceof ACECreditsError) {
+      text = 'out of credits';
+      outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
     }
-    if (isDefined(preflight)) {
-      if (preflight instanceof Error) {
-        meta = { iconClass: 'codicon-error', text: 'error', badgeClass: 'badge-error' };
-      } else if (typeof preflight === 'string') {
-      } else {
-        meta = { iconClass: 'codicon-sparkle', text: 'activated', badgeClass: 'badge-activated' };
-      }
+
+    // Always in error if analysis failed to initialize
+    if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
+      iconClass = 'codicon-error';
+      text = 'error';
     }
 
     return /*html*/ `
         <div class="row">
-            <div class="icon-and-text"><span class="codicon ${meta.iconClass}"></span><span>CodeScene ACE</span></div>
-            <div class="badge badge-${meta.text} ${meta.text === 'error' ? 'clickable' : ''}" id="ace-badge">${
-      meta.text
-    }</div>
+            <div class="icon-and-text"><span class="codicon ${iconClass}"></span><span>CodeScene ACE</span></div>
+            <div class="badge badge-${text} ${text === 'error' ? 'clickable' : ''}" 
+              id="ace-badge"
+              title="${tooltip ? tooltip : ''}">${text}
+            </div>
         </div>
-`;
+        ${outOfCreditsBanner ? outOfCreditsBanner : ''}
+    `;
+  }
+
+  private creditBannerContent(creditInfo: AceCredits) {
+    if (!creditInfo.resetTime) return;
+
+    const differenceInDays = Math.floor((creditInfo.resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    const content = /* html*/ `
+    <div class="out-of-credits-banner">
+      <div class="icon-and-text">
+        <span class="codicon codicon-warning warning"></span>
+        <span class="bold">You're out of ACE credits</span>
+      </div>
+      <p>
+        You'll get new credits in ${differenceInDays} ${pluralize(
+      'day',
+      differenceInDays
+    )}. (${creditInfo.resetTime.toLocaleString()})
+      </p>
+    </div>
+    `;
+    return content;
   }
 
   private moreGroup() {
@@ -226,12 +272,4 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     </div>  
     `;
   }
-}
-
-export function codeHealthAnalysisEnabled(features?: CsFeatures) {
-  return isDefined(features?.codeHealthAnalysis) && !(features?.codeHealthAnalysis instanceof Error);
-}
-
-export function aceEnabled(features?: CsFeatures) {
-  return isDefined(features?.ace) && typeof features?.ace !== 'string' && !(features?.ace instanceof Error);
 }
