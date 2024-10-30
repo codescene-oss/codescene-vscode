@@ -11,6 +11,10 @@ export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== undefined && value !== null;
 }
 
+export function isError(value: unknown): value is Error {
+  return value instanceof Error;
+}
+
 export function pluralize(noun: string, count: number) {
   return Math.abs(count) <= 1 ? noun : `${noun}s`;
 }
