@@ -1,21 +1,17 @@
-import { readFile } from 'fs/promises';
-import path, { join } from 'path';
+import path from 'path';
 import vscode, { Disposable, Selection, Uri, ViewColumn, WebviewPanel } from 'vscode';
-import { categoryToDocsCode } from '../documentation/csdoc-provider';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
-import { getLogoUrl } from '../utils';
-import { getUri, nonce } from '../webviews/utils';
-import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
-import { CsRefactoringRequest } from './cs-refactoring-requests';
-import { RefactorResponse } from './model';
-import { CodeWithLangId, decorateCode, targetEditor } from './utils';
 import {
   collapsibleContent,
   readRawMarkdownDocs,
   renderedSegment,
   renderHtmlTemplate,
 } from '../webviews/doc-and-refac-common';
+import { FnToRefactor, refactoringSymbol, toConfidenceSymbol } from './commands';
+import { CsRefactoringRequest } from './cs-refactoring-requests';
+import { RefactorConfidence, RefactorResponse } from './model';
+import { CodeWithLangId, decorateCode, targetEditor } from './utils';
 
 interface RefactorPanelParams {
   refactoring: CsRefactoringRequest;
@@ -77,6 +73,9 @@ export class RefactoringPanel {
           case 'show-diff':
             void vscode.commands.executeCommand('codescene.showDiffForRefactoring', refactoring);
             return;
+          case 'show-logoutput':
+            logOutputChannel.show();
+            return;
         }
       },
       this,
@@ -91,12 +90,12 @@ export class RefactoringPanel {
     }
   }
 
-  private async updateWebView({ refactoring }: RefactorPanelParams) {
+  private updateWebView({ refactoring }: RefactorPanelParams) {
     const { fnToRefactor, promise, document } = refactoring;
 
     this.currentRefactoring = refactoring;
 
-    await this.updateContent('Refactoring...', this.loadingContent());
+    this.updateContent('Refactoring...', this.loadingContent());
 
     const fnLocContent = this.functionLocationContent(this.currentRefactoring.fnToRefactor);
 
@@ -115,18 +114,31 @@ export class RefactoringPanel {
           editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
         }
 
-        await this.updateContent(title, [
+        this.updateContent(title, [
           fnLocContent,
-          this.refactoringSummary(response), // TODO - change title and texts in the service
+          this.refactoringSummary(response.confidence), // TODO - change title and texts in the service
           await this.autoRefactorOrCodeImprovementContent(response, document.languageId),
         ]);
       })
       .catch(async (error) => {
-        await this.updateContent('Auto-refactor error', [fnLocContent, this.errorContent(error)]);
+        const title = 'Refactoring Failed';
+        const actionHtml = `
+          There was an error when performing this refactoring. 
+          Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
+        const summaryContent = this.refactoringSummary({
+          level: 0,
+          title,
+          description: '',
+          'recommended-action': {
+            description: title,
+            details: actionHtml,
+          },
+        });
+        this.updateContent(title, [fnLocContent, summaryContent, this.refactoringUnavailable()]);
       });
   }
 
-  private async updateContent(title: string, content: string | string[]) {
+  private updateContent(title: string, content: string | string[]) {
     renderHtmlTemplate(this.webViewPanel, this.extensionUri, {
       title,
       bodyContent: content,
@@ -141,24 +153,9 @@ export class RefactoringPanel {
     </div>`;
   }
 
-  private errorContent(error: any) {
-    let errorMessage = error.message || 'Unknown error';
-
-    return /*html*/ `<h2>Refactoring failed</h2>
-    <p>There was an error when performing this refactoring. Here's the response from the refactoring service:</p>
-    <pre>${errorMessage}</pre>
-    <div class="bottom-controls">
-      <div></div> <!-- Spacer, making sure close button is right aligned -->
-      <div class="button-group right">
-        <vscode-button id="close-button" appearance="primary">Close</vscode-button>
-      </div>
-    </div>
-`;
-  }
-
   private refactoringUnavailable() {
     return /*html*/ `
-    <div>
+    <div class="refactoring-unavailable-content">
       <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement 
       guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
       <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a> 
@@ -194,8 +191,7 @@ export class RefactoringPanel {
       `;
   }
 
-  private refactoringSummary(response: RefactorResponse) {
-    const { confidence } = response;
+  private refactoringSummary(confidence: RefactorConfidence) {
     const {
       level,
       'recommended-action': { details: actionDetails, description: action },

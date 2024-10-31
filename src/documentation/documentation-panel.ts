@@ -1,12 +1,11 @@
-import { readFile } from 'fs/promises';
-import path, { join } from 'path';
+import path from 'path';
 import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor, RefactoringTarget } from '../refactoring/commands';
 import { isDefined } from '../utils';
-import { getUri, nonce } from '../webviews/utils';
-import { categoryToDocsCode, InteractiveDocsParams } from './csdoc-provider';
-import { collapsibleContent, readRawMarkdownDocs, renderedSegment, renderHtmlTemplate } from '../webviews/doc-and-refac-common';
+import { readRawMarkdownDocs, renderedSegment, renderHtmlTemplate } from '../webviews/doc-and-refac-common';
+import { getUri } from '../webviews/utils';
+import { InteractiveDocsParams } from './csdoc-provider';
 
 export interface IssueInfo {
   category: string;
@@ -206,10 +205,6 @@ export class DocumentationPanel implements Disposable {
     `;
   }
 
-  private getUri(...pathSegments: string[]) {
-    return getUri(this.webViewPanel.webview, this.extensionUri, ...pathSegments);
-  }
-
   dispose() {
     DocumentationPanel.currentPanel = undefined;
     this.webViewPanel.dispose();
@@ -217,19 +212,19 @@ export class DocumentationPanel implements Disposable {
   }
 
   static createOrShow({
-    issueInfo: codeSmell,
+    issueInfo,
     documentUri,
     request,
     extensionUri,
   }: InteractiveDocsParams & { extensionUri: Uri }) {
     if (DocumentationPanel.currentPanel) {
-      void DocumentationPanel.currentPanel.updateWebView({ issueInfo: codeSmell, documentUri, request });
+      void DocumentationPanel.currentPanel.updateWebView({ issueInfo, documentUri, request });
       DocumentationPanel.currentPanel.webViewPanel.reveal(undefined, true);
       return;
     }
 
     // Otherwise, create a new web view panel.
     DocumentationPanel.currentPanel = new DocumentationPanel(extensionUri);
-    void DocumentationPanel.currentPanel.updateWebView({ issueInfo: codeSmell, documentUri, request });
+    void DocumentationPanel.currentPanel.updateWebView({ issueInfo, documentUri, request });
   }
 }

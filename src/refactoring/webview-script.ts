@@ -1,9 +1,4 @@
-import {
-  provideVSCodeDesignSystem,
-  vsCodeButton,
-  vsCodeDivider,
-  vsCodeProgressRing
-} from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider, vsCodeProgressRing } from '@vscode/webview-ui-toolkit';
 import loadingMessages from './loading-messages';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeProgressRing());
@@ -21,6 +16,7 @@ function main() {
   document.getElementById('reject-button')?.addEventListener('click', () => sendMessage('reject'));
   document.getElementById('apply-button')?.addEventListener('click', () => sendMessage('apply'));
   document.getElementById('copy-to-clipboard-button')?.addEventListener('click', () => sendMessage('copy-code'));
+  document.getElementById('show-logoutput-link')?.addEventListener('click', () => sendMessage('show-logoutput'));
 
   const loadingEl = document.getElementById('loading-span');
   if (loadingEl) {
