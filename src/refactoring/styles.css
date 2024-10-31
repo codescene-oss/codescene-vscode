@@ -73,8 +73,12 @@
   color: var(--codeScene-green);
 }
 
+.refactoring-unavailable-content {
+  margin-top: 12px;
+}
+
 .accept-reject-buttons {
   display: inline-flex;
   gap: 10px;
-  margin: 12px 0;
+  margin-top: 12px;
 }
