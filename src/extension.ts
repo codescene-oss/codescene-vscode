@@ -21,6 +21,7 @@ import Telemetry from './telemetry';
 import { isError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-conditions';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -33,10 +34,13 @@ interface CsContext {
  */
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
+  Telemetry.init(context.extension);
+
+  registerShowLogCommand(context);
+  registerTermsAndPoliciesCmds(context);
+  await acceptTermsAndPolicies(context);
 
   CsExtensionState.init(context);
-  Telemetry.init(context.extension);
-  registerShowLogCommand(context);
 
   try {
     const binaryPath = await ensureCompatibleBinary(context.extensionPath);
