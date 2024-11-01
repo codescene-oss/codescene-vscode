@@ -39,11 +39,11 @@ function webviewConfig(watch = false) {
     target: 'es2020',
     format: 'esm',
     entryPoints: [
-      './src/refactoring/webview-script.ts',
-      './src/documentation/webview-script.ts',
       './src/code-health-monitor/details/webview-script.ts',
       './src/control-center/webview-script.ts',
-      './src/webviews/doc-and-refac-common-webview-script.ts',
+      './src/codescene-tab/webview/script.ts',
+      './src/codescene-tab/webview/refactoring-script.ts',
+      './src/codescene-tab/webview/documentation-script.ts',
     ],
     outdir: './out',
     plugins: [

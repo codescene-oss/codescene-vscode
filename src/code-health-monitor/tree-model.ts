@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { issueToDocsParams } from '../documentation/csdoc-provider';
+import { issueToDocsParams } from '../documentation/commands';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
 import { roundScore, vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';

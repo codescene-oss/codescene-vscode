@@ -55,7 +55,7 @@ async function enableACE(context: vscode.ExtensionContext) {
 
   const preflightResponse = await RefactoringAPI.instance.preFlight();
 
-  const commandDisposable = new CsRefactoringCommands(context.extensionUri, preflightResponse);
+  const commandDisposable = new CsRefactoringCommands(preflightResponse);
   aceDisposables.push(commandDisposable);
   aceDisposables.push(createTmpDiffUriScheme());
 

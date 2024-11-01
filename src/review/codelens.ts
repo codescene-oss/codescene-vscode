@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { scorePresentation } from '../code-health-monitor/model';
 import { getConfiguration, onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
-import { toDocsParams } from '../documentation/csdoc-provider';
+import { toDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';

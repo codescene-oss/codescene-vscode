@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { toDocsParams } from '../documentation/csdoc-provider';
+import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { AceAPI } from '../refactoring/addon';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
@@ -44,8 +44,8 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
 
     const diagnostics: vscode.Diagnostic[] = await review.review.diagnostics;
 
-    const refactoringRequests = this.requestsForDocument.get(document.uri.toString());
-    const matchingRequest = refactoringRequests?.find((request) => request.fnToRefactor.range.contains(range));
+    const matchingRequest = this.findRequest(document.uri, range);
+
     const actions = diagnostics
       .filter((diagnostic) => diagnostic.range.contains(range))
       .map((diagnostic) => {
@@ -54,11 +54,14 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
         const title = `Explain ${category}`;
         const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
         const params = toDocsParams(category, diagnostic.range.start, document.uri);
+
+        // If the request contains the issue category, pass it to the command to show the refactoring in the docs panel
+        const request = this.requestContainsIssueCategory(category, matchingRequest);
         action.diagnostics = [diagnostic];
         action.command = {
           command: 'codescene.openInteractiveDocsPanel',
           title,
-          arguments: [{ ...params, request: matchingRequest }],
+          arguments: [{ ...params, request }],
         };
         return action;
       })
@@ -77,6 +80,24 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     }
 
     return actions;
+  }
+
+  /**
+   * Returns a request if there are requests for the document uri where the function range
+   * contains the range of the requested codeaction.
+   *
+   * @param uri Uri of document with potential refactorings
+   * @param range Range of the line to provide the codeaction for
+   * @returns
+   */
+  private findRequest(uri: vscode.Uri, range: vscode.Range) {
+    const refactoringRequests = this.requestsForDocument.get(uri.toString());
+    return refactoringRequests?.find((request) => request.fnToRefactor.range.contains(range));
+  }
+
+  private requestContainsIssueCategory(category: string, request?: CsRefactoringRequest) {
+    const containsCodeSmell = request?.fnToRefactor.codeSmells.find((cs) => cs.category === category);
+    if (containsCodeSmell) return request;
   }
 
   dispose() {

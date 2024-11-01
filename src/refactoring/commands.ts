@@ -1,14 +1,14 @@
 import vscode, { Position, Range, Selection, TextEditorRevealType, ViewColumn, WorkspaceEdit } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
+import { CodeSceneTabPanel } from '../codescene-tab/webViewPanel';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { logOutputChannel } from '../log';
+import Telemetry from '../telemetry';
 import { isDefined, registerCommandWithTelemetry } from '../utils';
 import { toRefactoringDocumentSelector } from './addon';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { PreFlightResponse } from './model';
-import { RefactoringPanel } from './refactoring-panel';
 import { createTempDocument, decorateCode, targetEditor } from './utils';
-import Telemetry from '../telemetry';
 
 export interface FnToRefactor {
   name: string;
@@ -32,11 +32,9 @@ export interface RefactoringTarget {
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
-  private extensionUri: vscode.Uri;
   private documentSelector: vscode.DocumentSelector;
 
-  constructor(extensionUri: vscode.Uri, private preflightResponse: PreFlightResponse) {
-    this.extensionUri = extensionUri;
+  constructor(private preflightResponse: PreFlightResponse) {
     this.documentSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
 
     this.disposables.push(
@@ -58,13 +56,9 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
   }
 
-  private presentRefactoringRequestCmd(request?: CsRefactoringRequest, viewColumn?: vscode.ViewColumn) {
+  private presentRefactoringRequestCmd(request?: CsRefactoringRequest) {
     if (!request) return;
-    RefactoringPanel.createOrShow({
-      extensionUri: this.extensionUri,
-      refactoring: request,
-      viewColumn,
-    });
+    CodeSceneTabPanel.show({ params: request });
   }
 
   private async requestRefactoringsCmd(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {

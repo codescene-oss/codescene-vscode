@@ -1,4 +1,4 @@
-import vscode from 'vscode';
+import vscode, { Uri } from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { onDidChangeConfiguration } from './configuration';
@@ -33,6 +33,7 @@ interface CsFeatures {
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features: CsFeatures;
+  extensionUri: vscode.Uri;
 }
 
 /**
@@ -51,6 +52,7 @@ export class CsExtensionState {
         analysis: { state: 'loading' },
         ace: { state: 'loading' },
       },
+      extensionUri: context.extensionUri,
     };
     this.controlCenterView = registerControlCenterViewProvider(context);
     context.subscriptions.push(
@@ -70,6 +72,10 @@ export class CsExtensionState {
 
   static get stateProperties() {
     return CsExtensionState._instance.stateProperties;
+  }
+
+  static get extensionUri(): Uri {
+    return CsExtensionState._instance.stateProperties.extensionUri;
   }
 
   static get binaryPath(): string {

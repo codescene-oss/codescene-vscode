@@ -12,7 +12,7 @@ import { logOutputChannel } from '../log';
 import { ACECreditsError } from '../refactoring/api';
 import { AceCredits } from '../refactoring/model';
 import { pluralize } from '../utils';
-import { getUri, nonce } from '../webviews/utils';
+import { getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
   const provider = new ControlCenterViewProvider(context.extensionUri);
@@ -81,9 +81,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
   }
 
   private wrapWithBoilerplate(webView: vscode.Webview, bodyContent?: string) {
-    const webviewScript = getUri(webView, this.extensionUri, 'out', 'control-center', 'webview-script.js');
-    const stylesUri = getUri(webView, this.extensionUri, 'out', 'control-center', 'styles.css');
-    const codiconsUri = getUri(webView, this.extensionUri, 'out', 'codicons', 'codicon.css');
+    const webviewScript = getUri(webView, 'out', 'control-center', 'webview-script.js');
+    const stylesUri = getUri(webView, 'out', 'control-center', 'styles.css');
+    const codiconsUri = getUri(webView, 'out', 'codicons', 'codicon.css');
 
     return /*html*/ `
       <!DOCTYPE html>
