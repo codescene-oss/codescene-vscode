@@ -6,7 +6,8 @@ import { register as registerCHRulesCommands } from './code-health-rules';
 import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
-import { register as registerCsDoc } from './documentation/csdoc-provider';
+import { register as registerDocumentationCommands } from './documentation/commands';
+import { register as registerCsDocProvider } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
@@ -17,7 +18,7 @@ import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
-import { isError, registerCommandWithTelemetry } from './utils';
+import { isError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 
@@ -68,7 +69,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   createAuthProvider(context, csContext);
   await enableOrDisableACECapabilities(context, csContext);
   registerCommands(context, csContext);
-  registerCsDoc(context);
+  registerCsDocProvider(context);
   addReviewListeners(context);
   setupStatsCollector(context);
 
@@ -108,17 +109,12 @@ function finalizeActivation() {
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
-  const openCodeHealthDocsCmd = registerCommandWithTelemetry({
-    commandId: 'codescene.openCodeHealthDocs',
-    handler: () => {
-      void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
-    },
-  });
+  registerDocumentationCommands(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
   });
-  context.subscriptions.push(openCodeHealthDocsCmd, toggleReviewCodeLensesCmd);
+  context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
 }

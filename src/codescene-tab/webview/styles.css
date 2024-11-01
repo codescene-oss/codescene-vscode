@@ -58,3 +58,9 @@ h2.cs-common {
 .container {
   overflow: hidden;
 }
+
+.button-container {
+  display: inline-flex;
+  gap: 10px;
+  margin-top: 12px;
+}

@@ -1,9 +1,9 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Uri, Webview, WebviewViewProvider } from 'vscode';
-import { issueToDocsParams } from '../../documentation/csdoc-provider';
+import { issueToDocsParams } from '../../documentation/commands';
 import { CsRefactoringRequest } from '../../refactoring/cs-refactoring-requests';
 import { pluralize } from '../../utils';
-import { getUri, nonce } from '../../webviews/utils';
+import { getUri, nonce } from '../../webview-utils';
 import { DeltaFunctionInfo } from '../tree-model';
 
 export function register(context: ExtensionContext) {
@@ -61,16 +61,9 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   private initBaseContent(webView: Webview) {
-    const webviewScript = getUri(
-      webView,
-      this.extensionUri,
-      'out',
-      'code-health-monitor',
-      'details',
-      'webview-script.js'
-    );
-    const styleSheet = getUri(webView, this.extensionUri, 'out', 'code-health-monitor', 'details', 'styles.css');
-    const codiconsUri = getUri(webView, this.extensionUri, 'out', 'codicons', 'codicon.css');
+    const webviewScript = getUri(webView, 'out', 'code-health-monitor', 'details', 'webview-script.js');
+    const styleSheet = getUri(webView, 'out', 'code-health-monitor', 'details', 'styles.css');
+    const codiconsUri = getUri(webView, 'out', 'codicons', 'codicon.css');
 
     return /*html*/ `
     <!DOCTYPE html>
@@ -167,6 +160,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     const webView = this.view?.webview;
     refactoring?.promise
       .then(() => {
+        // TODO - consider the actual result (confidence > 0)
         void webView?.postMessage({
           command: 'refactoring-ok',
         });

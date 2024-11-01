@@ -1,4 +1,5 @@
 import { Uri, Webview } from 'vscode';
+import { CsExtensionState } from './cs-extension-state';
 
 export function nonce() {
   let text = '';
@@ -9,6 +10,6 @@ export function nonce() {
   return text;
 }
 
-export function getUri(webView: Webview, extensionUri: Uri, ...pathSegments: string[]) {
-  return webView.asWebviewUri(Uri.joinPath(extensionUri, ...pathSegments));
+export function getUri(webView: Webview, ...pathSegments: string[]) {
+  return webView.asWebviewUri(Uri.joinPath(CsExtensionState.extensionUri, ...pathSegments));
 }

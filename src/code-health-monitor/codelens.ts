@@ -1,6 +1,6 @@
 import vscode, { Uri } from 'vscode';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
-import { issueToDocsParams } from '../documentation/csdoc-provider';
+import { issueToDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './tree-model';
 
