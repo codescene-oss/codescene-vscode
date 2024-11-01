@@ -1,4 +1,4 @@
-import { commands, env, ExtensionContext, Uri, window } from 'vscode';
+import { env, ExtensionContext, Uri, window } from 'vscode';
 import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 
@@ -16,7 +16,7 @@ export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
   );
 }
 
-export async function acceptTermsAndPolicies(context: ExtensionContext) {
+export async function acceptTermsAndPolicies(context: ExtensionContext): Promise<boolean> {
   const hasAcceptedTerms = context.globalState.get<boolean>(acceptedTermsAndPoliciesKey);
   if (hasAcceptedTerms === true) return hasAcceptedTerms;
 
