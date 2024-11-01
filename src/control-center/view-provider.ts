@@ -57,7 +57,10 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
       case 'open-documentation':
         void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs'));
         return;
-      case 'open-privacy-principles':
+      case 'open-terms-and-policies':
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/policies'));
+        return;
+      case 'open-ai-privacy-principles':
         void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ace/principles'));
         return;
       case 'open-contact-codescene':
@@ -264,7 +267,10 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
             <div class="icon-and-text clickable" id="documentation"><span class="codicon codicon-question"></span><span>Documentation</span></div>
         </div>
         <div class="row">
-            <div class="icon-and-text clickable" id="privacy-principles"><span class="codicon codicon-file"></span><span>Privacy Principles</span></div>
+            <div class="icon-and-text clickable" id="terms-and-policies"><span class="codicon codicon-file"></span><span>Terms & Policies</span></div>
+        </div>
+        <div class="row">
+            <div class="icon-and-text clickable" id="privacy-principles"><span class="codicon codicon-file"></span><span>AI Privacy Principles</span></div>
         </div>
         <div class="row">
             <div class="icon-and-text clickable" id="contact-codescene"><span class="codicon codicon-comment-discussion"></span><span>Contact CodeScene</span></div>
