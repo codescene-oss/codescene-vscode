@@ -16,8 +16,12 @@ function main() {
   document.getElementById('codescene-settings')?.addEventListener('click', () => sendMessage('open-settings'));
   document.getElementById('documentation')?.addEventListener('click', () => sendMessage('open-documentation'));
   document
+    .getElementById('terms-and-policies')
+    ?.addEventListener('click', () => sendMessage('open-terms-and-policies'));
+
+  document
     .getElementById('privacy-principles')
-    ?.addEventListener('click', () => sendMessage('open-privacy-principles'));
+    ?.addEventListener('click', () => sendMessage('open-ai-privacy-principles'));
   document.getElementById('contact-codescene')?.addEventListener('click', () => sendMessage('open-contact-codescene'));
 
   document.getElementById('machine-id')?.addEventListener('click', () => sendMessage('copy-machine-id'));

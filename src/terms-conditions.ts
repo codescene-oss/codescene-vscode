@@ -1,4 +1,4 @@
-import { env, ExtensionContext, Uri, window } from 'vscode';
+import { commands, env, ExtensionContext, Uri, window } from 'vscode';
 import Telemetry from './telemetry';
 import { registerCommandWithTelemetry } from './utils';
 
