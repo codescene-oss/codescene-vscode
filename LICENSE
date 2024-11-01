@@ -1,25 +1,19 @@
 Copyright CodeScene AB
 
-The following license applies only to files located in this repository, and not to other utilities
-used by this software to perform code analysis. These utilities are only for use in the
-codescene-oss/codescene-vscode open source project.
+This extension ("IDE Plugin") includes both Open-Source and Closed-Source software components.
 
-MIT License
+Usage of the IDE Plugin requires acceptance of the CodeScene Plugin Terms, and is governed by those terms. The Plugin Terms are available at https://codescene.com/policies
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Subject to your compliance with the Plugin Terms and payment of any applicable fees, CodeScene grants rights to this IDE Plugin as follows:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Open-Source Components
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The Open-Source Components relate to the user interface and are published in a public, open-source git repository, located at https://github.com/codescene-oss/codescene-vscode
+CodeScene grants a GNU Lesser General Public License ('LGPL') to these software components, based on the license to be found at https://www.gnu.org/licenses/lgpl-3.0.en.html
+
+Closed-Source Components
+
+The Closed-Source Components relate to extension libraries, analysis libraries and other services, and are held in a private git repository.
+CodeScene grants a non-exclusive, non-transferable, non-sub-licensable, limited license to use the Closed-Source Components in object code format as described in the Plugin Terms.
+
+The Closed-Source Components shall under no circumstances be considered as sold and, other than any license granted pursuant to the Plugin Terms, CodeScene reserves all rights to the software components not expressly granted herein.
