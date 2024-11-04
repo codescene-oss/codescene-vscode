@@ -73,7 +73,10 @@ async function autoRefactorContent(response: RefactorResponse, code: CodeWithLan
 }
 
 function reasonsContent(response: RefactorResponse) {
-  const { 'reasons-with-details': reasonsWithDetails } = response;
+  const {
+    'reasons-with-details': reasonsWithDetails,
+    confidence: { 'review-header': reviewHeader, level },
+  } = response;
   let reasonsList;
   if (reasonsWithDetails && reasonsWithDetails.length > 0) {
     const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
@@ -81,7 +84,10 @@ function reasonsContent(response: RefactorResponse) {
           <ul>${reasonText}</ul>
         `;
   }
-  return collapsibleContent('Reasons for detailed review', reasonsList);
+  // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
+  const safeHeader = reviewHeader || 'Reasons for review';
+  const isCollapsed = level > 2;
+  return collapsibleContent(safeHeader, reasonsList, isCollapsed);
 }
 
 function acceptAndRejectButtons() {

@@ -43,6 +43,7 @@ export interface RefactorConfidence {
   title: string;
   level: number;
   'recommended-action': { description: string; details: string };
+  'review-header'?: string;
 }
 interface RefactorProperties {
   'added-code-smells': string[];
