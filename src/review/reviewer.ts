@@ -72,7 +72,7 @@ export class ReviewCacheItem {
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
     const delta = await DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
-    if (delta) this.delta = delta;
+    this.delta = delta || undefined;
   }
 
   resetBaseline() {
