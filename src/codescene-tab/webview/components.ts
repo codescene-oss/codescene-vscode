@@ -10,7 +10,7 @@ import { isDefined } from '../../utils';
  * @param containerContent
  * @returns
  */
-export function collapsibleContent(title: string, containerContent?: string) {
+export function collapsibleContent(title: string, containerContent?: string, isCollapsed = false) {
   if (!isDefined(containerContent)) return '';
 
   const classCompatibleTitle = title.toLowerCase().replace(/ /g, '-');
@@ -19,12 +19,12 @@ export function collapsibleContent(title: string, containerContent?: string) {
     <h3 data-cs-type="collapsible-header"
         data-cs-title="${classCompatibleTitle}" 
         class="${classCompatibleTitle}-header clickable">
-      <span class="codicon codicon-chevron-down expand-indicator"></span>
+      <span class="codicon codicon-chevron-down expand-indicator ${isCollapsed ? 'rotated' : ''}"></span>
       ${title}
     </h3>
     <div data-cs-type="collapsible-container" 
          data-cs-title="${classCompatibleTitle}" 
-         class="container ${classCompatibleTitle}-container">
+         class="container ${classCompatibleTitle}-container ${isCollapsed ? 'collapsed' : ''}">
       ${containerContent}
     </div>
 `;
