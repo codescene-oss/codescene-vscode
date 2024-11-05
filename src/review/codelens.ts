@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { scorePresentation } from '../code-health-monitor/model';
-import { getConfiguration, onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
+import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { toDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
@@ -47,7 +47,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
     const delta = cacheItem.delta;
 
     const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
-    if (isDefined(delta) && getConfiguration('previewCodeHealthMonitoring')) {
+    if (isDefined(delta)) {
       codeLens.command = {
         title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
         command: 'codescene.codeHealthMonitorView.focus',

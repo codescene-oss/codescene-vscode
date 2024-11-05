@@ -89,16 +89,16 @@
         },
         {
           "id": "codescene.codeHealthMonitorView",
-          "name": "Code Health Monitoring [beta]",
+          "name": "Code Health Monitoring",
           "icon": "$(cs-logo)",
-          "when": "config.codescene.previewCodeHealthMonitoring && codescene.asyncActivationFinished"
+          "when": "codescene.asyncActivationFinished"
         },
         {
           "id": "codescene.codeHealthDetailsView",
-          "name": "Code Health Details [beta]",
+          "name": "Code Health Details",
           "icon": "$(cs-logo)",
           "type": "webview",
-          "when": "config.codescene.previewCodeHealthMonitoring && codescene.asyncActivationFinished"
+          "when": "codescene.asyncActivationFinished"
         },
         {
           "id": "codescene.controlCenterView",
@@ -132,12 +132,6 @@
           "default": true,
           "description": "Show CodeLenses for review diagnostics",
           "order": 1
-        },
-        "codescene.previewCodeHealthMonitoring": {
-          "type": "boolean",
-          "default": false,
-          "description": "Preview the experimental Code Health Monitoring (beta)",
-          "order": 5
         },
         "codescene.gitignore": {
           "type": "boolean",
