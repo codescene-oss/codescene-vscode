@@ -45,7 +45,6 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     const documentUri = functionInfo.parent.uri;
     this.clear(documentUri);
     this.disposables = [
-      onDidChangeConfiguration('previewCodeHealthMonitoring', () => this.dismiss(documentUri)),
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.showFor(functionInfo)),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document.uri !== documentUri) return;

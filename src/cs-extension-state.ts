@@ -112,13 +112,10 @@ export class CsExtensionState {
           // Reset credits error state when a request succeeds again
           if (evt.type === 'end' && isDefined(evt.request)) {
             try {
-              const okResponse = await evt.request.promise;
+              await evt.request.promise;
               CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
             } catch (error) {}
           }
-        }),
-        onDidChangeConfiguration('previewCodeHealthMonitoring', (e) => {
-          CsExtensionState._instance.updateStatusViews();
         })
       );
   }
