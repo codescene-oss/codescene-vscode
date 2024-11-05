@@ -141,8 +141,8 @@
         },
         "codescene.enableAutoRefactor": {
           "type": "boolean",
-          "default": false,
-          "description": "Enable CodeScene ACE. This is currently only available for customers part of the ACE beta program.",
+          "default": true,
+          "description": "Enable CodeScene ACE",
           "order": 15
         },
         "codescene.serverUrl": {
