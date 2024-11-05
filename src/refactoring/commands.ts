@@ -5,9 +5,8 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, registerCommandWithTelemetry } from '../utils';
-import { toRefactoringDocumentSelector } from './addon';
+import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
-import { PreFlightResponse } from './model';
 import { createTempDocument, decorateCode, targetEditor } from './utils';
 
 export interface FnToRefactor {
@@ -32,10 +31,9 @@ export interface RefactoringTarget {
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
-  private documentSelector: vscode.DocumentSelector;
 
-  constructor(private preflightResponse: PreFlightResponse) {
-    this.documentSelector = toRefactoringDocumentSelector(preflightResponse.supported['file-types']);
+  constructor(private capabilities: RefactoringCapabilities) {
+    capabilities.documentSelector;
 
     this.disposables.push(
       vscode.commands.registerCommand('codescene.requestRefactorings', this.requestRefactoringsCmd, this),
@@ -73,19 +71,19 @@ export class CsRefactoringCommands implements vscode.Disposable {
   }
 
   private async supportedDistinctFnsToRefactor(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
-    if (vscode.languages.match(this.documentSelector, document) === 0) return;
+    if (vscode.languages.match(this.capabilities.documentSelector, document) === 0) return;
     return await this.findFunctionsToRefactor(document, refactoringTargets);
   }
 
   private initiateRefactoringForFunction(document: vscode.TextDocument, fnToRefactor: FnToRefactor) {
-    if (vscode.languages.match(this.documentSelector, document) === 0) return;
+    if (vscode.languages.match(this.capabilities.documentSelector, document) === 0) return;
     const requests = CsRefactoringRequests.initiate(document, [fnToRefactor]);
     return requests[0];
   }
 
   private async findFunctionsToRefactor(document: vscode.TextDocument, refactoringTargets: RefactoringTarget[]) {
     const supportedTargets = refactoringTargets.filter((d: RefactoringTarget) =>
-      this.preflightResponse.supported['code-smells'].includes(d.category)
+      this.capabilities.isSupported(d.category, document)
     );
 
     const distinctSupportedLines = new Set(supportedTargets.map((d: RefactoringTarget) => d.line));
@@ -95,7 +93,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
       document.getText()
     );
 
-    const maxInputLoc = this.preflightResponse['max-input-loc'];
+    const maxInputLoc = this.capabilities.maxLocFor(document);
     return enclosingFns
       .filter((enclosingFn) => {
         const activeLoc = enclosingFn['active-code-size'];

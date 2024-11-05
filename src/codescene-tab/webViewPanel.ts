@@ -273,7 +273,7 @@ export class CodeSceneTabPanel implements Disposable {
    * send a message to the webview to show the refactor button.
    */
   private async attemptRefactoring(documentUri: Uri, issueInfo: IssueInfo) {
-    if (CsExtensionState.acePreflight) {
+    if (CsExtensionState.aceCapabilities) {
       // Asynchronously open doc and find refactorable function, then posting a message back to the
       // webview to show the refactor button. (see webview-script.ts)
       const document = await vscode.workspace.openTextDocument(documentUri);

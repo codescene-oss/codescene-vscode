@@ -4,9 +4,9 @@ import vscode from 'vscode';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
 import { RefactoringAPI } from './api';
+import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
-import { PreFlightResponse } from './model';
 import { createTmpDiffUriScheme } from './utils';
 
 /**
@@ -14,7 +14,7 @@ import { createTmpDiffUriScheme } from './utils';
  * the ACE functionality and the rest of the extension
  */
 export interface AceAPI {
-  enableACE: (context: vscode.ExtensionContext) => Promise<PreFlightResponse>;
+  enableACE: (context: vscode.ExtensionContext) => Promise<RefactoringCapabilities>;
   disableACE: () => void;
   onDidChangeRequests: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
@@ -54,8 +54,9 @@ async function enableACE(context: vscode.ExtensionContext) {
   disableACE();
 
   const preflightResponse = await RefactoringAPI.instance.preFlight();
+  const capabilities = new RefactoringCapabilities(preflightResponse);
 
-  const commandDisposable = new CsRefactoringCommands(preflightResponse);
+  const commandDisposable = new CsRefactoringCommands(capabilities);
   aceDisposables.push(commandDisposable);
   aceDisposables.push(createTmpDiffUriScheme());
 
@@ -68,7 +69,7 @@ async function enableACE(context: vscode.ExtensionContext) {
   vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
     CsDiagnostics.review(document);
   });
-  return preflightResponse;
+  return capabilities;
 }
 
 function disableACE() {
