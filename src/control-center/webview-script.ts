@@ -13,6 +13,7 @@ function main() {
   const aceError = document.getElementById('ace-badge');
   addClickEventForClass(aceError, 'badge-error', () => sendMessage('show-ace-error'));
 
+  document.getElementById('upgrade-link')?.addEventListener('click', () => sendMessage('open-ai-pricing'));
   document.getElementById('codescene-settings')?.addEventListener('click', () => sendMessage('open-settings'));
   document.getElementById('documentation')?.addEventListener('click', () => sendMessage('open-documentation'));
   document
@@ -23,6 +24,7 @@ function main() {
     .getElementById('privacy-principles')
     ?.addEventListener('click', () => sendMessage('open-ai-privacy-principles'));
   document.getElementById('contact-codescene')?.addEventListener('click', () => sendMessage('open-contact-codescene'));
+  document.getElementById('support-ticket-link')?.addEventListener('click', () => sendMessage('raise-support-ticket'));
 
   document.getElementById('machine-id')?.addEventListener('click', () => sendMessage('copy-machine-id'));
 }
