@@ -7,29 +7,32 @@ function sendMessage(command: string, data?: object) {
 }
 
 function main() {
-  const chError = document.getElementById('code-health-analysis-badge');
-  addClickEventForClass(chError, 'badge-error', () => sendMessage('show-code-health-analysis-error'));
+  // Account
+  addClickListenerToElementById('upgrade-link', () => sendMessage('open-ai-pricing'));
 
-  const aceError = document.getElementById('ace-badge');
-  addClickEventForClass(aceError, 'badge-error', () => sendMessage('show-ace-error'));
+  // Status
+  addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('show-code-health-analysis-error'));
+  addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('show-ace-error'));
 
-  document.getElementById('upgrade-link')?.addEventListener('click', () => sendMessage('open-ai-pricing'));
-  document.getElementById('codescene-settings')?.addEventListener('click', () => sendMessage('open-settings'));
-  document.getElementById('documentation')?.addEventListener('click', () => sendMessage('open-documentation'));
-  document
-    .getElementById('terms-and-policies')
-    ?.addEventListener('click', () => sendMessage('open-terms-and-policies'));
+  // More
+  addClickListenerToElementById('codescene-settings', () => sendMessage('open-settings'));
+  addClickListenerToElementById('documentation', () => sendMessage('open-documentation'));
+  addClickListenerToElementById('terms-and-policies', () => sendMessage('open-terms-and-policies'));
+  addClickListenerToElementById('privacy-principles', () => sendMessage('open-ai-privacy-principles'));
+  addClickListenerToElementById('contact-codescene', () => sendMessage('open-contact-codescene'));
+  addClickListenerToElementById('support-ticket-link', () => sendMessage('raise-support-ticket'));
 
-  document
-    .getElementById('privacy-principles')
-    ?.addEventListener('click', () => sendMessage('open-ai-privacy-principles'));
-  document.getElementById('contact-codescene')?.addEventListener('click', () => sendMessage('open-contact-codescene'));
-  document.getElementById('support-ticket-link')?.addEventListener('click', () => sendMessage('raise-support-ticket'));
-
-  document.getElementById('machine-id')?.addEventListener('click', () => sendMessage('copy-machine-id'));
+  addClickListenerToElementById('machine-id', () => sendMessage('copy-machine-id'));
 }
 
-function addClickEventForClass(element: HTMLElement | null, className: string, handler: () => void) {
+function addClickListenerToElementById(elementId: string, listener: () => void) {
+  const element = document.getElementById(elementId);
+  if (!element) throw new Error(`HTMLElement with id "${elementId}" not found`);
+  element.addEventListener('click', listener);
+}
+
+function addClickEventForClass(elementId: string, className: string, handler: () => void) {
+  const element = document.getElementById(elementId);
   if (element?.classList.contains(className)) {
     element.addEventListener('click', handler);
   }
