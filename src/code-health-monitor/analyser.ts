@@ -88,7 +88,7 @@ export class DeltaAnalyser {
           return;
         }
         deltaResult = JSON.parse(result.stdout) as DeltaForFile;
-        if (CsExtensionState.acePreflight) {
+        if (CsExtensionState.aceCapabilities) {
           requestRefactoringsForDegradation({ document, deltaResult });
         }
         return deltaResult;

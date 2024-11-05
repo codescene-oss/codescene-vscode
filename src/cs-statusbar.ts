@@ -1,7 +1,6 @@
 import vscode from 'vscode';
-import { CsExtensionState, CsFeature, CsStateProperties } from './cs-extension-state';
+import { CsExtensionState, CsStateProperties } from './cs-extension-state';
 import { ACECreditsError } from './refactoring/api';
-import { AceCredits, PreFlightResponse } from './refactoring/model';
 import { isDefined } from './utils';
 
 export class CsStatusBar {

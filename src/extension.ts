@@ -18,10 +18,10 @@ import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
+import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-conditions';
 import { isError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-conditions';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -188,8 +188,9 @@ async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, 
   CsExtensionState.setACEState({ state: 'loading' });
 
   try {
-    const preFlight = await aceApi.enableACE(context);
-    CsExtensionState.setACEState({ preFlight, state: 'enabled' });
+    const refactorCapabilities = await aceApi.enableACE(context);
+
+    CsExtensionState.setACEState({ refactorCapabilities, state: 'enabled' });
     logOutputChannel.info('Auto-refactor enabled!');
   } catch (unknownErr) {
     const error = assertError(unknownErr);

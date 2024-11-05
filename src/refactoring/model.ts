@@ -1,24 +1,26 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-export interface RefactoringSupport {
+interface RefactoringSupport {
   'file-types': string[];
   'code-smells': string[];
 }
 
-export interface PreFlightResponse {
+interface PreFlightResponseOld {
   supported: RefactoringSupport;
   'max-input-tokens': number;
   'max-input-loc': number;
 }
 
-export function isPreFlightResponse(obj: unknown): obj is PreFlightResponse {
-  return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    obj.hasOwnProperty('supported') &&
-    obj.hasOwnProperty('max-input-tokens') &&
-    obj.hasOwnProperty('max-input-loc')
-  );
-}
+export type PreFlightResponse = PreFlightResponseOld & {
+  version: number;
+  'file-types': string[];
+  'language-common': RefactorSupport;
+  'language-specific'?: Record<string, Partial<RefactorSupport>>;
+};
+
+export type RefactorSupport = {
+  'max-input-loc': number;
+  'code-smells': string[];
+};
 
 interface Review {
   category: string; // Type of issue
@@ -45,6 +47,7 @@ export interface RefactorConfidence {
   'recommended-action': { description: string; details: string };
   'review-header'?: string;
 }
+
 interface RefactorProperties {
   'added-code-smells': string[];
   'removed-code-smells': string[];
