@@ -54,6 +54,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
       case 'show-ace-error':
         logOutputChannel.show();
         return;
+      case 'open-ai-pricing':
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ai-coding#pricing'));
+        return;
       case 'open-documentation':
         void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs'));
         return;
@@ -65,6 +68,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
         return;
       case 'open-contact-codescene':
         void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/company/contact-us'));
+        return;
+      case 'raise-support-ticket':
+        void vscode.env.openExternal(vscode.Uri.parse('https://supporthub.codescene.com/kb-tickets/new'));
         return;
       case 'copy-machine-id':
         void vscode.env.clipboard.writeText(vscode.env.machineId).then(() => {
@@ -125,7 +131,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     <div class="group">
         <div class="header">ACCOUNT</div>
         <div class="row">
-            <div class="icon-and-text"><span class="codicon codicon-star"></span><span>Upgrade</span></div>
+            <div class="icon-and-text clickable" id="upgrade-link"><span class="codicon codicon-star"></span><span>Upgrade</span></div>
             <div class="badge">coming soon</div>
         </div>
     </div>  
@@ -270,10 +276,13 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
             <div class="icon-and-text clickable" id="terms-and-policies"><span class="codicon codicon-file"></span><span>Terms & Policies</span></div>
         </div>
         <div class="row">
-            <div class="icon-and-text clickable" id="privacy-principles"><span class="codicon codicon-file"></span><span>AI Privacy Principles</span></div>
+            <div class="icon-and-text clickable" id="privacy-principles"><span class="codicon codicon-shield"></span><span>AI Privacy Principles</span></div>
         </div>
         <div class="row">
             <div class="icon-and-text clickable" id="contact-codescene"><span class="codicon codicon-comment-discussion"></span><span>Contact CodeScene</span></div>
+        </div>
+        <div class="row">
+            <div class="icon-and-text clickable" id="support-ticket-link"><span class="codicon codicon-feedback"></span><span>Raise a support ticket</span></div>
         </div>
     </div>  
     `;
