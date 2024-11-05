@@ -9,8 +9,8 @@
 
 
 ### Table of Contents
-1. [ACE — AI-Powered Auto-Refactoring ✨<strong>New</strong> ✨](#augmented-code-engineering)
-2. [Monitor ✨<strong>New</strong> ✨](#code-health-monitor)
+1. [ACE — AI-Powered Auto-Refactoring ✨**New**✨](#augmented-code-engineering)
+2. [Code Health Monitor ✨**New**✨](#code-health-monitor)
 3. [Code Health Analysis](#code-health) 
 4. [Code Smells Guide](#code-smells)
 
@@ -33,16 +33,16 @@ ACE supported code smells:
 - Deep, Nested Complexity
 - Large Method
 
-Also, only functions under 130 lines (180 for java) of code will be considered for refactoring (ignoring commented lines).
+Also, only functions under 130 lines (200 for java) of code will be considered for refactoring (ignoring commented lines).
 
 ## Code Health Monitor
 Track code health in real-time as you work. The Monitor highlights code smells and offers AI-powered refactoring to improve your code.
 ![Code Health Monitor](https://codescene.com/hubfs/Refactor%20as%20you%20go.svg)
 
-## Code Health
-CodeScene’s Code Health metric is the software industry’s only code-level metric with proven business impact, measured through fact-based, winning research. It’s a metric that you can trust.
+## Code Health Analysis
+CodeScene’s [Code Health](https://codescene.io/docs/guides/technical/code-health.html) metric is the software industry’s only code-level metric with proven business impact, measured through fact-based, winning research. It’s a metric that you can trust.
 
-A healthy codebase, or high Code Health score, enables a fast time-to-market with, on average, 120+% faster development time. Healthy code also contains 15 times fewer defects than unhealthy code.
+The extension analyses and scores your code as you type, and adds diagnostic items that highlights any [code smells](#code-smells).
 
 ### Language support
 CodeScene supports [most popular languages](https://codescene.io/docs/usage/language-support.html#supported-programming-languages).
@@ -56,7 +56,7 @@ To customize the code analysis you can either use local [Code Comment Directives
 
 Code smells often lead to issues such as increased technical debt, more bugs, and reduced overall quality of the software.
 
-You can find more detailed information for each [code smell](https://codescene.io/docs/guides/technical/code-health.html)  by clicking on it in the editor.
+You can find detailed information for each code smell by either clicking the corresponding codelens in the editor, by examining the diagnostics (squigglies or in the Problems view), or by using the Quick Fix action menu (light bulb).
 
 
 
