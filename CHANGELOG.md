@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.10...v0.9.0) (2024-11-06)
+
+
+### Features
+
+* **code-health-details:** Add new panel for viewing details about a function ([2d8c462](https://github.com/codescene-oss/codescene-vscode/commit/2d8c4624819b8dc1753de8433d58d89460369c5e))
+* **code-health-monitor:** Misc improvements ([62b00b0](https://github.com/codescene-oss/codescene-vscode/commit/62b00b08ea7eb903b9eb0e54c8356ffa383450ea))
+* **control-center:** Extension status and Out of ACE Credits presentation ([39776dc](https://github.com/codescene-oss/codescene-vscode/commit/39776dcbb9f62f827cdcc6fa9aa2ab8cf2887c68))
+* **control-center:** First implementation of control-center panel from the new  UX ([78eaa5c](https://github.com/codescene-oss/codescene-vscode/commit/78eaa5c1dd982d93d079200cdf3035445acd8a7a))
+* **refactoring:** Add anonymous refactoring access ([6b3f04f](https://github.com/codescene-oss/codescene-vscode/commit/6b3f04f2a83fafc5c3a6e487f63070223e4edceb))
+* **terms-and-conditions:** Add agreement popup on extension activation ([54c4af9](https://github.com/codescene-oss/codescene-vscode/commit/54c4af94383699a16a7ae6ba284bf3915f8f5099))
+
+
+### Bug fixes
+
+* Bump devtools binary version to fix some code health monitoring issues ([8c79a89](https://github.com/codescene-oss/codescene-vscode/commit/8c79a892feb8e011e3d9b4147be2b522adf5137e))
+* Changed behaviour of code health monitor codelens ([fb2ccdc](https://github.com/codescene-oss/codescene-vscode/commit/fb2ccdcad66d6ebceef362a83b55c5f1df9a2d2a))
+* **code-health-details:** Better async handling for refactoring button ([09e40e2](https://github.com/codescene-oss/codescene-vscode/commit/09e40e2dec687c08fb639183dc2be47cd03b5c73))
+* **code-health-monitor:** Calculate total score change and present in the monitoring tree ([d65c896](https://github.com/codescene-oss/codescene-vscode/commit/d65c896b7f5a05a22b5e239f93788e6022102dcc))
+* **code-health-monitor:** Correct the sorting of functions ([8d555d9](https://github.com/codescene-oss/codescene-vscode/commit/8d555d94ce549671e103e573a9567d8fc7c6bb6b))
+* **code-health-monitor:** Invalidate current refactorings for a file when applying a refactoring ([e83b020](https://github.com/codescene-oss/codescene-vscode/commit/e83b020cdb0166e50b6fc362bd07bd2b510b3fe0))
+* **codelens:** Make sure score is properly updated on code change ([4a9c621](https://github.com/codescene-oss/codescene-vscode/commit/4a9c621f6079227b924ece1510d3be828389d711))
+* **configuration:** Add extra defaults to config getters ([977d583](https://github.com/codescene-oss/codescene-vscode/commit/977d583d5208b175f3a930cda37f87258b65aa67))
+* **interactive-docs-panel:** Make sure that existing refactorings are immediately available in the docs panel ([a7625ba](https://github.com/codescene-oss/codescene-vscode/commit/a7625ba4d1a56054bd9b10c2dcc47917f2471cb5))
+* **readme:** Replace svg for png ([f8e3c4d](https://github.com/codescene-oss/codescene-vscode/commit/f8e3c4d2f9807cd1185e31e0c1e46b0e2ef4e67a))
+* **review-stats:** Ensure that review stats collector is disposable ([4756aaf](https://github.com/codescene-oss/codescene-vscode/commit/4756aaf1f2405464afd79c5789bd099c82ef199a))
+* **startup:** Wait until activation is finalized before enabling certain views and commands ([48b4199](https://github.com/codescene-oss/codescene-vscode/commit/48b4199a75e065f411d89955e296e59b8ab850c0))
+
 ### [0.7.10](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.9...v0.7.10) (2024-09-27)
 
 
