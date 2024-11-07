@@ -20,7 +20,7 @@ const preFlight: PreFlightResponse = {
     java: {
       'max-input-loc': 200,
     },
-    dreamberd: {
+    mm: {
       'code-smells': ['Bad Naming', 'Bumpy Road Ahead', 'Large Method'],
     },
   },
@@ -38,6 +38,7 @@ const capabilities = new RefactoringCapabilities(preFlight);
 
 suite('Refactoring capabilities Test Suite', () => {
   test('Check DocumentSelector from supported file-types', () => {
+    console.log(JSON.stringify(capabilities.documentSelector));
     /*
      * Assert that we only have one 'javascript' language (although we have multiple js file-types)
      * and that we have both 'objective-c' and 'objective-cpp' language support
@@ -61,18 +62,18 @@ suite('Refactoring capabilities Test Suite', () => {
   test('Supported code smells', () => {
     assert.strictEqual(capabilities.isSupported('Complex Method'), true, 'Complex Method should be supported');
     assert.strictEqual(capabilities.isSupported('Bad Naming'), false, 'Unsupported code smell should return false');
+  });
 
-    test('Supported code smells for specific languageIds', async () => {
-      let support = capabilities.isSupported('Complex Method', { languageId: 'javascript' } as any);
-      assert.strictEqual(support, true, 'Complex Method should be supported for js');
-      support = capabilities.isSupported('Bad Naming', { languageId: 'javascript' } as any);
-      assert.strictEqual(support, true, 'Unsupported code smell should return false for js');
+  test('Supported code smells for specific languageIds', async () => {
+    let support = capabilities.isSupported('Complex Method', { languageId: 'javascript' } as any);
+    assert.strictEqual(support, true, 'Complex Method should be supported for js');
+    support = capabilities.isSupported('Bad Naming', { languageId: 'javascript' } as any);
+    assert.strictEqual(support, false, 'Unsupported code smell should return false for js');
 
-      support = capabilities.isSupported('Complex Method', { languageId: 'dreamberd' } as any);
-      assert.strictEqual(support, false, 'Complex Method is not supported for dreamberd');
-      support = capabilities.isSupported('Bad Naming', { languageId: 'dreamberd' } as any);
-      assert.strictEqual(support, true, '"Bad Naming" smell is supported for dreamberd');
-    });
+    support = capabilities.isSupported('Complex Method', { languageId: 'objective-cpp' } as any);
+    assert.strictEqual(support, false, 'Complex Method is not supported for objective-cpp');
+    support = capabilities.isSupported('Bad Naming', { languageId: 'objective-cpp' } as any);
+    assert.strictEqual(support, true, '"Bad Naming" smell is supported for objective-cpp');
   });
 
   test('Get max-loc-limit for documents', () => {

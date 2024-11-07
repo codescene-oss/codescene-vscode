@@ -1,16 +1,27 @@
 import { DocumentSelector, TextDocument } from 'vscode';
-import { toDistinctLanguageIds } from '../language-support';
+import { fileTypeToLanguageId, toDistinctLanguageIds } from '../language-support';
 import { PreFlightResponse, RefactorSupport } from './model';
 
 export class RefactoringCapabilities {
+  
+  // Maps vscode languageIds (note - NOT "file-type") to a specific RefactorSupport
   private languageSupport: Map<string, RefactorSupport> = new Map();
 
   constructor(private preFlight: PreFlightResponse) {
+    this.initLanguageSpecificSupport();
+  }
+
+  private initLanguageSpecificSupport() {
     this.preFlight['file-types'].forEach((fileType) => {
       const propsForFileType = this.preFlight['language-specific']?.[fileType];
-      if (propsForFileType) {
+      const languageId = fileTypeToLanguageId(fileType);
+      if (propsForFileType && languageId) {
         const support = { ...this.preFlight['language-common'], ...propsForFileType };
-        this.languageSupport.set(fileType, support);
+        if (Array.isArray(languageId)) {
+          languageId.forEach((id) => this.languageSupport.set(id, support));
+        } else {
+          this.languageSupport.set(languageId, support);
+        }
       }
     });
   }
@@ -18,13 +29,19 @@ export class RefactoringCapabilities {
   get documentSelector(): DocumentSelector {
     return toDistinctLanguageIds(this.preFlight['file-types']).map((language) => ({
       language,
-      // scheme: 'file',
     }));
   }
 
+  /**
+   * 
+   * @param codeSmell is this code smell supported?
+   * @param document optional document if checking language-specific support
+   * @returns 
+   */
   isSupported(codeSmell: string, document?: TextDocument) {
     const languageSpecificRule = document && this.languageSupport.get(document.languageId)?.['code-smells'];
-    return languageSpecificRule || this.preFlight['language-common']['code-smells'].includes(codeSmell);
+    const rule = languageSpecificRule || this.preFlight['language-common']['code-smells'];
+    return rule.includes(codeSmell);
   }
 
   maxLocFor(document?: TextDocument) {
