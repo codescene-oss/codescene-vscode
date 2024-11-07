@@ -34,7 +34,7 @@ export class CsStatusBar {
   }
 
   private isAnalysing(stateProperties: CsStateProperties) {
-    return stateProperties.features.analysis.analysisState !== 'idle';
+    return stateProperties.features.analysis.analysisState === 'running';
   }
 
   private textContent(stateProperties: CsStateProperties) {
