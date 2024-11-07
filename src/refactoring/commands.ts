@@ -87,14 +87,14 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
 
     const distinctSupportedLines = new Set(supportedTargets.map((d: RefactoringTarget) => d.line));
-    const enclosingFns = await findEnclosingFunctions(
+    const enclosingFnsWithSupportedSmells = await findEnclosingFunctions(
       document.fileName,
       [...distinctSupportedLines],
       document.getText()
     );
 
     const maxInputLoc = this.capabilities.maxLocFor(document);
-    return enclosingFns
+    return enclosingFnsWithSupportedSmells
       .filter((enclosingFn) => {
         const activeLoc = enclosingFn['active-code-size'];
         if (activeLoc <= maxInputLoc) return true;
@@ -103,7 +103,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
         );
         return false;
       })
-      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, supportedTargets))
+      .map((enclosingFn) => toFnToRefactor(enclosingFn, document, refactoringTargets))
       .sort((a, b) => linesOfCode(a.range) - linesOfCode(b.range));
   }
 
