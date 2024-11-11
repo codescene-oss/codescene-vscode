@@ -1,4 +1,3 @@
-const { error } = require('console');
 const { build, context } = require('esbuild');
 const { copy } = require('esbuild-plugin-copy');
 

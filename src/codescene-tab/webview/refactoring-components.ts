@@ -1,5 +1,4 @@
 import { commands } from 'vscode';
-import { CsExtensionState } from '../../cs-extension-state';
 import { RefactorConfidence, RefactorResponse } from '../../refactoring/model';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
@@ -93,12 +92,10 @@ function reasonsContent(response: RefactorResponse) {
 function acceptAndRejectButtons() {
   return /* html */ `
       <div class="button-container">
-        <vscode-button id="apply-button" appearance="primary" aria-label="Accept Auto-Refactor" title="Accept Auto-Refactor">
-          <span slot="start" class="codicon codicon-check"></span>
+        <vscode-button id="apply-button" icon="check" primary aria-label="Accept Auto-Refactor" title="Accept Auto-Refactor">
           Accept Auto-Refactor
         </vscode-button>
-        <vscode-button id="reject-button" appearance="secondary" aria-label="Reject" title="Reject">
-          <span slot="start" class="codicon codicon-circle-slash"></span>
+        <vscode-button id="reject-button" icon="circle-slash" secondary aria-label="Reject" title="Reject">
           Reject
         </vscode-button>
       </div>
@@ -114,8 +111,7 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
 
   const diffButton = showDiff
     ? /*html*/ `
-          <vscode-button id="diff-button" appearance="secondary" aria-label="Show diff">
-            <span slot="start" class="codicon codicon-diff"></span>
+          <vscode-button id="diff-button" icon="diff" secondary aria-label="Show diff">
             Show diff
           </vscode-button>
         `
@@ -126,8 +122,7 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
         <div class="code-container-buttons">
           ${diffButton}
         <!-- slot="start" ? -->
-          <vscode-button id="copy-to-clipboard-button" appearance="secondary" aria-label="Copy code" title="Copy code">
-            <span slot="start" class="codicon codicon-clippy"></span>
+          <vscode-button id="copy-to-clipboard-button" icon="clippy" secondary aria-label="Copy code" title="Copy code">
             Copy
           </vscode-button>
         </div>      

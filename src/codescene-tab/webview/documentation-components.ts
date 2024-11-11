@@ -4,9 +4,9 @@ import { readRawMarkdownDocs } from './utils';
 export function optionalRefactoringButton(hidden: boolean) {
   return /*html*/ `
     <div class="button-container">
-      <vscode-button id="refactoring-button" class="${hidden ? 'hidden' : ''}">
-        <span slot="start" class="codicon codicon-loading codicon-modifier-spin"></span>
-        Auto-refactor
+      <vscode-button id="refactoring-button" icon="loading" icon-spin="true"
+        ${hidden ? 'hidden' : ''}>
+          Auto-refactor
       </vscode-button>
     </div>
   `;
