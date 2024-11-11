@@ -1,6 +1,5 @@
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeProgressRing } from '@vscode/webview-ui-toolkit';
-
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeProgressRing());
+import '@vscode-elements/elements/dist/vscode-button';
+import '@vscode-elements/elements/dist/vscode-progress-ring';
 
 window.addEventListener('load', main);
 

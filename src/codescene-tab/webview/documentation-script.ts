@@ -1,6 +1,5 @@
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
-
-provideVSCodeDesignSystem().register(vsCodeButton());
+import '@vscode-elements/elements/dist/vscode-button';
+import { VscodeButton } from '@vscode-elements/elements/dist/vscode-button';
 
 window.addEventListener('load', main);
 
@@ -17,21 +16,20 @@ function main() {
   refactoringButton?.addEventListener('click', () => sendMessage('show-refactoring'));
 
   if (refactoringButton) {
-    window.addEventListener('message', refactoringButtonHandler(refactoringButton));
+    window.addEventListener('message', refactoringButtonHandler(refactoringButton as VscodeButton));
   }
 }
 
-function refactoringButtonHandler(refactoringButton: HTMLElement) {
+function refactoringButtonHandler(refactoringButton: VscodeButton) {
   return (event: MessageEvent<any>) => {
     const { command } = event.data;
-    const iconSpan = refactoringButton.querySelector('span');
-    if (!iconSpan) return;
-    iconSpan.classList.remove('codicon-loading', 'codicon-modifier-spin');
+    refactoringButton.iconSpin = false;
     if (command === 'refactoring-ok') {
-      iconSpan.classList.add('codicon-sparkle');
+      refactoringButton.icon = 'sparkle';
     } else if (command === 'refactoring-failed') {
-      iconSpan.classList.add('codicon-circle-slash');
-      refactoringButton.setAttribute('disabled', 'true');
+      refactoringButton.secondary = true;
+      refactoringButton.disabled = true;
+      refactoringButton.icon = 'circle-slash';
     }
   };
 }

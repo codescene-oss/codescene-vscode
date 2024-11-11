@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.9.0",
+  "version": "0.9.1-beta-241107-2",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -213,8 +213,8 @@
     "@types/follow-redirects": "^1.14.1",
     "@types/lodash.debounce": "^4.0.7",
     "@types/vscode-webview": "^1.57.4",
+    "@vscode-elements/elements": "^1.8.0",
     "@vscode/codicons": "^0.0.35",
-    "@vscode/webview-ui-toolkit": "^1.4.0",
     "axios": "^1.7.4",
     "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.6",

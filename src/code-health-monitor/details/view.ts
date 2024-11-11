@@ -75,7 +75,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
           webView.cspSource
         }; font-src ${webView.cspSource}; style-src 'unsafe-inline' ${webView.cspSource};">
 
-        <link href="${codiconsUri}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
+        <link href="${codiconsUri}" nonce="${nonce()}" type="text/css" rel="stylesheet" id="vscode-codicon-stylesheet" />
         <link href="${styleSheet}" nonce="${nonce()}" type="text/css" rel="stylesheet" />
     </head>
 
@@ -110,7 +110,9 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     return `
     ${this.fileAndFunctionInfo(functionInfo)}
     ${this.functionDescription(functionInfo)}
-    ${this.refactoringButton(functionInfo.refactoring)}
+    <div class="block">
+      ${this.refactoringButton(functionInfo.refactoring)}
+    </div>
     ${this.issueDetails(functionInfo)}
     `;
   }
@@ -144,33 +146,32 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   private refactoringButton(refactoring?: CsRefactoringRequest) {
-    const buttonBlock = (iconClass = 'codicon-sparkle', appearance = 'primary', disabled = false) => {
-      return /*html*/ `
-        <div class="block">
-          <vscode-button id="refactoring-button" appearance="${appearance}" ${disabled ? 'disabled' : ''}>
-            <span slot="start" class="codicon ${iconClass}"></span>
-            Auto-refactor
-          </vscode-button>
-        </div>`;
-    };
-
     if (!refactoring) {
-      return buttonBlock('codicon-circle-slash', 'secondary', true);
+      return /* html */ `
+        <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
+          Auto-refactor
+        </vscode-button>`;
     }
+
     const webView = this.view?.webview;
-    refactoring?.promise
-      .then(() => {
-        // TODO - consider the actual result (confidence > 0)
-        void webView?.postMessage({
-          command: 'refactoring-ok',
+    if (refactoring && webView) {
+      refactoring.promise
+        .then(() => {
+          if (refactoring.actionable()) {
+            void webView.postMessage({ command: 'refactoring-ok' });
+          } else {
+            void webView.postMessage({ command: 'refactoring-failed' });
+          }
+        })
+        .catch(() => {
+          void webView.postMessage({ command: 'refactoring-failed' });
         });
-      })
-      .catch(() => {
-        void webView?.postMessage({
-          command: 'refactoring-failed',
-        });
-      });
-    return buttonBlock('codicon-loading codicon-modifier-spin');
+    }
+
+    return /* html */ `
+      <vscode-button id="refactoring-button" icon="loading" icon-spin="true" primary>
+        Auto-refactor
+      </vscode-button>`;
   }
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {

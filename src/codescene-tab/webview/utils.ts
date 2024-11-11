@@ -29,7 +29,7 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
     cssTag(webView, ['out', 'codescene-tab', 'webview', 'styles.css']),
     cssTag(webView, ['assets', 'markdown-languages.css']),
     cssTag(webView, ['assets', 'highlight.css']),
-    cssTag(webView, ['out', 'codicons', 'codicon.css'])
+    cssTag(webView, ['out', 'codicons', 'codicon.css'], 'vscode-codicon-stylesheet') // NOTE - vscode-elements needs an id for the stylesheet tag ¯\_(ツ)_/¯
   );
 
   cssPaths?.forEach((path) => cssTags.push(cssTag(webView, path)));
@@ -65,10 +65,10 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
   webView.html = html;
 }
 
-function cssTag(webView: Webview, pathComponents: string[]) {
+function cssTag(webView: Webview, pathComponents: string[], id?: string) {
   const uri = getUri(webView, ...pathComponents);
   return /*html*/ `
-        <link href="${uri}" type="text/css" rel="stylesheet" />
+        <link href="${uri}" type="text/css" rel="stylesheet" ${id ? 'id="' + id + '"' : ''}/>
     `;
 }
 
