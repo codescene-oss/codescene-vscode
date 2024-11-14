@@ -35,12 +35,11 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
   Telemetry.init(context.extension);
+  CsExtensionState.init(context);
 
   registerShowLogCommand(context);
   registerTermsAndPoliciesCmds(context);
   await acceptTermsAndPolicies(context);
-
-  CsExtensionState.init(context);
 
   try {
     const binaryPath = await ensureCompatibleBinary(context.extensionPath);
