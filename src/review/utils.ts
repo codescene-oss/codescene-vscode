@@ -106,9 +106,9 @@ export function getCsDiagnosticCode(code?: string | number | { value: string | n
  * @returns
  */
 function createDiagnosticCodeWithTarget(category: string, position: vscode.Position, document: vscode.TextDocument) {
-  const args = [{ codeSmell: { category, position }, documentUri: document.uri }];
+  const args = [{ category, lineNo: position.line, charNo: position.character, documentUri: document.uri }];
   const openDocCommandUri = vscode.Uri.parse(
-    `command:codescene.openInteractiveDocsPanel?${encodeURIComponent(JSON.stringify(args))}`
+    `command:codescene.openInteractiveDocsFromDiagnosticTarget?${encodeURIComponent(JSON.stringify(args))}`
   );
   return {
     value: category,

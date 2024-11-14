@@ -1,4 +1,13 @@
-import vscode, { TextDocument, Uri, window } from 'vscode';
+import vscode, {
+  Position,
+  Range,
+  Selection,
+  TextDocument,
+  TextEditorRevealType,
+  Uri,
+  ViewColumn,
+  window,
+} from 'vscode';
 import { RefactorResponse } from '../refactoring/model';
 import { isDefined } from '../utils';
 
@@ -72,4 +81,27 @@ export async function createTempDocument(name: string, code: CodeWithLangId) {
   const tmpUri = Uri.from({ scheme: 'tmp-diff', path: name, query: code.content });
   const tmpDoc = await vscode.workspace.openTextDocument(tmpUri);
   return vscode.languages.setTextDocumentLanguage(tmpDoc, code.languageId);
+}
+
+function rangeFromCode(position: Position, code: string) {
+  const lines = code.split(/\r\n|\r|\n/);
+  const lineDelta = lines.length - 1;
+  const characterDelta = lines[lines.length - 1].length;
+  return new Range(position, position.translate({ lineDelta, characterDelta }));
+}
+
+/**
+ * Opens the document if not already opened, and selects the code at a position in the
+ * editor containing the document
+ */
+export async function selectCode(document: vscode.TextDocument, code: string, position: vscode.Position) {
+  const newRange = rangeFromCode(position, code);
+  const editor =
+    targetEditor(document) ||
+    (await vscode.window.showTextDocument(document.uri, {
+      preview: false,
+      viewColumn: ViewColumn.One,
+    }));
+  editor.selection = new Selection(newRange.start, newRange.end);
+  editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
 }

@@ -1,4 +1,4 @@
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { FnToRefactor } from '../refactoring/capabilities';
 import { Range } from '../review/model';
 import { roundScore } from '../review/utils';
 
@@ -8,7 +8,6 @@ export interface DeltaForFile {
   'new-score'?: number;
   'file-level-findings': ChangeDetail[];
   'function-level-findings': FunctionFinding[];
-  refactorings?: CsRefactoringRequest[]; // Added for ACE
 }
 
 export function scorePresentation(delta: DeltaForFile) {
@@ -21,6 +20,9 @@ export function scorePresentation(delta: DeltaForFile) {
 export interface FunctionFinding {
   function: FunctionInfo;
   'change-details': ChangeDetail[];
+
+  /* Present if the function finding is deemed refactorable. See Analyser.addRefactorableFunctionsToDeltaResult() */
+  refactorableFn?: FnToRefactor;
 }
 
 export interface ChangeDetail {

@@ -1,17 +1,6 @@
 import { markdownAsCollapsible } from './components';
 import { readRawMarkdownDocs } from './utils';
 
-export function optionalRefactoringButton(hidden: boolean) {
-  return /*html*/ `
-    <div class="button-container">
-      <vscode-button id="refactoring-button" icon="loading" icon-spin="true"
-        ${hidden ? 'hidden' : ''}>
-          Auto-refactor
-      </vscode-button>
-    </div>
-  `;
-}
-
 /**
  * This relies on the docs being in the correct format, with the following sections (in order!):
  * - Description text

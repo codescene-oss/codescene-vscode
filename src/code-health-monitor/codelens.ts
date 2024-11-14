@@ -9,7 +9,7 @@ export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider),
     vscode.commands.registerCommand('codescene.monitorCodeLens.showFunction', (functionInfo: DeltaFunctionInfo) => {
-      const uri = functionInfo.parent.uri;
+      const uri = functionInfo.parent.document.uri;
       const pos = functionInfo.range.start;
       const location = new vscode.Location(uri, pos);
       codeLensProvider.showFor(functionInfo);
@@ -42,7 +42,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
   }
 
   showFor(functionInfo: DeltaFunctionInfo) {
-    const documentUri = functionInfo.parent.uri;
+    const documentUri = functionInfo.parent.document.uri;
     this.clear(documentUri);
     this.disposables = [
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.showFor(functionInfo)),
@@ -54,12 +54,12 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
 
     const codeLenses = [];
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
-    if (functionInfo.refactoring) {
+    if (functionInfo.fnToRefactor) {
       codeLenses.push(
         new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
           title: '$(sparkle) CodeScene ACE',
-          command: 'codescene.presentRefactoring',
-          arguments: [functionInfo.refactoring],
+          command: 'codescene.requestAndPresentRefactoring',
+          arguments: [functionInfo.parent.document, functionInfo.fnToRefactor],
         })
       );
     }
@@ -84,7 +84,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         {
           title: '$(circle-slash) Dismiss',
           command: 'codescene.monitorCodeLens.dismiss',
-          arguments: [functionInfo.parent.uri],
+          arguments: [functionInfo.parent.document.uri],
         }
       )
     );

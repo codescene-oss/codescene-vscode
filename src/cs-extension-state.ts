@@ -1,7 +1,6 @@
 import vscode, { Uri } from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
-import { onDidChangeConfiguration } from './configuration';
 import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { logOutputChannel } from './log';
@@ -96,28 +95,27 @@ export class CsExtensionState {
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+  static addListeners(context: vscode.ExtensionContext, aceApi: AceAPI) {
     context.subscriptions.push(
       Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
       Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
       DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
       DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
-    aceApi &&
-      context.subscriptions.push(
-        aceApi.onDidRequestFail((error) => {
-          CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
-        }),
-        aceApi.onDidChangeRequests(async (evt) => {
-          // Reset credits error state when a request succeeds again
-          if (evt.type === 'end' && isDefined(evt.request)) {
-            try {
-              await evt.request.promise;
-              CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
-            } catch (error) {}
-          }
-        })
-      );
+    context.subscriptions.push(
+      aceApi.onDidRequestFail((error) => {
+        CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
+      }),
+      aceApi.onDidChangeRequests(async (evt) => {
+        // Reset credits error state when a request succeeds again
+        if (evt.type === 'end' && isDefined(evt.request)) {
+          try {
+            await evt.request.promise;
+            CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
+          } catch (error) {}
+        }
+      })
+    );
   }
 
   static clearErrors() {

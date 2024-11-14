@@ -6,8 +6,8 @@ import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi, isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { getFileExtension, isDefined, rangeStr } from '../utils';
-import { FnToRefactor } from './commands';
 import { AceCredits, PreFlightResponse, RefactorConfidence, RefactorRequest, RefactorResponse } from './model';
+import { FnToRefactor } from './capabilities';
 
 const refactoringTimeout = 60000;
 

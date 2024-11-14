@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { issueToDocsParams } from '../documentation/commands';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { FnToRefactor } from '../refactoring/capabilities';
 import { roundScore, vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalysisState } from './analyser';
@@ -26,7 +26,7 @@ export function refactoringsCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisS
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaFunctionInfo) {
-      return prev + (curr.refactoring?.shouldPresent() ? 1 : 0);
+      return prev + (curr.isRefactoringSupported ? 1 : 0);
     }
     return prev + (curr.children ? refactoringsCount(curr.children) : 0);
   }, 0);
@@ -45,8 +45,8 @@ export class FileWithIssues implements DeltaTreeViewItem {
   private fileLevelIssues: DeltaIssue[] = [];
   public functionLevelIssues: DeltaFunctionInfo[] = [];
 
-  constructor(public deltaForFile: DeltaForFile, public uri: vscode.Uri) {
-    this.update(deltaForFile, uri);
+  constructor(public deltaForFile: DeltaForFile, public document: vscode.TextDocument) {
+    this.update(deltaForFile, document);
   }
 
   private createCodeHealthInfo(deltaForFile: DeltaForFile) {
@@ -83,14 +83,13 @@ export class FileWithIssues implements DeltaTreeViewItem {
     return (this.scoreChange / oldScore) * 100;
   }
 
-  update(deltaForFile: DeltaForFile, uri: vscode.Uri) {
+  update(deltaForFile: DeltaForFile, document: vscode.TextDocument) {
     this.deltaForFile = deltaForFile;
-    this.uri = uri;
+    this.document = document;
     this.codeHealthInfo = this.createCodeHealthInfo(deltaForFile);
     this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
     this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
-      const refactoring = refactoringFromFunction(finding.function, deltaForFile.refactorings);
-      const functionInfo = new DeltaFunctionInfo(this, finding.function, refactoring);
+      const functionInfo = new DeltaFunctionInfo(this, finding.function, finding.refactorableFn);
       finding['change-details'].forEach((changeDetail) =>
         functionInfo.children.push(new DeltaIssue(functionInfo, changeDetail))
       );
@@ -107,8 +106,8 @@ export class FileWithIssues implements DeltaTreeViewItem {
   sortAndSetChildren() {
     this.functionLevelIssues.sort((a, b) => {
       // Refactorability first
-      const aRef = a.refactoring?.shouldPresent() ? -1 : 1;
-      const bRef = b.refactoring?.shouldPresent() ? -1 : 1;
+      const aRef = a.isRefactoringSupported ? -1 : 1;
+      const bRef = b.isRefactoringSupported ? -1 : 1;
       if (aRef !== bRef) return aRef - bRef;
       // ...then by line number
       return a.range.start.line - b.range.start.line;
@@ -119,7 +118,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
   }
 
   toTreeItem(): vscode.TreeItem {
-    const item = new vscode.TreeItem(toFileWithIssuesUri(this.uri, this.children), this.collapsedState);
+    const item = new vscode.TreeItem(toFileWithIssuesUri(this.document.uri, this.children), this.collapsedState);
     item.iconPath = vscode.ThemeIcon.File;
     return item;
   }
@@ -136,36 +135,25 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly range: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
-  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public refactoring?: CsRefactoringRequest) {
+  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public fnToRefactor?: FnToRefactor) {
     this.fnName = fnMeta.name;
     this.range = vscodeRange(fnMeta.range);
   }
 
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(this.fnName, vscode.TreeItemCollapsibleState.None);
-    this.presentAsDefault(item);
-
-    if (this.refactoring) {
-      if (this.refactoring.isPending()) {
-        this.presentAsLoadingRefactoring(item);
-      }
-      this.refactoring.promise.then(
-        () => {
-          this.refactoring?.actionable() ? this.presentAsRefactorable(item) : this.presentAsDefault(item);
-        },
-        () => this.presentAsDefault(item)
-      );
-    }
-
-    return item;
-  }
-
-  private get command() {
-    return {
+    item.command = {
       command: 'codescene.codeHealthMonitor.selectFunction',
       title: 'Show function for code health monitoring',
       arguments: [this],
     };
+
+    if (this.isRefactoringSupported) {
+      this.presentAsRefactorable(item);
+    } else {
+      this.presentAsDefault(item);
+    }
+    return item;
   }
 
   private tooltip(refactorable?: boolean) {
@@ -177,19 +165,19 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     return tips.join(' • ');
   }
 
-  private presentAsDefault(item: vscode.TreeItem) {
-    item.iconPath = new vscode.ThemeIcon('symbol-function', fgColor);
-    item.tooltip = this.tooltip();
-    item.command = this.command;
+  public get isRefactoringSupported() {
+    return isDefined(this.fnToRefactor);
   }
 
-  private presentAsLoadingRefactoring(item: vscode.TreeItem) {
-    item.iconPath = new vscode.ThemeIcon('loading~spin');
+  private presentAsDefault(item: vscode.TreeItem) {
+    item.iconPath = new vscode.ThemeIcon('symbol-function');
+    item.tooltip = this.tooltip();
   }
 
   private presentAsRefactorable(item: vscode.TreeItem) {
-    item.tooltip = this.tooltip(true);
     item.iconPath = new vscode.ThemeIcon('sparkle');
+    item.description = 'Auto-Refactor';
+    item.tooltip = this.tooltip(true);
   }
 }
 
@@ -210,18 +198,14 @@ export class DeltaIssue implements DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(this.changeDetail.category, vscode.TreeItemCollapsibleState.None);
     item.iconPath = this.iconPath;
-    item.command = this.command;
     item.tooltip = this.changeDetail.description;
-    return item;
-  }
-
-  private get command() {
     const fnInfo = this.parent instanceof DeltaFunctionInfo ? this.parent : undefined;
-    return {
+    item.command = {
       command: 'codescene.openInteractiveDocsPanel',
       title: 'Open interactive documentation',
       arguments: [issueToDocsParams(this, fnInfo)],
     };
+    return item;
   }
 
   private get iconPath() {
@@ -233,16 +217,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
     return undefined;
   }
 
-  get parentUri() {
-    return this.parent instanceof DeltaFunctionInfo ? this.parent.parent.uri : this.parent.uri;
+  get parentDocument() {
+    return this.parent instanceof DeltaFunctionInfo ? this.parent.parent.document : this.parent.document;
   }
-}
-
-function refactoringFromFunction(functionInfo: FunctionInfo, refactorings?: CsRefactoringRequest[]) {
-  if (!refactorings) return;
-  return refactorings.find(
-    (refactoring) =>
-      refactoring.fnToRefactor.name === functionInfo.name &&
-      refactoring.fnToRefactor.range.start.line === functionInfo.range['start-line'] - 1
-  );
 }

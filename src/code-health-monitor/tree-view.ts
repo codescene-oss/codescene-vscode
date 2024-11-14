@@ -1,10 +1,7 @@
 import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
 import { logOutputChannel } from '../log';
-import { AceAPI, AceRequestEvent } from '../refactoring/addon';
-import Reviewer from '../review/reviewer';
 import { isDefined, pluralize } from '../utils';
-import { DeltaAnalyser } from './analyser';
-import { DeltaForFile } from './model';
+import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import {
   DeltaFunctionInfo,
@@ -14,7 +11,7 @@ import {
   FileWithIssues,
   issuesCount,
   okColor,
-  refactoringsCount
+  refactoringsCount,
 } from './tree-model';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
@@ -22,10 +19,10 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   private treeDataProvider: DeltaAnalysisTreeProvider;
   private view: vscode.TreeView<DeltaTreeViewItem>;
 
-  constructor(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+  constructor(context: vscode.ExtensionContext) {
     registerDeltaAnalysisDecorations(context);
 
-    this.treeDataProvider = new DeltaAnalysisTreeProvider(aceApi);
+    this.treeDataProvider = new DeltaAnalysisTreeProvider();
 
     this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
@@ -59,6 +56,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
   private handleSelectionChange(e: TreeViewSelectionChangeEvent<DeltaTreeViewItem>) {
     this.updateFunctionInfoDetails(e.selection[0]);
+    this.goToLocation(e.selection[0]);
   }
 
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
@@ -70,9 +68,21 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     }
   }
 
+  private goToLocation(selection?: DeltaTreeViewItem) {
+    if (selection instanceof DeltaFunctionInfo) {
+      const uri = selection.parent.document.uri;
+      const pos = selection.range.start;
+      const location = new vscode.Location(uri, pos);
+      void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
+    }
+  }
+
   private revealAutoRefactorings() {
     this.treeDataProvider.tree.forEach((treeItem) => {
-      if (treeItem instanceof FileWithIssues && treeItem.functionLevelIssues.some((issue) => issue.refactoring)) {
+      if (
+        treeItem instanceof FileWithIssues &&
+        treeItem.functionLevelIssues.some((issue) => issue.isRefactoringSupported)
+      ) {
         this.view.reveal(treeItem, { expand: true, select: false, focus: false }).then(
           () => {},
           (error) => logOutputChannel.error(`Failed to reveal auto-refactorings: ${error}`)
@@ -99,26 +109,14 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
   public tree: Array<DeltaTreeViewItem> = [];
 
-  constructor(aceApi?: AceAPI) {
+  constructor() {
     this.disposables.push(
       DeltaAnalyser.instance.onDidAnalyse((event) => {
         if (event.type === 'end') {
-          const { document, result } = event;
-          this.syncTree(document, result);
-        }
-      }),
-      Reviewer.instance.onDidReview((event) => {
-        // When a file starts being reviewed, we need to remove any refactorings
-        // associated with that file since they are no longer valid.
-        // Refactorings will be re-populated after the following review and delta analysis is complete.
-        if (event.type === 'start' && isDefined(event.document)) {
-          this.invalidateRefactorings(event.document);
+          this.syncTree(event);
         }
       })
     );
-    if (aceApi) {
-      this.disposables.push(aceApi.onDidChangeRequests((e) => this.addRefactoringsToTree(e)));
-    }
   }
 
   update() {
@@ -133,50 +131,21 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
     this.treeDataChangedEmitter.fire(); // Fire this to refresh the tree view
   }
-
-  private invalidateRefactorings(document: vscode.TextDocument) {
-    const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
-    if (isDefined(fileWithIssues)) {
-      fileWithIssues.functionLevelIssues.forEach((child) => {
-        child.refactoring = undefined;
-      });
-      fileWithIssues.sortAndSetChildren();
-      this.update();
-    }
-  }
-
-  private addRefactoringsToTree(event: AceRequestEvent) {
-    const fileWithIssues = this.fileIssueMap.get(event.document.uri.fsPath);
-    if (isDefined(fileWithIssues)) {
-      if (event.type === 'start') {
-        fileWithIssues.functionLevelIssues.forEach((child) => {
-          if (event.requests) {
-            const fnReq = event.requests.find(
-              (r) => r.fnToRefactor.name === child.fnName && r.fnToRefactor.range.intersection(child.range)
-            );
-            child.refactoring = fnReq;
-          }
-        });
-      }
-      fileWithIssues.sortAndSetChildren();
-      this.update();
-    }
-  }
-
-  private syncTree(document: vscode.TextDocument, deltaForFile?: DeltaForFile) {
+  
+  private syncTree({ document, result }: DeltaAnalysisEvent) {
     // Find the tree item matching the event document
     const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
     if (fileWithIssues) {
-      if (deltaForFile) {
+      if (result) {
         // Update the existing entry if there are changes
-        fileWithIssues.update(deltaForFile, document.uri);
+        fileWithIssues.update(result, document);
       } else {
         // If there are no longer any issues, remove the entry from the tree
         this.fileIssueMap.delete(document.uri.fsPath);
       }
-    } else if (deltaForFile) {
+    } else if (result) {
       // No existing file entry found - add one if there are changes
-      this.fileIssueMap.set(document.uri.fsPath, new FileWithIssues(deltaForFile, document.uri));
+      this.fileIssueMap.set(document.uri.fsPath, new FileWithIssues(result, document));
     }
 
     this.update();
