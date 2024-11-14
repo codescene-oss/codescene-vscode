@@ -5,8 +5,8 @@ import Reviewer from '../review/reviewer';
 import { registerCommandWithTelemetry } from '../utils';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
-import { CodeHealthMonitorView } from './tree-view';
 import { DeltaFunctionInfo } from './tree-model';
+import { CodeHealthMonitorView } from './tree-view';
 
 export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
     }
   );
 
-  const codeHealthMonitorView = new CodeHealthMonitorView(context, aceApi);
+  const codeHealthMonitorView = new CodeHealthMonitorView(context);
   registerCodeLens(context);
   registerCodeHealthDetailsView(context);
 

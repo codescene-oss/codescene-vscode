@@ -3,7 +3,8 @@ import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { RefactoringTarget } from '../refactoring/commands';
+import { RefactoringTarget } from '../refactoring/capabilities';
+import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
 import { DeltaForFile, isDegradation } from './model';
 
@@ -77,52 +78,59 @@ export class DeltaAnalyser {
       return;
     }
 
-    let deltaResult: DeltaForFile | undefined;
+    let deltaForFile: DeltaForFile | undefined;
     return new SimpleExecutor()
       .execute({ command: this.cliPath, args: ['delta', '--ide-api'] }, undefined, inputJsonString)
-      .then((result) => {
+      .then(async (result) => {
         if (result.stderr.trim() !== '') {
           logOutputChannel.debug(`Delta analysis debug output: ${result.stderr}`);
         }
         if (result.stdout.trim() === '') {
           return;
         }
-        deltaResult = JSON.parse(result.stdout) as DeltaForFile;
-        if (CsExtensionState.aceCapabilities) {
-          requestRefactoringsForDegradation({ document, deltaResult });
-        }
-        return deltaResult;
+        deltaForFile = JSON.parse(result.stdout) as DeltaForFile;
+
+        await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
+
+        return deltaForFile;
       })
       .catch((error) => {
         logOutputChannel.error('Error during delta analysis:', error);
         this.errorEmitter.fire(error);
       })
       .finally(() => {
-        this.endAnalysisEvent(document, deltaResult);
+        this.endAnalysisEvent(document, deltaForFile);
       });
   }
-}
 
-/**
- * Try to send a refactoring request for all degradations found in the document.
- */
-function requestRefactoringsForDegradation({
-  document,
-  deltaResult,
-}: {
-  document: vscode.TextDocument;
-  deltaResult: DeltaForFile;
-}) {
-  const linesAndCategories: RefactoringTarget[] = [];
-  deltaResult['function-level-findings'].flatMap((finding) => {
-    return finding['change-details']
-      .filter((changeDetail) => isDegradation(changeDetail['change-type']))
-      .forEach((changeDetail) =>
-        linesAndCategories.push({
+  /**
+   * NOTE - Mutates the delta result by adding info about refactorable functions to the 'function-level-findings' list.
+   */
+  private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: DeltaForFile) {
+    const aceCapabilities = CsExtensionState.aceCapabilities;
+    if (!aceCapabilities) return;
+
+    const refactoringTargets: RefactoringTarget[] = deltaForFile['function-level-findings'].flatMap((finding) => {
+      return finding['change-details']
+        .filter((changeDetail) => isDegradation(changeDetail['change-type']))
+        .map((changeDetail) => ({
           line: changeDetail.position.line,
           category: changeDetail.category,
-        })
+        }));
+    });
+
+    const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(
+      document,
+      refactoringTargets
+    );
+    if (!functionsToRefactor) return;
+
+    // Add a refactorableFn property to the findings that matches function name and range
+    deltaForFile['function-level-findings'].forEach((finding) => {
+      const refactorableFunctionForFinding = functionsToRefactor.find(
+        (fn) => fn.name === finding.function.name && fn.range.intersection(vscodeRange(finding.function.range))
       );
-  });
-  void vscode.commands.executeCommand('codescene.requestRefactorings', document, linesAndCategories);
+      finding.refactorableFn = refactorableFunctionForFinding;
+    });
+  }
 }

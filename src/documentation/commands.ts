@@ -1,26 +1,46 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
-import { CodeSceneTabPanel } from '../codescene-tab/webViewPanel';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
+import { FnToRefactor } from '../refactoring/capabilities';
 import { registerCommandWithTelemetry } from '../utils';
 
 export function register(context: vscode.ExtensionContext) {
-  const openInteractiveDocsPanel = registerCommandWithTelemetry({
-    commandId: 'codescene.openInteractiveDocsPanel',
-    handler: (params) => {
-      CodeSceneTabPanel.show({ params });
-    },
-    logArgs: (params: InteractiveDocsParams) => ({ category: params.issueInfo.category }),
-  });
+  context.subscriptions.push(
+    registerCommandWithTelemetry({
+      commandId: 'codescene.openInteractiveDocsPanel',
+      handler: (params) => {
+        CodeSceneTabPanel.show({ params });
+      },
+      logArgs: (params: InteractiveDocsParams) => ({ category: params.issueInfo.category }),
+    }),
+    registerCommandWithTelemetry({
+      // A query param friendly version of openInteractiveDocsPanel
+      commandId: 'codescene.openInteractiveDocsFromDiagnosticTarget',
+      handler: async (queryParams) => {
+        const { category, lineNo, charNo, documentUri } = queryParams;
+        const params: InteractiveDocsParams = {
+          issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
+          document: await findOrOpenDocument(documentUri),
+        };
+        CodeSceneTabPanel.show({ params });
+      },
+      logArgs: (queryParams: any) => ({ category: queryParams.category }),
+    }),
+    registerCommandWithTelemetry({
+      commandId: 'codescene.openCodeHealthDocs',
+      handler: () => {
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
+      },
+    })
+  );
+}
 
-  const openCodeHealthDocsCmd = registerCommandWithTelemetry({
-    commandId: 'codescene.openCodeHealthDocs',
-    handler: () => {
-      void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
-    },
-  });
-
-  context.subscriptions.push(openInteractiveDocsPanel, openCodeHealthDocsCmd);
+async function findOrOpenDocument(uri: vscode.Uri) {
+  let document = vscode.workspace.textDocuments.find((doc) => doc.uri.toString() === uri.toString());
+  if (!document) {
+    document = await vscode.workspace.openTextDocument(uri);
+  }
+  return document;
 }
 
 export interface IssueInfo {
@@ -31,23 +51,24 @@ export interface IssueInfo {
 
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
-  documentUri: vscode.Uri;
-  request?: CsRefactoringRequest;
+  document: vscode.TextDocument;
+  fnToRefactor?: FnToRefactor;
 }
 
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
-  const params = toDocsParams(issue.changeDetail.category, issue.position, issue.parentUri);
+  const params = toDocsParams(issue.changeDetail.category, issue.position, issue.parentDocument);
   params.issueInfo.fnName = fnInfo?.fnName;
-  params.request = fnInfo?.refactoring;
+  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 
 export function toDocsParams(
   category: string,
   position: vscode.Position,
-  documentUri: vscode.Uri
+  document: vscode.TextDocument,
+  fnToRefactor?: FnToRefactor
 ): InteractiveDocsParams {
-  return { issueInfo: { category, position }, documentUri };
+  return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
 }
 
 export function categoryToDocsCode(issueCategory: string) {

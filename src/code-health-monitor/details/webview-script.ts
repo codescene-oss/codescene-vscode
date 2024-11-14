@@ -10,12 +10,8 @@ function sendMessage(command: string, data?: object) {
 }
 
 function main() {
-  const refactoringButton = document.getElementById('refactoring-button');
-  refactoringButton?.addEventListener('click', () => sendMessage('auto-refactor'));
+  document.getElementById('refactoring-button')?.addEventListener('click', () => sendMessage('request-and-present-refactoring'));
 
-  if (refactoringButton) {
-    window.addEventListener('message', refactoringButtonHandler(refactoringButton as VscodeButton));
-  }
   for (const link of Array.from(document.getElementsByClassName('issue-icon-link'))) {
     link.addEventListener('click', (e) => issueClickHandler(e));
   }
@@ -24,18 +20,4 @@ function main() {
 function issueClickHandler(event: Event) {
   const issueIndex = Number((event.currentTarget as HTMLElement).getAttribute('issue-index'));
   sendMessage('interactive-docs', { issueIndex });
-}
-
-function refactoringButtonHandler(refactoringButton: VscodeButton) {
-  return (event: MessageEvent<any>) => {
-    const { command } = event.data;
-    refactoringButton.iconSpin = false;
-    if (command === 'refactoring-ok') {
-      refactoringButton.icon = 'sparkle';
-    } else if (command === 'refactoring-failed') {
-      refactoringButton.secondary = true;
-      refactoringButton.disabled = true;
-      refactoringButton.icon = 'circle-slash';
-    }
-  };
 }

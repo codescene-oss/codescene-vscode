@@ -8,8 +8,21 @@ import { logOutputChannel } from '../log';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
+import { CsExtensionState } from '../cs-extension-state';
 
-export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.CodeLens>, vscode.Disposable {
+class CsCodeLens extends vscode.CodeLens {
+  constructor(
+    range: vscode.Range,
+    public readonly document: vscode.TextDocument,
+    public readonly diagnostic: vscode.Diagnostic
+  ) {
+    super(range);
+  }
+}
+
+export class CsReviewCodeLensProvider
+  implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
+{
   private changeCodeLensesEmitter = new vscode.EventEmitter<void>();
   onDidChangeCodeLenses = this.changeCodeLensesEmitter.event;
 
@@ -37,10 +50,17 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
     if (!cacheItem) return;
 
     const scoreLens = this.provideScoreLens(cacheItem);
-    const diagnosticsLenses = this.provideDiagnosticsLenses(cacheItem);
+    const diagnosticsLenses = this.provideDiagnosticsLenses(cacheItem, document);
     return Promise.all([scoreLens, diagnosticsLenses]).then(([scoreLens, diagnosticsLenses]) => {
       return [scoreLens, ...diagnosticsLenses];
     });
+  }
+
+  async resolveCodeLens(codeLens: vscode.CodeLens | CsCodeLens, token: vscode.CancellationToken) {
+    if (codeLens instanceof CsCodeLens) {
+      codeLens.command = await this.openInteractiveDocsCommand(codeLens.diagnostic, codeLens.document);
+    }
+    return codeLens;
   }
 
   private async provideScoreLens(cacheItem: ReviewCacheItem) {
@@ -60,7 +80,7 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
     }
   }
 
-  private async provideDiagnosticsLenses(cacheItem: ReviewCacheItem) {
+  private async provideDiagnosticsLenses(cacheItem: ReviewCacheItem, document: vscode.TextDocument) {
     if (!reviewCodeLensesEnabled()) {
       return [];
     }
@@ -73,26 +93,30 @@ export class CsReviewCodeLensProvider implements vscode.CodeLensProvider<vscode.
     return diagnostics
       .map((diagnostic) => {
         if (!isGeneralDiagnostic(diagnostic)) {
-          return new vscode.CodeLens(
-            diagnostic.range,
-            this.openInteractiveDocsCommand(diagnostic, cacheItem.review.document.uri)
-          );
+          return new CsCodeLens(diagnostic.range, document, diagnostic);
         }
       })
       .filter(isDefined);
   }
 
-  private openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, documentUri: vscode.Uri) {
+  private async openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, document: vscode.TextDocument) {
     const category = getCsDiagnosticCode(diagnostic.code);
     if (!category) {
       logOutputChannel.warn(`Unknown diagnostic code "${diagnostic.code}"`);
       return;
     }
+
+    const fnToRefactor = (
+      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
+        { category, line: diagnostic.range.start.line + 1 },
+      ])
+    )?.[0];
+
     const title = `$(warning) ${removeDetails(diagnostic.message)}`;
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [toDocsParams(category, diagnostic.range.start, documentUri)],
+      arguments: [toDocsParams(category, diagnostic.range.start, document, fnToRefactor)],
     };
   }
 

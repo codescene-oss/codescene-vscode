@@ -5,7 +5,7 @@ import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
 import { AceRequestEvent } from './addon';
 import { RefactoringAPI } from './api';
-import { FnToRefactor } from './commands';
+import { FnToRefactor } from './capabilities';
 import { RefactorResponse } from './model';
 
 export class CsRefactoringRequest {

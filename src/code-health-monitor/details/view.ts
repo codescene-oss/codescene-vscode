@@ -1,7 +1,7 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Uri, Webview, WebviewViewProvider } from 'vscode';
+import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
-import { CsRefactoringRequest } from '../../refactoring/cs-refactoring-requests';
 import { pluralize } from '../../utils';
 import { getUri, nonce } from '../../webview-utils';
 import { DeltaFunctionInfo } from '../tree-model';
@@ -45,8 +45,12 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private messageHandler(message: any) {
     switch (message.command) {
-      case 'auto-refactor':
-        void vscode.commands.executeCommand('codescene.presentRefactoring', this.functionInfo?.refactoring);
+      case 'request-and-present-refactoring':
+        void vscode.commands.executeCommand(
+          'codescene.requestAndPresentRefactoring',
+          this.functionInfo?.parent.document,
+          this.functionInfo?.fnToRefactor
+        );
         return;
       case 'interactive-docs':
         const issue = this.functionInfo?.children[message.issueIndex];
@@ -111,14 +115,14 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     ${this.fileAndFunctionInfo(functionInfo)}
     ${this.functionDescription(functionInfo)}
     <div class="block">
-      ${this.refactoringButton(functionInfo.refactoring)}
+      ${refactoringButton(functionInfo.fnToRefactor)}
     </div>
     ${this.issueDetails(functionInfo)}
     `;
   }
 
   private fileAndFunctionInfo(functionInfo: DeltaFunctionInfo) {
-    const fileName = basename(functionInfo.parent.uri.fsPath);
+    const fileName = basename(functionInfo.parent.document.uri.fsPath);
     return /*html*/ `
       <div class="block function-info">
         <div class="function-name flex-row large"><span class="codicon codicon-symbol-method"></span><span>${functionInfo.fnName}</span></div>
@@ -143,35 +147,6 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
       </div>`;
 
     return description ? description : '';
-  }
-
-  private refactoringButton(refactoring?: CsRefactoringRequest) {
-    if (!refactoring) {
-      return /* html */ `
-        <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
-          Auto-refactor
-        </vscode-button>`;
-    }
-
-    const webView = this.view?.webview;
-    if (refactoring && webView) {
-      refactoring.promise
-        .then(() => {
-          if (refactoring.actionable()) {
-            void webView.postMessage({ command: 'refactoring-ok' });
-          } else {
-            void webView.postMessage({ command: 'refactoring-failed' });
-          }
-        })
-        .catch(() => {
-          void webView.postMessage({ command: 'refactoring-failed' });
-        });
-    }
-
-    return /* html */ `
-      <vscode-button id="refactoring-button" icon="loading" icon-spin="true" primary>
-        Auto-refactor
-      </vscode-button>`;
   }
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {

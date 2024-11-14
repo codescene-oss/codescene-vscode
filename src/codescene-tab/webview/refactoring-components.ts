@@ -1,4 +1,5 @@
 import { commands } from 'vscode';
+import { FnToRefactor } from '../../refactoring/capabilities';
 import { RefactorConfidence, RefactorResponse } from '../../refactoring/model';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
@@ -140,4 +141,17 @@ export function refactoringUnavailable() {
       for best practices and guidance on improving your code.</p>
     </div>
     `;
+}
+
+export function refactoringButton(refactoring?: FnToRefactor) {
+  if (!refactoring) {
+    return /* html */ `
+      <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
+        Auto-refactor
+      </vscode-button>`;
+  }
+  return /* html */ `
+    <vscode-button id="refactoring-button" icon="sparkle" primary>
+      Auto-refactor
+    </vscode-button>`;
 }

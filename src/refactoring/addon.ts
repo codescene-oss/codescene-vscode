@@ -8,14 +8,18 @@ import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { createTmpDiffUriScheme } from './utils';
+import { CsFeature } from '../cs-extension-state';
+import { logOutputChannel } from '../log';
+import { assertError, reportError } from '../utils';
 
 /**
  * Work in progress API just to keep us from creating too many contact points between
  * the ACE functionality and the rest of the extension
  */
 export interface AceAPI {
-  enableACE: (context: vscode.ExtensionContext) => Promise<RefactoringCapabilities>;
-  disableACE: () => void;
+  enable: (context: vscode.ExtensionContext) => Promise<RefactoringCapabilities | undefined>;
+  disable: () => void;
+  onDidChangeState: vscode.Event<CsFeature & { refactorCapabilities?: RefactoringCapabilities }>;
   onDidChangeRequests: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
 }
@@ -28,53 +32,65 @@ export type AceRequestEvent = {
 };
 
 /**
- * Aside from the AceAPI, this "addon" also contributes these commands from commands.ts:
- *  - codescene.requestRefactorings
- *  - codescene.presentRefactoring
+ * Aside from the AceAPI, this "addon" also contributes some key commands from commands.ts:
  */
 export function activate(): AceAPI {
   return {
-    enableACE,
-    disableACE,
+    enable,
+    disable,
+    onDidChangeState: stateEmitter.event,
     onDidChangeRequests: CsRefactoringRequests.onDidChangeRequests,
     onDidRequestFail: CsRefactoringRequests.onDidRequestFail,
   };
 }
 
 const aceDisposables: vscode.Disposable[] = [];
-
+const stateEmitter = new vscode.EventEmitter<CsFeature & { refactorCapabilities?: RefactoringCapabilities }>();
 /**
  * If config is enabled and we have a session, try to enable ACE capabilities by getting a preflight response.
  * If disabled manually by the config option, the capabilities are disabled with an appropriate message.
  *
  * @param context
  */
-async function enableACE(context: vscode.ExtensionContext) {
+async function enable(context: vscode.ExtensionContext) {
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
-  disableACE();
+  disable(false);
 
-  const preflightResponse = await RefactoringAPI.instance.preFlight();
-  const capabilities = new RefactoringCapabilities(preflightResponse);
+  stateEmitter.fire({ state: 'loading'});
 
-  const commandDisposable = new CsRefactoringCommands(capabilities);
-  aceDisposables.push(commandDisposable);
-  aceDisposables.push(createTmpDiffUriScheme());
+  try {
+    const preflightResponse = await RefactoringAPI.instance.preFlight();
+    const capabilities = new RefactoringCapabilities(preflightResponse);
+    aceDisposables.push(new CsRefactoringCommands());
+    aceDisposables.push(createTmpDiffUriScheme());
+  
+    /* Add disposables to both subscription context and the extension state list
+     * of disposables. This is to ensure they're disposed either when the extension
+     * is deactivated or if the online features are disabled */
+    context.subscriptions.push(...aceDisposables);
+  
+    // Force update diagnosticCollection to request initial refactorings
+    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+      CsDiagnostics.review(document);
+    });
+    stateEmitter.fire({ state: 'enabled', refactorCapabilities: capabilities });
+  
+    logOutputChannel.info('ACE enabled!');
+    return capabilities;
+  } catch (unknownErr) {
+    const error = assertError(unknownErr);
+    if (!error) return;
 
-  /* Add disposables to both subscription context and the extension state list
-   * of disposables. This is to ensure they're disposed either when the extension
-   * is deactivated or if the online features are disabled */
-  context.subscriptions.push(...aceDisposables);
-
-  // Force update diagnosticCollection to request initial refactorings
-  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    CsDiagnostics.review(document);
-  });
-  return capabilities;
+    stateEmitter.fire({ state: 'error', error });
+    reportError('Unable to enable refactoring capabilities', error);
+  }
 }
 
-function disableACE() {
+function disable(externalCall = true) {
   aceDisposables.forEach((d) => d.dispose());
   aceDisposables.length = 0;
+  stateEmitter.fire({ state: 'disabled' });
+  if (externalCall) logOutputChannel.info('ACE disabled!');
 }
 
 /**

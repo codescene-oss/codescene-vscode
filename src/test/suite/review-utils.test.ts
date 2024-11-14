@@ -123,7 +123,6 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics.length, 4);
 
     for (const d of diagnostics) {
-      console.log(d.message);
       let expectedRange;
       let expectedSeverity;
       if (d.message === 'Code health score: 9.81/10') {

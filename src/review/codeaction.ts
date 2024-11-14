@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
+import { CsExtensionState } from '../cs-extension-state';
 import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
-import { AceAPI } from '../refactoring/addon';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { RefactoringTarget } from '../refactoring/capabilities';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { getCsDiagnosticCode } from './utils';
 
-export function register(context: vscode.ExtensionContext, aceApi?: AceAPI) {
-  const codeActionProvider = new ReviewCodeActionProvider(aceApi);
+export function register(context: vscode.ExtensionContext) {
+  const codeActionProvider = new ReviewCodeActionProvider();
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(reviewDocumentSelector(), codeActionProvider),
     codeActionProvider
@@ -19,19 +19,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
   readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.Empty];
   private disposables: vscode.Disposable[] = [];
 
-  private requestsForDocument = new Map<string, CsRefactoringRequest[]>();
-
-  constructor(aceApi?: AceAPI) {
-    if (aceApi) {
-      this.disposables.push(
-        aceApi.onDidChangeRequests((event) => {
-          if (event.requests) {
-            this.requestsForDocument.set(event.document.uri.toString(), event.requests);
-          }
-        })
-      );
-    }
-  }
+  constructor() {}
 
   async provideCodeActions(
     document: vscode.TextDocument,
@@ -43,65 +31,54 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     if (!review) return;
 
     const diagnostics: vscode.Diagnostic[] = await review.review.diagnostics;
+    const actions: vscode.CodeAction[] = [];
+    const diagnosticsInRange = diagnostics.filter((diagnostic) => diagnostic.range.contains(range));
 
-    const matchingRequest = this.findRequest(document.uri, range);
-
-    const actions = diagnostics
-      .filter((diagnostic) => diagnostic.range.contains(range))
+    const refactoringTargets: RefactoringTarget[] = diagnosticsInRange
       .map((diagnostic) => {
         const category = getCsDiagnosticCode(diagnostic.code);
         if (!category) return;
-        const title = `Explain ${category}`;
-        const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
-        const params = toDocsParams(category, diagnostic.range.start, document.uri);
-
-        // If the request contains the issue category, pass it to the command to show the refactoring in the docs panel
-        const request = this.requestContainsIssueCategory(category, matchingRequest);
-        action.diagnostics = [diagnostic];
-        action.command = {
-          command: 'codescene.openInteractiveDocsPanel',
-          title,
-          arguments: [{ ...params, request }],
+        return {
+          category,
+          line: diagnostic.range.start.line + 1,
         };
-        return action;
       })
       .filter(isDefined);
 
-    if (actions.length === 0) return;
+    const fnToRefactor = (
+      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, refactoringTargets)
+    )?.[0];
 
-    if (matchingRequest) {
+    if (fnToRefactor) {
       const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
       refactorAction.command = {
-        command: 'codescene.presentRefactoring',
+        command: 'codescene.requestAndPresentRefactoring',
         title: 'Refactor using CodeScene ACE',
-        arguments: [matchingRequest],
+        arguments: [document, fnToRefactor],
       };
-      actions.unshift(refactorAction);
+      actions.push(refactorAction);
     }
+
+    diagnosticsInRange.forEach((diagnostic) => {
+      const category = getCsDiagnosticCode(diagnostic.code);
+      if (!category) return;
+      const title = `Explain ${category}`;
+      const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
+      action.diagnostics = [diagnostic];
+      action.command = {
+        command: 'codescene.openInteractiveDocsPanel',
+        title,
+        arguments: [toDocsParams(category, diagnostic.range.start, document, fnToRefactor)],
+      };
+      actions.push(action);
+    });
+
+    if (actions.length === 0) return;
 
     return actions;
   }
 
-  /**
-   * Returns a request if there are requests for the document uri where the function range
-   * contains the range of the requested codeaction.
-   *
-   * @param uri Uri of document with potential refactorings
-   * @param range Range of the line to provide the codeaction for
-   * @returns
-   */
-  private findRequest(uri: vscode.Uri, range: vscode.Range) {
-    const refactoringRequests = this.requestsForDocument.get(uri.toString());
-    return refactoringRequests?.find((request) => request.fnToRefactor.range.contains(range));
-  }
-
-  private requestContainsIssueCategory(category: string, request?: CsRefactoringRequest) {
-    const containsCodeSmell = request?.fnToRefactor.codeSmells.find((cs) => cs.category === category);
-    if (containsCodeSmell) return request;
-  }
-
   dispose() {
     this.disposables.forEach((d) => d.dispose());
-    this.requestsForDocument.clear();
   }
 }
