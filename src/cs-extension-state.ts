@@ -35,6 +35,9 @@ export interface CsStateProperties {
   extensionUri: vscode.Uri;
 }
 
+const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
+const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
+
 /**
  * This class is used to handle the state of the extension. One part is managing and presenting
  * the state properties, the other part is to handle the state of components that are registered
@@ -45,7 +48,7 @@ export class CsExtensionState {
   readonly controlCenterView: ControlCenterViewProvider;
   readonly statusBar: CsStatusBar;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -61,12 +64,33 @@ export class CsExtensionState {
       })
     );
     this.statusBar = new CsStatusBar(this.stateProperties);
+    this.setupGlobalStateSync();
+  }
+
+  private setupGlobalStateSync() {
+    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey]);
   }
 
   private static _instance: CsExtensionState;
 
   static init(context: vscode.ExtensionContext) {
     CsExtensionState._instance = new CsExtensionState(context);
+  }
+
+  static get acceptedTermsAndPolicies() {
+    return this._instance.context.globalState.get<boolean>(acceptedTermsAndPoliciesKey);
+  }
+
+  static async setAcceptedTermsAndPolicies(value?: boolean) {
+    await this._instance.context.globalState.update(acceptedTermsAndPoliciesKey, value);
+  }
+
+  static get acknowledgedAceUsage() {
+    return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
+  }
+
+  static async setAcknowledgedAceUsage(value?: boolean) {
+    await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
   }
 
   static get stateProperties() {
