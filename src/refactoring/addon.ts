@@ -1,16 +1,16 @@
 // Functions for handling enabling and disabling the ACE "addon" components
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
+import { CsFeature } from '../cs-extension-state';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { toDistinctLanguageIds } from '../language-support';
+import { logOutputChannel } from '../log';
+import { assertError, reportError } from '../utils';
 import { RefactoringAPI } from './api';
 import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
 import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
 import { createTmpDiffUriScheme } from './utils';
-import { CsFeature } from '../cs-extension-state';
-import { logOutputChannel } from '../log';
-import { assertError, reportError } from '../utils';
 
 /**
  * Work in progress API just to keep us from creating too many contact points between
@@ -56,25 +56,25 @@ async function enable(context: vscode.ExtensionContext) {
   // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
   disable(false);
 
-  stateEmitter.fire({ state: 'loading'});
+  stateEmitter.fire({ state: 'loading' });
 
   try {
     const preflightResponse = await RefactoringAPI.instance.preFlight();
     const capabilities = new RefactoringCapabilities(preflightResponse);
     aceDisposables.push(new CsRefactoringCommands());
     aceDisposables.push(createTmpDiffUriScheme());
-  
+
     /* Add disposables to both subscription context and the extension state list
      * of disposables. This is to ensure they're disposed either when the extension
      * is deactivated or if the online features are disabled */
     context.subscriptions.push(...aceDisposables);
-  
+
     // Force update diagnosticCollection to request initial refactorings
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       CsDiagnostics.review(document);
     });
     stateEmitter.fire({ state: 'enabled', refactorCapabilities: capabilities });
-  
+
     logOutputChannel.info('ACE enabled!');
     return capabilities;
   } catch (unknownErr) {

@@ -1,5 +1,6 @@
 import vscode, { WorkspaceEdit } from 'vscode';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
+import { CsExtensionState } from '../cs-extension-state';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
@@ -24,11 +25,16 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
   private presentRefactoringRequestCmd(request?: CsRefactoringRequest) {
     if (!request) return;
-    CodeSceneTabPanel.show({ params: request });
+    CodeSceneTabPanel.show(request);
   }
 
   private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor?: FnToRefactor) {
     if (!fnToRefactor) return;
+    if (!CsExtensionState.acknowledgedAceUsage) {
+      CodeSceneTabPanel.show({ document, fnToRefactor });
+      return;
+    }
+
     const [request] = CsRefactoringRequests.initiate(document, [fnToRefactor]);
     this.presentRefactoringRequestCmd(request);
   }

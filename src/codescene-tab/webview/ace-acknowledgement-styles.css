@@ -1,0 +1,19 @@
+.ace-acknowledgement-container {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--vscode-focusBorder);
+  background: var(--vscode-textCodeBlock-background);
+
+  p.header {
+    font-weight: 600;
+  }
+
+  p.dimmed {
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 0;
+  }
+
+  #acknowledge-button {
+    margin-top: 8px;
+  }
+}

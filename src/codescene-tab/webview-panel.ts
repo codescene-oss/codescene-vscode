@@ -1,6 +1,6 @@
 import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { InteractiveDocsParams } from '../documentation/commands';
+import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { refactoringSymbol, toConfidenceSymbol } from '../refactoring/commands';
 import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
@@ -15,17 +15,21 @@ import {
   refactoringUnavailable,
 } from './webview/refactoring-components';
 import { renderHtmlTemplate } from './webview/utils';
+import { FnToRefactor } from '../refactoring/capabilities';
 
-export interface CodeSceneTabPanelParams {
-  params: InteractiveDocsParams | CsRefactoringRequest;
+interface ShowAceAcknowledgement {
+  document: vscode.TextDocument;
+  fnToRefactor: FnToRefactor;
 }
+
+type CodeSceneTabPanelParams = InteractiveDocsParams | CsRefactoringRequest | ShowAceAcknowledgement;
 
 export class CodeSceneTabPanel implements Disposable {
   private static _instance: CodeSceneTabPanel | undefined;
   private static readonly viewType = 'codescene-tab';
   private readonly webViewPanel: WebviewPanel;
   private disposables: Disposable[] = [];
-  private state?: InteractiveDocsParams | CsRefactoringRequest;
+  private state?: CodeSceneTabPanelParams;
 
   public static get instance() {
     if (!CodeSceneTabPanel._instance) {
@@ -55,8 +59,10 @@ export class CodeSceneTabPanel implements Disposable {
           if (!this.state) return;
           if (this.state instanceof CsRefactoringRequest) {
             await this.handleRefactoringMessage(this.state, message.command);
-          } else {
+          } else if (isInteractiveDocsParams(this.state)) {
             await this.handleDocumentationMessage(this.state, message.command);
+          } else {
+            await this.handleAceAcknowledgementMessage(this.state, message.command);
           }
         } catch (error) {
           if (!isError(error)) return;
@@ -67,6 +73,22 @@ export class CodeSceneTabPanel implements Disposable {
       this,
       this.disposables
     );
+  }
+
+  private async handleAceAcknowledgementMessage(ackParams: ShowAceAcknowledgement, command: string) {
+    switch (command) {
+      case 'acknowledged':
+        await CsExtensionState.setAcknowledgedAceUsage(true);
+        void vscode.commands.executeCommand(
+          'codescene.requestAndPresentRefactoring',
+          ackParams.document,
+          ackParams.fnToRefactor
+        );
+        return;
+      case 'goto-function-location':
+        this.goToFunctionLocation(ackParams.document.uri, ackParams.fnToRefactor.range.start);
+        return;
+    }
   }
 
   private async handleRefactoringMessage(refactoring: CsRefactoringRequest, command: string) {
@@ -138,13 +160,45 @@ export class CodeSceneTabPanel implements Disposable {
     void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
   }
 
-  private async updateWebView(params: InteractiveDocsParams | CsRefactoringRequest) {
+  private async updateWebView(params: InteractiveDocsParams | CsRefactoringRequest | ShowAceAcknowledgement) {
     this.state = params;
     if (params instanceof CsRefactoringRequest) {
       await this.presentRefactoring(params);
       return;
+    } else if (isInteractiveDocsParams(params)) {
+      await this.presentDocumentation(params);
+      return;
+    } else {
+      this.presentAceAcknowledgement(params.fnToRefactor);
     }
-    await this.presentDocumentation(params);
+  }
+
+  private presentAceAcknowledgement(fnToRefactor: FnToRefactor) {
+    const fnLocContent = functionLocationContent({
+      filePath: fnToRefactor.filePath,
+      position: fnToRefactor.range.start,
+      fnName: fnToRefactor.name,
+    });
+
+    const ackContent = /*html*/ `
+      <div class="ace-acknowledgement-container">
+        <p class="header">CodeScene ACE - AI-Powered Refactoring</p>
+        <p>CodeScene ACE combines multiple LLMs with fact-based validation. ACE chooses the best LLM for the job, 
+        validates its output, and proposes refactoring for cleaner code which is easier to maintain.</p>
+        <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a proven business impact.</p>
+        <a href="https://codescene.com/product/ace/principles">View CodeScene's AI Privacy Principles</a><br>
+        <vscode-button id="acknowledge-button">Show me CodeScene ACE</vscode-button>
+        <hr>
+        <p class="dimmed">You can disable CodeScene ACE anytime in settings.</p>
+      </div>
+    `;
+
+    renderHtmlTemplate(this.webViewPanel, {
+      title: 'CodeScene ACE  - AI Powered Refactoring',
+      bodyContent: [fnLocContent, ackContent],
+      cssPaths: [['out', 'codescene-tab', 'webview', 'ace-acknowledgement-styles.css']],
+      scriptPaths: [['out', 'codescene-tab', 'webview', 'ace-acknowledgement-script.js']],
+    });
   }
 
   private async presentRefactoring(refactoring: CsRefactoringRequest) {
@@ -254,7 +308,7 @@ export class CodeSceneTabPanel implements Disposable {
     this.disposables.forEach((d) => d.dispose());
   }
 
-  static show({ params }: CodeSceneTabPanelParams) {
+  static show(params: CodeSceneTabPanelParams) {
     void CodeSceneTabPanel.instance.updateWebView(params);
     if (!CodeSceneTabPanel.instance.webViewPanel.visible) {
       CodeSceneTabPanel.instance.webViewPanel.reveal(undefined, true);
