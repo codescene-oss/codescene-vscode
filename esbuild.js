@@ -41,6 +41,7 @@ function webviewConfig(watch = false) {
       './src/code-health-monitor/details/webview-script.ts',
       './src/control-center/webview-script.ts',
       './src/codescene-tab/webview/script.ts',
+      './src/codescene-tab/webview/ace-acknowledgement-script.ts',
       './src/codescene-tab/webview/refactoring-script.ts',
       './src/codescene-tab/webview/documentation-script.ts',
     ],

@@ -9,7 +9,7 @@ export function register(context: vscode.ExtensionContext) {
     registerCommandWithTelemetry({
       commandId: 'codescene.openInteractiveDocsPanel',
       handler: (params) => {
-        CodeSceneTabPanel.show({ params });
+        CodeSceneTabPanel.show(params);
       },
       logArgs: (params: InteractiveDocsParams) => ({ category: params.issueInfo.category }),
     }),
@@ -22,7 +22,7 @@ export function register(context: vscode.ExtensionContext) {
           issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
           document: await findOrOpenDocument(documentUri),
         };
-        CodeSceneTabPanel.show({ params });
+        CodeSceneTabPanel.show(params);
       },
       logArgs: (queryParams: any) => ({ category: queryParams.category }),
     }),
@@ -53,6 +53,15 @@ export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
+}
+
+export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
+  if (!obj) return false;
+  if (typeof obj === 'object') {
+    Object.hasOwnProperty.call(obj, 'issueInfo');
+    return obj.hasOwnProperty('issueInfo') && obj.hasOwnProperty('document');
+  }
+  return false;
 }
 
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
