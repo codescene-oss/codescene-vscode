@@ -13,3 +13,7 @@ export function nonce() {
 export function getUri(webView: Webview, ...pathSegments: string[]) {
   return webView.asWebviewUri(Uri.joinPath(CsExtensionState.extensionUri, ...pathSegments));
 }
+
+export function commonResourceRoots() {
+  return [Uri.joinPath(CsExtensionState.extensionUri, 'out'), Uri.joinPath(CsExtensionState.extensionUri, 'assets')];
+}

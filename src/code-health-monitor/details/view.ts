@@ -1,13 +1,13 @@
 import { basename } from 'path';
-import vscode, { Disposable, ExtensionContext, Uri, Webview, WebviewViewProvider } from 'vscode';
+import vscode, { Disposable, ExtensionContext, Webview, WebviewViewProvider } from 'vscode';
 import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
 import { pluralize } from '../../utils';
-import { getUri, nonce } from '../../webview-utils';
+import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
 import { DeltaFunctionInfo } from '../tree-model';
 
 export function register(context: ExtensionContext) {
-  const viewProvider = new CodeHealthDetailsView(context.extensionUri);
+  const viewProvider = new CodeHealthDetailsView();
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codescene.codeHealthDetailsView', viewProvider),
     vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo: DeltaFunctionInfo) =>
@@ -23,7 +23,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   private baseContent: string = '';
   private functionInfo?: DeltaFunctionInfo;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor() {}
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -34,7 +34,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     const webView = this.view.webview;
     webView.options = {
       enableScripts: true,
-      localResourceRoots: [Uri.joinPath(this.extensionUri, 'out'), Uri.joinPath(this.extensionUri, 'assets')],
+      localResourceRoots: commonResourceRoots(),
     };
 
     webView.onDidReceiveMessage(this.messageHandler, this, this.disposables);

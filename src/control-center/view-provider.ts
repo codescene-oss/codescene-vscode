@@ -1,7 +1,6 @@
 import vscode, {
   CancellationToken,
   ExtensionContext,
-  Uri,
   WebviewView,
   WebviewViewProvider,
   WebviewViewResolveContext,
@@ -12,10 +11,10 @@ import { logOutputChannel } from '../log';
 import { ACECreditsError } from '../refactoring/api';
 import { AceCredits } from '../refactoring/model';
 import { pluralize } from '../utils';
-import { getUri, nonce } from '../webview-utils';
+import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
-  const provider = new ControlCenterViewProvider(context.extensionUri);
+  const provider = new ControlCenterViewProvider();
   context.subscriptions.push(window.registerWebviewViewProvider('codescene.controlCenterView', provider));
   return provider;
 }
@@ -23,7 +22,7 @@ export function registerControlCenterViewProvider(context: ExtensionContext) {
 export class ControlCenterViewProvider implements WebviewViewProvider /* , Disposable */ {
   private view?: WebviewView;
 
-  constructor(private readonly extensionUri: Uri) {}
+  constructor() {}
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -34,7 +33,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     const webView = this.view.webview;
     webView.options = {
       enableScripts: true,
-      localResourceRoots: [Uri.joinPath(this.extensionUri, 'out'), Uri.joinPath(this.extensionUri, 'assets')],
+      localResourceRoots: commonResourceRoots(),
     };
 
     webView.onDidReceiveMessage(this.handleMessages, this);

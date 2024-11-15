@@ -2,10 +2,13 @@ import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
+import { FnToRefactor } from '../refactoring/capabilities';
 import { refactoringSymbol, toConfidenceSymbol } from '../refactoring/commands';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
+import Telemetry from '../telemetry';
 import { isError } from '../utils';
+import { commonResourceRoots } from '../webview-utils';
 import { functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
 import {
@@ -15,8 +18,6 @@ import {
   refactoringUnavailable,
 } from './webview/refactoring-components';
 import { renderHtmlTemplate } from './webview/utils';
-import { FnToRefactor } from '../refactoring/capabilities';
-import Telemetry from '../telemetry';
 
 interface ShowAceAcknowledgement {
   document: vscode.TextDocument;
@@ -46,10 +47,7 @@ export class CodeSceneTabPanel implements Disposable {
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
-        localResourceRoots: [
-          Uri.joinPath(CsExtensionState.extensionUri, 'out'),
-          Uri.joinPath(CsExtensionState.extensionUri, 'assets'),
-        ],
+        localResourceRoots: commonResourceRoots(),
         // retainContextWhenHidden: true, // Might this to keep the state of the auto-refactor button then moving the webview tab around. It's
       }
     );

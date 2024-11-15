@@ -32,7 +32,6 @@ interface CsFeatures {
 export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features: CsFeatures;
-  extensionUri: vscode.Uri;
 }
 
 const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
@@ -47,6 +46,7 @@ export class CsExtensionState {
   readonly stateProperties: CsStateProperties;
   readonly controlCenterView: ControlCenterViewProvider;
   readonly statusBar: CsStatusBar;
+  readonly extensionUri: Uri;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
@@ -54,8 +54,8 @@ export class CsExtensionState {
         analysis: { state: 'loading' },
         ace: { state: 'loading' },
       },
-      extensionUri: context.extensionUri,
     };
+    this.extensionUri = context.extensionUri;
     this.controlCenterView = registerControlCenterViewProvider(context);
     context.subscriptions.push(
       vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
@@ -98,7 +98,7 @@ export class CsExtensionState {
   }
 
   static get extensionUri(): Uri {
-    return CsExtensionState._instance.stateProperties.extensionUri;
+    return CsExtensionState._instance.extensionUri;
   }
 
   static get binaryPath(): string {
