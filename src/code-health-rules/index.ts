@@ -1,5 +1,5 @@
 import { window, ExtensionContext } from 'vscode';
-import { registerCommandWithTelemetry } from '../utils';
+import { registerCommandWithTelemetry } from '../telemetry';
 import { checkCodeHealthRules } from './check-rules';
 import { createRulesTemplate } from './rules-template';
 

@@ -1,6 +1,6 @@
 import { commands, env, ExtensionContext, Uri, window } from 'vscode';
 import { CsExtensionState } from './cs-extension-state';
-import { registerCommandWithTelemetry } from './utils';
+import { registerCommandWithTelemetry } from './telemetry';
 
 export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
   context.subscriptions.push(
