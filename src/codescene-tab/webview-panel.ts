@@ -3,7 +3,7 @@ import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { refactoringSymbol, toConfidenceSymbol } from '../refactoring/commands';
-import { CsRefactoringRequest } from '../refactoring/cs-refactoring-requests';
+import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import { isError } from '../utils';
 import { functionLocationContent } from './webview/components';
@@ -22,7 +22,7 @@ interface ShowAceAcknowledgement {
   fnToRefactor: FnToRefactor;
 }
 
-type CodeSceneTabPanelParams = InteractiveDocsParams | CsRefactoringRequest | ShowAceAcknowledgement;
+type CodeSceneTabPanelParams = InteractiveDocsParams | RefactoringRequest | ShowAceAcknowledgement;
 
 export class CodeSceneTabPanel implements Disposable {
   private static _instance: CodeSceneTabPanel | undefined;
@@ -57,7 +57,7 @@ export class CodeSceneTabPanel implements Disposable {
       async (message) => {
         try {
           if (!this.state) return;
-          if (this.state instanceof CsRefactoringRequest) {
+          if (this.state instanceof RefactoringRequest) {
             await this.handleRefactoringMessage(this.state, message.command);
           } else if (isInteractiveDocsParams(this.state)) {
             await this.handleDocumentationMessage(this.state, message.command);
@@ -91,7 +91,7 @@ export class CodeSceneTabPanel implements Disposable {
     }
   }
 
-  private async handleRefactoringMessage(refactoring: CsRefactoringRequest, command: string) {
+  private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string) {
     switch (command) {
       case 'goto-function-location':
         this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start);
@@ -125,14 +125,14 @@ export class CodeSceneTabPanel implements Disposable {
     }
   }
 
-  private deselectRefactoring(refactoring: CsRefactoringRequest) {
+  private deselectRefactoring(refactoring: RefactoringRequest) {
     const editor = targetEditor(refactoring.document);
     if (editor) {
       editor.selection = new vscode.Selection(0, 0, 0, 0);
     }
   }
 
-  private async copyCode(refactoring: CsRefactoringRequest) {
+  private async copyCode(refactoring: RefactoringRequest) {
     const decoratedCode = decorateCode(await refactoring.promise, refactoring.document.languageId);
     await vscode.env.clipboard.writeText(decoratedCode);
     void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
@@ -160,9 +160,9 @@ export class CodeSceneTabPanel implements Disposable {
     void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
   }
 
-  private async updateWebView(params: InteractiveDocsParams | CsRefactoringRequest | ShowAceAcknowledgement) {
+  private async updateWebView(params: InteractiveDocsParams | RefactoringRequest | ShowAceAcknowledgement) {
     this.state = params;
-    if (params instanceof CsRefactoringRequest) {
+    if (params instanceof RefactoringRequest) {
       await this.presentRefactoring(params);
       return;
     } else if (isInteractiveDocsParams(params)) {
@@ -201,7 +201,7 @@ export class CodeSceneTabPanel implements Disposable {
     });
   }
 
-  private async presentRefactoring(refactoring: CsRefactoringRequest) {
+  private async presentRefactoring(refactoring: RefactoringRequest) {
     const { fnToRefactor, promise, document } = refactoring;
 
     const fnLocContent = functionLocationContent({
