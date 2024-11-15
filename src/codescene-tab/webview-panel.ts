@@ -16,6 +16,7 @@ import {
 } from './webview/refactoring-components';
 import { renderHtmlTemplate } from './webview/utils';
 import { FnToRefactor } from '../refactoring/capabilities';
+import Telemetry from '../telemetry';
 
 interface ShowAceAcknowledgement {
   document: vscode.TextDocument;
@@ -79,6 +80,7 @@ export class CodeSceneTabPanel implements Disposable {
     switch (command) {
       case 'acknowledged':
         await CsExtensionState.setAcknowledgedAceUsage(true);
+        Telemetry.instance.logUsage('aceAcknowledged');
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           ackParams.document,
@@ -229,6 +231,7 @@ export class CodeSceneTabPanel implements Disposable {
         editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
       }
 
+      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: level });
       this.updateRefactoringContent(title, [
         fnLocContent,
         refactoringSummary(response.confidence),
@@ -248,6 +251,8 @@ export class CodeSceneTabPanel implements Disposable {
           details: actionHtml,
         },
       });
+
+      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: 0 });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringUnavailable()]);
     }
   }

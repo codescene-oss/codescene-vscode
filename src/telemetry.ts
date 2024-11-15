@@ -7,6 +7,7 @@ import { CsExtensionState } from './cs-extension-state';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult } from './executor';
 import { logOutputChannel } from './log';
+import { isDefined } from './utils';
 
 export default class Telemetry {
   private static _instance: Telemetry;
@@ -77,4 +78,32 @@ export default class Telemetry {
 
     return this.axiosInstance.post(`${getPortalUrl()}/api/analytics/events/ide`, jsonData, config);
   }
+}
+
+/**
+ * Register a command with this function to automatically log telemetry when executed.
+ * Essentially wraps vscode.commands.registerCommand, adding Telemetry.logUsage with optional
+ * eventData.
+ */
+export function registerCommandWithTelemetry({
+  commandId,
+  handler,
+  thisArg,
+  logArgs,
+}: {
+  commandId: string;
+  handler: (...args: any[]) => any;
+  thisArg?: any;
+  logArgs?: (...args: any[]) => any;
+}): vscode.Disposable {
+  const wrappedHandler = (...args: any[]) => {
+    const eventName = `command/${commandId}`;
+    let eventData;
+    if (isDefined(logArgs)) {
+      eventData = logArgs(...args);
+    }
+    Telemetry.instance.logUsage(eventName, eventData);
+    return handler.apply(thisArg, args);
+  };
+  return vscode.commands.registerCommand(commandId, wrappedHandler, thisArg);
 }

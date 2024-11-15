@@ -2,7 +2,7 @@ import vscode from 'vscode';
 import { Branch, GitExtension, Repository } from '../../types/git';
 import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
-import { registerCommandWithTelemetry } from '../utils';
+import { registerCommandWithTelemetry } from '../telemetry';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { DeltaFunctionInfo } from './tree-model';
