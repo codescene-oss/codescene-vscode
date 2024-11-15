@@ -52,14 +52,16 @@ const stateEmitter = new vscode.EventEmitter<CsFeature & { refactorCapabilities?
  * @param context
  */
 async function enable(context: vscode.ExtensionContext) {
-  // Make sure to clear the capabilities first, disposing components, so we don't accidentally get multiple commands etc.
-  disable(false);
-
   stateEmitter.fire({ state: 'loading' });
 
   try {
     const preflightResponse = await RefactoringAPI.instance.preFlight();
     const capabilities = new RefactoringCapabilities(preflightResponse);
+
+    // Make sure to dispose old commands and diff uri scheme so we won't get duplicates (same as in disable())
+    aceDisposables.forEach((d) => d.dispose());
+    aceDisposables.length = 0;
+
     aceDisposables.push(new CsRefactoringCommands());
     aceDisposables.push(createTmpDiffUriScheme());
 
@@ -85,11 +87,11 @@ async function enable(context: vscode.ExtensionContext) {
   }
 }
 
-function disable(externalCall = true) {
+function disable() {
   aceDisposables.forEach((d) => d.dispose());
   aceDisposables.length = 0;
   stateEmitter.fire({ state: 'disabled' });
-  if (externalCall) logOutputChannel.info('ACE disabled!');
+  logOutputChannel.info('ACE disabled!');
 }
 
 /**
