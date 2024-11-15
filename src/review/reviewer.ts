@@ -98,6 +98,12 @@ class ReviewCache {
     }
   }
 
+  refreshDeltas() {
+    this._cache.forEach((item) => {
+      void item.runDeltaAnalysis();
+    });
+  }
+
   /**
    * Get review cache item. (note that fileName is same as uri.fsPath)
    */
@@ -192,6 +198,10 @@ class CachingReviewer {
     this.setOrUpdate(document, csReview);
 
     return csReview;
+  }
+
+  refreshDeltas() {
+    this.reviewCache.refreshDeltas();
   }
 
   /**

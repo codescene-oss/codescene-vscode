@@ -64,8 +64,11 @@ async function startExtension(context: vscode.ExtensionContext) {
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context, csContext.aceApi);
-  csContext.aceApi.onDidChangeState((state) => {
-    CsExtensionState.setACEState(state);
+  csContext.aceApi.onDidChangeState((event) => {
+    CsExtensionState.setACEState(event);
+    if (event.state === 'enabled' || event.state === 'disabled') {
+      Reviewer.instance.refreshDeltas();
+    }
   });
 
   // send telemetry on activation (gives us basic usage stats)
