@@ -2,7 +2,7 @@ import { DocumentSelector, languages, Range, TextDocument } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { fileTypeToLanguageId, toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
-import { CsRefactoringRequests } from './cs-refactoring-requests';
+import { RefactoringRequest } from './request';
 import { PreFlightResponse, RefactorSupport } from './model';
 
 export interface FnToRefactor {
@@ -77,10 +77,9 @@ export class RefactoringCapabilities {
 
   initiateRefactoringForFunction(document: TextDocument, fnToRefactor: FnToRefactor) {
     if (languages.match(this.documentSelector, document) === 0) return;
-    const requests = CsRefactoringRequests.initiate(document, [fnToRefactor]);
-    return requests[0];
+    return new RefactoringRequest(fnToRefactor, document);
   }
-  
+
   private async supportedDistinctFnsToRefactor(document: TextDocument, refactoringTargets: RefactoringTarget[]) {
     if (languages.match(this.documentSelector, document) === 0) return;
     return await this.findFunctionsToRefactor(document, refactoringTargets);
@@ -155,4 +154,3 @@ function rangeFromEnclosingFn(enclosingFn: EnclosingFn) {
 
 // export for test
 export { rangeFromEnclosingFn, targetsInRange };
-

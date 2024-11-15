@@ -9,7 +9,7 @@ import { assertError, reportError } from '../utils';
 import { RefactoringAPI } from './api';
 import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { RefactoringRequest } from './request';
 import { createTmpDiffUriScheme } from './utils';
 
 /**
@@ -20,15 +20,14 @@ export interface AceAPI {
   enable: (context: vscode.ExtensionContext) => Promise<RefactoringCapabilities | undefined>;
   disable: () => void;
   onDidChangeState: vscode.Event<CsFeature & { refactorCapabilities?: RefactoringCapabilities }>;
-  onDidChangeRequests: vscode.Event<AceRequestEvent>;
+  onDidRefactoringRequest: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
 }
 
 export type AceRequestEvent = {
   document: vscode.TextDocument;
   type: 'start' | 'end';
-  request?: CsRefactoringRequest;
-  requests?: CsRefactoringRequest[];
+  request: RefactoringRequest;
 };
 
 /**
@@ -39,8 +38,8 @@ export function activate(): AceAPI {
     enable,
     disable,
     onDidChangeState: stateEmitter.event,
-    onDidChangeRequests: CsRefactoringRequests.onDidChangeRequests,
-    onDidRequestFail: CsRefactoringRequests.onDidRequestFail,
+    onDidRefactoringRequest: RefactoringRequest.onDidRefactoringRequest,
+    onDidRequestFail: RefactoringRequest.onDidRequestFail,
   };
 }
 

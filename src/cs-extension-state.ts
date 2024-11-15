@@ -130,11 +130,11 @@ export class CsExtensionState {
       aceApi.onDidRequestFail((error) => {
         CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
       }),
-      aceApi.onDidChangeRequests(async (evt) => {
-        // Reset credits error state when a request succeeds again
-        if (evt.type === 'end' && isDefined(evt.request)) {
+      aceApi.onDidRefactoringRequest(async (evt) => {
+        if (evt.type === 'end') {
           try {
             await evt.request.promise;
+            // Reset error state when a request succeeds again
             CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
           } catch (error) {}
         }

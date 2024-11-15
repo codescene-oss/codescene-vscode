@@ -5,9 +5,10 @@ import { getPortalUrl } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi, isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
+import Telemetry from '../telemetry';
 import { getFileExtension, isDefined, rangeStr } from '../utils';
-import { AceCredits, PreFlightResponse, RefactorConfidence, RefactorRequest, RefactorResponse } from './model';
 import { FnToRefactor } from './capabilities';
+import { AceCredits, PreFlightResponse, RefactorConfidence, RefactorRequest, RefactorResponse } from './model';
 
 const refactoringTimeout = 60000;
 
@@ -75,6 +76,7 @@ export class RefactoringAPI {
       signal,
     };
     logOutputChannel.debug(`Refactor request for ${logIdString(traceId, fnToRefactor)}`);
+    Telemetry.instance.logUsage('refactor/requested', { 'trace-id': traceId });
     try {
       const refactorResponse = await CsRestApi.instance.postRequest<RefactorResponse>(
         this.refactorUrl(),

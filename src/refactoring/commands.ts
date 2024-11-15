@@ -5,7 +5,7 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { isDefined } from '../utils';
 import { FnToRefactor } from './capabilities';
-import { CsRefactoringRequest, CsRefactoringRequests } from './cs-refactoring-requests';
+import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
 
 export class CsRefactoringCommands implements vscode.Disposable {
@@ -23,7 +23,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
   }
 
-  private presentRefactoringRequestCmd(request?: CsRefactoringRequest) {
+  private presentRefactoringRequestCmd(request?: RefactoringRequest) {
     if (!request) return;
     CodeSceneTabPanel.show(request);
   }
@@ -35,11 +35,11 @@ export class CsRefactoringCommands implements vscode.Disposable {
       return;
     }
 
-    const [request] = CsRefactoringRequests.initiate(document, [fnToRefactor]);
+    const request = new RefactoringRequest(fnToRefactor, document);
     this.presentRefactoringRequestCmd(request);
   }
 
-  private async applyRefactoringCmd(refactoring: CsRefactoringRequest) {
+  private async applyRefactoringCmd(refactoring: RefactoringRequest) {
     const {
       document,
       fnToRefactor,
@@ -66,7 +66,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     });
   }
 
-  private async showDiffForRefactoringCmd(refactoring: CsRefactoringRequest) {
+  private async showDiffForRefactoringCmd(refactoring: RefactoringRequest) {
     const {
       document,
       fnToRefactor: { range },
