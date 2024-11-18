@@ -1,4 +1,11 @@
-import { AxiosError, AxiosRequestConfig, AxiosResponseHeaders, isAxiosError, RawAxiosResponseHeaders } from 'axios';
+import {
+  AxiosError,
+  AxiosHeaderValue,
+  AxiosRequestConfig,
+  AxiosResponseHeaders,
+  isAxiosError,
+  RawAxiosResponseHeaders,
+} from 'axios';
 import * as vscode from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { getPortalUrl } from '../configuration';
@@ -67,16 +74,23 @@ export class RefactoringAPI {
     return request;
   }
 
-  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal?: AbortSignal) {
+  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal: AbortSignal, skipCache = false) {
+    logFetchRefactoringRequest(fnToRefactor, traceId, skipCache);
+    
+    const headers: Record<string, AxiosHeaderValue> = {
+      'x-codescene-trace-id': traceId,
+    };
+
+    if (skipCache) {
+      headers['Cache-Control'] = 'no-store';
+    }
+
     const config: AxiosRequestConfig = {
-      headers: {
-        'x-codescene-trace-id': traceId,
-      },
+      headers,
       timeout: refactoringTimeout,
       signal,
     };
-    logOutputChannel.debug(`Refactor request for ${logIdString(traceId, fnToRefactor)}`);
-    Telemetry.instance.logUsage('refactor/requested', { 'trace-id': traceId });
+
     try {
       const refactorResponse = await CsRestApi.instance.postRequest<RefactorResponse>(
         this.refactorUrl(),
@@ -88,21 +102,37 @@ export class RefactoringAPI {
       );
       return refactorResponse;
     } catch (error) {
-      if (error instanceof Error) {
-        logOutputChannel.error(`Refactor error for ${logIdString(traceId, fnToRefactor)}: ${error.message}`);
-        if (isAxiosError(error)) {
-          const msg = getErrorString(error);
-          const creditInfo = toCreditInfo(error.response?.headers);
-          // The refactoring API is designed to return 403 with some specific headers if the user has run out of credits
-          // Throw a specific error in this case, to be able to handle separately in CsExtensionState
-          if (isDefined(creditInfo)) {
-            throw new ACECreditsError(msg, creditInfo);
-          }
-        }
-      }
-      throw error;
+      errorHandler(error, traceId, fnToRefactor);
     }
   }
+}
+
+function logFetchRefactoringRequest(fnToRefactor: FnToRefactor, traceId: string, skipCache = false) {
+  logOutputChannel.debug(
+    `Refactor request for ${logIdString(traceId, fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
+  );
+  const evtData: any = { 'trace-id': traceId };
+  if (skipCache) evtData['skip-cache'] = true;
+  Telemetry.instance.logUsage('refactor/requested', evtData);
+}
+
+/**
+ * Logs error and rethrows it, adding credit info if available. NOTE the 'never' return - always throws!
+ */
+function errorHandler(error: unknown, traceId: string, fnToRefactor: FnToRefactor): never {
+  if (error instanceof Error) {
+    logOutputChannel.error(`Refactor error for ${logIdString(traceId, fnToRefactor)}: ${error.message}`);
+    if (isAxiosError(error)) {
+      const msg = getErrorString(error);
+      const creditInfo = toCreditInfo(error.response?.headers);
+      // The refactoring API is designed to return 403 with some specific headers if the user has run out of credits
+      // Throw a specific error in this case, to be able to handle separately in CsExtensionState
+      if (isDefined(creditInfo)) {
+        throw new ACECreditsError(msg, creditInfo);
+      }
+    }
+  }
+  throw error;
 }
 
 function getErrorString(err: AxiosError) {

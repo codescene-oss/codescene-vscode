@@ -28,14 +28,14 @@ export class CsRefactoringCommands implements vscode.Disposable {
     CodeSceneTabPanel.show(request);
   }
 
-  private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor?: FnToRefactor) {
+  private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor?: FnToRefactor, skipCache?: boolean) {
     if (!fnToRefactor) return;
     if (!CsExtensionState.acknowledgedAceUsage) {
       CodeSceneTabPanel.show({ document, fnToRefactor });
       return;
     }
 
-    const request = new RefactoringRequest(fnToRefactor, document);
+    const request = new RefactoringRequest(fnToRefactor, document, skipCache);
     this.presentRefactoringRequestCmd(request);
   }
 

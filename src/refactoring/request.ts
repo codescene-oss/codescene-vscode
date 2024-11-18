@@ -17,17 +17,17 @@ export class RefactoringRequest {
   promise: Promise<RefactorResponse>;
   private abortController: AbortController;
 
-  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument) {
+  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, skipCache = false) {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
     this.abortController = new AbortController();
-    this.promise = this.initiate();
+    this.promise = this.initiate(skipCache);
   }
 
-  private initiate() {
+  private initiate(skipCache: boolean) {
     this.promise = RefactoringAPI.instance
-      .fetchRefactoring(this.fnToRefactor, this.traceId, this.abortController.signal)
+      .fetchRefactoring(this.fnToRefactor, this.traceId, this.abortController.signal, skipCache)
       .then((response) => {
         return response;
       })
@@ -37,7 +37,7 @@ export class RefactoringRequest {
       })
       .finally(() => {
         // Fire updates for all finished requests
-        RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'end', request: this }); 
+        RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'end', request: this });
       });
     RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'start', request: this });
     return this.promise;

@@ -10,13 +10,24 @@ export function refactoringSummary(confidence: RefactorConfidence) {
     level,
     'recommended-action': { details: actionDetails, description: action },
   } = confidence;
-  const levelClass = `level-${level > 2 ? 'ok' : level}`;
+  return customRefactoringSummary(level, action, actionDetails);
+}
+
+export function customRefactoringSummary(level: number | 'error', action: string, actionDetails: string) {
+  const levelClass = `level-${level}`;
   return /*html*/ `
     <div class="refactoring-summary ${levelClass}">
       <div class="refactoring-summary-header ${levelClass}">${action}</div>
       <span>${actionDetails}</span>
+      ${level === 0 ? '<br>' + retryButton() : ''}
     </div>
     `;
+}
+
+function retryButton() {
+  return `<vscode-button id="retry-button" icon="sparkle" primary aria-label="Retry Auto-Refactor" title="Retry Auto-Refactor">
+            Retry Auto-Refactor
+          </vscode-button>`;
 }
 
 export function refactoringContent(response: RefactorResponse, languageId: string) {
@@ -24,7 +35,7 @@ export function refactoringContent(response: RefactorResponse, languageId: strin
   const code = { content: decoratedCode, languageId };
   const { level } = response.confidence;
   if (level === 0) {
-    return refactoringUnavailable();
+    return unverifiedRefactoring(response, code);
   } else if (level === 1) {
     return codeImprovementContent(response, code);
   }
@@ -77,17 +88,26 @@ function reasonsContent(response: RefactorResponse) {
     'reasons-with-details': reasonsWithDetails,
     confidence: { 'review-header': reviewHeader, level },
   } = response;
-  let reasonsList;
-  if (reasonsWithDetails && reasonsWithDetails.length > 0) {
-    const reasonText = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
-    reasonsList = /*html*/ `
-          <ul>${reasonText}</ul>
+  let reasons;
+  if (presentReasons(response)) {
+    const reasonLi = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
+    reasons = /*html*/ `
+          <ul>${reasonLi}</ul>
         `;
+  } else {
+    reasons =
+      "The LLMs couldn't provide an ideal refactoring due to the specific complexities of the code. Though not an endorsed solution, it is displayed as a guide to help refine your approach.";
   }
   // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
   const safeHeader = reviewHeader || 'Reasons for review';
   const isCollapsed = level > 2;
-  return collapsibleContent(safeHeader, reasonsList, isCollapsed);
+  return collapsibleContent(safeHeader, reasons, isCollapsed);
+}
+
+function presentReasons(response: RefactorResponse) {
+  return (
+    response.confidence.level !== 0 && response['reasons-with-details'] && response['reasons-with-details'].length > 0
+  );
 }
 
 function acceptAndRejectButtons() {
@@ -132,9 +152,16 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
     `;
 }
 
-export function refactoringUnavailable() {
+async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithLangId) {
   return /*html*/ `
-    <div class="refactoring-unavailable-content">
+    ${reasonsContent(response)}
+    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code))}
+  `;
+}
+
+export function refactoringError() {
+  return /*html*/ `
+    <div class="refactoring-error-content">
       <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement 
       guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
       <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a> 

@@ -1,7 +1,9 @@
 :root {
   --codeScene-green: #73c991;
   --codeScene-orange: #ee9d28;
-  --codeScene-red: #f14c4c;
+
+  /* unused, trying to use colors from the vscode coloring scheme */
+  --codeScene-red: #f14c4c; 
   --codeScene-blue: #66a8f5;
 }
 
@@ -42,16 +44,20 @@
   margin-top: 14px;
 }
 
+.refactoring-summary.level-error {
+  border-left-color: var(--vscode-errorForeground);
+}
 .refactoring-summary.level-0 {
-  border-left-color: var(--codeScene-red);
+  border-left-color: var(--vscode-descriptionForeground);
 }
 .refactoring-summary.level-1 {
-  border-left-color: var(--codeScene-blue);
+  border-left-color: var(--vscode-focusBorder);
 }
 .refactoring-summary.level-2 {
   border-left-color: var(--codeScene-orange);
 }
-.refactoring-summary.level-ok {
+.refactoring-summary.level-3,
+.refactoring-summary.level-4 {
   border-left-color: var(--codeScene-green);
 }
 
@@ -60,20 +66,24 @@
   font-weight: 600;
 }
 
-.refactoring-summary-header.level-0 {
-  color: var(--codeScene-red);
+.refactoring-summary-header.level-error {
+  color: var(--vscode-errorForeground);
 }
 .refactoring-summary-header.level-1 {
-  color: var(--codeScene-blue);
+  color: var(--vscode-focusBorder);
 }
 .refactoring-summary-header.level-2 {
   color: var(--codeScene-orange);
 }
-.refactoring-summary-header.level-ok {
+.refactoring-summary-header.level-3,
+.refactoring-summary-header.level-4 {
   color: var(--codeScene-green);
 }
 
-.refactoring-unavailable-content {
+.refactoring-error-content {
   margin-top: 12px;
 }
 
+#retry-button {
+  margin-top: 12px;
+}

@@ -11,10 +11,11 @@ import { commonResourceRoots } from '../webview-utils';
 import { functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
 import {
+  customRefactoringSummary,
   refactoringButton,
   refactoringContent,
+  refactoringError,
   refactoringSummary,
-  refactoringUnavailable,
 } from './webview/refactoring-components';
 import { renderHtmlTemplate } from './webview/utils';
 
@@ -91,11 +92,10 @@ export class CodeSceneTabPanel implements Disposable {
   }
 
   private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string) {
-    switch (command) {
-      case 'goto-function-location':
-        this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start);
-        return;
-      case 'apply':
+    const commands: { [key: string]: () => void } = {
+      gotoFunctionLocation: () =>
+        this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start),
+      apply: async () => {
         vscode.commands.executeCommand('codescene.applyRefactoring', refactoring).then(
           () => {
             this.dispose();
@@ -105,23 +105,34 @@ export class CodeSceneTabPanel implements Disposable {
             this.dispose();
           }
         );
-        return;
-      case 'reject':
+      },
+      reject: () => {
         this.deselectRefactoring(refactoring);
         this.dispose();
-        return;
-      case 'copy-code':
+      },
+      retry: async () => {
+        await vscode.commands.executeCommand(
+          'codescene.requestAndPresentRefactoring',
+          refactoring.document,
+          refactoring.fnToRefactor,
+          true
+        );
+      },
+      copyCode: async () => {
         await this.copyCode(refactoring);
-        return;
-      case 'show-diff':
+      },
+      showDiff: () => {
         void vscode.commands.executeCommand('codescene.showDiffForRefactoring', refactoring);
-        return;
-      case 'show-logoutput':
+      },
+      showLogoutput: () => {
         logOutputChannel.show();
-        return;
-      default:
-        throw new Error(`Command not implemented: "${command}"!`);
-    }
+      },
+    };
+
+    const cmd = commands[command];
+
+    if (!cmd) throw new Error(`Command not implemented: "${command}"!`);
+    cmd.call(this);
   }
 
   private deselectRefactoring(refactoring: RefactoringRequest) {
@@ -239,18 +250,11 @@ export class CodeSceneTabPanel implements Disposable {
       const actionHtml = `
         There was an error when performing this refactoring. 
         Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
-      const summaryContent = refactoringSummary({
-        level: 0,
-        title,
-        description: '',
-        'recommended-action': {
-          description: title,
-          details: actionHtml,
-        },
-      });
 
-      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: 0 });
-      this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringUnavailable()]);
+      const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
+
+      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: 'error' });
+      this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
     }
   }
 
