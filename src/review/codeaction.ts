@@ -34,14 +34,14 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     const actions: vscode.CodeAction[] = [];
     const diagnosticsInRange = diagnostics.filter((diagnostic) => diagnostic.range.contains(range));
 
-    const refactoringTargets: RefactoringTarget[] = diagnosticsInRange
+    const refactoringTargets = diagnosticsInRange
       .map((diagnostic) => {
         const category = getCsDiagnosticCode(diagnostic.code);
         if (!category) return;
         return {
           category,
           line: diagnostic.range.start.line + 1,
-        };
+        } as RefactoringTarget;
       })
       .filter(isDefined);
 

@@ -2,8 +2,8 @@ import { DocumentSelector, languages, Range, TextDocument } from 'vscode';
 import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
 import { fileTypeToLanguageId, toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
-import { RefactoringRequest } from './request';
 import { PreFlightResponse, RefactorSupport } from './model';
+import { RefactoringRequest } from './request';
 
 export interface FnToRefactor {
   name: string;
@@ -91,6 +91,8 @@ export class RefactoringCapabilities {
     );
 
     const distinctSupportedLines = new Set(supportedTargets.map((d: RefactoringTarget) => d.line));
+    if (distinctSupportedLines.size === 0) return;
+
     const enclosingFnsWithSupportedSmells = await findEnclosingFunctions(
       document.fileName,
       [...distinctSupportedLines],
