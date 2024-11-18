@@ -10,10 +10,11 @@ function sendMessage(command: string) {
 }
 
 function main() {
-  document.getElementById('function-location')?.addEventListener('click', () => sendMessage('goto-function-location'));
-  document.getElementById('diff-button')?.addEventListener('click', () => sendMessage('show-diff'));
+  document.getElementById('function-location')?.addEventListener('click', () => sendMessage('gotoFunctionLocation'));
+  document.getElementById('diff-button')?.addEventListener('click', () => sendMessage('showDiff'));
   document.getElementById('reject-button')?.addEventListener('click', () => sendMessage('reject'));
   document.getElementById('apply-button')?.addEventListener('click', () => sendMessage('apply'));
-  document.getElementById('copy-to-clipboard-button')?.addEventListener('click', () => sendMessage('copy-code'));
-  document.getElementById('show-logoutput-link')?.addEventListener('click', () => sendMessage('show-logoutput'));
+  document.getElementById('retry-button')?.addEventListener('click', () => sendMessage('retry'));
+  document.getElementById('copy-to-clipboard-button')?.addEventListener('click', () => sendMessage('copyCode'));
+  document.getElementById('show-logoutput-link')?.addEventListener('click', () => sendMessage('showLogoutput'));
 }
