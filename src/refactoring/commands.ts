@@ -99,16 +99,3 @@ export class CsRefactoringCommands implements vscode.Disposable {
     this.disposables = [];
   }
 }
-
-export const refactoringSymbol = '✨';
-const codeImprovementGuideSymbol = '🧐';
-export const pendingSymbol = '⏳';
-
-export function toConfidenceSymbol(level?: number) {
-  if (!isDefined(level)) return pendingSymbol;
-  if (level > 1) {
-    return refactoringSymbol;
-  } else if (level === 1) {
-    return codeImprovementGuideSymbol;
-  }
-}

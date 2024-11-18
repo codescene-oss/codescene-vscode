@@ -36,7 +36,12 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       this.view,
       vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
-      )
+      ),
+      DeltaAnalyser.instance.onDidAnalyse((event) => {
+        if (event.type === 'end') {
+          this.treeDataProvider.syncTree(event);
+        }
+      })
     );
   }
 
@@ -100,26 +105,17 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   }
 }
 
-class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeViewItem>, vscode.Disposable {
+class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeViewItem> {
   private treeDataChangedEmitter: vscode.EventEmitter<DeltaTreeViewItem | void> =
     new vscode.EventEmitter<DeltaTreeViewItem>();
   readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | void> = this.treeDataChangedEmitter.event;
 
-  private disposables: vscode.Disposable[] = [];
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
   public tree: Array<DeltaTreeViewItem> = [];
 
-  constructor() {
-    this.disposables.push(
-      DeltaAnalyser.instance.onDidAnalyse((event) => {
-        if (event.type === 'end') {
-          this.syncTree(event);
-        }
-      })
-    );
-  }
+  constructor() {}
 
-  update() {
+  private update() {
     if (this.fileIssueMap.size > 0) {
       // const statusItem = this.statusTreeItem();
       const filesWithIssues = Array.from(this.fileIssueMap.values());
@@ -131,8 +127,8 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
     this.treeDataChangedEmitter.fire(); // Fire this to refresh the tree view
   }
-  
-  private syncTree({ document, result }: DeltaAnalysisEvent) {
+
+  syncTree({ document, result }: DeltaAnalysisEvent) {
     // Find the tree item matching the event document
     const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
     if (fileWithIssues) {
@@ -222,9 +218,5 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   getParent(element: DeltaTreeViewItem): vscode.ProviderResult<DeltaTreeViewItem> {
     return element.parent;
-  }
-
-  dispose() {
-    this.disposables.forEach((d) => d.dispose());
   }
 }

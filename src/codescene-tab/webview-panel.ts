@@ -3,7 +3,6 @@ import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { FnToRefactor } from '../refactoring/capabilities';
-import { refactoringSymbol, toConfidenceSymbol } from '../refactoring/commands';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import Telemetry from '../telemetry';
@@ -223,7 +222,7 @@ export class CodeSceneTabPanel implements Disposable {
         confidence: { level, title },
       } = response;
 
-      const highlightCode = toConfidenceSymbol(level) === refactoringSymbol;
+      const highlightCode = level > 1;
       const editor = targetEditor(document);
       if (highlightCode && editor) {
         editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);

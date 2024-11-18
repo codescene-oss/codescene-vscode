@@ -10,7 +10,7 @@ export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codescene.codeHealthDetailsView', viewProvider),
-    vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo: DeltaFunctionInfo) =>
+    vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
       viewProvider.update(functionInfo)
     )
   );
