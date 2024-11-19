@@ -8,12 +8,36 @@
     font-weight: 600;
   }
 
-  p.dimmed {
+  p.fineprint {
     color: var(--vscode-descriptionForeground);
     margin-bottom: 0;
+    font-size: 11px;
+    text-align: center;
+    line-height: initial;
   }
 
-  #acknowledge-button {
-    margin-top: 8px;
+  .green {
+    color: var(--vscode-terminal-ansiBrightGreen);
+  }
+
+  ul {
+    padding-inline-start: 14px;
+    margin-bottom: 1.2em;
+  }
+
+  li {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .privacy-link {
+    margin: 8px 0;
+  }
+
+  .button-container {
+    display: flex;
+    margin: 14px 0 10px 0;
+    justify-content: center;
   }
 }
