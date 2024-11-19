@@ -26,9 +26,9 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
 
   const cssTags = [];
   cssTags.push(
-    cssTag(webView, ['out', 'codescene-tab', 'webview', 'styles.css']),
     cssTag(webView, ['assets', 'markdown-languages.css']),
     cssTag(webView, ['assets', 'highlight.css']),
+    cssTag(webView, ['out', 'codescene-tab', 'webview', 'styles.css']),
     cssTag(webView, ['out', 'codicons', 'codicon.css'], 'vscode-codicon-stylesheet') // NOTE - vscode-elements needs an id for the stylesheet tag ¯\_(ツ)_/¯
   );
 
@@ -56,7 +56,7 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
 
     <body>
         ${scriptTags.join('\n')}
-        <h2 class="cs-common">${title}</h2>
+        <h2>${title}</h2>
         ${Array.isArray(bodyContent) ? bodyContent.join('\n') : bodyContent}
     </body>
 

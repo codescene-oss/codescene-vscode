@@ -1,6 +1,22 @@
-h2.cs-common {
+body {
+  font-size: var(--vscode-font-size);
+  line-height: 18px;
+}
+
+h2 {
+  font-size: 18px;
   border: none;
-  margin-bottom: 2px;
+  margin: 20px 0 12px 0;
+}
+
+h3 {
+  font-size: 15px;
+  margin: 12px 0 10px 0;
+}
+
+h4 {
+  font-size: 14px;
+  margin: 0 0 8px 0;
 }
 
 .hidden {
@@ -62,5 +78,5 @@ h2.cs-common {
 .button-container {
   display: inline-flex;
   gap: 10px;
-  margin-top: 12px;
+  margin: 12px 0;
 }

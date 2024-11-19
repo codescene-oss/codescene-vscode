@@ -23,11 +23,6 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
   }
 
-  private presentRefactoringRequestCmd(request?: RefactoringRequest) {
-    if (!request) return;
-    CodeSceneTabPanel.show(request);
-  }
-
   private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor?: FnToRefactor, skipCache?: boolean) {
     if (!fnToRefactor) return;
     if (!CsExtensionState.acknowledgedAceUsage) {
@@ -36,7 +31,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     }
 
     const request = new RefactoringRequest(fnToRefactor, document, skipCache);
-    this.presentRefactoringRequestCmd(request);
+    CodeSceneTabPanel.show(request);
   }
 
   private async applyRefactoringCmd(refactoring: RefactoringRequest) {

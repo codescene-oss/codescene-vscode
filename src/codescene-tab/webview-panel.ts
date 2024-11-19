@@ -192,14 +192,24 @@ export class CodeSceneTabPanel implements Disposable {
 
     const ackContent = /*html*/ `
       <div class="ace-acknowledgement-container">
-        <p class="header">CodeScene ACE - AI-Powered Refactoring</p>
-        <p>CodeScene ACE combines multiple LLMs with fact-based validation. ACE chooses the best LLM for the job, 
-        validates its output, and proposes refactoring for cleaner code which is easier to maintain.</p>
+        <h4>CodeScene ACE - AI-Powered Refactoring</h4>
+        <p><a href="https://codescene.com/product/ai-coding">CodeScene ACE</a> combines multiple LLMs with fact-based validation. 
+        ACE chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier 
+        to maintain.</p>
         <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a proven business impact.</p>
-        <a href="https://codescene.com/product/ace/principles">View CodeScene's AI Privacy Principles</a><br>
-        <vscode-button id="acknowledge-button">Show me CodeScene ACE</vscode-button>
-        <hr>
-        <p class="dimmed">You can disable CodeScene ACE anytime in settings.</p>
+
+        <ul>
+          <li><span class="codicon codicon-check green"></span> Your code is never stored by us or the LLMs</li>
+          <li><span class="codicon codicon-check green"></span> Your code is only shared with carefully selected LLMs</li>
+          <li><span class="codicon codicon-check green"></span> Your code is not used to train any LLM</li>
+          <li><span class="codicon codicon-check green"></span> All communication with CodeScene ACE is fully encrypted</li>
+        </ul>
+
+        <a href="https://codescene.com/product/ace/principles" class="privacy-link">View CodeScene's AI Privacy Principles</a><br>
+        <div class="button-container">
+          <vscode-button id="acknowledge-button">Show me CodeScene ACE</vscode-button>
+        </div>
+        <p class="fineprint">You can disable CodeScene ACE anytime in settings.</p>
       </div>
     `;
 
