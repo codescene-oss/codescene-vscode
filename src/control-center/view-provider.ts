@@ -42,41 +42,38 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
   }
 
   private handleMessages(message: any) {
-    switch (message.command) {
-      case 'open-settings':
-        void vscode.commands.executeCommand(
-          'workbench.action.openWorkspaceSettings',
-          '@ext:codescene.codescene-vscode'
-        );
-        return;
-      case 'show-code-health-analysis-error':
-      case 'show-ace-error':
-        logOutputChannel.show();
-        return;
-      case 'open-ai-pricing':
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ai-coding#pricing'));
-        return;
-      case 'open-documentation':
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs'));
-        return;
-      case 'open-terms-and-policies':
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/policies'));
-        return;
-      case 'open-ai-privacy-principles':
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ace/principles'));
-        return;
-      case 'open-contact-codescene':
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/company/contact-us'));
-        return;
-      case 'raise-support-ticket':
-        void vscode.env.openExternal(vscode.Uri.parse('https://supporthub.codescene.com/kb-tickets/new'));
-        return;
-      case 'copy-machine-id':
+    const commands: { [key: string]: () => void } = {
+      openAiPricing: () =>
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ai-coding#pricing')),
+      showLogOutput: () => logOutputChannel.show(),
+      openSettings: () =>
+        vscode.commands
+          .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode')
+          .then(
+            () => {},
+            (err) => {
+              logOutputChannel.info('Not inside a workspace, opening general/user settings instead.');
+              void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+            }
+          ),
+      openDocumentation: () => void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs')),
+      openTermsAndPolicies: () => void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/policies')),
+      openAiPrivacyPrinciples: () =>
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ace/principles')),
+      openContactCodescene: () =>
+        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/company/contact-us')),
+      raiseSupportTicket: () =>
+        void vscode.env.openExternal(vscode.Uri.parse('https://supporthub.codescene.com/kb-tickets/new')),
+      copyMachineId: () =>
         void vscode.env.clipboard.writeText(vscode.env.machineId).then(() => {
           void vscode.window.showInformationMessage('Copied machine-id to clipboard.');
-        });
-        return;
-    }
+        }),
+    };
+
+    const cmd = commands[message.command];
+
+    if (!cmd) throw new Error(`Command not implemented: "${message.command}"!`);
+    cmd.call(this);
   }
 
   update() {
