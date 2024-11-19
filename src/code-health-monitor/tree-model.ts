@@ -148,36 +148,23 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
       arguments: [this],
     };
 
-    if (this.isRefactoringSupported) {
-      this.presentAsRefactorable(item);
-    } else {
-      this.presentAsDefault(item);
-    }
+    item.iconPath = new vscode.ThemeIcon('symbol-function');
+    item.description = this.isRefactoringSupported ? 'Auto-Refactor' : undefined;
+    item.tooltip = this.tooltip();
     return item;
   }
 
-  private tooltip(refactorable?: boolean) {
+  private tooltip() {
     const issues = issuesCount(this.children);
     const tips = [`Function "${this.fnName}"`];
 
     issues && tips.push(`Contains ${issues} ${pluralize('issue', issues)} degrading code health`);
-    refactorable && tips.push('Auto-refactor available');
+    this.isRefactoringSupported && tips.push('Auto-refactor available');
     return tips.join(' • ');
   }
 
   public get isRefactoringSupported() {
     return isDefined(this.fnToRefactor);
-  }
-
-  private presentAsDefault(item: vscode.TreeItem) {
-    item.iconPath = new vscode.ThemeIcon('symbol-function');
-    item.tooltip = this.tooltip();
-  }
-
-  private presentAsRefactorable(item: vscode.TreeItem) {
-    item.iconPath = new vscode.ThemeIcon('sparkle');
-    item.description = 'Auto-Refactor';
-    item.tooltip = this.tooltip(true);
   }
 }
 

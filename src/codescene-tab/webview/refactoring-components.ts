@@ -174,11 +174,11 @@ export function refactoringButton(refactoring?: FnToRefactor) {
   if (!refactoring) {
     return /* html */ `
       <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
-        Auto-refactor
+        Auto-Refactor
       </vscode-button>`;
   }
   return /* html */ `
     <vscode-button id="refactoring-button" icon="sparkle" primary>
-      Auto-refactor
+      Auto-Refactor
     </vscode-button>`;
 }
