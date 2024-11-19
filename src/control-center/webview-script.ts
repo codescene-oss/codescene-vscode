@@ -8,21 +8,21 @@ function sendMessage(command: string, data?: object) {
 
 function main() {
   // Account
-  addClickListenerToElementById('upgrade-link', () => sendMessage('open-ai-pricing'));
+  addClickListenerToElementById('upgrade-link', () => sendMessage('openAiPricing'));
 
   // Status
-  addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('show-code-health-analysis-error'));
+  addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('showLogOutput'));
   addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('show-ace-error'));
 
   // More
-  addClickListenerToElementById('codescene-settings', () => sendMessage('open-settings'));
-  addClickListenerToElementById('documentation', () => sendMessage('open-documentation'));
-  addClickListenerToElementById('terms-and-policies', () => sendMessage('open-terms-and-policies'));
-  addClickListenerToElementById('privacy-principles', () => sendMessage('open-ai-privacy-principles'));
-  addClickListenerToElementById('contact-codescene', () => sendMessage('open-contact-codescene'));
-  addClickListenerToElementById('support-ticket-link', () => sendMessage('raise-support-ticket'));
+  addClickListenerToElementById('codescene-settings', () => sendMessage('openSettings'));
+  addClickListenerToElementById('documentation', () => sendMessage('openDocumentation'));
+  addClickListenerToElementById('terms-and-policies', () => sendMessage('openTermsAndPolicies'));
+  addClickListenerToElementById('privacy-principles', () => sendMessage('openAiPrivacyPrinciples'));
+  addClickListenerToElementById('contact-codescene', () => sendMessage('openContactCodescene'));
+  addClickListenerToElementById('support-ticket-link', () => sendMessage('raiseSupportTicket'));
 
-  addClickListenerToElementById('machine-id', () => sendMessage('copy-machine-id'));
+  addClickListenerToElementById('machine-id', () => sendMessage('copyMachineId'));
 }
 
 function addClickListenerToElementById(elementId: string, listener: () => void) {
