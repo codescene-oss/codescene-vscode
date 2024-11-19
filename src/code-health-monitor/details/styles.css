@@ -2,6 +2,15 @@ body {
   line-height: 20px;
 }
 
+h2 {
+  font-size: 16px;
+  margin: 4px 0;
+}
+
+a:focus {
+  outline: none;
+}
+
 .flex-row {
   display: flex;
   gap: 6px;
@@ -15,11 +24,16 @@ body {
 }
 
 .block {
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
-.function-info {
+.color-red {
+  color: var(--vscode-errorForeground);
+}
+
+.function-summary {
   margin-top: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .function-name {
@@ -27,7 +41,7 @@ body {
   font-weight: bold;
 }
 
-.function-coordinate {
+.filename-and-smell {
   gap: 10px;
 }
 
@@ -35,12 +49,7 @@ body {
   margin-bottom: 14px;
 }
 
-.issue-details {
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  padding-top: 20px;
-}
-
-.issue-icon-link {
-  color: var(--vscode-foreground);
-  line-height: 0;
+.issue-link {
+  font-weight: bold;
+  text-decoration: none;
 }

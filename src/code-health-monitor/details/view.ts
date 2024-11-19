@@ -112,8 +112,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private functionInfoContent(functionInfo: DeltaFunctionInfo) {
     return `
-    ${this.fileAndFunctionInfo(functionInfo)}
-    ${this.functionDescription(functionInfo)}
+    ${this.fileAndCodeSmellSummary(functionInfo)}
     <div class="block">
       ${refactoringButton(functionInfo.fnToRefactor)}
     </div>
@@ -121,32 +120,19 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     `;
   }
 
-  private fileAndFunctionInfo(functionInfo: DeltaFunctionInfo) {
+  private fileAndCodeSmellSummary(functionInfo: DeltaFunctionInfo) {
     const fileName = basename(functionInfo.parent.document.uri.fsPath);
+    const smellInfo =
+      functionInfo.children.length === 1 ? functionInfo.children[0].changeDetail.category : 'Multiple Code Smells';
     return /*html*/ `
-      <div class="block function-info">
-        <div class="function-name flex-row large"><span class="codicon codicon-symbol-method"></span><span>${functionInfo.fnName}</span></div>
-        <div class="function-coordinate flex-row">
+      <div class="block function-summary">
+        <h2>${functionInfo.fnName}</h2>
+        <div class="flex-row filename-and-smell">
           <div class="flex-row">${fileName}</div> <!-- TODO seti file type theme icon ? -->
-          <div class="flex-row"><span class="codicon codicon-list-flat"></span> Line:${functionInfo.range.start.line}</div>
+          <div class="flex-row"><span class="codicon codicon-warning"></span> ${smellInfo}</div>
         </div>
       </div>
     `;
-  }
-
-  private functionDescription(functionInfo: DeltaFunctionInfo) {
-    const categories = functionInfo.children.map((issue) => issue.changeDetail.category);
-    const description =
-      categories.length > 0 &&
-      /*html*/ `
-      <div class="block">
-        <p>CodeScene identified the following code ${pluralize('smell', categories.length)}: <strong>${categories.join(
-        ', '
-      )}</strong> resulting in a decline in Code Health.
-        </p>
-      </div>`;
-
-    return description ? description : '';
   }
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {
@@ -154,9 +140,9 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
       (issue, ix) => /*html*/ `
       <div class="issue">
         <div class="flex-row">
-          <span class="codicon codicon-warning"></span> 
-          <strong>${issue.changeDetail.category}</strong>
-          <a href="" class="issue-icon-link" issue-index="${ix}"><span class="codicon codicon-link-external"></span></a>
+          <span class="codicon codicon-chrome-close color-red"></span> 
+          <strong>${capitalize(issue.changeDetail['change-type'])}: </strong>
+          <a href="" class="issue-link" issue-index="${ix}">${issue.changeDetail.category}</a>
         </div>
         ${issue.changeDetail.description}
       </div>
@@ -168,4 +154,8 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         ${issueDetails.join('')}
       </div>`;
   }
+}
+
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
