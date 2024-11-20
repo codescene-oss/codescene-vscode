@@ -15,19 +15,19 @@ export class RefactoringRequest {
 
   readonly traceId: string;
   promise: Promise<RefactorResponse>;
-  private abortController: AbortController;
+  private abortController = new AbortController();
+  readonly signal = this.abortController.signal;
 
-  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, skipCache = false) {
+  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, readonly skipCache = false) {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
-    this.abortController = new AbortController();
-    this.promise = this.initiate(skipCache);
+    this.promise = this.initiate();
   }
 
-  private initiate(skipCache: boolean) {
+  private initiate() {
     this.promise = RefactoringAPI.instance
-      .fetchRefactoring(this.fnToRefactor, this.traceId, this.abortController.signal, skipCache)
+      .fetchRefactoring(this)
       .then((response) => {
         return response;
       })
@@ -41,6 +41,12 @@ export class RefactoringRequest {
       });
     RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'start', request: this });
     return this.promise;
+  }
+
+  get eventData() {
+    const eventData: any = { 'trace-id': this.traceId };
+    if (this.skipCache) eventData['skip-cache'] = true;
+    return eventData;
   }
 
   abort() {

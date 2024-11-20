@@ -249,7 +249,7 @@ export class CodeSceneTabPanel implements Disposable {
         editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
       }
 
-      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: level });
+      Telemetry.instance.logUsage('refactor/presented', { confidence: level, ...refactoring.eventData });
       this.updateRefactoringContent(title, [
         fnLocContent,
         refactoringSummary(response.confidence),
@@ -263,7 +263,7 @@ export class CodeSceneTabPanel implements Disposable {
 
       const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
 
-      Telemetry.instance.logUsage('refactor/presented', { 'trace-id': refactoring.traceId, confidence: 'error' });
+      Telemetry.instance.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
     }
   }

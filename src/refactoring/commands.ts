@@ -23,7 +23,11 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
   }
 
-  private async requestAndPresentRefactoringCmd(document: vscode.TextDocument, fnToRefactor?: FnToRefactor, skipCache?: boolean) {
+  private async requestAndPresentRefactoringCmd(
+    document: vscode.TextDocument,
+    fnToRefactor?: FnToRefactor,
+    skipCache?: boolean
+  ) {
     if (!fnToRefactor) return;
     if (!CsExtensionState.acknowledgedAceUsage) {
       CodeSceneTabPanel.show({ document, fnToRefactor });
@@ -57,7 +61,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
       // Immediately trigger a re-review of the new file-content
       // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
       CsDiagnostics.review(document);
-      Telemetry.instance.logUsage('refactor/applied', { 'trace-id': refactoring.traceId });
+      Telemetry.instance.logUsage('refactor/applied', refactoring.eventData);
     });
   }
 
@@ -86,7 +90,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
 
-    Telemetry.instance.logUsage('refactor/diff-shown', { 'trace-id': refactoring.traceId });
+    Telemetry.instance.logUsage('refactor/diff-shown', refactoring.eventData);
   }
 
   dispose() {

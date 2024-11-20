@@ -16,6 +16,7 @@ import Telemetry from '../telemetry';
 import { getFileExtension, isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './capabilities';
 import { AceCredits, PreFlightResponse, RefactorConfidence, RefactorRequest, RefactorResponse } from './model';
+import { RefactoringRequest } from './request';
 
 const refactoringTimeout = 60000;
 
@@ -74,11 +75,13 @@ export class RefactoringAPI {
     return request;
   }
 
-  async fetchRefactoring(fnToRefactor: FnToRefactor, traceId: string, signal: AbortSignal, skipCache = false) {
-    logFetchRefactoringRequest(fnToRefactor, traceId, skipCache);
-    
+  async fetchRefactoring(request: RefactoringRequest) {
+    logFetchRefactoringRequest(request);
+
+    const { traceId, fnToRefactor, signal, skipCache } = request;
+
     const headers: Record<string, AxiosHeaderValue> = {
-      'x-codescene-trace-id': traceId,
+      'x-codescene-trace-id': request.traceId,
     };
 
     if (skipCache) {
@@ -107,13 +110,12 @@ export class RefactoringAPI {
   }
 }
 
-function logFetchRefactoringRequest(fnToRefactor: FnToRefactor, traceId: string, skipCache = false) {
+function logFetchRefactoringRequest(request: RefactoringRequest) {
+  const { traceId, fnToRefactor, skipCache, eventData } = request;
   logOutputChannel.debug(
     `Refactor request for ${logIdString(traceId, fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
   );
-  const evtData: any = { 'trace-id': traceId };
-  if (skipCache) evtData['skip-cache'] = true;
-  Telemetry.instance.logUsage('refactor/requested', evtData);
+  Telemetry.instance.logUsage('refactor/requested', eventData);
 }
 
 /**
