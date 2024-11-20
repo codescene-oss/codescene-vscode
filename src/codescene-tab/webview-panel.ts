@@ -196,13 +196,15 @@ export class CodeSceneTabPanel implements Disposable {
         <p><a href="https://codescene.com/product/ai-coding">CodeScene ACE</a> combines multiple LLMs with fact-based validation. 
         ACE chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier 
         to maintain.</p>
-        <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a proven business impact.</p>
+        <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a 
+        <a href="https://codescene.com/hubfs/web_docs/Business-impact-of-code-quality.pdf?utm_campaign=AI Coding&utm_source=IDE&utm_medium=extension&utm_content=code-red">
+        proven business impact</a>.</p>
 
         <ul>
           <li><span class="codicon codicon-check green"></span> Your code is never stored by us or the LLMs</li>
-          <li><span class="codicon codicon-check green"></span> Your code is only shared with carefully selected LLMs</li>
+          <li><span class="codicon codicon-check green"></span> Your code snippets are shared only with select LLMs</li>
           <li><span class="codicon codicon-check green"></span> Your code is not used to train any LLM</li>
-          <li><span class="codicon codicon-check green"></span> All communication with CodeScene ACE is fully encrypted</li>
+          <li><span class="codicon codicon-check green"></span> All communications with CodeScene ACE is fully encrypted</li>
         </ul>
 
         <a href="https://codescene.com/product/ace/principles" class="privacy-link">View CodeScene's AI Privacy Principles</a><br>
