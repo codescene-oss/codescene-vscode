@@ -283,12 +283,6 @@ export class CodeSceneTabPanel implements Disposable {
     const { issueInfo, document } = params;
     const title = issueInfo.category;
 
-    const fnLocContent = functionLocationContent({
-      filePath: document.uri.fsPath,
-      position: issueInfo.position,
-      fnName: issueInfo.fnName,
-    });
-
     let fnToRefactor = params.fnToRefactor;
     // If we haven't been provided with a function to refactor, try to find one
     // This is the case when presenting documentation from a codelens or codeaction,
@@ -300,6 +294,12 @@ export class CodeSceneTabPanel implements Disposable {
         ])
       )?.[0];
     }
+
+    const fnLocContent = functionLocationContent({
+      filePath: document.uri.fsPath,
+      position: issueInfo.position,
+      fnName: issueInfo.fnName || fnToRefactor?.name,
+    });
 
     const buttonContent = `
       <div class="button-container">
