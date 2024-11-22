@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.0...v0.9.1) (2024-11-22)
+
+
+### Features
+
+* **ace:** Change refactoring behaviour to on-demand only ([aa07f6d](https://github.com/codescene-oss/codescene-vscode/commit/aa07f6d354266d4f30eedf4a63f8dbe44ddacc7b))
+* **refactoring:** Add an acknowledgement view the first time a refactoring is requested ([223caa4](https://github.com/codescene-oss/codescene-vscode/commit/223caa475c937c95b59cc3ed4e4b074a17b02e12))
+
+
+### Bug fixes
+
+* **control-center:** Opening settings outside of a workspace ([ef292cf](https://github.com/codescene-oss/codescene-vscode/commit/ef292cf1935112f34aa6ff6691fe46c8aa94425f))
+* **refactoring:** Bug in supported code smells check ([57299cd](https://github.com/codescene-oss/codescene-vscode/commit/57299cd37135243f8b3aa667f0c544684cb46974))
+* **statusbar:** Analysis keeps running on startup ([fb88e38](https://github.com/codescene-oss/codescene-vscode/commit/fb88e3817ab849598bbb936197b5eb0e09f71a98))
+
 ## [0.9.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.7.10...v0.9.0) (2024-11-06)
 
 
