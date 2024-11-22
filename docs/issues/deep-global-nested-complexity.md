@@ -1,3 +1,0 @@
-The code contains deeply nested code in its global scope, i.e. code outside functions. Nesting is logical control structures such as if statements or loops. The deeper the nesting, the lower the code health.
-
-Deep nested logic increases the cognitive load on the programmer reading the code. The human working memory has a typical maximum capacity of 3-4 items; beyond that threshold, we struggle with keeping things in our head. Consequently, deep nested logic has a strong correlation to defects and accounts for roughly 20% of all programming mistakes.
