@@ -88,26 +88,20 @@ function reasonsContent(response: RefactorResponse) {
     'reasons-with-details': reasonsWithDetails,
     confidence: { 'review-header': reviewHeader, level },
   } = response;
+
   let reasons;
-  if (presentReasons(response)) {
-    const reasonLi = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`).join('\n');
-    reasons = /*html*/ `
-          <ul>${reasonLi}</ul>
-        `;
-  } else {
+  if (response.confidence.level === 0) {
     reasons =
       "The LLMs couldn't provide an ideal refactoring due to the specific complexities of the code. Though not an endorsed solution, it is displayed as a guide to help refine your approach.";
+  } else {
+    const reasonListItems = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`);
+    reasons = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
   }
+
   // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
   const safeHeader = reviewHeader || 'Reasons for review';
   const isCollapsed = level > 2;
-  return collapsibleContent(safeHeader, reasons, isCollapsed);
-}
-
-function presentReasons(response: RefactorResponse) {
-  return (
-    response.confidence.level !== 0 && response['reasons-with-details'] && response['reasons-with-details'].length > 0
-  );
+  return reasons ? collapsibleContent(safeHeader, reasons, isCollapsed) : '';
 }
 
 function acceptAndRejectButtons() {
@@ -182,3 +176,5 @@ export function refactoringButton(refactoring?: FnToRefactor) {
       Auto-Refactor
     </vscode-button>`;
 }
+
+export { reasonsContent };
