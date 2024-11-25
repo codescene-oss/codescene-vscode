@@ -34,25 +34,41 @@ export function functionLocationContent({
   position,
   filePath,
   fnName,
+  isStale,
 }: {
   position: Position;
   filePath: string;
   fnName?: string;
+  isStale?: boolean;
 }) {
   const fileName = basename(filePath);
 
   const fnNameHtml = fnName
     ? `<span class="codicon codicon-symbol-method"></span>
-      ${fnName}`
+       <span class="${isStale ? 'strikeout' : ''}">${fnName}</span>`
     : '';
 
   return /*html*/ `
     <div id="function-location" class="flex-row">
       <span class="file-name">${fileName}</span>
       ${fnNameHtml}
-      <span class="line-no">[Ln ${position.line + 1}]</span>
+      <span class="line-no ${isStale ? 'strikeout' : ''}">[Ln ${position.line + 1}]</span>
     </div>
     <hr>
+    `;
+}
+
+export function fileChangesDetectedContent(description: string) {
+  return /*html*/ `
+    <div class="file-changes-detected">
+      <div class="codicon codicon-warning warning-icon"></div>
+      <div class="content">
+        <div class="header">File Changes Detected</div>
+        <span>${description}</span>
+        <vscode-button id="close-button" icon="close" secondary aria-label="Close" title="Close">Close Panel</vscode-button>
+        </div>
+      </div>
+    </div>
     `;
 }
 

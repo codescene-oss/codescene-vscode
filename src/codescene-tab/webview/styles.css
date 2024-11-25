@@ -27,6 +27,10 @@ h4 {
   cursor: pointer;
 }
 
+.strikeout {
+  text-decoration: line-through;
+}
+
 .flex-row {
   display: flex;
   gap: 4px;
@@ -54,6 +58,35 @@ h4 {
 
 #function-location:hover {
   background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.file-changes-detected {
+  background-color: var(--vscode-textCodeBlock-background);
+  border-left: 2px solid var(--vscode-editorWarning-foreground);
+  padding: 10px 14px;
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+
+  .warning-icon {
+    color: var(--vscode-editorWarning-foreground);
+    padding-top: 5px;
+  }
+
+  div.content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  div.header {
+    font-weight: 600;
+  }
+
+  #close-button {
+    margin-top: 6px;
+  }
 }
 
 .expand-indicator {

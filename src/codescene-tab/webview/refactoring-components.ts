@@ -30,7 +30,7 @@ function retryButton() {
           </vscode-button>`;
 }
 
-export function refactoringContent(response: RefactorResponse, languageId: string) {
+export function refactoringContent(response: RefactorResponse, languageId: string, isStale: boolean) {
   const decoratedCode = decorateCode(response, languageId);
   const code = { content: decoratedCode, languageId };
   const { level } = response.confidence;
@@ -39,7 +39,7 @@ export function refactoringContent(response: RefactorResponse, languageId: strin
   } else if (level === 1) {
     return codeImprovementContent(response, code);
   }
-  return autoRefactorContent(response, code);
+  return autoRefactorContent(response, code, isStale);
 }
 
 type Code = {
@@ -74,9 +74,9 @@ async function codeSmellsGuide(codeSmell: string) {
     `;
 }
 
-async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId) {
+async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId, isStale: boolean) {
   const content = /*html*/ `
-        ${acceptAndRejectButtons()}
+        ${isStale ? '' : acceptAndRejectButtons()}
         ${reasonsContent(response)}
         ${collapsibleContent('Refactored code', await codeContainerContent(code))}
     `;

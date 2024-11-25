@@ -39,7 +39,6 @@
 .refactoring-summary {
   background-color: var(--vscode-textCodeBlock-background);
   border-left: 2px solid var(--vscode-textCodeBlock-background);
-  font-size: 12px;
   padding: 10px 14px;
   margin-top: 14px;
 }
@@ -62,7 +61,6 @@
 }
 
 .refactoring-summary-header {
-  text-transform: uppercase;
   font-weight: 600;
 }
 

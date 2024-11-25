@@ -8,7 +8,7 @@ import { decorateCode, targetEditor } from '../refactoring/utils';
 import Telemetry from '../telemetry';
 import { isError } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
-import { functionLocationContent } from './webview/components';
+import { fileChangesDetectedContent, functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
 import {
   customRefactoringSummary,
@@ -24,7 +24,9 @@ interface ShowAceAcknowledgement {
   fnToRefactor: FnToRefactor;
 }
 
-type CodeSceneTabPanelParams = InteractiveDocsParams | RefactoringRequest | ShowAceAcknowledgement;
+type CodeSceneTabPanelParams = (InteractiveDocsParams | RefactoringRequest | ShowAceAcknowledgement) & {
+  isStale?: boolean;
+};
 
 export class CodeSceneTabPanel implements Disposable {
   private static _instance: CodeSceneTabPanel | undefined;
@@ -52,26 +54,52 @@ export class CodeSceneTabPanel implements Disposable {
       }
     );
     this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
-    this.webViewPanel.webview.onDidReceiveMessage(
-      async (message) => {
-        try {
-          if (!this.state) return;
-          if (this.state instanceof RefactoringRequest) {
-            await this.handleRefactoringMessage(this.state, message.command);
-          } else if (isInteractiveDocsParams(this.state)) {
-            await this.handleDocumentationMessage(this.state, message.command);
-          } else {
-            await this.handleAceAcknowledgementMessage(this.state, message.command);
-          }
-        } catch (error) {
-          if (!isError(error)) return;
-          void vscode.window.showErrorMessage(error.message);
-          logOutputChannel.error(error.message);
+    this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
+    vscode.workspace.onDidChangeTextDocument(
+      (e) => {
+        if (!this.state) return;
+        const { document, fnToRefactor } = this.state;
+        if (document !== e.document || e.contentChanges.length === 0) return;
+        const isStale = this.isFunctionUnchangedInDocument(document, fnToRefactor);
+
+        // (cast this.state.isStale to boolean to avoid a first glitch when changing state from undefined to false)
+        if (isStale !== !!this.state.isStale) {
+          this.state.isStale = isStale;
+          void this.updateWebView(this.state);
         }
       },
       this,
       this.disposables
     );
+  }
+
+  private isFunctionUnchangedInDocument(document: vscode.TextDocument, fnToRefactor?: FnToRefactor) {
+    if (!fnToRefactor) return false;
+    const contentAtRange = document.getText(fnToRefactor.range);
+    if (contentAtRange === fnToRefactor.content) return false;
+    if (document.getText().indexOf(fnToRefactor.content) >= 0) return false;
+    return true;
+  }
+
+  private async handleMessages(message: any) {
+    try {
+      if (!this.state) return;
+      if (message.command === 'close') {
+        this.dispose();
+        return;
+      }
+      if (this.state instanceof RefactoringRequest) {
+        await this.handleRefactoringMessage(this.state, message.command);
+      } else if (isInteractiveDocsParams(this.state)) {
+        await this.handleDocumentationMessage(this.state, message.command);
+      } else {
+        await this.handleAceAcknowledgementMessage(this.state, message.command);
+      }
+    } catch (error) {
+      if (!isError(error)) return;
+      void vscode.window.showErrorMessage(error.message);
+      logOutputChannel.error(error.message);
+    }
   }
 
   private async handleAceAcknowledgementMessage(ackParams: ShowAceAcknowledgement, command: string) {
@@ -170,13 +198,13 @@ export class CodeSceneTabPanel implements Disposable {
     void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
   }
 
-  private async updateWebView(params: InteractiveDocsParams | RefactoringRequest | ShowAceAcknowledgement) {
+  private async updateWebView(params: CodeSceneTabPanelParams) {
     this.state = params;
     if (params instanceof RefactoringRequest) {
-      await this.presentRefactoring(params);
+      await this.presentRefactoring(params, params.isStale);
       return;
     } else if (isInteractiveDocsParams(params)) {
-      await this.presentDocumentation(params);
+      await this.presentDocumentation(params, params.isStale);
       return;
     } else {
       this.presentAceAcknowledgement(params.fnToRefactor);
@@ -223,13 +251,14 @@ export class CodeSceneTabPanel implements Disposable {
     });
   }
 
-  private async presentRefactoring(refactoring: RefactoringRequest) {
+  private async presentRefactoring(refactoring: RefactoringRequest, isStale = false) {
     const { fnToRefactor, promise, document } = refactoring;
 
     const fnLocContent = functionLocationContent({
       filePath: fnToRefactor.filePath,
       position: fnToRefactor.range.start,
       fnName: fnToRefactor.name,
+      isStale,
     });
 
     this.updateRefactoringContent('Refactoring...', [
@@ -245,17 +274,22 @@ export class CodeSceneTabPanel implements Disposable {
         confidence: { level, title },
       } = response;
 
-      const highlightCode = level > 1;
+      const highlightCode = !isStale && level > 1;
       const editor = targetEditor(document);
       if (highlightCode && editor) {
         editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
       }
+      const summaryContent = !isStale
+        ? refactoringSummary(response.confidence)
+        : fileChangesDetectedContent(
+            'The function has been changed, so the refactoring might no longer apply. If the change was intentional, please reopen the panel to have ACE refactor the latest state of the function. If not, you might want to undo your changes.'
+          );
 
       Telemetry.instance.logUsage('refactor/presented', { confidence: level, ...refactoring.eventData });
       this.updateRefactoringContent(title, [
         fnLocContent,
-        refactoringSummary(response.confidence),
-        await refactoringContent(response, document.languageId),
+        summaryContent,
+        await refactoringContent(response, document.languageId, isStale),
       ]);
     } catch (error) {
       const title = 'Refactoring Failed';
@@ -279,7 +313,7 @@ export class CodeSceneTabPanel implements Disposable {
     });
   }
 
-  private async presentDocumentation(params: InteractiveDocsParams) {
+  private async presentDocumentation(params: InteractiveDocsParams, isStale = false) {
     const { issueInfo, document } = params;
     const title = issueInfo.category;
 
@@ -299,17 +333,25 @@ export class CodeSceneTabPanel implements Disposable {
       filePath: document.uri.fsPath,
       position: issueInfo.position,
       fnName: issueInfo.fnName || fnToRefactor?.name,
+      isStale,
     });
 
-    const buttonContent = `
-      <div class="button-container">
-        ${refactoringButton(fnToRefactor)}
-      </div>
-    `;
+    const staleContent = isStale
+      ? fileChangesDetectedContent(
+          'The function has been changed, so the issue might no longer apply. If the change was intentional, please reopen the panel to check the latest state of the function. If not, you might want to undo your changes.'
+        )
+      : '';
+
+    const buttonContent = isStale
+      ? ''
+      : `<div class="button-container">
+          ${refactoringButton(fnToRefactor)}
+        </div>
+        `;
 
     const docsContent = await docsForCategory(issueInfo.category);
 
-    this.updateContentWithDocScripts(title, [fnLocContent, buttonContent, docsContent]);
+    this.updateContentWithDocScripts(title, [fnLocContent, staleContent, buttonContent, docsContent]);
   }
 
   private updateContentWithDocScripts(title: string, content: string | string[]) {
