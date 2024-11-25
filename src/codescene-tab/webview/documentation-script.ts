@@ -9,6 +9,7 @@ function sendMessage(command: string) {
 }
 
 function main() {
+  document.getElementById('close-button')?.addEventListener('click', () => sendMessage('close'));
   document.getElementById('function-location')?.addEventListener('click', () => sendMessage('goto-function-location'));
   document
     .getElementById('refactoring-button')

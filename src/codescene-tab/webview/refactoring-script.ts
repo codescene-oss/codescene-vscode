@@ -10,11 +10,17 @@ function sendMessage(command: string) {
 }
 
 function main() {
-  document.getElementById('function-location')?.addEventListener('click', () => sendMessage('gotoFunctionLocation'));
-  document.getElementById('diff-button')?.addEventListener('click', () => sendMessage('showDiff'));
-  document.getElementById('reject-button')?.addEventListener('click', () => sendMessage('reject'));
-  document.getElementById('apply-button')?.addEventListener('click', () => sendMessage('apply'));
-  document.getElementById('retry-button')?.addEventListener('click', () => sendMessage('retry'));
-  document.getElementById('copy-to-clipboard-button')?.addEventListener('click', () => sendMessage('copyCode'));
-  document.getElementById('show-logoutput-link')?.addEventListener('click', () => sendMessage('showLogoutput'));
+  addClickEventListener('close-button', 'close');
+  addClickEventListener('function-location', 'gotoFunctionLocation');
+  addClickEventListener('diff-button', 'showDiff');
+  addClickEventListener('reject-button', 'reject');
+  addClickEventListener('apply-button', 'apply');
+  addClickEventListener('retry-button', 'retry');
+  addClickEventListener('copy-to-clipboard-button', 'copyCode');
+  addClickEventListener('show-logoutput-link', 'showLogoutput');
+}
+
+function addClickEventListener(elementId: string, command: string) {
+  const buttonEl = document.getElementById(elementId);
+  buttonEl?.addEventListener('click', () => sendMessage(command));
 }
