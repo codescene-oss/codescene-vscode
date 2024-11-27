@@ -71,6 +71,14 @@ export class CodeSceneTabPanel implements Disposable {
       this,
       this.disposables
     );
+    vscode.workspace.onDidCloseTextDocument(
+      (e) => {
+        const closedThisDoc = this.state?.document === e;
+        if (closedThisDoc) this.dispose();
+      },
+      this,
+      this.disposables
+    );
   }
 
   private isFunctionUnchangedInDocument(document: vscode.TextDocument, fnToRefactor?: FnToRefactor) {
