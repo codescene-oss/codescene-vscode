@@ -27,7 +27,7 @@ export function assertError(val: unknown): Error | undefined {
 export function reportError(pre: string, error: Error) {
   const message = `${pre}. ${error.message}`;
   delete error.stack;
-  logOutputChannel.error(`${message}: ${JSON.stringify(error)}`);
+  logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
   void vscode.window.showErrorMessage(message);
   void vscode.commands.executeCommand('codescene.controlCenterView.focus');
 }

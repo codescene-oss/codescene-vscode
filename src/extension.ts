@@ -34,15 +34,13 @@ interface CsContext {
  */
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
-  Telemetry.init(context.extension);
   CsExtensionState.init(context);
-
-  registerShowLogCommand(context);
-  registerTermsAndPoliciesCmds(context);
-  await acceptTermsAndPolicies(context);
 
   try {
     const binaryPath = await ensureCompatibleBinary(context.extensionPath);
+    Telemetry.init(context.extension);
+    await acceptTermsAndPolicies(context);
+
     CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
     await startExtension(context);
   } catch (unknownErr) {
@@ -70,9 +68,6 @@ async function startExtension(context: vscode.ExtensionContext) {
       Reviewer.instance.refreshDeltas();
     }
   });
-
-  // send telemetry on activation (gives us basic usage stats)
-  Telemetry.instance.logUsage('onActivateExtension');
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
@@ -115,10 +110,14 @@ async function startExtension(context: vscode.ExtensionContext) {
  * point to commands that haven't been fully initialized.
  */
 function finalizeActivation() {
-  void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
+    // send telemetry on activation (gives us basic usage stats)
+    Telemetry.instance.logUsage('onActivateExtension');
+    void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
+  registerShowLogCommand(context);
+  registerTermsAndPoliciesCmds(context);
   registerDocumentationCommands(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {

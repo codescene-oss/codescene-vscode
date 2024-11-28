@@ -1,6 +1,6 @@
 import { commands, env, ExtensionContext, Uri, window } from 'vscode';
 import { CsExtensionState } from './cs-extension-state';
-import { registerCommandWithTelemetry } from './telemetry';
+import Telemetry, { registerCommandWithTelemetry } from './telemetry';
 
 export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
   context.subscriptions.push(
@@ -29,6 +29,8 @@ export async function acceptTermsAndPolicies(context: ExtensionContext): Promise
     'Decline',
     'View Terms & Policies'
   );
+
+  Telemetry.instance.logUsage('termsAndPoliciesResponse', { selection });
 
   switch (selection) {
     case 'Accept':
