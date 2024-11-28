@@ -15,7 +15,7 @@ a:focus {
   display: flex;
   gap: 6px;
   align-items: center;
-  margin: 4px 0;
+  margin: 2px 0 6px 0;
 }
 
 .large {
@@ -24,7 +24,9 @@ a:focus {
 }
 
 .block {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .color-red {
@@ -32,7 +34,7 @@ a:focus {
 }
 
 .function-summary {
-  margin-top: 20px;
+  margin-top: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
