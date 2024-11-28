@@ -80,7 +80,7 @@ export class DeltaAnalyser {
 
     let deltaForFile: DeltaForFile | undefined;
     return new SimpleExecutor()
-      .execute({ command: this.cliPath, args: ['delta', '--ide-api'] }, undefined, inputJsonString)
+      .execute({ command: this.cliPath, args: ['delta'] }, undefined, inputJsonString)
       .then(async (result) => {
         if (result.stderr.trim() !== '') {
           logOutputChannel.debug(`Delta analysis debug output: ${result.stderr}`);
