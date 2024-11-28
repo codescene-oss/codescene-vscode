@@ -144,6 +144,7 @@ export class CodeSceneTabPanel implements Disposable {
       },
       reject: () => {
         this.deselectRefactoring(refactoring);
+        Telemetry.instance.logUsage('refactor/rejected', refactoring.eventData);
         this.dispose();
       },
       retry: async () => {
