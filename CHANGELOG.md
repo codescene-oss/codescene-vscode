@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.1...v0.9.2) (2024-11-29)
+
+
+### Bug fixes
+
+* **devtools-binary:** Update binary to handle crash on python .pyi files ([a354fd9](https://github.com/codescene-oss/codescene-vscode/commit/a354fd97824733dc28345b6e0ac98bf953118d92))
+* **refactoring-panel:** Correctly present refactoring reasons when no reasons are provided (high/full conf) ([0a732b3](https://github.com/codescene-oss/codescene-vscode/commit/0a732b3215efe73243499f0c686303f890f26fbf))
+* **refactoring/documentation:** Add file-changes message when applicable ([4e6d5ad](https://github.com/codescene-oss/codescene-vscode/commit/4e6d5ada0c6677aa0fad6bb0c5f108fa6608461b))
+* **refactoring/documentation:** Close side panel if current document is closed ([7eca893](https://github.com/codescene-oss/codescene-vscode/commit/7eca893d2b88e10997afe77d0a0e325e00c244d9))
+
 ### [0.9.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.0...v0.9.1) (2024-11-22)
 
 
