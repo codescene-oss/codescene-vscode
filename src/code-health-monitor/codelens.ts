@@ -59,7 +59,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
           title: '$(sparkle) CodeScene ACE',
           command: 'codescene.requestAndPresentRefactoring',
-          arguments: [functionInfo.parent.document, functionInfo.fnToRefactor],
+          arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
         })
       );
     }
@@ -70,7 +70,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
           new vscode.CodeLens(this.lensRange(issue.position, order++), {
             title: `$(warning) ${issue.changeDetail.category}`,
             command: 'codescene.openInteractiveDocsPanel',
-            arguments: [issueToDocsParams(issue, functionInfo)],
+            arguments: [issueToDocsParams(issue, functionInfo), 'codelens (code-health-monitor)'],
           })
         );
       });

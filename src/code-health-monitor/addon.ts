@@ -2,7 +2,6 @@ import vscode from 'vscode';
 import { Branch, GitExtension, Repository } from '../../types/git';
 import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
-import { registerCommandWithTelemetry } from '../telemetry';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { DeltaFunctionInfo } from './tree-model';
@@ -17,14 +16,6 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
     return;
   }
 
-  const selectFunctionDisposable = vscode.commands.registerCommand(
-    'codescene.codeHealthMonitor.selectFunction',
-    (functionInfo: DeltaFunctionInfo) => {
-      void vscode.commands.executeCommand('codescene.monitorCodeLens.showFunction', functionInfo);
-      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', functionInfo);
-    }
-  );
-
   const codeHealthMonitorView = new CodeHealthMonitorView(context);
   registerCodeLens(context);
   registerCodeHealthDetailsView(context);
@@ -35,16 +26,12 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   context.subscriptions.push(
     codeHealthMonitorView,
     ...repoStateListeners,
-    registerCommandWithTelemetry({
-      commandId: 'codescene.codeHealthMonitorHelp',
-      handler: () => {
-        void vscode.commands.executeCommand(
-          'markdown.showPreviewToSide',
-          vscode.Uri.parse(`csdoc:code-health-monitor.md`)
-        );
-      },
-    }),
-    selectFunctionDisposable
+    vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
+      void vscode.commands.executeCommand(
+        'markdown.showPreviewToSide',
+        vscode.Uri.parse(`csdoc:code-health-monitor.md`)
+      );
+    })
   );
 }
 

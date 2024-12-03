@@ -3,7 +3,6 @@ import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { CsExtensionState } from '../cs-extension-state';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
-import { isDefined } from '../utils';
 import { FnToRefactor } from './capabilities';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
@@ -25,16 +24,19 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
   private async requestAndPresentRefactoringCmd(
     document: vscode.TextDocument,
+    source: string,
     fnToRefactor?: FnToRefactor,
     skipCache?: boolean
   ) {
     if (!fnToRefactor) return;
     if (!CsExtensionState.acknowledgedAceUsage) {
+      Telemetry.logUsage('ace-info/presented', { source });
       CodeSceneTabPanel.show({ document, fnToRefactor });
       return;
     }
 
     const request = new RefactoringRequest(fnToRefactor, document, skipCache);
+    Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneTabPanel.show(request);
   }
 
@@ -61,7 +63,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
       // Immediately trigger a re-review of the new file-content
       // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
       CsDiagnostics.review(document);
-      Telemetry.instance.logUsage('refactor/applied', refactoring.eventData);
+      Telemetry.logUsage('refactor/applied', refactoring.eventData);
     });
   }
 
@@ -90,7 +92,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
 
-    Telemetry.instance.logUsage('refactor/diff-shown', refactoring.eventData);
+    Telemetry.logUsage('refactor/diff-shown', refactoring.eventData);
   }
 
   dispose() {

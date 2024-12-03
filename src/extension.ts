@@ -111,7 +111,7 @@ async function startExtension(context: vscode.ExtensionContext) {
  */
 function finalizeActivation() {
     // send telemetry on activation (gives us basic usage stats)
-    Telemetry.instance.logUsage('onActivateExtension');
+    Telemetry.logUsage('onActivateExtension');
     void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 

@@ -20,6 +20,7 @@ suite('Refactor panel components Test Suite', () => {
         },
         'review-header': 'Reason for unverified refactoring',
       },
+      metadata: {},
     };
     const content = reasonsContent(response);
     assert.match(
@@ -43,6 +44,7 @@ suite('Refactor panel components Test Suite', () => {
         },
         'review-header': 'Refactoring notes',
       },
+      metadata: {},
     };
     const content = reasonsContent(response);
     assert.equal(content, '');

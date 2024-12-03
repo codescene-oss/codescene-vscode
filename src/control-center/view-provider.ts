@@ -1,5 +1,6 @@
 import vscode, {
   CancellationToken,
+  Disposable,
   ExtensionContext,
   WebviewView,
   WebviewViewProvider,
@@ -10,6 +11,7 @@ import { CsExtensionState } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { ACECreditsError } from '../refactoring/api';
 import { AceCredits } from '../refactoring/model';
+import Telemetry from '../telemetry';
 import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
@@ -19,8 +21,9 @@ export function registerControlCenterViewProvider(context: ExtensionContext) {
   return provider;
 }
 
-export class ControlCenterViewProvider implements WebviewViewProvider /* , Disposable */ {
+export class ControlCenterViewProvider implements WebviewViewProvider, Disposable {
   private view?: WebviewView;
+  private disposables: Disposable[] = [];
 
   constructor() {}
 
@@ -37,16 +40,28 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
     };
 
     webView.onDidReceiveMessage(this.handleMessages, this);
+    this.handleVisibilityEvents(webviewView);
 
     this.update();
   }
 
+  private handleVisibilityEvents(view: vscode.WebviewView) {
+    // On first resolve ("resolveWebviewView is called when a view first becomes visible")
+    Telemetry.logUsage('control-center/visibility', { visible: view.visible });
+    view.onDidChangeVisibility(
+      // On subsequent visibility changes (void event - use view.visible)
+      () => Telemetry.logUsage('control-center/visibility', { visible: view.visible }),
+      this,
+      this.disposables
+    );
+  }
+
   private handleMessages(message: any) {
     const commands: { [key: string]: () => void } = {
-      openAiPricing: () =>
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ai-coding#pricing')),
+      openAiPricing: () => this.openLink('https://codescene.com/product/ai-coding#pricing'),
       showLogOutput: () => logOutputChannel.show(),
-      openSettings: () =>
+      openSettings: () => {
+        Telemetry.logUsage('control-center/open-settings');
         vscode.commands
           .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode')
           .then(
@@ -55,15 +70,13 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
               logOutputChannel.info('Not inside a workspace, opening general/user settings instead.');
               void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
             }
-          ),
-      openDocumentation: () => void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs')),
-      openTermsAndPolicies: () => void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/policies')),
-      openAiPrivacyPrinciples: () =>
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/product/ace/principles')),
-      openContactCodescene: () =>
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.com/company/contact-us')),
-      raiseSupportTicket: () =>
-        void vscode.env.openExternal(vscode.Uri.parse('https://supporthub.codescene.com/kb-tickets/new')),
+          );
+      },
+      openDocumentation: () => this.openLink('https://codescene.io/docs'),
+      openTermsAndPolicies: () => this.openLink('https://codescene.com/policies'),
+      openAiPrivacyPrinciples: () => this.openLink('https://codescene.com/product/ace/principles'),
+      openContactCodescene: () => this.openLink('https://codescene.com/company/contact-us'),
+      raiseSupportTicket: () => this.openLink('https://supporthub.codescene.com/kb-tickets/new'),
       copyMachineId: () =>
         void vscode.env.clipboard.writeText(vscode.env.machineId).then(() => {
           void vscode.window.showInformationMessage('Copied machine-id to clipboard.');
@@ -74,6 +87,11 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
 
     if (!cmd) throw new Error(`Command not implemented: "${message.command}"!`);
     cmd.call(this);
+  }
+
+  private openLink(url: string) {
+    Telemetry.logUsage('control-center/open-link', { url });
+    void vscode.env.openExternal(vscode.Uri.parse(url));
   }
 
   update() {
@@ -282,5 +300,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider /* , Dispo
         </div>
     </div>  
     `;
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
   }
 }

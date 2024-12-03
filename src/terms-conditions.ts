@@ -1,15 +1,13 @@
 import { commands, env, ExtensionContext, Uri, window } from 'vscode';
 import { CsExtensionState } from './cs-extension-state';
-import Telemetry, { registerCommandWithTelemetry } from './telemetry';
+import Telemetry from './telemetry';
 
 export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
   context.subscriptions.push(
-    registerCommandWithTelemetry({
-      commandId: 'codescene.revokeTerms',
-      handler: async () => {
-        await CsExtensionState.setAcceptedTermsAndPolicies(undefined);
-        void window.showInformationMessage('Terms and Privacy Policy agreement has now been revoked');
-      },
+    commands.registerCommand('codescene.revokeTerms', async () => {
+      Telemetry.logUsage('revokeTerms');
+      await CsExtensionState.setAcceptedTermsAndPolicies(undefined);
+      void window.showInformationMessage('Terms and Privacy Policy agreement has now been revoked');
     }),
     // Mostly for testing, users should rarely need to revoke this since it is controlled by a setting as well
     // The acceptance is just for notifying the user about the feature
@@ -30,7 +28,7 @@ export async function acceptTermsAndPolicies(context: ExtensionContext): Promise
     'View Terms & Policies'
   );
 
-  Telemetry.instance.logUsage('termsAndPoliciesResponse', { selection });
+  Telemetry.logUsage('termsAndPoliciesResponse', { selection });
 
   switch (selection) {
     case 'Accept':

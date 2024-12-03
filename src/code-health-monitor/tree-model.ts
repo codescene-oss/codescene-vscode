@@ -69,6 +69,14 @@ export class FileWithIssues implements DeltaTreeViewItem {
     return new DeltaInfoItem(scoreInfo);
   }
 
+  get nIssues() {
+    return this.fileLevelIssues.length + this.functionLevelIssues.length;
+  }
+
+  get nRefactorableFunctions() {
+    return this.functionLevelIssues.filter((fn) => fn.isRefactoringSupported).length;
+  }
+
   get scoreChange() {
     const oldScore = this.deltaForFile['old-score'] || 10;
     const newScore = this.deltaForFile['new-score'];
@@ -142,12 +150,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(this.fnName, vscode.TreeItemCollapsibleState.None);
-    item.command = {
-      command: 'codescene.codeHealthMonitor.selectFunction',
-      title: 'Show function for code health monitoring',
-      arguments: [this],
-    };
-
     item.iconPath = new vscode.ThemeIcon('symbol-function');
     item.description = this.isRefactoringSupported ? 'Auto-Refactor' : undefined;
     item.tooltip = this.tooltip();
@@ -190,7 +192,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
     item.command = {
       command: 'codescene.openInteractiveDocsPanel',
       title: 'Open interactive documentation',
-      arguments: [issueToDocsParams(this, fnInfo)],
+      arguments: [issueToDocsParams(this, fnInfo), 'code-health-tree-view'],
     };
     return item;
   }

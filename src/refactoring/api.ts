@@ -12,7 +12,6 @@ import { getPortalUrl } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { CsRestApi, isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import Telemetry from '../telemetry';
 import { getFileExtension, isDefined, rangeStr } from '../utils';
 import { FnToRefactor } from './capabilities';
 import { AceCredits, PreFlightResponse, RefactorConfidence, RefactorRequest, RefactorResponse } from './model';
@@ -111,11 +110,10 @@ export class RefactoringAPI {
 }
 
 function logFetchRefactoringRequest(request: RefactoringRequest) {
-  const { traceId, fnToRefactor, skipCache, eventData } = request;
+  const { traceId, fnToRefactor, skipCache } = request;
   logOutputChannel.debug(
     `Refactor request for ${logIdString(traceId, fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
   );
-  Telemetry.instance.logUsage('refactor/requested', eventData);
 }
 
 /**

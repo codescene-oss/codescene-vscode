@@ -2,7 +2,7 @@ import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Webview, WebviewViewProvider } from 'vscode';
 import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
-import { pluralize } from '../../utils';
+import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
 import { DeltaFunctionInfo } from '../tree-model';
 
@@ -36,11 +36,22 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
       enableScripts: true,
       localResourceRoots: commonResourceRoots(),
     };
-
     webView.onDidReceiveMessage(this.messageHandler, this, this.disposables);
 
+    this.handleVisibilityEvents(webviewView);
     this.baseContent = this.initBaseContent(webView);
     this.update();
+  }
+
+  private handleVisibilityEvents(view: vscode.WebviewView) {
+    // On first resolve ("resolveWebviewView is called when a view first becomes visible")
+    Telemetry.logUsage('code-health-details/visibility', { visible: view.visible });
+    view.onDidChangeVisibility(
+      // On subsequent visibility changes (void event - use view.visible)
+      () => Telemetry.logUsage('code-health-details/visibility', { visible: view.visible }),
+      this,
+      this.disposables
+    );
   }
 
   private messageHandler(message: any) {
@@ -49,6 +60,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           this.functionInfo?.parent.document,
+          'code-health-details',
           this.functionInfo?.fnToRefactor
         );
         return;
@@ -57,7 +69,8 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         if (issue) {
           void vscode.commands.executeCommand(
             'codescene.openInteractiveDocsPanel',
-            issueToDocsParams(issue, this.functionInfo)
+            issueToDocsParams(issue, this.functionInfo),
+            'code-health-details'
           );
         }
         return;
@@ -97,13 +110,25 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   update(functionInfo?: DeltaFunctionInfo) {
-    this.functionInfo = functionInfo;
     const webView = this.view?.webview;
     if (!webView) return;
-    webView.html = this.baseContent.replace(
-      CodeHealthDetailsView.placeholder,
-      functionInfo ? this.functionInfoContent(functionInfo) : this.defaultContent()
-    );
+    this.functionInfo = functionInfo;
+
+    let content = '';
+    if (functionInfo) {
+      content = this.functionInfoContent(functionInfo);
+      const { isRefactoringSupported, children } = functionInfo;
+      Telemetry.logUsage('code-health-details/function-selected', {
+        visible: this.view?.visible,
+        isRefactoringSupported,
+        nIssues: children.length,
+      });
+    } else {
+      content = this.defaultContent();
+      Telemetry.logUsage('code-health-details/function-deselected', { visible: this.view?.visible });
+    }
+
+    webView.html = this.baseContent.replace(CodeHealthDetailsView.placeholder, content);
   }
 
   private defaultContent() {
