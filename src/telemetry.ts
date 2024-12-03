@@ -7,10 +7,11 @@ import { CsExtensionState } from './cs-extension-state';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult } from './executor';
 import { logOutputChannel } from './log';
-import { isDefined } from './utils';
 
 export default class Telemetry {
   private static _instance: Telemetry;
+
+  private static eventPrefix = 'vscode';
 
   private telemetryLogger: vscode.TelemetryLogger;
   private axiosInstance: AxiosInstance;
@@ -18,7 +19,9 @@ export default class Telemetry {
   constructor(extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
       sendEventData: (eventName, eventData) => {
-        this.postTelemetry(eventName, eventData).catch(() => {}); // post but ignore errors (logged using logAxiosError in interceptor instead)
+        // The telemetry-sender apparently adds the extension id to the event name - replace it manually here to keep it simple for Amplitude users
+        const evtName = eventName.replace(extension.id, Telemetry.eventPrefix);
+        this.postToPortal(evtName, eventData).catch(() => {}); // post but ignore errors (logged using logAxiosError in interceptor instead)
       },
       sendErrorData: (error) => {
         logOutputChannel.error(error);
@@ -41,15 +44,11 @@ export default class Telemetry {
     Telemetry._instance = new Telemetry(extension);
   }
 
-  static get instance(): Telemetry {
-    return Telemetry._instance;
+  static logUsage(eventName: string, eventData?: any) {
+    Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
 
-  logUsage(eventName: string, eventData?: any) {
-    this.telemetryLogger.logUsage(eventName, eventData);
-  }
-
-  private async postTelemetry(eventName: string, eventData: any) {
+  private async postToPortal(eventName: string, eventData: any) {
     const data = {
       ...eventData,
       'event-time': new Date().toISOString(),
@@ -78,32 +77,18 @@ export default class Telemetry {
 
     return this.axiosInstance.post(`${getPortalUrl()}/api/analytics/events/ide`, jsonData, config);
   }
-}
 
-/**
- * Register a command with this function to automatically log telemetry when executed.
- * Essentially wraps vscode.commands.registerCommand, adding Telemetry.logUsage with optional
- * eventData.
- */
-export function registerCommandWithTelemetry({
-  commandId,
-  handler,
-  thisArg,
-  logArgs,
-}: {
-  commandId: string;
-  handler: (...args: any[]) => any;
-  thisArg?: any;
-  logArgs?: (...args: any[]) => any;
-}): vscode.Disposable {
-  const wrappedHandler = (...args: any[]) => {
-    const eventName = `command/${commandId}`;
-    let eventData;
-    if (isDefined(logArgs)) {
-      eventData = logArgs(...args);
+  private logEventData(eventName: string, eventData: any, noCommonProps = true) {
+    let dataToLog = eventData;
+    if (noCommonProps) {
+      // Remove all vscode common props before logging
+      dataToLog = Object.keys(eventData).reduce((acc, key) => {
+        if (!key.startsWith('common.')) {
+          acc[key] = eventData[key];
+        }
+        return acc;
+      }, {} as Record<string, any>);
     }
-    Telemetry.instance.logUsage(eventName, eventData);
-    return handler.apply(thisArg, args);
-  };
-  return vscode.commands.registerCommand(commandId, wrappedHandler, thisArg);
+    logOutputChannel.debug(`[Telemetry] Event "${eventName}": ${JSON.stringify(dataToLog)}`);
+  }
 }

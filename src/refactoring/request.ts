@@ -44,8 +44,8 @@ export class RefactoringRequest {
   }
 
   get eventData() {
-    const eventData: any = { 'trace-id': this.traceId };
-    if (this.skipCache) eventData['skip-cache'] = true;
+    const eventData: any = { traceId: this.traceId };
+    if (this.skipCache) eventData.skipCache = true;
     return eventData;
   }
 

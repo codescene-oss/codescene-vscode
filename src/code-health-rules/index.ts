@@ -1,24 +1,19 @@
-import { window, ExtensionContext } from 'vscode';
-import { registerCommandWithTelemetry } from '../telemetry';
+import { commands, ExtensionContext, window } from 'vscode';
 import { checkCodeHealthRules } from './check-rules';
 import { createRulesTemplate } from './rules-template';
+import Telemetry from '../telemetry';
 
 export function register(context: ExtensionContext) {
-  const createRulesTemplateCmd = registerCommandWithTelemetry({
-    commandId: 'codescene.createRulesTemplate',
-    handler: () => {
+  context.subscriptions.push(
+    commands.registerCommand('codescene.createRulesTemplate', () => {
+      Telemetry.logUsage('createRulesTemplate');
       createRulesTemplate().catch((error: Error) => {
         void window.showErrorMessage(error.message);
       });
-    },
-  });
-  context.subscriptions.push(createRulesTemplateCmd);
-
-  const createCheckRules = registerCommandWithTelemetry({
-    commandId: 'codescene.checkRules',
-    handler: () => {
+    }),
+    commands.registerCommand('codescene.checkRules', () => {
+      Telemetry.logUsage('checkRules');
       void checkCodeHealthRules();
-    },
-  });
-  context.subscriptions.push(createCheckRules);
+    })
+  );
 }

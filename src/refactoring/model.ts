@@ -64,11 +64,15 @@ export interface ReasonsWithDetails {
   details?: ReasonDetails[];
 }
 
+interface Metadata {
+  'cached?'?: boolean;
+}
 export interface RefactorResponse {
   confidence: RefactorConfidence;
   'reasons-with-details': ReasonsWithDetails[];
   'refactoring-properties': RefactorProperties;
   code: string;
+  metadata: Metadata;
 }
 
 export interface AceCredits {

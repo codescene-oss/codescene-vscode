@@ -114,10 +114,11 @@ export class CodeSceneTabPanel implements Disposable {
     switch (command) {
       case 'acknowledged':
         await CsExtensionState.setAcknowledgedAceUsage(true);
-        Telemetry.instance.logUsage('aceAcknowledged');
+        Telemetry.logUsage('ace-info/acknowledged');
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           ackParams.document,
+          'ace-acknowledgement',
           ackParams.fnToRefactor
         );
         return;
@@ -144,18 +145,20 @@ export class CodeSceneTabPanel implements Disposable {
       },
       reject: () => {
         this.deselectRefactoring(refactoring);
-        Telemetry.instance.logUsage('refactor/rejected', refactoring.eventData);
+        Telemetry.logUsage('refactor/rejected', refactoring.eventData);
         this.dispose();
       },
       retry: async () => {
         await vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           refactoring.document,
+          'retry',
           refactoring.fnToRefactor,
           true
         );
       },
       copyCode: async () => {
+        Telemetry.logUsage('refactor/copy-code', refactoring.eventData);
         await this.copyCode(refactoring);
       },
       showDiff: () => {
@@ -194,6 +197,7 @@ export class CodeSceneTabPanel implements Disposable {
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           params.document,
+          'interactive-docs',
           params.fnToRefactor
         );
         return;
@@ -281,6 +285,7 @@ export class CodeSceneTabPanel implements Disposable {
       const response = await promise;
       const {
         confidence: { level, title },
+        metadata: { 'cached?': isCached },
       } = response;
 
       const highlightCode = !isStale && level > 1;
@@ -294,7 +299,7 @@ export class CodeSceneTabPanel implements Disposable {
             'The function has been changed, so the refactoring might no longer apply. If the change was intentional, please reopen the panel to have ACE refactor the latest state of the function. If not, you might want to undo your changes.'
           );
 
-      Telemetry.instance.logUsage('refactor/presented', { confidence: level, ...refactoring.eventData });
+      Telemetry.logUsage('refactor/presented', { confidence: level, isCached, ...refactoring.eventData });
       this.updateRefactoringContent(title, [
         fnLocContent,
         summaryContent,
@@ -308,7 +313,7 @@ export class CodeSceneTabPanel implements Disposable {
 
       const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
 
-      Telemetry.instance.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
+      Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
     }
   }

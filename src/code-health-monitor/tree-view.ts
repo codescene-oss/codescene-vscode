@@ -1,5 +1,6 @@
 import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
 import { logOutputChannel } from '../log';
+import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
@@ -30,6 +31,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       canSelectMany: false,
     });
 
+    this.treeDataProvider.setParentView(this.view);
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
     this.view.onDidChangeSelection(this.handleSelectionChange, this, this.disposables);
     this.disposables.push(
@@ -41,6 +43,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
         if (event.type === 'end') {
           this.treeDataProvider.syncTree(event);
         }
+      }),
+      this.view.onDidChangeVisibility((e) => {
+        Telemetry.logUsage('code-health-monitor/visibility', { visible: e.visible });
       })
     );
   }
@@ -67,7 +72,8 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
-    } else {
+      void vscode.commands.executeCommand('codescene.monitorCodeLens.showFunction', selection);
+   } else {
       // else just clear the view
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
     }
@@ -112,8 +118,13 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
   public tree: Array<DeltaTreeViewItem> = [];
+  private parentView?: vscode.TreeView<DeltaTreeViewItem>;
 
   constructor() {}
+
+  setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
+    this.parentView = view;
+  }
 
   private update() {
     if (this.fileIssueMap.size > 0) {
@@ -129,19 +140,28 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   }
 
   syncTree({ document, result }: DeltaAnalysisEvent) {
+    const evtData = (fileWithIssues: FileWithIssues) => {
+      const { nIssues, nRefactorableFunctions, scoreChange } = fileWithIssues;
+      return { visible: this.parentView?.visible, scoreChange, nIssues, nRefactorableFunctions };
+    };
+
     // Find the tree item matching the event document
     const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
     if (fileWithIssues) {
       if (result) {
         // Update the existing entry if there are changes
         fileWithIssues.update(result, document);
+        Telemetry.logUsage('code-health-monitor/file-updated', evtData(fileWithIssues));
       } else {
         // If there are no longer any issues, remove the entry from the tree
         this.fileIssueMap.delete(document.uri.fsPath);
+        Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible });
       }
     } else if (result) {
       // No existing file entry found - add one if there are changes
-      this.fileIssueMap.set(document.uri.fsPath, new FileWithIssues(result, document));
+      const newFileWithIssues = new FileWithIssues(result, document);
+      this.fileIssueMap.set(document.uri.fsPath, newFileWithIssues);
+      Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
     this.update();

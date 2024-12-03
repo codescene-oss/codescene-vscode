@@ -10,6 +10,7 @@ suite('Refactor utils Test Suite', () => {
     'reasons-with-details': [],
     'refactoring-properties': { 'added-code-smells': [], 'removed-code-smells': [] },
     confidence: { level: 3, 'recommended-action': { description: '', details: '' }, description: '', title: '' },
+    metadata: {},
   };
 
   test("Return code as is if there's no reasons-with-details", async () => {

@@ -2,35 +2,30 @@ import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { FnToRefactor } from '../refactoring/capabilities';
-import { registerCommandWithTelemetry } from '../telemetry';
+import Telemetry from '../telemetry';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
-    registerCommandWithTelemetry({
-      commandId: 'codescene.openInteractiveDocsPanel',
-      handler: (params) => {
+    vscode.commands.registerCommand(
+      'codescene.openInteractiveDocsPanel',
+      (params: InteractiveDocsParams, source: string) => {
+        Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params.issueInfo.category });
         CodeSceneTabPanel.show(params);
-      },
-      logArgs: (params: InteractiveDocsParams) => ({ category: params.issueInfo.category }),
+      }
+    ),
+    // A query param friendly version of openInteractiveDocsPanel
+    vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
+      const { category, lineNo, charNo, documentUri } = queryParams;
+      Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
+      const params: InteractiveDocsParams = {
+        issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
+        document: await findOrOpenDocument(documentUri),
+      };
+      CodeSceneTabPanel.show(params);
     }),
-    registerCommandWithTelemetry({
-      // A query param friendly version of openInteractiveDocsPanel
-      commandId: 'codescene.openInteractiveDocsFromDiagnosticTarget',
-      handler: async (queryParams) => {
-        const { category, lineNo, charNo, documentUri } = queryParams;
-        const params: InteractiveDocsParams = {
-          issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
-          document: await findOrOpenDocument(documentUri),
-        };
-        CodeSceneTabPanel.show(params);
-      },
-      logArgs: (queryParams: any) => ({ category: queryParams.category }),
-    }),
-    registerCommandWithTelemetry({
-      commandId: 'codescene.openCodeHealthDocs',
-      handler: () => {
-        void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
-      },
+    vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
+      Telemetry.logUsage('openCodeHealthDocs');
+      void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
     })
   );
 }

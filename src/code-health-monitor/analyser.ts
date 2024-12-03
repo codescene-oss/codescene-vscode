@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
-import { SimpleExecutor } from '../executor';
+import { LimitingExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { RefactoringTarget } from '../refactoring/capabilities';
 import { vscodeRange } from '../review/utils';
@@ -20,6 +20,7 @@ export class DeltaAnalyser {
   private analysisEmitter: vscode.EventEmitter<DeltaAnalysisEvent> = new vscode.EventEmitter<DeltaAnalysisEvent>();
   readonly onDidAnalyse = this.analysisEmitter.event;
   private analysesRunning = 0;
+  private executor = new LimitingExecutor();
 
   constructor(private cliPath: string) {}
 
@@ -79,28 +80,33 @@ export class DeltaAnalyser {
     }
 
     let deltaForFile: DeltaForFile | undefined;
-    return new SimpleExecutor()
-      .execute({ command: this.cliPath, args: ['delta'] }, undefined, inputJsonString)
-      .then(async (result) => {
-        if (result.stderr.trim() !== '') {
-          logOutputChannel.debug(`Delta analysis debug output: ${result.stderr}`);
-        }
-        if (result.stdout.trim() === '') {
-          return;
-        }
-        deltaForFile = JSON.parse(result.stdout) as DeltaForFile;
+    const { stdout, stderr, exitCode } = await this.executor.execute(
+      { command: this.cliPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
+      undefined,
+      inputJsonString
+    );
 
-        await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
-
-        return deltaForFile;
-      })
-      .catch((error) => {
-        logOutputChannel.error('Error during delta analysis:', error);
-        this.errorEmitter.fire(error);
-      })
-      .finally(() => {
+    switch (exitCode) {
+      case 'ABORT_ERR':
         this.endAnalysisEvent(document, deltaForFile);
-      });
+        return;
+      case 1:
+        logOutputChannel.error('Error during delta analysis:', stderr);
+        this.errorEmitter.fire(new Error(stderr));
+        this.endAnalysisEvent(document, deltaForFile);
+        return;
+    }
+
+    if (exitCode === 0) {
+      if (stdout.trim() === '') {
+        this.endAnalysisEvent(document, deltaForFile);
+        return;
+      }
+      deltaForFile = JSON.parse(stdout) as DeltaForFile;
+      await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
+      this.endAnalysisEvent(document, deltaForFile);
+      return deltaForFile;
+    }
   }
 
   /**
@@ -119,10 +125,7 @@ export class DeltaAnalyser {
         }));
     });
 
-    const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(
-      document,
-      refactoringTargets
-    );
+    const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(document, refactoringTargets);
     if (!functionsToRefactor) return;
 
     // Add a refactorableFn property to the findings that matches function name and range
@@ -133,4 +136,8 @@ export class DeltaAnalyser {
       finding.refactorableFn = refactorableFunctionForFinding;
     });
   }
+}
+
+function taskId(document: vscode.TextDocument) {
+  return `${document.uri.fsPath} v${document.version}`;
 }

@@ -34,7 +34,7 @@ export class StatsCollector {
   sendCurrentStats() {
     if (this.stats.analysis.length > 0) {
       for (const byLanguage of this.stats.analysis) {
-        Telemetry.instance.logUsage('stats', { stats: { analysis: byLanguage } });
+        Telemetry.logUsage('stats', { stats: { analysis: byLanguage } });
       }
     }
     this.clear();

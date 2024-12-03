@@ -156,7 +156,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
    */
   private async login() {
     this.cancelLogin();
-    Telemetry.instance.logUsage('auth/attempted');
+    Telemetry.logUsage('auth/attempted');
     return window.withProgress<LoginResponse>(
       {
         location: ProgressLocation.Notification,
@@ -175,7 +175,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         const cancelledByButtonPromise = promiseFromEvent(
           cancelButtonToken.onCancellationRequested,
           (_, __, reject) => {
-            Telemetry.instance.logUsage('auth/cancelled');
+            Telemetry.logUsage('auth/cancelled');
             reject('User Cancelled');
           }
         ).promise;
@@ -184,7 +184,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         if (CsAuthenticationProvider.runningLogin) {
           promises.push(
             promiseFromEvent(CsAuthenticationProvider.runningLogin.token.onCancellationRequested, (_, __, reject) => {
-              Telemetry.instance.logUsage('auth/cancelled');
+              Telemetry.logUsage('auth/cancelled');
               reject('Cancelled due to starting another login attempt');
             }).promise
           );
@@ -219,24 +219,24 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       const userId = query.get('user-id');
 
       if (token === null) {
-        Telemetry.instance.logUsage('auth/rejected');
+        Telemetry.logUsage('auth/rejected');
         reject('No token found in redirect');
         return;
       }
 
       if (name === null) {
-        Telemetry.instance.logUsage('auth/rejected');
+        Telemetry.logUsage('auth/rejected');
         reject('No name found in redirect');
         return;
       }
 
       if (userId === null) {
-        Telemetry.instance.logUsage('auth/rejected');
+        Telemetry.logUsage('auth/rejected');
         reject('No user-id found in redirect');
         return;
       }
 
-      Telemetry.instance.logUsage('auth/successful');
+      Telemetry.logUsage('auth/successful');
       resolve({ name, token, userId });
     };
   }
