@@ -149,7 +149,7 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
 async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithLangId) {
   return /*html*/ `
     ${reasonsContent(response)}
-    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code))}
+    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code, false))}
   `;
 }
 
