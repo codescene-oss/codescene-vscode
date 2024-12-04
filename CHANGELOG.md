@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.2...v0.9.3) (2024-12-04)
+
+
+### Bug fixes
+
+* **refactoring-panel:** Do not show diff button on Unverified refactorings ([6134b00](https://github.com/codescene-oss/codescene-vscode/commit/6134b0053001ae2c4824a64d401549e401c4e5ec))
+
 ### [0.9.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.1...v0.9.2) (2024-11-29)
 
 
