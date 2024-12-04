@@ -1,4 +1,4 @@
-name: Build and upload vsix artifact
+name: Manual vsix package (just testing, no release)
 
 on:
   workflow_dispatch:
@@ -24,9 +24,6 @@ jobs:
         run: |
           npm install --global @vscode/vsce
           vsce package
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          path: "*.vsix"
-          name: "codescene-latest"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
+    
