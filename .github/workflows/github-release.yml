@@ -26,7 +26,9 @@ jobs:
         run: |
           npm install --global @vscode/vsce
           vsce package
-
+        env:
+          GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
+  
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
