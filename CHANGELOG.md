@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.3...v0.9.4) (2024-12-07)
+
+
+### Bug fixes
+
+* **telemetry:** Send acceptTermsAndPolicies event on startup ([5b526ab](https://github.com/codescene-oss/codescene-vscode/commit/5b526ab22b9311ef5a72f179bda50a82aa68f842))
+
 ### [0.9.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.2...v0.9.3) (2024-12-04)
 
 
