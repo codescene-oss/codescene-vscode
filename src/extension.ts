@@ -38,7 +38,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   try {
     const binaryPath = await ensureCompatibleBinary(context.extensionPath);
-    Telemetry.init(context.extension);
+    Telemetry.init(context.extension, binaryPath);
     await acceptTermsAndPolicies(context);
 
     CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
@@ -110,9 +110,9 @@ async function startExtension(context: vscode.ExtensionContext) {
  * point to commands that haven't been fully initialized.
  */
 function finalizeActivation() {
-    // send telemetry on activation (gives us basic usage stats)
-    Telemetry.logUsage('onActivateExtension');
-    void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
+  // send telemetry on activation (gives us basic usage stats)
+  Telemetry.logUsage('onActivateExtension');
+  void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {

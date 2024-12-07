@@ -19,13 +19,6 @@ export function codeHealthRulesCheck(rootPath: string, filePath: string) {
   );
 }
 
-/**
- * Executes the command for signing a payload.
- */
-export function sign(payload: string) {
-  return new SimpleExecutor().execute({ command: CsExtensionState.binaryPath, args: ['sign'] }, {}, payload);
-}
-
 export interface EnclosingFn {
   name: string;
   'start-line': number;
