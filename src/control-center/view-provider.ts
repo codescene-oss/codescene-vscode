@@ -163,17 +163,22 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
   }
 
   private codeHealthAnalysisRow() {
-    const analysisFeature = CsExtensionState.stateProperties.features.analysis;
-    let meta = { iconClass: '', text: '', badgeClass: '' };
-    switch (analysisFeature.state) {
+    const { state, error } = CsExtensionState.stateProperties.features.analysis;
+    let meta = { iconClass: '', text: '', badgeClass: '', error: '' };
+    switch (state) {
       case 'loading':
-        meta = { iconClass: 'codicon-loading codicon-modifier-spin', text: 'initializing', badgeClass: '' };
+        meta = { iconClass: 'codicon-loading codicon-modifier-spin', text: 'initializing', badgeClass: '', error: '' };
         break;
       case 'enabled':
-        meta = { iconClass: 'codicon-pulse', text: 'activated', badgeClass: 'badge-activated' };
+        meta = { iconClass: 'codicon-pulse', text: 'activated', badgeClass: 'badge-activated', error: '' };
         break;
       case 'error':
-        meta = { iconClass: 'codicon-error', text: 'error', badgeClass: 'badge-error' };
+        meta = {
+          iconClass: 'codicon-error',
+          text: state,
+          badgeClass: 'badge-error',
+          error: error ? error.message : '',
+        };
         /* TODO - restore this in new UX somehow
           if (analysisState.error instanceof DownloadError) {
             const err = analysisState.error;
@@ -197,7 +202,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
             }"></span><span>Code Health Analysis</span></div>
             <div class="badge ${meta.badgeClass} ${
       meta.text === 'error' ? 'clickable' : ''
-    }" id="code-health-analysis-badge">${meta.text}</div>
+    }" id="code-health-analysis-badge" title="${meta.error}">${meta.text}</div>
     </div>
     `;
   }
@@ -226,6 +231,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         break;
       case 'error':
         iconClass = 'codicon-error';
+        tooltip = aceFeature.error ? aceFeature.error.message : '';
         text = 'error';
         break;
     }
@@ -236,7 +242,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
     }
 
-    // Always in error if analysis failed to initialize
+    // Always in error if analysis error (fail to init or other error)
     if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
       iconClass = 'codicon-error';
       text = 'error';

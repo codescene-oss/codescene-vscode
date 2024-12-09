@@ -1,5 +1,6 @@
 import { DocumentSelector, languages, Range, TextDocument } from 'vscode';
-import { EnclosingFn, findEnclosingFunctions } from '../codescene-interop';
+import { DevtoolsAPI } from '../devtools-interop/api';
+import { EnclosingFn } from '../devtools-interop/model';
 import { fileTypeToLanguageId, toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { PreFlightResponse, RefactorSupport } from './model';
@@ -29,7 +30,7 @@ export class RefactoringCapabilities {
   // Maps vscode languageIds (note - NOT "file-type") to a specific RefactorSupport
   private languageSupport: Map<string, RefactorSupport> = new Map();
 
-  constructor(private preFlight: PreFlightResponse) {
+  constructor(private preFlight: PreFlightResponse, private devtoolsAPI: DevtoolsAPI) {
     this.initLanguageSpecificSupport();
   }
 
@@ -93,7 +94,7 @@ export class RefactoringCapabilities {
     const distinctSupportedLines = new Set(supportedTargets.map((d: RefactoringTarget) => d.line));
     if (distinctSupportedLines.size === 0) return;
 
-    const enclosingFnsWithSupportedSmells = await findEnclosingFunctions(
+    const enclosingFnsWithSupportedSmells = await this.devtoolsAPI.enclosingFunctions(
       document.fileName,
       [...distinctSupportedLines],
       document.getText()
