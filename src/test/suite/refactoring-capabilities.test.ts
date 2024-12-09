@@ -2,7 +2,8 @@ import assert from 'assert';
 import * as vscode from 'vscode';
 import { rangeFromEnclosingFn, RefactoringCapabilities, targetsInRange } from '../../refactoring/capabilities';
 import { PreFlightResponse } from '../../refactoring/model';
-import { EnclosingFn } from '../../codescene-interop';
+import { EnclosingFn } from '../../devtools-interop/model';
+import { DevtoolsAPI } from '../../devtools-interop/api';
 
 const preFlight: PreFlightResponse = {
   version: 2.0,
@@ -35,7 +36,7 @@ const preFlight: PreFlightResponse = {
   'max-input-tokens': 2048,
 };
 
-const capabilities = new RefactoringCapabilities(preFlight);
+const capabilities = new RefactoringCapabilities(preFlight, new DevtoolsAPI('./cs-dummy'));
 
 suite('Refactoring capabilities Test Suite', () => {
   test('Check DocumentSelector from supported file-types', () => {
@@ -85,7 +86,6 @@ suite('Refactoring capabilities Test Suite', () => {
   });
 });
 
-
 const enclosingFn1: EnclosingFn = {
   name: 'anon',
   'start-line': 1,
@@ -113,7 +113,7 @@ suite('Refactor capabilities helper Test Suite', () => {
     const enclosingFunctionRange = rangeFromEnclosingFn(enclosingFn1);
     assert.ok(enclosingFunctionRange.isEqual(new vscode.Range(0, 0, 0, 19)));
 
-    const complexMethod = {line: 1, category: 'Complex Method'};
+    const complexMethod = { line: 1, category: 'Complex Method' };
     const codeSmell = targetsInRange([complexMethod], enclosingFunctionRange)[0];
     assert.equal(codeSmell.relativeStartLine, 0);
     assert.equal(codeSmell.relativeEndLine, 0);
@@ -123,8 +123,8 @@ suite('Refactor capabilities helper Test Suite', () => {
     const enclosingFunctionRange = rangeFromEnclosingFn(enclosingFn2);
     assert.ok(enclosingFunctionRange.isEqual(new vscode.Range(47, 0, 100, 1)));
 
-    const complexMethod = {line: 48, category: 'Complex Method'};
-    const complexConditional = {line: 56, category: 'Complex Conditional'};
+    const complexMethod = { line: 48, category: 'Complex Method' };
+    const complexConditional = { line: 56, category: 'Complex Conditional' };
     const codeSmells = targetsInRange([complexMethod, complexConditional], enclosingFunctionRange);
     assert.equal(codeSmells[0].relativeStartLine, 0);
     assert.equal(codeSmells[0].relativeEndLine, 53);

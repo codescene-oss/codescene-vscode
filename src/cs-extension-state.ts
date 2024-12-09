@@ -22,11 +22,14 @@ export interface CsFeature {
   error?: Error;
 }
 
+type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
+export type AceFeature = CsFeature & { refactorCapabilities?: RefactoringCapabilities };
+
 interface CsFeatures {
-  analysis: CsFeature & { binaryPath?: string; analysisState?: RunnerState };
-  ace: CsFeature & { refactorCapabilities?: RefactoringCapabilities };
+  analysis: AnalysisFeature;
+  ace: AceFeature;
 }
 
 export interface CsStateProperties {
@@ -101,14 +104,6 @@ export class CsExtensionState {
     return CsExtensionState._instance.extensionUri;
   }
 
-  static get binaryPath(): string {
-    const path = CsExtensionState._instance.stateProperties.features.analysis.binaryPath;
-    if (!isDefined(path)) {
-      throw new Error(`CodeScene devtools binary path not set (${path})`);
-    }
-    return path;
-  }
-
   /**
    * Returns the preflight response if ACE is enabled, otherwise undefined.
    */
@@ -144,17 +139,21 @@ export class CsExtensionState {
 
   static clearErrors() {
     CsExtensionState.stateProperties.features.analysis.error = undefined;
+    CsExtensionState.stateProperties.features.analysis.state = 'enabled';
     CsExtensionState.stateProperties.features.ace.error = undefined;
+    CsExtensionState.stateProperties.features.ace.state = 'enabled';
     CsExtensionState._instance.updateStatusViews();
   }
 
   private handleAnalysisEvent(event: AnalysisEvent) {
-    CsExtensionState.stateProperties.features.analysis.analysisState = event.type === 'idle' ? 'idle' : 'running';
-    CsExtensionState._instance.updateStatusViews(); // TODO - flag to update status bar only
+    if (event.type === 'end') return;
+    const analysisState = (CsExtensionState.stateProperties.features.analysis.analysisState =
+      event.type === 'idle' ? 'idle' : 'running');
+    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, analysisState });
   }
 
   private handleAnalysisError(error: Error) {
-    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, error });
+    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, error, state: 'error' });
   }
 
   private updateStatusViews() {
@@ -183,27 +182,24 @@ export class CsExtensionState {
     return CsExtensionState.stateProperties.session;
   }
 
-  static setAnalysisState({ binaryPath, error, state }: { binaryPath?: string; error?: Error; state: FeatureState }) {
+  static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      analysis: { binaryPath, state, error },
+      analysis: { state: featureState({ state, error }), error, analysisState },
     };
     CsExtensionState._instance.updateStatusViews();
   }
 
-  static setACEState({
-    refactorCapabilities,
-    state,
-    error,
-  }: {
-    refactorCapabilities?: RefactoringCapabilities;
-    error?: Error;
-    state: FeatureState;
-  }) {
+  static setACEState({ refactorCapabilities, state, error }: AceFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      ace: { refactorCapabilities, state, error },
+      ace: { refactorCapabilities, state: featureState({ state, error }), error },
     };
     CsExtensionState._instance.updateStatusViews();
   }
+}
+
+function featureState(feature: CsFeature) {
+  if (isDefined(feature.error)) return 'error';
+  return feature.state;
 }

@@ -6,6 +6,7 @@ import { CsExtensionState } from './cs-extension-state';
 import { logAxiosError } from './cs-rest-api';
 import { ExecResult, SimpleExecutor } from './executor';
 import { logOutputChannel } from './log';
+import { DevtoolsAPI } from './devtools-interop/api';
 
 export default class Telemetry {
   private static _instance: Telemetry;
@@ -15,7 +16,7 @@ export default class Telemetry {
   private telemetryLogger: vscode.TelemetryLogger;
   private axiosInstance: AxiosInstance;
 
-  constructor(extension: vscode.Extension<any>, private binaryPath: string) {
+  constructor(extension: vscode.Extension<any>, private devtoolsApi: DevtoolsAPI) {
     const sender: vscode.TelemetrySender = {
       sendEventData: (eventName, eventData) => {
         // The telemetry-sender apparently adds the extension id to the event name - replace it manually here to keep it simple for Amplitude users
@@ -38,9 +39,9 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-  static init(extension: vscode.Extension<any>, binaryPath: string): void {
+  static init(extension: vscode.Extension<any>, devtoolsApi: DevtoolsAPI): void {
     logOutputChannel.info('Initializing telemetry logger');
-    Telemetry._instance = new Telemetry(extension, binaryPath);
+    Telemetry._instance = new Telemetry(extension, devtoolsApi);
   }
 
   static logUsage(eventName: string, eventData?: any) {
@@ -66,11 +67,11 @@ export default class Telemetry {
     // To ensure we are sending exactly the same data to the sign command as we are sending in the body of the request,
     // we stringify the data manually.
     const jsonData = JSON.stringify(data);
-    const signResult: ExecResult = await this.sign(jsonData);
+    const signResult = await this.devtoolsApi.sign(jsonData);
 
     const config: AxiosRequestConfig = {
       headers: {
-        'x-codescene-signature': signResult.stdout,
+        'x-codescene-signature': signResult,
       },
     };
 
@@ -89,12 +90,5 @@ export default class Telemetry {
       }, {} as Record<string, any>);
     }
     logOutputChannel.debug(`[Telemetry] Event "${eventName}": ${JSON.stringify(dataToLog)}`);
-  }
-
-  /**
-   * Executes the command for signing a payload.
-   */
-  private sign(payload: string) {
-    return new SimpleExecutor().execute({ command: this.binaryPath, args: ['sign'] }, {}, payload);
   }
 }

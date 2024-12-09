@@ -22,10 +22,10 @@ export class DeltaAnalyser {
   private analysesRunning = 0;
   private executor = new LimitingExecutor();
 
-  constructor(private cliPath: string) {}
+  constructor(private binaryPath: string) {}
 
-  static init() {
-    DeltaAnalyser._instance = new DeltaAnalyser(CsExtensionState.binaryPath);
+  static init(binaryPath: string) {
+    DeltaAnalyser._instance = new DeltaAnalyser(binaryPath);
   }
 
   static get instance() {
@@ -81,7 +81,7 @@ export class DeltaAnalyser {
 
     let deltaForFile: DeltaForFile | undefined;
     const { stdout, stderr, exitCode } = await this.executor.execute(
-      { command: this.cliPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
+      { command: this.binaryPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
       undefined,
       inputJsonString
     );

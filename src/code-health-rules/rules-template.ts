@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { QuickPickItem, Uri, WorkspaceFolder, window, workspace } from 'vscode';
-import { codeHealthRulesJson } from '../codescene-interop';
+import { DevtoolsAPI } from '../devtools-interop/api';
 
 const rulesPathAndFile: string = '.codescene/code-health-rules.json';
 
@@ -33,7 +33,7 @@ async function pickFolder(
  * Function to generate rules template file and store it in a workspace folder.
  * @returns void
  */
-export async function createRulesTemplate() {
+export async function createRulesTemplate(devtoolsApi: DevtoolsAPI) {
   const folders = workspace.workspaceFolders;
   if (!folders) {
     throw new Error('A CodeScene rules template can only be generated if VS Code is opened on a workspace folder.');
@@ -52,7 +52,7 @@ export async function createRulesTemplate() {
     return;
   }
   const configUri: Uri = Uri.joinPath(folder.uri, rulesPathAndFile);
-  const result = await codeHealthRulesJson();
-  await workspace.fs.writeFile(configUri, Buffer.from(result.stdout, 'utf8'));
+  const template = await devtoolsApi.codeHealthRulesTemplate();
+  await workspace.fs.writeFile(configUri, Buffer.from(template, 'utf8'));
   void window.showInformationMessage('CodeScene rules file successfully generated.');
 }
