@@ -21,6 +21,8 @@ export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
 export async function acceptTermsAndPolicies(context: ExtensionContext): Promise<boolean> {
   if (CsExtensionState.acceptedTermsAndPolicies === true) return true;
 
+  Telemetry.logUsage('terms_and_policies_shown');
+
   const selection = await window.showInformationMessage(
     "By using this extension you agree to CodeScene's Terms and Privacy Policy",
     'Accept',
@@ -28,7 +30,7 @@ export async function acceptTermsAndPolicies(context: ExtensionContext): Promise
     'View Terms & Policies'
   );
 
-  Telemetry.logUsage('termsAndPoliciesResponse', { selection });
+  Telemetry.logUsage('terms_and_policies_response', { selection });
 
   switch (selection) {
     case 'Accept':
