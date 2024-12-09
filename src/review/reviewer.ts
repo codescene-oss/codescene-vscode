@@ -16,8 +16,8 @@ export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(): void {
-    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(CsExtensionState.binaryPath)));
+  static init(binaryPath: string): void {
+    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(binaryPath)));
     logOutputChannel.info('Code reviewer initialized');
   }
 

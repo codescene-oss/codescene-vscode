@@ -5,6 +5,7 @@ import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
+import { DevtoolsAPI } from './devtools-interop/api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
@@ -25,6 +26,7 @@ import debounce = require('lodash.debounce');
 
 interface CsContext {
   csWorkspace: CsWorkspace;
+  devtoolsApi: DevtoolsAPI;
   aceApi: AceAPI;
 }
 
@@ -38,11 +40,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
   try {
     const binaryPath = await ensureCompatibleBinary(context.extensionPath);
-    Telemetry.init(context.extension, binaryPath);
+    const devtoolsApi = new DevtoolsAPI(binaryPath);
+    Telemetry.init(context.extension, devtoolsApi);
     await acceptTermsAndPolicies(context);
 
-    CsExtensionState.setAnalysisState({ binaryPath, state: 'enabled' });
-    await startExtension(context);
+    // Terms accepted - init analysis and start extension
+    Reviewer.init(binaryPath);
+    DeltaAnalyser.init(binaryPath);
+    CsExtensionState.setAnalysisState({ state: 'enabled' });
+    await startExtension(context, devtoolsApi);
   } catch (unknownErr) {
     const error = assertError(unknownErr);
     if (!error) return;
@@ -52,13 +58,12 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 }
 
-async function startExtension(context: vscode.ExtensionContext) {
+async function startExtension(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
+    devtoolsApi,
     aceApi: activateAce(),
   };
-  Reviewer.init();
-  DeltaAnalyser.init();
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context, csContext.aceApi);
@@ -125,7 +130,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   });
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
-  registerCHRulesCommands(context);
+  registerCHRulesCommands(context, csContext.devtoolsApi);
 }
 
 /**
@@ -188,7 +193,7 @@ async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, 
     aceApi.disable();
     return;
   }
-  await aceApi.enable(context);
+  await aceApi.enable(context, csContext.devtoolsApi);
 }
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
