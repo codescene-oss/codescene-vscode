@@ -52,20 +52,30 @@ export class FileWithIssues implements DeltaTreeViewItem {
   private createCodeHealthInfo(deltaForFile: DeltaForFile) {
     const scoreLabel = `Code Health: ${scorePresentation(deltaForFile)}`;
     const scoreInfo = new vscode.TreeItem(scoreLabel);
-    scoreInfo.tooltip = 'The Code health for this file is declining. Explore the functions below for more details.';
-
-    const iconFn = () => {
+    const exploreText = 'Explore the functions below for more details.';
+    const iconAndTooltip = () => {
       if (this.scoreChange > 0) {
-        return new vscode.ThemeIcon('arrow-up', okColor);
+        return {
+          icon: new vscode.ThemeIcon('arrow-up', okColor),
+          tooltip: 'The Code health for this file is improving.',
+        };
       } else if (this.scoreChange < 0) {
-        return new vscode.ThemeIcon('arrow-down', errorColor);
+        return {
+          icon: new vscode.ThemeIcon('arrow-down', errorColor),
+          tooltip: 'The Code health for this file is declining.',
+        };
       } else {
-        return new vscode.ThemeIcon('arrow-right', fgColor);
+        return {
+          icon: new vscode.ThemeIcon('arrow-right', fgColor),
+          tooltip: 'The Code health for this file is unchanged.',
+        };
       }
     };
 
+    const { icon, tooltip } = iconAndTooltip();
+    scoreInfo.tooltip = `${tooltip} ${exploreText}`;
+    scoreInfo.iconPath = icon;
     scoreInfo.description = `(${roundScore(this.scorePercentageChange)}%)`;
-    scoreInfo.iconPath = iconFn();
     return new DeltaInfoItem(scoreInfo);
   }
 
