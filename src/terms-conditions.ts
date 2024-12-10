@@ -18,7 +18,7 @@ export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
   );
 }
 
-export async function acceptTermsAndPolicies(context: ExtensionContext): Promise<boolean> {
+export async function acceptTermsAndPolicies(context: ExtensionContext): Promise<true> {
   if (CsExtensionState.acceptedTermsAndPolicies === true) return true;
 
   Telemetry.logUsage('terms_and_policies_shown');

@@ -4,12 +4,11 @@ import * as vscode from 'vscode';
 import { getPortalUrl } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { logAxiosError } from './cs-rest-api';
-import { ExecResult, SimpleExecutor } from './executor';
-import { logOutputChannel } from './log';
 import { DevtoolsAPI } from './devtools-interop/api';
+import { logOutputChannel } from './log';
 
 export default class Telemetry {
-  private static _instance: Telemetry;
+  private static _instance?: Telemetry;
 
   private static eventPrefix = 'vscode';
 
@@ -45,6 +44,10 @@ export default class Telemetry {
   }
 
   static logUsage(eventName: string, eventData?: any) {
+    if (!Telemetry._instance) {
+      logOutputChannel.warn(`[Telemetry] Attempted to log event "${eventName}" before telemetry was initialized`);
+      return;
+    }
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
 

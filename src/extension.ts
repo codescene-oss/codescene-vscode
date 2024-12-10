@@ -4,6 +4,7 @@ import { activate as activateCHMonitor } from './code-health-monitor/addon';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
+import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-interop/api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -36,26 +37,33 @@ interface CsContext {
  */
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
-  CsExtensionState.init(context);
+  const controlCenterViewProvider = registerControlCenterViewProvider(context);
+  CsExtensionState.init(context, controlCenterViewProvider);
 
-  try {
-    const binaryPath = await ensureCompatibleBinary(context.extensionPath);
-    const devtoolsApi = new DevtoolsAPI(binaryPath);
-    Telemetry.init(context.extension, devtoolsApi);
-    await acceptTermsAndPolicies(context);
+  ensureCompatibleBinary(context.extensionPath).then(
+    async (binaryPath) => {
+      const devtoolsApi = new DevtoolsAPI(binaryPath);
+      Telemetry.init(context.extension, devtoolsApi);
 
-    // Terms accepted - init analysis and start extension
-    Reviewer.init(binaryPath);
-    DeltaAnalyser.init(binaryPath);
-    CsExtensionState.setAnalysisState({ state: 'enabled' });
-    await startExtension(context, devtoolsApi);
-  } catch (unknownErr) {
-    const error = assertError(unknownErr);
-    if (!error) return;
-
-    CsExtensionState.setAnalysisState({ state: 'error', error });
-    reportError('Unable to start extension', error);
-  }
+      try {
+        await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
+        Reviewer.init(binaryPath);
+        DeltaAnalyser.init(binaryPath);
+        CsExtensionState.setAnalysisState({ state: 'enabled' });
+        await startExtension(context, devtoolsApi);
+        finalizeActivation(controlCenterViewProvider);
+      } catch (e) {
+        const error = assertError(e) || new Error('Unknown error');
+        CsExtensionState.setAnalysisState({ state: 'error', error });
+        reportError('Unable to start extension', error);
+      }
+    },
+    (e) => {
+      const error = assertError(e) || new Error('Unknown error');
+      CsExtensionState.setAnalysisState({ state: 'error', error });
+      reportError('Unable to start extension', error);
+    }
+  );
 }
 
 async function startExtension(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
@@ -105,8 +113,6 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
       await debouncedEnableOrDisableACECapabilities(context, csContext);
     })
   );
-
-  finalizeActivation();
 }
 
 /**
@@ -114,9 +120,10 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
  * The context variable is used in package.json to conditionally enable/disable views that could
  * point to commands that haven't been fully initialized.
  */
-function finalizeActivation() {
+function finalizeActivation(ccProvider: ControlCenterViewProvider) {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('onActivateExtension');
+  ccProvider.sendStartupTelemetry();
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 

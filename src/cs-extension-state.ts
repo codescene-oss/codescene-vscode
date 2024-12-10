@@ -1,7 +1,7 @@
 import vscode, { Uri } from 'vscode';
 import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
-import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
+import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { logOutputChannel } from './log';
 import { AceAPI } from './refactoring/addon';
@@ -47,11 +47,13 @@ const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
  */
 export class CsExtensionState {
   readonly stateProperties: CsStateProperties;
-  readonly controlCenterView: ControlCenterViewProvider;
   readonly statusBar: CsStatusBar;
   readonly extensionUri: Uri;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly controlCenterView: ControlCenterViewProvider
+  ) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -59,7 +61,6 @@ export class CsExtensionState {
       },
     };
     this.extensionUri = context.extensionUri;
-    this.controlCenterView = registerControlCenterViewProvider(context);
     context.subscriptions.push(
       vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
         CsExtensionState.clearErrors();
@@ -76,8 +77,8 @@ export class CsExtensionState {
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext) {
-    CsExtensionState._instance = new CsExtensionState(context);
+  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
+    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
   }
 
   static get acceptedTermsAndPolicies() {
