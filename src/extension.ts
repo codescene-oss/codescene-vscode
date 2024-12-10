@@ -62,6 +62,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const error = assertError(e) || new Error('Unknown error');
       CsExtensionState.setAnalysisState({ state: 'error', error });
       reportError('Unable to start extension', error);
+      Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
 }
@@ -122,7 +123,7 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
  */
 function finalizeActivation(ccProvider: ControlCenterViewProvider) {
   // send telemetry on activation (gives us basic usage stats)
-  Telemetry.logUsage('onActivateExtension');
+  Telemetry.logUsage('on_activate_extension');
   ccProvider.sendStartupTelemetry();
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
