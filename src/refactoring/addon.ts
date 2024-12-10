@@ -79,10 +79,8 @@ async function enable(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI
 
     logOutputChannel.info('ACE enabled!');
     return capabilities;
-  } catch (unknownErr) {
-    const error = assertError(unknownErr);
-    if (!error) return;
-
+  } catch (e) {
+    const error = assertError(e) || new Error('Unknown error');
     stateEmitter.fire({ state: 'error', error });
     reportError('Unable to enable refactoring capabilities', error);
   }

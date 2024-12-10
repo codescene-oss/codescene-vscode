@@ -46,14 +46,17 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
   }
 
   private handleVisibilityEvents(view: vscode.WebviewView) {
-    // On first resolve ("resolveWebviewView is called when a view first becomes visible")
-    Telemetry.logUsage('control-center/visibility', { visible: view.visible });
     view.onDidChangeVisibility(
       // On subsequent visibility changes (void event - use view.visible)
       () => Telemetry.logUsage('control-center/visibility', { visible: view.visible }),
       this,
       this.disposables
     );
+  }
+
+  // Just to be able to send visibility status on startup. Can't do that on resolveWebviewView since we don't know if DevtoolsAPI is available.
+  public sendStartupTelemetry() {
+    Telemetry.logUsage('control-center/visibility', { visible: this.view?.visible ? true : false });
   }
 
   private handleMessages(message: any) {
