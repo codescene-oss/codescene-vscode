@@ -3,12 +3,12 @@ name: Create github release from tag
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   tagged-release:
-    name: "Tagged Release"
-    runs-on: "ubuntu-latest"
+    name: 'Tagged Release'
+    runs-on: 'ubuntu-latest'
 
     steps:
       - name: Checkout
@@ -22,9 +22,8 @@ jobs:
           vsce package
         env:
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
-  
-      - uses: "marvinpinto/action-automatic-releases@latest"
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-          files: "*.vsix"
+          files: '*.vsix'
