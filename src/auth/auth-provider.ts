@@ -99,7 +99,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       },
       scopes: [],
       version: info.version,
-      url: info.url
+      url: info.url,
     };
 
     await this.context.secrets.store(SESSIONS_STORAGE_KEY, JSON.stringify([session]));
@@ -163,6 +163,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         title: 'Signing in to CodeScene...',
         cancellable: true,
       },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       async (_, cancelButtonToken) => {
         const loginUrl = await this.loginUrl();
         logOutputChannel.debug(`Opening ${loginUrl.toString()}`);
@@ -171,9 +172,11 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
         const promises: Promise<any>[] = [];
         const codeExchangePromise = promiseFromEvent(this.uriHandler.event, this.handleUri());
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         const timeoutPromise = new Promise<LoginResponse>((_, reject) => setTimeout(() => reject('Cancelled'), 60000));
         const cancelledByButtonPromise = promiseFromEvent(
           cancelButtonToken.onCancellationRequested,
+          // eslint-disable-next-line @typescript-eslint/naming-convention
           (_, __, reject) => {
             Telemetry.logUsage('auth/cancelled');
             reject('User Cancelled');
@@ -183,6 +186,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
         if (CsAuthenticationProvider.runningLogin) {
           promises.push(
+            // eslint-disable-next-line @typescript-eslint/naming-convention
             promiseFromEvent(CsAuthenticationProvider.runningLogin.token.onCancellationRequested, (_, __, reject) => {
               Telemetry.logUsage('auth/cancelled');
               reject('Cancelled due to starting another login attempt');
