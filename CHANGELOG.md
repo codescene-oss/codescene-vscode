@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.4...v0.9.5) (2024-12-12)
+
+
+### Bug fixes
+
+* **code-health-monitor:** Tooltip for code health info should reflect the score change ([6cf8618](https://github.com/codescene-oss/codescene-vscode/commit/6cf861845c11f0b557587a048d34897574d4a752))
+* **control-center:** Make sure that control-center gets resolved while ensuring compatible binary and accepting T&C ([77cf187](https://github.com/codescene-oss/codescene-vscode/commit/77cf187dba9288e0939f4304855620125408962c))
+
 ### [0.9.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.3...v0.9.4) (2024-12-07)
 
 
