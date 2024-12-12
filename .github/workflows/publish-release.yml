@@ -1,12 +1,12 @@
-name: Publish latest release (Manual)
+name: Publish latest release (manual)
 
 on:
   workflow_dispatch:
     inputs:
-      publish_microsoft_marketplace:
+      publish_vscode_marketplace:
         type: boolean
         default: true
-        description: Publish to Microsoft Marketplace
+        description: Publish to VS Code Marketplace
       publish_open_vsx:
         type: boolean
         default: true
@@ -30,15 +30,20 @@ jobs:
       - name: Output file-name for use in publishing steps
         id: latest-release
         run: echo "file-name=$(find . -name codescene-vscode*.vsix)" >> "$GITHUB_OUTPUT"
-  
-      - name: Publish to Microsoft Marketplace
-        if: ${{ github.event.inputs.publish_microsoft_marketplace == 'true' }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publish to VS Code Marketplace
+        if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' }}
         run: |
           npm install -g vsce
-          vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath ${{ github.steps.latest-release.outputs.file-name }}
+          vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath ${{ steps.latest-release.outputs.file-name }}
 
       - name: Publish to open-vsx
         if: ${{ github.event.inputs.publish_open_vsx == 'true' }}
         run: |
           npm install -g ovsx
-          ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath ${{ github.steps.latest-release.outputs.file-name }}
+          ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath ${{ steps.latest-release.outputs.file-name }}

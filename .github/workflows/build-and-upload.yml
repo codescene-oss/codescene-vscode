@@ -1,9 +1,9 @@
 name: Build and upload vsix
 
 on:
-  # push:
-  #   branches:
-  #     - main
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,6 @@ jobs:
       - uses: './.github/actions/setup'
 
       - name: Set PRERELEASE version
-        working-directory: codescene-vscode
         run: |
           current_version=$(jq -r '.version' package.json)
           short_sha=$(git rev-parse --short HEAD)
@@ -35,3 +34,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: '*.vsix'
+          name: 'codescene-vscode-prerelease'
