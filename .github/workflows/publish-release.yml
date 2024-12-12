@@ -1,0 +1,44 @@
+name: Publish latest release (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_microsoft_marketplace:
+        type: boolean
+        default: true
+        description: Publish to Microsoft Marketplace
+      publish_open_vsx:
+        type: boolean
+        default: true
+        description: Publish to Open VSX
+
+jobs:
+  build:
+    name: 'Publish Extension'
+    runs-on: 'ubuntu-latest'
+
+    steps:
+      - name: Get latest release
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          regex: true
+          file: 'codescene-vscode.*\.vsix'
+          version: 'latest'
+          target: './'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output file-name for use in publishing steps
+        id: latest-release
+        run: echo "file-name=$(find . -name codescene-vscode*.vsix)" >> "$GITHUB_OUTPUT"
+  
+      - name: Publish to Microsoft Marketplace
+        if: ${{ github.event.inputs.publish_microsoft_marketplace == 'true' }}
+        run: |
+          npm install -g vsce
+          vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath ${{ github.steps.latest-release.outputs.file-name }}
+
+      - name: Publish to open-vsx
+        if: ${{ github.event.inputs.publish_open_vsx == 'true' }}
+        run: |
+          npm install -g ovsx
+          ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath ${{ github.steps.latest-release.outputs.file-name }}

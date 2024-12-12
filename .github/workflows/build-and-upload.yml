@@ -1,0 +1,37 @@
+name: Build and upload vsix
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: 'ubuntu-latest'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: './.github/actions/setup'
+
+      - name: Set PRERELEASE version
+        working-directory: codescene-vscode
+        run: |
+          current_version=$(jq -r '.version' package.json)
+          short_sha=$(git rev-parse --short HEAD)
+          jq --arg new_version "${current_version}-PRERELEASE-${short_sha}" '.version = $new_version' package.json > tmp.json
+          mv tmp.json package.json
+
+      - name: Build extension vsix file
+        run: |
+          npm install --global @vscode/vsce
+          vsce package
+        env:
+          GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
+
+      - name: Upload vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: '*.vsix'

@@ -1,0 +1,14 @@
+name: 'Extension setup'
+description: 'Setup node and run npm ci'
+
+runs:
+  using: 'composite'
+    steps:
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: codescene-vscode
+        run: npm ci
