@@ -19,18 +19,19 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '1d8b31b9a73b4e6520f32da65a81d6b209bf3f27';
+const REQUIRED_DEVTOOLS_VERSION = 'da9e1735c9b3d3b7ff5334cb7b54b02ec1da86f5';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
-    x64: `codescene-cli-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `codescene-cli-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    x64: `cs-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   linux: {
-    x64: `codescene-cli-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   win32: {
-    x64: `codescene-cli-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    x64: `cs-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
 };
 
@@ -65,9 +66,9 @@ async function unzipFile({ absoluteDownloadPath, extensionPath, absoluteBinaryPa
     logOutputChannel.warn(`Error trying to delete ${absoluteDownloadPath} after extracting:`, e);
   });
 
-  // The zip file contains a single file named "cs", or "cs.exe" on Windows.
+  // The zip file contains a single file named "cs-ide", or "cs-ide.exe" on Windows.
   // We rename it to the name of the executable for the current platform.
-  const execFromZip = path.join(extensionPath, 'cs' + (process.platform === 'win32' ? '.exe' : ''));
+  const execFromZip = path.join(extensionPath, 'cs-ide' + (process.platform === 'win32' ? '.exe' : ''));
   await fs.promises.rename(execFromZip, absoluteBinaryPath);
 }
 
