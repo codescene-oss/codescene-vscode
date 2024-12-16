@@ -24,6 +24,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
 
       - name: GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: '*.vsix'
+        run: |
+          gh release create ${{ github.ref_name }} *.vsix --generate-notes --verify-tag
