@@ -1,15 +1,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import vscode from 'vscode';
 import { CodeSceneAuthenticationSession } from './auth/auth-provider';
-import { Coupling } from './coupling/model';
 import { CsExtensionState } from './cs-extension-state';
 import { logOutputChannel } from './log';
-import { RefactorRequest } from './refactoring/model';
-import { CsServerVersion } from './server-version';
 
 const defaultTimeout = 10000;
 
-// TODO - rename, this is basically just an axios wrapper (after cleaning up the fetchprojects and couplings)
 export class CsRestApi {
   private static _instance: CsRestApi;
 
@@ -48,67 +44,16 @@ export class CsRestApi {
     return CsRestApi._instance;
   }
 
-  private async getServerApiUrl() {
-    let url: string;
-    let serverType: string;
-    if (CsExtensionState.stateProperties.session && isCodeSceneSession(CsExtensionState.stateProperties.session)) {
-      let session = CsExtensionState.stateProperties.session as CodeSceneAuthenticationSession;
-      url = session.url;
-      serverType = session.version.server;
-    } else {
-      const info = await CsServerVersion.info;
-      url = info.url;
-      serverType = info.version.server;
-    }
-    let apiUrl;
-    if (serverType === 'cloud') {
-      if (url === 'https://staging.codescene.io') {
-        apiUrl = 'https://api-staging.codescene.io';
-      } else if (url === 'https://codescene.io') {
-        apiUrl = 'https://api.codescene.io';
-      } else {
-        apiUrl = url;
-      }
-    } else {
-      // onprem
-      apiUrl = url + '/api';
-    }
-    logOutputChannel.trace(`Using API URL: ${apiUrl}`);
-    return apiUrl;
-  }
-
   public async getRequest<T>(url: string, config?: AxiosRequestConfig) {
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.get(url, conf);
     return response.data as T;
   }
 
-  public async postRequest<T>(url: string, data: RefactorRequest, config?: AxiosRequestConfig) {
+  public async postRequest<T>(url: string, data: any, config?: AxiosRequestConfig) {
     const conf = Object.assign({ headers: { Accept: 'application/json' } }, config);
     const response = await this.axiosInstance.post(url, data, conf);
     return response.data as T;
-  }
-
-  /** deprecated - TODO, remove */
-  async fetchCouplings(projectId: number) {
-    const serverUrl = await this.getServerApiUrl();
-    const couplingsUrl = `${serverUrl}/v2/devtools/projects/${projectId}/couplings`;
-
-    const rawData = await this.getRequest<{ [key: string]: any }[]>(couplingsUrl);
-
-    rawData.forEach((entity) => {
-      entity.averageRevs = entity['average_revs'];
-      delete entity['average_revs'];
-    });
-
-    return rawData as Coupling[];
-  }
-
-  /** deprecated - TODO, remove along with /couplings */
-  async fetchProjects() {
-    const serverUrl = await this.getServerApiUrl();
-    const projectsUrl = serverUrl + '/v2/devtools/projects';
-    return await this.getRequest<{ id: number; name: string }[]>(projectsUrl);
   }
 }
 

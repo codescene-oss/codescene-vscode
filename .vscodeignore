@@ -5,7 +5,6 @@ src/**
 .gitignore
 .yarnrc
 esbuild.js
-vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
@@ -13,10 +12,7 @@ vsc-extension-quickstart.md
 node_modules/
 
 ## Ignore executables and zips created (in the download process) when running the extension in dev mode
-cs
-cs.last-modified
-cs-*-*
-cs-*.last-modified
+cs-*
 *.zip
 
 ## Misc dotfiles
