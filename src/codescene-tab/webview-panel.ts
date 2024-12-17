@@ -85,7 +85,18 @@ export class CodeSceneTabPanel implements Disposable {
     if (!fnToRefactor) return false;
     const contentAtRange = document.getText(fnToRefactor.range);
     if (contentAtRange === fnToRefactor.content) return false;
-    if (document.getText().indexOf(fnToRefactor.content) >= 0) return false;
+    
+    const ixOfContent = document.getText().indexOf(fnToRefactor.content);
+    if (ixOfContent >= 0) {
+      // Content matches, but function has been moved - update fnToRefactorRange!
+      const newPos = document.positionAt(ixOfContent);
+      const r = fnToRefactor.range;
+      const newRange = r.with(
+        newPos,
+        r.end.translate(newPos.line - r.start.line)
+      );
+      fnToRefactor.range = newRange;
+    }
     return true;
   }
 
