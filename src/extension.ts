@@ -47,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       try {
         await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
-        Reviewer.init(binaryPath);
+        Reviewer.init(binaryPath, context);
         DeltaAnalyser.init(binaryPath);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context, devtoolsApi);

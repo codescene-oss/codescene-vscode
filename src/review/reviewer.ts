@@ -1,10 +1,9 @@
 import { basename, dirname } from 'path';
-import vscode from 'vscode';
+import vscode, { Disposable } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
-import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { StatsCollector } from '../stats';
@@ -16,8 +15,9 @@ export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(binaryPath: string): void {
+  static init(binaryPath: string, context: vscode.ExtensionContext): void {
     Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(binaryPath)));
+    context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
   }
 
@@ -55,7 +55,7 @@ export class ReviewCacheItem {
   public documentVersion: number;
   public delta?: DeltaForFile;
 
-  constructor(private document: vscode.TextDocument, public review: CsReview) {
+  constructor(public document: vscode.TextDocument, public review: CsReview) {
     this.documentVersion = document.version;
     this.resetBaseline();
   }
@@ -71,8 +71,14 @@ export class ReviewCacheItem {
   async runDeltaAnalysis() {
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
-    const delta = await DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
-    this.delta = delta || undefined;
+    this.delta = await DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
+  }
+
+  /**
+   * Deletes the delta for this item, and makes sure that (empty) DeltaAnalysisEvents are triggered properly
+   */
+  async deleteDelta() {
+    this.delta = await DeltaAnalyser.instance.deltaForScores(this.document);
   }
 
   resetBaseline() {
@@ -115,8 +121,12 @@ class ReviewCache {
     this._cache.set(document.fileName, new ReviewCacheItem(document, review));
   }
 
-  delete(document: vscode.TextDocument) {
-    this._cache.delete(document.fileName);
+  delete(fsPath: string) {
+    const item = this._cache.get(fsPath);
+    if (item) {
+      void item.deleteDelta();
+      this._cache.delete(fsPath);
+    }
   }
 
   resetBaseline(fsPath: string) {
@@ -124,7 +134,8 @@ class ReviewCache {
   }
 }
 
-class CachingReviewer {
+class CachingReviewer implements Disposable {
+  private disposables: vscode.Disposable[] = [];
   readonly reviewCache = new ReviewCache();
 
   private readonly errorEmitter = new vscode.EventEmitter<Error>();
@@ -134,7 +145,15 @@ class CachingReviewer {
 
   private reviewsRunning = 0;
 
-  constructor(private reviewer: InternalReviewer) {}
+  constructor(private reviewer: InternalReviewer) {
+    const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
+    this.disposables.push(
+      deleteFileWatcher,
+      deleteFileWatcher.onDidDelete((uri) => {
+        this.reviewCache.delete(uri.fsPath);
+      })
+    );
+  }
 
   private startReviewEvent(document: vscode.TextDocument) {
     this.reviewsRunning++;
@@ -163,7 +182,7 @@ class CachingReviewer {
         case 'ABORT_ERR':
           // Delete the cache entry for this document if the review was aborted (document closed)
           // Otherwise it won't be reviewed immediately when the document is opened again
-          this.reviewCache.delete(document);
+          this.reviewCache.delete(document.uri.fsPath);
           return;
         default:
           logOutputChannel.error(e.message);
@@ -185,7 +204,7 @@ class CachingReviewer {
       .review(document, reviewOpts)
       .then((reviewResult) => {
         // Clear cache of void reviews (ignored files probably)
-        if (!reviewResult) this.reviewCache.delete(document);
+        if (!reviewResult) this.reviewCache.delete(document.uri.fsPath);
         return reviewResult;
       })
       .catch((e) => this.handleReviewError(e, document))
@@ -239,6 +258,10 @@ class CachingReviewer {
 
   abort(document: vscode.TextDocument): void {
     this.reviewer.abort(document);
+  }
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
   }
 }
 
