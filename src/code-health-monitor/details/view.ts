@@ -5,6 +5,7 @@ import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
 import { DeltaFunctionInfo } from '../tree-model';
+import { ChangeType, isDegradation, isImprovement } from '../model';
 
 export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
@@ -161,11 +162,17 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {
+    const iconClass = (changeType: ChangeType) => {
+      if (isDegradation(changeType)) return 'codicon-chrome-close color-red';
+      if (isImprovement(changeType)) return 'codicon-check color-green';
+      return 'codicon-circle-small-filled';
+    };
+
     const issueDetails = functionInfo.children.map(
       (issue, ix) => /*html*/ `
       <div class="issue">
         <div class="flex-row">
-          <span class="codicon codicon-chrome-close color-red"></span> 
+          <span class="codicon ${iconClass(issue.changeDetail['change-type'])}"></span> 
           <strong>${capitalize(issue.changeDetail['change-type'])}: </strong>
           <a href="" class="issue-link" issue-index="${ix}">${issue.changeDetail.category}</a>
         </div>

@@ -33,6 +33,10 @@ a:focus {
   color: var(--vscode-errorForeground);
 }
 
+.color-green {
+  color: var(--vscode-terminal-ansiGreen);
+}
+
 .function-summary {
   margin-top: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
