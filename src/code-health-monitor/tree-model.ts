@@ -163,6 +163,12 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     item.iconPath = new vscode.ThemeIcon('symbol-function');
     item.description = this.isRefactoringSupported ? 'Auto-Refactor' : undefined;
     item.tooltip = this.tooltip();
+    item.command = {
+      command: 'codescene.codeHealthMonitor.showDeltaFunctionInfo',
+      title: 'Show details for function',
+      arguments: [this],
+    };
+
     return item;
   }
 

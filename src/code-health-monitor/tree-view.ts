@@ -1,4 +1,4 @@
-import vscode, { TreeViewSelectionChangeEvent } from 'vscode';
+import vscode from 'vscode';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
@@ -33,11 +33,14 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
     this.treeDataProvider.setParentView(this.view);
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
-    this.view.onDidChangeSelection(this.handleSelectionChange, this, this.disposables);
     this.disposables.push(
       this.view,
       vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
+      ),
+      vscode.commands.registerCommand(
+        'codescene.codeHealthMonitor.showDeltaFunctionInfo',
+        (selection: DeltaFunctionInfo) => this.showDeltaFunctionInfo(selection)
       ),
       DeltaAnalyser.instance.onDidAnalyse((event) => {
         if (event.type === 'end') {
@@ -61,19 +64,30 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       tooltip: [resultsText].filter(isDefined).join(' • '),
     };
 
-    this.updateFunctionInfoDetails(this.view.selection[0]);
+    // The selection is not yet updated with the new tree data here!
+    // Try and find the new data in the tree and update the details view with that
+    const selection = this.view.selection[0];
+    if (selection instanceof DeltaFunctionInfo) {
+      const newItem = this.treeDataProvider.tree
+        .flatMap((item) => item.children)
+        .find(
+          (item) =>
+            item instanceof DeltaFunctionInfo && item.fnName === selection.fnName && item.parent === selection.parent
+        );
+      this.updateFunctionInfoDetails(newItem);
+    }
   }
 
-  private handleSelectionChange(e: TreeViewSelectionChangeEvent<DeltaTreeViewItem>) {
-    this.updateFunctionInfoDetails(e.selection[0]);
-    this.goToLocation(e.selection[0]);
+  private showDeltaFunctionInfo(selection: DeltaFunctionInfo) {
+    this.updateFunctionInfoDetails(selection);
+    this.goToLocation(selection);
   }
 
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
-      void vscode.commands.executeCommand('codescene.monitorCodeLens.showFunction', selection);
-   } else {
+      void vscode.commands.executeCommand('codescene.monitorCodeLens.showForFunction', selection);
+    } else {
       // else just clear the view
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
     }

@@ -8,12 +8,8 @@ export function register(context: vscode.ExtensionContext) {
   const codeLensProvider = new CodeHealthMonitorCodeLens();
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider),
-    vscode.commands.registerCommand('codescene.monitorCodeLens.showFunction', (functionInfo: DeltaFunctionInfo) => {
-      const uri = functionInfo.parent.document.uri;
-      const pos = functionInfo.range.start;
-      const location = new vscode.Location(uri, pos);
+    vscode.commands.registerCommand('codescene.monitorCodeLens.showForFunction', (functionInfo: DeltaFunctionInfo) => {
       codeLensProvider.showFor(functionInfo);
-      void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
     }),
     vscode.commands.registerCommand('codescene.monitorCodeLens.dismiss', (documentUri: Uri) => {
       codeLensProvider.dismiss(documentUri);
