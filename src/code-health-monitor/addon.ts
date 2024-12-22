@@ -4,7 +4,6 @@ import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
-import { DeltaFunctionInfo } from './tree-model';
 import { CodeHealthMonitorView } from './tree-view';
 
 export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
