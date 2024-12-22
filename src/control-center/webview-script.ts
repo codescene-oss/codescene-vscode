@@ -12,7 +12,7 @@ function main() {
 
   // Status
   addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('showLogOutput'));
-  addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('show-ace-error'));
+  addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('retryAce'));
 
   // More
   addClickListenerToElementById('codescene-settings', () => sendMessage('openSettings'));

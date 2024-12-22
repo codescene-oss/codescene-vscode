@@ -63,6 +63,11 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     const commands: { [key: string]: () => void } = {
       openAiPricing: () => this.openLink('https://codescene.com/product/ai-coding#pricing'),
       showLogOutput: () => logOutputChannel.show(),
+      retryAce: () => {
+        logOutputChannel.show();
+        logOutputChannel.info('Retrying ACE activation...');
+        void vscode.commands.executeCommand('codescene.ace.activate');
+      },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
@@ -234,7 +239,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         break;
       case 'error':
         iconClass = 'codicon-error';
-        tooltip = aceFeature.error ? aceFeature.error.message : '';
+        tooltip = 'Click to retry connecting to CodeScene ACE';
         text = 'error';
         break;
     }
