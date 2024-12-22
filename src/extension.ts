@@ -71,7 +71,7 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
     devtoolsApi,
-    aceApi: activateAce(),
+    aceApi: activateAce(context, devtoolsApi),
   };
   CsServerVersion.init();
 
@@ -86,7 +86,7 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
-  await enableOrDisableACECapabilities(context, csContext);
+  void vscode.commands.executeCommand('codescene.ace.activate');
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
@@ -102,16 +102,18 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   registerCodeActionProvider(context);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedEnableOrDisableACECapabilities = debounce(enableOrDisableACECapabilities, 500);
+  const debouncedEnableAce = debounce(() => {
+    void vscode.commands.executeCommand('codescene.ace.activate');
+  }, 500);
   context.subscriptions.push(
-    onDidChangeConfiguration('enableAutoRefactor', async (e) => {
-      await debouncedEnableOrDisableACECapabilities(context, csContext);
+    onDidChangeConfiguration('enableAutoRefactor', (e) => {
+      debouncedEnableAce();
     })
   );
 
   context.subscriptions.push(
-    onDidChangeConfiguration('devtoolsPortalUrl', async (e) => {
-      await debouncedEnableOrDisableACECapabilities(context, csContext);
+    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
+      debouncedEnableAce();
     })
   );
 }
@@ -193,16 +195,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {}
 
 function disableRemoteFeatures() {}
-
-async function enableOrDisableACECapabilities(context: vscode.ExtensionContext, csContext: CsContext) {
-  const { aceApi } = csContext;
-  const enableACE = getConfiguration('enableAutoRefactor');
-  if (!enableACE) {
-    aceApi.disable();
-    return;
-  }
-  await aceApi.enable(context, csContext.devtoolsApi);
-}
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);

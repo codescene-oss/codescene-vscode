@@ -12,14 +12,13 @@ import { CsRefactoringCommands } from './commands';
 import { RefactoringRequest } from './request';
 import { createTmpDiffUriScheme } from './utils';
 import { DevtoolsAPI } from '../devtools-interop/api';
+import { getConfiguration } from '../configuration';
 
 /**
  * Work in progress API just to keep us from creating too many contact points between
  * the ACE functionality and the rest of the extension
  */
 export interface AceAPI {
-  enable: (context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) => Promise<RefactoringCapabilities | undefined>;
-  disable: () => void;
   onDidChangeState: vscode.Event<AceFeature>;
   onDidRefactoringRequest: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
@@ -32,12 +31,22 @@ export type AceRequestEvent = {
 };
 
 /**
- * Aside from the AceAPI, this "addon" also contributes some key commands from commands.ts:
+ * Aside from the AceAPI, this "addon" also contributes
+ * the codescene.ace.activate command
  */
-export function activate(): AceAPI {
+export function activate(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI): AceAPI {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codescene.ace.activate', () => {
+      const enableACE = getConfiguration('enableAutoRefactor');
+      if (!enableACE) {
+        disable();
+        return;
+      }
+      void enable(context, devtoolsApi);
+    })
+  );
+
   return {
-    enable,
-    disable,
     onDidChangeState: stateEmitter.event,
     onDidRefactoringRequest: RefactoringRequest.onDidRefactoringRequest,
     onDidRequestFail: RefactoringRequest.onDidRequestFail,
