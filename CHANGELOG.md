@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.7](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.6...v0.9.7) (2025-01-07)
+
+
+### Features
+
+* **control-center:** Retry ACE connection on error badge click ([d26b474](https://github.com/codescene-oss/codescene-vscode/commit/d26b474e1464025d2cd21b6d5b8719ce9e5cbd35))
+
+
+### Bug fixes
+
+* **code-health-details:** Correct icon for fixed issues ([7a39e27](https://github.com/codescene-oss/codescene-vscode/commit/7a39e273ab62fde35751e2459c3977e37d66d6d7))
+* **code-health-details:** Properly refresh the code health details view when the monitor result is updated ([06c6123](https://github.com/codescene-oss/codescene-vscode/commit/06c6123ea70f09ad8bd73d483466ead8bcb49fde))
+* **code-health-monitor:** Respect file delete/rename/move ([aa6f49f](https://github.com/codescene-oss/codescene-vscode/commit/aa6f49f250c5ceb54f73c5ced9de2f64f1c6a37f))
+* **github:** Add GH_TOKEN to release run ([d81cc45](https://github.com/codescene-oss/codescene-vscode/commit/d81cc45130a58d7c0a2c83d0afbeccdb68e8d8b2))
+* **refactoring:** Keep function range updated when content above has been changed ([195d66c](https://github.com/codescene-oss/codescene-vscode/commit/195d66c4800141535e4c6fec88e7454a0f879ec0))
+
 ### [0.9.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.5...v0.9.6) (2024-12-13)
 
 
