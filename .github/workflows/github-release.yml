@@ -24,5 +24,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_TOKEN }}
 
       - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} *.vsix --generate-notes --verify-tag
