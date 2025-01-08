@@ -154,7 +154,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
       <div class="block function-summary">
         <h2>${functionInfo.fnName}</h2>
         <div class="flex-row filename-and-smell">
-          <div class="flex-row">${fileName}</div> <!-- TODO seti file type theme icon ? -->
+          <div class="flex-row"><span class="codicon codicon-file"></span> ${fileName}</div>
           <div class="flex-row"><span class="codicon codicon-warning"></span> ${smellInfo}</div>
         </div>
       </div>
