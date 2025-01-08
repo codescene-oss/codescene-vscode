@@ -1,9 +1,9 @@
 import assert from 'assert';
 import * as vscode from 'vscode';
+import { DevtoolsAPI } from '../../devtools-interop/api';
+import { EnclosingFn } from '../../devtools-interop/model';
 import { rangeFromEnclosingFn, RefactoringCapabilities, targetsInRange } from '../../refactoring/capabilities';
 import { PreFlightResponse } from '../../refactoring/model';
-import { EnclosingFn } from '../../devtools-interop/model';
-import { DevtoolsAPI } from '../../devtools-interop/api';
 
 const preFlight: PreFlightResponse = {
   version: 2.0,
@@ -26,14 +26,6 @@ const preFlight: PreFlightResponse = {
       'code-smells': ['Bad Naming', 'Bumpy Road Ahead', 'Large Method'],
     },
   },
-
-  // Old props
-  supported: {
-    'code-smells': [],
-    'file-types': [],
-  },
-  'max-input-loc': 130,
-  'max-input-tokens': 2048,
 };
 
 const capabilities = new RefactoringCapabilities(preFlight, new DevtoolsAPI('./cs-dummy'));

@@ -69,7 +69,7 @@ export class RefactoringCapabilities {
 
   maxLocFor(document?: TextDocument) {
     const languageSpecificRule = document && this.languageSupport.get(document.languageId)?.['max-input-loc'];
-    return languageSpecificRule || this.preFlight['max-input-loc'];
+    return languageSpecificRule || this.preFlight['language-common']['max-input-loc'];
   }
 
   async getFunctionsToRefactor(document: TextDocument, refactoringTargets: RefactoringTarget[]) {

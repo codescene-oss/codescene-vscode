@@ -1,16 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-interface RefactoringSupport {
-  'file-types': string[];
-  'code-smells': string[];
-}
-
-interface PreFlightResponseOld {
-  supported: RefactoringSupport;
-  'max-input-tokens': number;
-  'max-input-loc': number;
-}
-
-export type PreFlightResponse = PreFlightResponseOld & {
+export type PreFlightResponse = {
   version: number;
   'file-types': string[];
   'language-common': RefactorSupport;
