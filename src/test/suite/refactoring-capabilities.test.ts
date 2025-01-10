@@ -31,47 +31,47 @@ const preFlight: PreFlightResponse = {
 const capabilities = new RefactoringCapabilities(preFlight, new DevtoolsAPI('./cs-dummy'));
 
 suite('Refactoring capabilities Test Suite', () => {
-  test('Check DocumentSelector from supported file-types', () => {
-    /*
-     * Assert that we only have one 'javascript' language (although we have multiple js file-types)
-     * and that we have both 'objective-c' and 'objective-cpp' language support
-     */
+  test('Check DocumentSelector from supported file-types', async () => {
+    // Sanity check it
     assert.strictEqual(
       JSON.stringify(capabilities.documentSelector),
-      '[{"language":"javascript"},{"language":"typescript"},{"language":"javascriptreact"},{"language":"typescriptreact"},{"language":"java"},{"language":"objective-c"},{"language":"objective-cpp"}]'
+      '[{"scheme":"file","pattern":"**/*.js"},{"scheme":"file","pattern":"**/*.mjs"},{"scheme":"file","pattern":"**/*.ts"},{"scheme":"file","pattern":"**/*.jsx"},{"scheme":"file","pattern":"**/*.tsx"},{"scheme":"file","pattern":"**/*.java"},{"scheme":"file","pattern":"**/*.mm"}]'
     );
-  });
 
-  test('Document Selector Test', async () => {
-    const jsDocument = await vscode.workspace.openTextDocument({ content: '', language: 'javascript' });
-    const jsMatch = vscode.languages.match(capabilities.documentSelector, jsDocument);
-    assert.strictEqual(jsMatch, 10, 'Document should match the selector');
-
-    const cudaDocument = await vscode.workspace.openTextDocument({ content: '', language: 'cuda-cpp' });
-    const cudaMatch = vscode.languages.match(capabilities.documentSelector, cudaDocument);
-    assert.strictEqual(cudaMatch, 0, 'Document should not match the selector');
+    let match = vscode.languages.match(capabilities.documentSelector, { uri: vscode.Uri.file('foo.js') } as any);
+    assert.strictEqual(match, 10);
+    match = vscode.languages.match(capabilities.documentSelector, { uri: vscode.Uri.file('foo.json') } as any);
+    assert.strictEqual(match, 0);
   });
 
   test('Supported code smells', () => {
-    assert.strictEqual(capabilities.isSupported('Complex Method'), true, 'Complex Method should be supported');
-    assert.strictEqual(capabilities.isSupported('Bad Naming'), false, 'Unsupported code smell should return false');
+    assert.strictEqual(
+      capabilities.isSupported('Complex Method', { fileName: 'foo.js' } as any),
+      true,
+      'Complex Method should be supported'
+    );
+    assert.strictEqual(
+      capabilities.isSupported('Bad Naming', { fileName: 'foo.js' } as any),
+      false,
+      'Unsupported code smell should return false'
+    );
   });
 
-  test('Supported code smells for specific languageIds', async () => {
-    let support = capabilities.isSupported('Complex Method', { languageId: 'javascript' } as any);
+  test('Supported code smells for specific file-types', async () => {
+    let support = capabilities.isSupported('Complex Method', { fileName: 'foo.js' } as any);
     assert.strictEqual(support, true, 'Complex Method should be supported for js');
-    support = capabilities.isSupported('Bad Naming', { languageId: 'javascript' } as any);
+    support = capabilities.isSupported('Bad Naming', { fileName: 'foo.js' } as any);
     assert.strictEqual(support, false, 'Unsupported code smell should return false for js');
 
-    support = capabilities.isSupported('Complex Method', { languageId: 'objective-cpp' } as any);
+    support = capabilities.isSupported('Complex Method', { fileName: 'foo.mm' } as any);
     assert.strictEqual(support, false, 'Complex Method is not supported for objective-cpp');
-    support = capabilities.isSupported('Bad Naming', { languageId: 'objective-cpp' } as any);
+    support = capabilities.isSupported('Bad Naming', { fileName: 'foo.mm' } as any);
     assert.strictEqual(support, true, '"Bad Naming" smell is supported for objective-cpp');
   });
 
   test('Get max-loc-limit for documents', () => {
-    const jsDocument = { languageId: 'javascript' };
-    const javaDocument = { languageId: 'java' };
+    const jsDocument = { fileName: 'foo.js' };
+    const javaDocument = { fileName: 'foo.java' };
 
     assert.strictEqual(capabilities.maxLocFor(jsDocument as any), 130, 'Max loc for js should be 130');
     assert.strictEqual(capabilities.maxLocFor(javaDocument as any), 200, 'Max loc for java should be 200');

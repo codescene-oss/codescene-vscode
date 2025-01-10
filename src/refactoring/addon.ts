@@ -3,7 +3,6 @@ import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { AceFeature } from '../cs-extension-state';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { assertError, reportError } from '../utils';
 import { RefactoringAPI } from './api';
@@ -101,17 +100,3 @@ function disable() {
   stateEmitter.fire({ state: 'disabled' });
   logOutputChannel.info('ACE disabled!');
 }
-
-/**
- *
- * @param refactoringSupport
- * @returns A list of distinct DocumentSelectors for the supported file types
- */
-function toRefactoringDocumentSelector(supportedFileTypes: string[]): vscode.DocumentSelector {
-  return toDistinctLanguageIds(supportedFileTypes).map((language) => ({
-    language,
-    scheme: 'file',
-  }));
-}
-
-export { toRefactoringDocumentSelector }; // For test only
