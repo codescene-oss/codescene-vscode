@@ -1,10 +1,10 @@
 import { DocumentSelector, languages, Range, TextDocument } from 'vscode';
 import { DevtoolsAPI } from '../devtools-interop/api';
 import { EnclosingFn } from '../devtools-interop/model';
-import { fileTypeToLanguageId, toDistinctLanguageIds } from '../language-support';
 import { logOutputChannel } from '../log';
 import { PreFlightResponse, RefactorSupport } from './model';
 import { RefactoringRequest } from './request';
+import { getFileExtension } from '../utils';
 
 export interface FnToRefactor {
   name: string;
@@ -27,49 +27,29 @@ export interface RefactoringTarget {
 }
 
 export class RefactoringCapabilities {
-  // Maps vscode languageIds (note - NOT "file-type") to a specific RefactorSupport
-  private languageSupport: Map<string, RefactorSupport> = new Map();
-
-  constructor(private preFlight: PreFlightResponse, private devtoolsAPI: DevtoolsAPI) {
-    this.initLanguageSpecificSupport();
-  }
-
-  private initLanguageSpecificSupport() {
-    this.preFlight['file-types'].forEach((fileType) => {
-      const propsForFileType = this.preFlight['language-specific']?.[fileType];
-      const languageId = fileTypeToLanguageId(fileType);
-      if (propsForFileType && languageId) {
-        const support = { ...this.preFlight['language-common'], ...propsForFileType };
-        if (Array.isArray(languageId)) {
-          languageId.forEach((id) => this.languageSupport.set(id, support));
-        } else {
-          this.languageSupport.set(languageId, support);
-        }
-      }
-    });
-  }
+  constructor(private preFlight: PreFlightResponse, private devtoolsAPI: DevtoolsAPI) {}
 
   get documentSelector(): DocumentSelector {
-    return toDistinctLanguageIds(this.preFlight['file-types']).map((language) => ({
-      language,
-    }));
+    return this.preFlight['file-types'].map((fileType) => ({ scheme: 'file', pattern: `**/*.${fileType}` }));
   }
 
   /**
    *
    * @param codeSmell is this code smell supported?
-   * @param document optional document if checking language-specific support
    * @returns
    */
-  isSupported(codeSmell: string, document?: TextDocument) {
-    const languageSpecificRule = document && this.languageSupport.get(document.languageId)?.['code-smells'];
-    const rule = languageSpecificRule || this.preFlight['language-common']['code-smells'];
+  isSupported(codeSmell: string, document: TextDocument) {
+    const rule =
+      this.preFlight['language-specific']?.[getFileExtension(document.fileName)]?.['code-smells'] ||
+      this.preFlight['language-common']['code-smells'];
     return rule.includes(codeSmell);
   }
 
-  maxLocFor(document?: TextDocument) {
-    const languageSpecificRule = document && this.languageSupport.get(document.languageId)?.['max-input-loc'];
-    return languageSpecificRule || this.preFlight['language-common']['max-input-loc'];
+  maxLocFor(document: TextDocument) {
+    const maxLoc =
+      this.preFlight['language-specific']?.[getFileExtension(document.fileName)]?.['max-input-loc'] ||
+      this.preFlight['language-common']['max-input-loc'];
+    return maxLoc;
   }
 
   async getFunctionsToRefactor(document: TextDocument, refactoringTargets: RefactoringTarget[]) {
