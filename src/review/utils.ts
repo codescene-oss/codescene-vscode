@@ -53,11 +53,8 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   return diagnostic;
 }
 
-export function roundScore(score: number): number {
-  return +score.toFixed(2);
-}
 export function formatScore(score: number | void): string {
-  return score ? `${roundScore(score)}/10` : 'n/a';
+  return score ? `${score}/10` : 'n/a';
 }
 
 const detailSeparator = ' (';

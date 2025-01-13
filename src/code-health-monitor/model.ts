@@ -1,6 +1,6 @@
 import { FnToRefactor } from '../refactoring/capabilities';
 import { Range } from '../review/model';
-import { roundScore } from '../review/utils';
+import { formatScore } from '../review/utils';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface DeltaForFile {
@@ -11,9 +11,9 @@ export interface DeltaForFile {
 }
 
 export function scorePresentation(delta: DeltaForFile) {
-  const oldScorePresentation = delta['old-score'] ? roundScore(delta['old-score']) : 'n/a';
-  const newScorePresentation = delta['new-score'] ? roundScore(delta['new-score']) : 'n/a';
-  if (oldScorePresentation === newScorePresentation) return oldScorePresentation;
+  if (delta['old-score'] === delta['new-score']) return formatScore(delta['old-score']);
+  const oldScorePresentation = delta['old-score'] || 'n/a';
+  const newScorePresentation = delta['new-score'] || 'n/a';
   return `${oldScorePresentation} → ${newScorePresentation}`;
 }
 
