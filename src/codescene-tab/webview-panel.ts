@@ -85,16 +85,13 @@ export class CodeSceneTabPanel implements Disposable {
     if (!fnToRefactor) return false;
     const contentAtRange = document.getText(fnToRefactor.range);
     if (contentAtRange === fnToRefactor.content) return false;
-    
+
     const ixOfContent = document.getText().indexOf(fnToRefactor.content);
     if (ixOfContent >= 0) {
       // Content matches, but function has been moved - update fnToRefactorRange!
       const newPos = document.positionAt(ixOfContent);
       const r = fnToRefactor.range;
-      const newRange = r.with(
-        newPos,
-        r.end.translate(newPos.line - r.start.line)
-      );
+      const newRange = r.with(newPos, r.end.translate(newPos.line - r.start.line));
       fnToRefactor.range = newRange;
       return false;
     }
@@ -109,7 +106,7 @@ export class CodeSceneTabPanel implements Disposable {
         return;
       }
       if (this.state instanceof RefactoringRequest) {
-        await this.handleRefactoringMessage(this.state, message.command);
+        await this.handleRefactoringMessage(this.state, message.command, this.state.isStale);
       } else if (isInteractiveDocsParams(this.state)) {
         await this.handleDocumentationMessage(this.state, message.command);
       } else {
@@ -135,15 +132,21 @@ export class CodeSceneTabPanel implements Disposable {
         );
         return;
       case 'goto-function-location':
-        this.goToFunctionLocation(ackParams.document.uri, ackParams.fnToRefactor.range.start);
+        void this.goToFunctionLocation(ackParams.document.uri, ackParams.fnToRefactor.range.start);
         return;
     }
   }
 
-  private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string) {
+  private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string, isStale?: boolean) {
     const commands: { [key: string]: () => void } = {
-      gotoFunctionLocation: () =>
-        this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start),
+      gotoFunctionLocation: async () => {
+        this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start).then(
+          () => {
+            this.highlightCode(refactoring, isStale);
+          },
+          () => {}
+        );
+      },
       apply: async () => {
         vscode.commands.executeCommand('codescene.applyRefactoring', refactoring).then(
           () => {
@@ -203,7 +206,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleDocumentationMessage(params: InteractiveDocsParams, command: string) {
     switch (command) {
       case 'goto-function-location':
-        this.goToFunctionLocation(params.document.uri, params.issueInfo.position);
+        void this.goToFunctionLocation(params.document.uri, params.issueInfo.position);
         return;
       case 'request-and-present-refactoring':
         void vscode.commands.executeCommand(
@@ -220,7 +223,7 @@ export class CodeSceneTabPanel implements Disposable {
 
   private goToFunctionLocation(uri: Uri, pos: vscode.Position) {
     const location = new vscode.Location(uri, pos);
-    void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
+    return vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
   }
 
   private async updateWebView(params: CodeSceneTabPanelParams) {
@@ -300,11 +303,8 @@ export class CodeSceneTabPanel implements Disposable {
         metadata: { 'cached?': isCached },
       } = response;
 
-      const highlightCode = !isStale && level > 1;
-      const editor = targetEditor(document);
-      if (highlightCode && editor) {
-        editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
-      }
+      this.highlightCode(refactoring, isStale);
+
       const summaryContent = !isStale
         ? refactoringSummary(response.confidence)
         : fileChangesDetectedContent(
@@ -328,6 +328,17 @@ export class CodeSceneTabPanel implements Disposable {
       Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
     }
+  }
+
+  private highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
+    const { fnToRefactor, document } = refactoring;
+    void refactoring.promise.then((result) => {
+      const highlightCode = !isStale && result.confidence.level > 1;
+      const editor = targetEditor(document);
+      if (highlightCode && editor) {
+        editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+      }
+    });
   }
 
   private updateRefactoringContent(title: string, content: string | string[]) {
