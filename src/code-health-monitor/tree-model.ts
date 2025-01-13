@@ -1,8 +1,8 @@
 import vscode from 'vscode';
 import { issueToDocsParams } from '../documentation/commands';
 import { FnToRefactor } from '../refactoring/capabilities';
-import { roundScore, vscodeRange } from '../review/utils';
-import { isDefined, pluralize } from '../utils';
+import { vscodeRange } from '../review/utils';
+import { isDefined, pluralize, round } from '../utils';
 import { DeltaAnalysisState } from './analyser';
 import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
 import { toFileWithIssuesUri } from './presentation';
@@ -75,7 +75,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
     const { icon, tooltip } = iconAndTooltip();
     scoreInfo.tooltip = `${tooltip} ${exploreText}`;
     scoreInfo.iconPath = icon;
-    scoreInfo.description = `(${roundScore(this.scorePercentageChange)}%)`;
+    scoreInfo.description = `(${round(this.scorePercentageChange, 2)}%)`;
     return new DeltaInfoItem(scoreInfo);
   }
 

@@ -1,7 +1,6 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
-import Telemetry from './telemetry';
 import { logOutputChannel } from './log';
 
 export function getFileExtension(filename: string) {
@@ -34,6 +33,10 @@ export function reportError(pre: string, error: Error) {
 
 export function pluralize(noun: string, count: number) {
   return Math.abs(count) <= 1 ? noun : `${noun}s`;
+}
+
+export function round(score: number, nDecimals: number): number {
+  return +score.toFixed(nDecimals);
 }
 
 let logoUrl: string | undefined;
