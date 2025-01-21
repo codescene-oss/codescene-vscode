@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.8](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.7...v0.9.8) (2025-01-21)
+
+
+### Features
+
+* **refactoring:** Re-select code to be refactored when clicking the function location component (if applicable) ([42869d0](https://github.com/codescene-oss/codescene-vscode/commit/42869d0fc27d904f66c6e8a51d6708b9352a5757))
+
+
+### Bug fixes
+
+* **language-support:** Make sure review and refactoring DocumentMatchers are in sync with the analysis lib ([ad5657f](https://github.com/codescene-oss/codescene-vscode/commit/ad5657fc55c23d2b38eee4bf7f6a9cd0ea9741d7))
+* Score rounding issues ([36abcd6](https://github.com/codescene-oss/codescene-vscode/commit/36abcd6a926ce29196eae87930820083199eb8bf))
+
 ### [0.9.7](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.6...v0.9.7) (2025-01-07)
 
 
