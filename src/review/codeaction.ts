@@ -68,7 +68,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParams(category, diagnostic.range.start, document, fnToRefactor), 'codeaction'],
+        arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codeaction'],
       };
       actions.push(action);
     });

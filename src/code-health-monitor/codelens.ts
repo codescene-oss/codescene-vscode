@@ -38,6 +38,8 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
   }
 
   showFor(functionInfo: DeltaFunctionInfo) {
+    if (!functionInfo.range) return;
+
     const documentUri = functionInfo.parent.document.uri;
     this.clear(documentUri);
     this.disposables = [
@@ -62,6 +64,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     let order = 1;
     if (!reviewCodeLensesEnabled()) {
       functionInfo.children.forEach((issue) => {
+        if (!issue.position) return;
         codeLenses.push(
           new vscode.CodeLens(this.lensRange(issue.position, order++), {
             title: `$(warning) ${issue.changeDetail.category}`,

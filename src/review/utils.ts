@@ -19,15 +19,11 @@ function createGeneralDiagnostic(reviewResult: ReviewResult) {
 }
 
 export function reviewFunctionToDiagnostics(reviewFunction: ReviewFunction, document: vscode.TextDocument) {
-  let diagnostics: vscode.Diagnostic[] = [];
-  for (const codeSmell of reviewFunction['code-smells']) {
-    const diagnostic = reviewCodeSmellToDiagnostics(codeSmell, document);
-    diagnostics.push(diagnostic);
-  }
-  return diagnostics;
+  return reviewFunction['code-smells'].map((cs) => reviewCodeSmellToDiagnostics(cs, document)).filter(isDefined);
 }
 
-export function vscodeRange(modelRange: Range) {
+export function vscodeRange(modelRange?: Range) {
+  if (!modelRange) return;
   return new vscode.Range(
     modelRange['start-line'] - 1,
     modelRange['start-column'] - 1,
@@ -38,7 +34,8 @@ export function vscodeRange(modelRange: Range) {
 
 export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vscode.TextDocument) {
   const category = codeSmell.category;
-  const range = vscodeRange(codeSmell['highlight-range']);
+  const range = vscodeRange(codeSmell['highlight-range'])!;
+  if (!range) return;
 
   let message;
   if (codeSmell.details) {
@@ -75,13 +72,15 @@ export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: 
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
   }
 
-  for (const codeSmell of reviewResult['expression-level-code-smells']) {
-    diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
-  }
+  const expressionDiagnostics = reviewResult['expression-level-code-smells']
+    .map((cs) => reviewCodeSmellToDiagnostics(cs, document))
+    .filter(isDefined);
+  diagnostics.push(...expressionDiagnostics);
 
-  for (const codeSmell of reviewResult['file-level-code-smells']) {
-    diagnostics.push(reviewCodeSmellToDiagnostics(codeSmell, document));
-  }
+  const fileLevelDiagnostics = reviewResult['file-level-code-smells']
+    .map((cs) => reviewCodeSmellToDiagnostics(cs, document))
+    .filter(isDefined);
+  diagnostics.push(...fileLevelDiagnostics);
 
   if (isDefined(reviewResult.score)) {
     const scoreDiagnostic = createGeneralDiagnostic(reviewResult);

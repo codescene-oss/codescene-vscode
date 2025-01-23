@@ -116,7 +116,7 @@ export class CsReviewCodeLensProvider
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [toDocsParams(category, diagnostic.range.start, document, fnToRefactor), 'codelens (review)'],
+      arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codelens (review)'],
     };
   }
 

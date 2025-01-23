@@ -206,6 +206,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleDocumentationMessage(params: InteractiveDocsParams, command: string) {
     switch (command) {
       case 'goto-function-location':
+        if (!params.issueInfo.position) return;
         void this.goToFunctionLocation(params.document.uri, params.issueInfo.position);
         return;
       case 'request-and-present-refactoring':
@@ -358,7 +359,7 @@ export class CodeSceneTabPanel implements Disposable {
     // If we haven't been provided with a function to refactor, try to find one
     // This is the case when presenting documentation from a codelens or codeaction,
     // and unfortunately in the case of presenting from a delta analysis with an unsupported code smell...
-    if (!fnToRefactor) {
+    if (!fnToRefactor && issueInfo.position) {
       fnToRefactor = (
         await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
           { category: issueInfo.category, line: issueInfo.position.line + 1 },
