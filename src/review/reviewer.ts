@@ -332,6 +332,7 @@ class SimpleReviewer implements InternalReviewer {
     );
 
     if (exitCode !== 0) {
+      logOutputChannel.debug(`Reviewer output: '${stdout.trim()}'`);
       throw new ReviewError(exitCode, `CodeScene review failed: '${stderr.trim()}' (exit ${exitCode})`);
     }
 
