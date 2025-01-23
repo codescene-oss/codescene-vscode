@@ -40,7 +40,7 @@ async function findOrOpenDocument(uri: vscode.Uri) {
 
 export interface IssueInfo {
   category: string;
-  position: vscode.Position;
+  position?: vscode.Position;
   fnName?: string;
 }
 
@@ -60,7 +60,7 @@ export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsPar
 }
 
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
-  const params = toDocsParams(issue.changeDetail.category, issue.position, issue.parentDocument);
+  const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
   params.issueInfo.fnName = fnInfo?.fnName;
   params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
@@ -68,8 +68,8 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
 
 export function toDocsParams(
   category: string,
-  position: vscode.Position,
   document: vscode.TextDocument,
+  position?: vscode.Position,
   fnToRefactor?: FnToRefactor
 ): InteractiveDocsParams {
   return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };

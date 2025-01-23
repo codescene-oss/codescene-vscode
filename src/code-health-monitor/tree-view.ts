@@ -38,6 +38,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
       ),
+      vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
+        this.treeDataProvider.selectSortFn();
+      }),
       vscode.commands.registerCommand(
         'codescene.codeHealthMonitor.showDeltaFunctionInfo',
         (selection: DeltaFunctionInfo) => this.showDeltaFunctionInfo(selection)
@@ -94,7 +97,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   }
 
   private goToLocation(selection?: DeltaTreeViewItem) {
-    if (selection instanceof DeltaFunctionInfo) {
+    if (selection instanceof DeltaFunctionInfo && selection.range) {
       const uri = selection.parent.document.uri;
       const pos = selection.range.start;
       const location = new vscode.Location(uri, pos);
@@ -125,6 +128,11 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   }
 }
 
+interface SortOption extends vscode.QuickPickItem {
+  label: string;
+  sortFn: (a: FileWithIssues, b: FileWithIssues) => number;
+}
+
 class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeViewItem> {
   private treeDataChangedEmitter: vscode.EventEmitter<DeltaTreeViewItem | void> =
     new vscode.EventEmitter<DeltaTreeViewItem>();
@@ -134,16 +142,51 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   public tree: Array<DeltaTreeViewItem> = [];
   private parentView?: vscode.TreeView<DeltaTreeViewItem>;
 
+  private sortOptions: SortOption[] = [
+    {
+      label: 'Score change, ascending',
+      picked: true,
+      description: 'Largest Code Health decline first',
+      sortFn: (a: FileWithIssues, b: FileWithIssues) => a.scoreChange - b.scoreChange,
+    },
+    {
+      label: 'Score change, descending',
+      description: 'Largest Code Health increase first',
+      sortFn: (a: FileWithIssues, b: FileWithIssues) => b.scoreChange - a.scoreChange,
+    },
+    {
+      label: 'File name',
+      description: 'Using absolute path',
+      sortFn: (a: FileWithIssues, b: FileWithIssues) => (a.document.fileName < b.document.fileName ? -1 : 1),
+    },
+  ];
+
   constructor() {}
 
   setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
     this.parentView = view;
   }
 
+  public async selectSortFn() {
+    const selected = await vscode.window.showQuickPick(this.sortOptions, {
+      placeHolder: 'Select sort mode for Code Health Monitor',
+    });
+    if (selected) {
+      this.sortOptions.forEach((o) => (o.picked = false));
+      selected.picked = true;
+      this.update();
+    }
+  }
+
   private update() {
     if (this.fileIssueMap.size > 0) {
       // const statusItem = this.statusTreeItem();
       const filesWithIssues = Array.from(this.fileIssueMap.values());
+      const sortOption = this.sortOptions.find((o) => o.picked);
+      if (sortOption) {
+        filesWithIssues.sort(sortOption.sortFn);
+      }
+
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
       const aceInfoItem = this.aceSummaryItem(filesWithIssues);
       this.tree = aceInfoItem ? [aceInfoItem, ...filesWithIssues] : filesWithIssues;
@@ -226,7 +269,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     if (refactorings === 0) {
       return;
     }
-    const label = `${refactorings} ${pluralize('auto-refactor', refactorings)} available`;
+    const label = `${refactorings} ${pluralize('auto-refactoring', refactorings)} available`;
     const tooltip = `Click to expand available refactorings`;
     const aceTreeItem = new vscode.TreeItem(label);
     aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');

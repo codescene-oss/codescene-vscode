@@ -29,7 +29,7 @@ export interface ChangeDetail {
   'change-type': ChangeType;
   category: string;
   description: string;
-  position: Position;
+  position?: Position;
 }
 
 export interface Position {
@@ -39,7 +39,7 @@ export interface Position {
 
 export interface FunctionInfo {
   name: string;
-  range: Range;
+  range?: Range;
 }
 
 export type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';

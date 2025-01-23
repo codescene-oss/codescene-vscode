@@ -119,10 +119,14 @@ export class DeltaAnalyser {
     const refactoringTargets: RefactoringTarget[] = deltaForFile['function-level-findings'].flatMap((finding) => {
       return finding['change-details']
         .filter((changeDetail) => isDegradation(changeDetail['change-type']))
-        .map((changeDetail) => ({
-          line: changeDetail.position.line,
-          category: changeDetail.category,
-        }));
+        .map((changeDetail) => {
+          if (!changeDetail.position) return;
+          return {
+            line: changeDetail.position.line,
+            category: changeDetail.category,
+          };
+        })
+        .filter(isDefined);
     });
 
     const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(document, refactoringTargets);
@@ -130,8 +134,10 @@ export class DeltaAnalyser {
 
     // Add a refactorableFn property to the findings that matches function name and range
     deltaForFile['function-level-findings'].forEach((finding) => {
+      const findingRange = vscodeRange(finding.function.range);
+      if (!findingRange) return;
       const refactorableFunctionForFinding = functionsToRefactor.find(
-        (fn) => fn.name === finding.function.name && fn.range.intersection(vscodeRange(finding.function.range))
+        (fn) => fn.name === finding.function.name && fn.range.intersection(findingRange)
       );
       finding.refactorableFn = refactorableFunctionForFinding;
     });

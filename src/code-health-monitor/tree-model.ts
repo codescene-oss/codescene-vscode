@@ -116,21 +116,9 @@ export class FileWithIssues implements DeltaTreeViewItem {
     this.sortAndSetChildren();
   }
 
-  /**
-   * Sort function level issues by refactorability, then by line number.
-   * After that, set the children array with the code health info first,
-   * then file level and last function level issues.
-   */
   sortAndSetChildren() {
-    this.functionLevelIssues.sort((a, b) => {
-      // Refactorability first
-      const aRef = a.isRefactoringSupported ? -1 : 1;
-      const bRef = b.isRefactoringSupported ? -1 : 1;
-      if (aRef !== bRef) return aRef - bRef;
-      // ...then by line number
-      return a.range.start.line - b.range.start.line;
-    });
-
+    this.functionLevelIssues.sort(sortFn);
+    // After sorting the fnLevel issues, set the code health info first, then file and lastly the sorted function level issues
     this.children = this.codeHealthInfo ? [this.codeHealthInfo] : [];
     this.children.push(...this.fileLevelIssues, ...this.functionLevelIssues);
   }
@@ -150,7 +138,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
 
 export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly fnName: string;
-  readonly range: vscode.Range;
+  readonly range?: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
   constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public fnToRefactor?: FnToRefactor) {
@@ -194,10 +182,12 @@ export class DeltaInfoItem implements DeltaTreeViewItem {
 }
 
 export class DeltaIssue implements DeltaTreeViewItem {
-  readonly position: vscode.Position;
+  readonly position?: vscode.Position;
 
   constructor(readonly parent: DeltaFunctionInfo | FileWithIssues, readonly changeDetail: ChangeDetail) {
-    this.position = new vscode.Position(changeDetail.position.line - 1, changeDetail.position.column - 1);
+    if (changeDetail.position) {
+      this.position = new vscode.Position(changeDetail.position.line - 1, changeDetail.position.column - 1);
+    }
   }
 
   toTreeItem(): vscode.TreeItem {
@@ -225,4 +215,20 @@ export class DeltaIssue implements DeltaTreeViewItem {
   get parentDocument() {
     return this.parent instanceof DeltaFunctionInfo ? this.parent.parent.document : this.parent.document;
   }
+}
+
+/**
+ * Sort function level issues by refactorability, then by line number.
+ */
+export function sortFn(a: DeltaFunctionInfo, b: DeltaFunctionInfo) {
+  // If one of the items has an undefined range, sort it last (functions with fixed issues might have null range)
+  if (!a.range) return 1;
+  if (!b.range) return -1;
+  // Refactorability first
+  const aRef = a.isRefactoringSupported ? -1 : 1;
+  const bRef = b.isRefactoringSupported ? -1 : 1;
+  if (aRef !== bRef) return aRef - bRef;
+
+  // ...then by line number
+  return a.range.start.line - b.range.start.line;
 }
