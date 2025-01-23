@@ -91,7 +91,8 @@ export class DeltaAnalyser {
         this.endAnalysisEvent(document, deltaForFile);
         return;
       case 1:
-        logOutputChannel.error('Error during delta analysis:', stderr);
+        logOutputChannel.debug(`Delta analysis output: '${stdout.trim()}'`);
+        logOutputChannel.error(`CodeScene delta analysis failed: '${stderr.trim()}' (exit ${exitCode})`);
         this.errorEmitter.fire(new Error(stderr));
         this.endAnalysisEvent(document, deltaForFile);
         return;
