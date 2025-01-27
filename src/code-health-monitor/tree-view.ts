@@ -41,10 +41,6 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
         this.treeDataProvider.selectSortFn();
       }),
-      vscode.commands.registerCommand(
-        'codescene.codeHealthMonitor.showDeltaFunctionInfo',
-        (selection: DeltaFunctionInfo) => this.showDeltaFunctionInfo(selection)
-      ),
       DeltaAnalyser.instance.onDidAnalyse((event) => {
         if (event.type === 'end') {
           this.treeDataProvider.syncTree(event);
@@ -52,6 +48,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       }),
       this.view.onDidChangeVisibility((e) => {
         Telemetry.logUsage('code-health-monitor/visibility', { visible: e.visible });
+      }),
+      this.view.onDidChangeSelection((e) => {
+        this.showDeltaFunctionInfo(e.selection[0]);
       })
     );
   }
@@ -81,7 +80,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     }
   }
 
-  private showDeltaFunctionInfo(selection: DeltaFunctionInfo) {
+  private showDeltaFunctionInfo(selection?: DeltaTreeViewItem) {
     this.updateFunctionInfoDetails(selection);
     this.goToLocation(selection);
   }
