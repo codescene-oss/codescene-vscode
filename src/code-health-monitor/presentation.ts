@@ -1,5 +1,7 @@
 import vscode from 'vscode';
-import { DeltaTreeViewItem, issuesCount } from './tree-model';
+import { pluralize } from '../utils';
+import { hasImprovementOpportunity } from './model';
+import { DeltaTreeViewItem, countInTree } from './tree-model';
 
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new FileWithIssuesDecorationProvider()));
@@ -14,14 +16,13 @@ class FileWithIssuesDecorationProvider implements vscode.FileDecorationProvider 
   ): vscode.ProviderResult<vscode.FileDecoration> {
     if (uri.scheme === fileWithIssuesScheme) {
       const queryParams = new URLSearchParams(uri.query);
-      const badge = queryParams.get('issues') || '';
+      const badge = queryParams.get('issues');
+      if (!badge || Number(badge) < 1) return;
       return {
-        // badge, // TODO - use this badge? Otherwise maybe move the tooltip out to the model and remove this decorationprovider entirely
-        tooltip: `Contains ${badge} issue(s) degrading code health`,
+        badge,
+        tooltip: `${badge} ${pluralize('issue', Number(badge))} can be improved`,
       };
     }
-
-    return undefined;
   }
 }
 
@@ -32,7 +33,7 @@ class FileWithIssuesDecorationProvider implements vscode.FileDecorationProvider 
  */
 export function toFileWithIssuesUri(uri: vscode.Uri, children?: DeltaTreeViewItem[]): vscode.Uri {
   const queryParams = new URLSearchParams();
-  children && queryParams.set('issues', issuesCount(children).toString());
+  children && queryParams.set('issues', countInTree(children, hasImprovementOpportunity).toString());
 
   return uri.with({
     scheme: fileWithIssuesScheme,

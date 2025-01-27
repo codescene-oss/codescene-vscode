@@ -6,6 +6,7 @@ import { formatScore } from '../review/utils';
 export interface DeltaForFile {
   'old-score'?: number;
   'new-score'?: number;
+  'score-change': number;
   'file-level-findings': ChangeDetail[];
   'function-level-findings': FunctionFinding[];
 }
@@ -43,10 +44,18 @@ export interface FunctionInfo {
 }
 
 export type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';
+export const sortOrder: { [key in ChangeType]: number } = {
+  introduced: 1,
+  degraded: 2,
+  unchanged: 3,
+  fixed: 5,
+  improved: 4,
+};
 
-export function isImprovement(changeType: ChangeType) {
-  return changeType === 'improved' || changeType === 'fixed';
-}
 export function isDegradation(changeType: ChangeType) {
   return changeType === 'degraded' || changeType === 'introduced';
+}
+
+export function hasImprovementOpportunity(changeType: ChangeType) {
+  return isDegradation(changeType) || changeType === 'improved';
 }

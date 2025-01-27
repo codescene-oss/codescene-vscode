@@ -4,7 +4,15 @@ import { FnToRefactor } from '../refactoring/capabilities';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize, round } from '../utils';
 import { DeltaAnalysisState } from './analyser';
-import { ChangeDetail, DeltaForFile, FunctionInfo, isDegradation, isImprovement, scorePresentation } from './model';
+import {
+  ChangeDetail,
+  ChangeType,
+  DeltaForFile,
+  FunctionInfo,
+  isDegradation,
+  scorePresentation,
+  sortOrder,
+} from './model';
 import { toFileWithIssuesUri } from './presentation';
 
 const fgColor = new vscode.ThemeColor('foreground');
@@ -12,13 +20,16 @@ export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
 const warningColor = new vscode.ThemeColor('editorWarning.foreground');
 export const errorColor = new vscode.ThemeColor('errorForeground');
 
-export function issuesCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): number {
+export function countInTree(
+  tree: Array<DeltaTreeViewItem | DeltaAnalysisState>,
+  fn: (item: ChangeType) => boolean
+): number {
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaIssue) {
-      return prev + (isDegradation(curr.changeDetail['change-type']) ? 1 : 0);
+      return prev + (fn(curr.changeDetail['change-type']) ? 1 : 0);
     }
-    return prev + (curr.children ? issuesCount(curr.children) : 0);
+    return prev + (curr.children ? countInTree(curr.children, fn) : 0);
   }, 0);
 }
 
@@ -56,18 +67,18 @@ export class FileWithIssues implements DeltaTreeViewItem {
     const iconAndTooltip = () => {
       if (this.scoreChange > 0) {
         return {
-          icon: new vscode.ThemeIcon('arrow-up', okColor),
-          tooltip: 'The Code health for this file is improving.',
+          icon: new vscode.ThemeIcon('pulse', okColor),
+          tooltip: 'Code Health for this file is improving.',
         };
       } else if (this.scoreChange < 0) {
         return {
-          icon: new vscode.ThemeIcon('arrow-down', errorColor),
-          tooltip: 'The Code health for this file is declining.',
+          icon: new vscode.ThemeIcon('pulse', errorColor),
+          tooltip: 'Code Health for this file is declining.',
         };
       } else {
         return {
-          icon: new vscode.ThemeIcon('arrow-right', fgColor),
-          tooltip: 'The Code health for this file is unchanged.',
+          icon: new vscode.ThemeIcon('pulse', fgColor),
+          tooltip: 'Code Health for this file is unchanged.',
         };
       }
     };
@@ -88,12 +99,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
   }
 
   get scoreChange() {
-    const oldScore = this.deltaForFile['old-score'] || 10;
-    const newScore = this.deltaForFile['new-score'];
-    if (isDefined(newScore)) {
-      return newScore - oldScore;
-    }
-    return 0;
+    return this.deltaForFile['score-change'];
   }
 
   get scorePercentageChange() {
@@ -105,7 +111,8 @@ export class FileWithIssues implements DeltaTreeViewItem {
     this.deltaForFile = deltaForFile;
     this.document = document;
     this.codeHealthInfo = this.createCodeHealthInfo(deltaForFile);
-    this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
+    // Remove these from the tree, and show in file level details view later
+    // this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
     this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
       const functionInfo = new DeltaFunctionInfo(this, finding.function, finding.refactorableFn);
       finding['change-details'].forEach((changeDetail) =>
@@ -117,7 +124,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
   }
 
   sortAndSetChildren() {
-    this.functionLevelIssues.sort(sortFn);
+    this.functionLevelIssues.sort(sortFnInfo);
     // After sorting the fnLevel issues, set the code health info first, then file and lastly the sorted function level issues
     this.children = this.codeHealthInfo ? [this.codeHealthInfo] : [];
     this.children.push(...this.fileLevelIssues, ...this.functionLevelIssues);
@@ -126,6 +133,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(toFileWithIssuesUri(this.document.uri, this.children), this.collapsedState);
     item.iconPath = vscode.ThemeIcon.File;
+    item.description = `${round(this.scorePercentageChange, 2)}%`;
     return item;
   }
 
@@ -148,19 +156,37 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
 
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(this.fnName, vscode.TreeItemCollapsibleState.None);
-    item.iconPath = new vscode.ThemeIcon('symbol-function');
+    item.iconPath = this.iconPath;
     item.description = this.isRefactoringSupported ? 'Auto-Refactor' : undefined;
     item.tooltip = this.tooltip();
 
     return item;
   }
 
+  get iconPath() {
+    if (this.children.every((issue) => issue.changeDetail['change-type'] === 'fixed')) {
+      return new vscode.ThemeIcon('symbol-function', okColor);
+    }
+    if (this.children.every((issue) => isDegradation(issue.changeDetail['change-type']))) {
+      return new vscode.ThemeIcon('symbol-function', errorColor);
+    }
+    return new vscode.ThemeIcon('symbol-function', warningColor);
+  }
+
   private tooltip() {
-    const issues = issuesCount(this.children);
     const tips = [`Function "${this.fnName}"`];
 
-    issues && tips.push(`Contains ${issues} ${pluralize('issue', issues)} degrading code health`);
+    const issues = countInTree(this.children, isDegradation);
+    issues && tips.push(`${issues} ${pluralize('issue', issues)} degrading code health`);
+
+    const improvements = countInTree(this.children, (t: ChangeType) => t === 'improved');
+    improvements && tips.push(`${improvements} ${pluralize('issue', issues)} with room for improvement`);
+
+    const fixed = countInTree(this.children, (t: ChangeType) => t === 'fixed');
+    fixed && tips.push(`${fixed} ${pluralize('issue', issues)} fixed`);
+
     this.isRefactoringSupported && tips.push('Auto-refactor available');
+
     return tips.join(' • ');
   }
 
@@ -199,11 +225,10 @@ export class DeltaIssue implements DeltaTreeViewItem {
   }
 
   private get iconPath() {
-    if (isDegradation(this.changeDetail['change-type'])) {
-      return new vscode.ThemeIcon('warning', warningColor);
-    } else if (isImprovement(this.changeDetail['change-type'])) {
-      return new vscode.ThemeIcon('pass', okColor);
-    }
+    if (isDegradation(this.changeDetail['change-type'])) return new vscode.ThemeIcon('chrome-close', errorColor);
+    if (this.changeDetail['change-type'] === 'improved') return new vscode.ThemeIcon('arrow-up', warningColor);
+    if (this.changeDetail['change-type'] === 'fixed') return new vscode.ThemeIcon('check', okColor);
+
     return undefined;
   }
 
@@ -215,15 +240,31 @@ export class DeltaIssue implements DeltaTreeViewItem {
 /**
  * Sort function level issues by refactorability, then by line number.
  */
-export function sortFn(a: DeltaFunctionInfo, b: DeltaFunctionInfo) {
+export function sortFnInfo(a: DeltaFunctionInfo, b: DeltaFunctionInfo) {
   // If one of the items has an undefined range, sort it last (functions with fixed issues might have null range)
   if (!a.range) return 1;
   if (!b.range) return -1;
+
   // Refactorability first
   const aRef = a.isRefactoringSupported ? -1 : 1;
   const bRef = b.isRefactoringSupported ? -1 : 1;
   if (aRef !== bRef) return aRef - bRef;
 
+  // Then by child change detail status.
+  const aChangeDetailsStatus = avgChangeDetailOrder(a);
+  const bChangeDetailsStatus = avgChangeDetailOrder(b);
+  if (aChangeDetailsStatus !== bChangeDetailsStatus) return aChangeDetailsStatus - bChangeDetailsStatus;
+
   // ...then by line number
   return a.range.start.line - b.range.start.line;
+}
+
+function avgChangeDetailOrder(fnInfo: DeltaFunctionInfo) {
+  if (fnInfo.children.length === 0) return 0;
+  const sortOrderSum = fnInfo.children.reduce((prev, curr) => prev + sortOrder[curr.changeDetail['change-type']], 0);
+  return sortOrderSum / fnInfo.children.length;
+}
+
+export function sortIssues(a: DeltaIssue, b: DeltaIssue) {
+  return sortOrder[a.changeDetail['change-type']] - sortOrder[b.changeDetail['change-type']];
 }

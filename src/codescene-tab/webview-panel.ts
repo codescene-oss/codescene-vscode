@@ -351,21 +351,27 @@ export class CodeSceneTabPanel implements Disposable {
     });
   }
 
-  private async presentDocumentation(params: InteractiveDocsParams, isStale = false) {
-    const { issueInfo, document } = params;
-    const title = issueInfo.category;
+  private async getOrFindFnToRefactor(params: InteractiveDocsParams) {
+    const { issueInfo, document, fnToRefactor } = params;
+    if (fnToRefactor) return fnToRefactor;
 
-    let fnToRefactor = params.fnToRefactor;
     // If we haven't been provided with a function to refactor, try to find one
     // This is the case when presenting documentation from a codelens or codeaction,
     // and unfortunately in the case of presenting from a delta analysis with an unsupported code smell...
-    if (!fnToRefactor && issueInfo.position) {
-      fnToRefactor = (
+    if (issueInfo.position) {
+      return (
         await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
           { category: issueInfo.category, line: issueInfo.position.line + 1 },
         ])
       )?.[0];
     }
+  }
+
+  private async presentDocumentation(params: InteractiveDocsParams, isStale = false) {
+    const { issueInfo, document } = params;
+    const title = issueInfo.category;
+
+    let fnToRefactor = await this.getOrFindFnToRefactor(params);
 
     const fnLocContent = functionLocationContent({
       filePath: document.uri.fsPath,

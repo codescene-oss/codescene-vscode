@@ -4,16 +4,7 @@ import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
-import {
-  DeltaFunctionInfo,
-  DeltaInfoItem,
-  DeltaTreeViewItem,
-  errorColor,
-  FileWithIssues,
-  issuesCount,
-  okColor,
-  refactoringsCount,
-} from './tree-model';
+import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -39,7 +30,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
         this.revealAutoRefactorings()
       ),
       vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
-        this.treeDataProvider.selectSortFn();
+        void this.treeDataProvider.selectSortFn();
       }),
       DeltaAnalyser.instance.onDidAnalyse((event) => {
         if (event.type === 'end') {
@@ -221,46 +212,6 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
 
     this.update();
-  }
-
-  private statusTreeItem() {
-    const totalScoreChange = Array.from(this.fileIssueMap.values())
-      .map((f) => f.scoreChange)
-      .reduce((acc, score) => acc + score, 0);
-
-    let label = 'Code Health unchanged';
-    let iconPath = new vscode.ThemeIcon('circle-large');
-    let tooltip = 'No changes in code health found';
-    if (totalScoreChange > 0) {
-      label = 'Code Health improving';
-      iconPath = new vscode.ThemeIcon('pass', okColor);
-      tooltip = 'Total code health improved';
-    } else if (totalScoreChange < 0) {
-      label = 'Code Health declining';
-      iconPath = new vscode.ThemeIcon('error', errorColor);
-      tooltip = 'Total code health declined';
-    }
-
-    const statusTreeItem = new vscode.TreeItem(label);
-    statusTreeItem.iconPath = iconPath;
-    statusTreeItem.tooltip = tooltip;
-    return new DeltaInfoItem(statusTreeItem);
-  }
-
-  private issueSummaryItem(filesWithIssues: FileWithIssues[]) {
-    const issues = issuesCount(filesWithIssues);
-    const nFiles = filesWithIssues.length;
-    const label = `Found ${issues} ${pluralize('issue', issues)} in ${nFiles} ${pluralize('file', nFiles)}`;
-
-    const tooltip = `CodeScene found ${issues} ${pluralize('issue', issues)} across ${nFiles} ${pluralize(
-      'file',
-      nFiles
-    )}.`;
-
-    const treeItem = new vscode.TreeItem(label);
-    treeItem.iconPath = new vscode.ThemeIcon('sparkle');
-    treeItem.tooltip = tooltip;
-    return new DeltaInfoItem(treeItem);
   }
 
   private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
