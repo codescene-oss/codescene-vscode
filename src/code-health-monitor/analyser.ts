@@ -6,7 +6,7 @@ import { logOutputChannel } from '../log';
 import { RefactoringTarget } from '../refactoring/capabilities';
 import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
-import { DeltaForFile, isDegradation } from './model';
+import { DeltaForFile, hasImprovementOpportunity } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -119,7 +119,7 @@ export class DeltaAnalyser {
 
     const refactoringTargets: RefactoringTarget[] = deltaForFile['function-level-findings'].flatMap((finding) => {
       return finding['change-details']
-        .filter((changeDetail) => isDegradation(changeDetail['change-type']))
+        .filter((changeDetail) => hasImprovementOpportunity(changeDetail['change-type']))
         .map((changeDetail) => {
           if (!changeDetail.position) return;
           return {

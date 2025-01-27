@@ -29,11 +29,15 @@ a:focus {
   flex-direction: column;
 }
 
-.color-red {
+.color-degraded {
   color: var(--vscode-errorForeground);
 }
 
-.color-green {
+.color-improved {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.color-fixed {
   color: var(--vscode-terminal-ansiGreen);
 }
 

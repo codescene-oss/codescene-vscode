@@ -4,8 +4,8 @@ import { refactoringButton } from '../../codescene-tab/webview/refactoring-compo
 import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
-import { DeltaFunctionInfo } from '../tree-model';
-import { ChangeType, isDegradation, isImprovement } from '../model';
+import { ChangeType, isDegradation } from '../model';
+import { DeltaFunctionInfo, sortIssues } from '../tree-model';
 
 export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
@@ -148,14 +148,11 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private fileAndCodeSmellSummary(functionInfo: DeltaFunctionInfo) {
     const fileName = basename(functionInfo.parent.document.uri.fsPath);
-    const smellInfo =
-      functionInfo.children.length === 1 ? functionInfo.children[0].changeDetail.category : 'Multiple Code Smells';
     return /*html*/ `
       <div class="block function-summary">
-        <h2>${functionInfo.fnName}</h2>
         <div class="flex-row filename-and-smell">
-          <div class="flex-row"><span class="codicon codicon-file"></span> ${fileName}</div>
-          <div class="flex-row"><span class="codicon codicon-warning"></span> ${smellInfo}</div>
+          <div class="flex-row"><span class="codicon codicon-file"></span>${fileName}</div>
+          <div class="flex-row"><span class="codicon codicon-symbol-function"></span>${functionInfo.fnName}</div>
         </div>
       </div>
     `;
@@ -163,12 +160,13 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private issueDetails(functionInfo: DeltaFunctionInfo) {
     const iconClass = (changeType: ChangeType) => {
-      if (isDegradation(changeType)) return 'codicon-chrome-close color-red';
-      if (isImprovement(changeType)) return 'codicon-check color-green';
+      if (isDegradation(changeType)) return 'codicon-chrome-close color-degraded';
+      if (changeType === 'improved') return 'codicon-arrow-up color-improved';
+      if (changeType === 'fixed') return 'codicon-check color-fixed';
       return 'codicon-circle-small-filled';
     };
 
-    const issueDetails = functionInfo.children.map(
+    const issueDetails = functionInfo.children.sort(sortIssues).map(
       (issue, ix) => /*html*/ `
       <div class="issue">
         <div class="flex-row">
