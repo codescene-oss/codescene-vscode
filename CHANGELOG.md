@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.9](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.8...v0.9.9) (2025-01-28)
+
+
+### Bug fixes
+
+* **review:** Allow for undefined score meaning "no scorable code" ([93ba0e5](https://github.com/codescene-oss/codescene-vscode/commit/93ba0e5f0bd4829d61e9c457e96035d1a9fd7628))
+
 ### [0.9.8](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.7...v0.9.8) (2025-01-21)
 
 
