@@ -12,10 +12,9 @@ export function isGeneralDiagnostic(diagnostic: vscode.Diagnostic) {
 }
 
 function createGeneralDiagnostic(reviewResult: ReviewResult) {
-  const scoreText =
-    reviewResult.score === 0
-      ? `${chScorePrefix}${noApplicationCode}`
-      : `${chScorePrefix}${formatScore(reviewResult.score)}`;
+  const scoreText = isDefined(reviewResult.score)
+    ? `${chScorePrefix}${formatScore(reviewResult.score)}`
+    : `${chScorePrefix}${noApplicationCode}`;
   return new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
 }
 
@@ -53,8 +52,8 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   return diagnostic;
 }
 
-export function formatScore(score: number | void): string {
-  return score ? `${score}/10` : 'n/a';
+export function formatScore(score?: number): string {
+  return score ? `${score}/10` : noApplicationCode;
 }
 
 const detailSeparator = ' (';
