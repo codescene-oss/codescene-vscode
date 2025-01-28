@@ -1,7 +1,7 @@
 // This details the structure of the JSON output from the 'cs review' command
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface ReviewResult {
-  score: number;
+  score?: number;
   'file-level-code-smells': CodeSmell[];
   'function-level-code-smells': ReviewFunction[];
   'expression-level-code-smells': CodeSmell[];

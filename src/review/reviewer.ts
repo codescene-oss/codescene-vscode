@@ -32,7 +32,7 @@ export interface ReviewOpts {
 
 export class CsReview {
   readonly diagnostics: Promise<vscode.Diagnostic[]>;
-  readonly score: Promise<void | number>;
+  readonly score: Promise<number | undefined>;
   readonly rawScore: Promise<void | string>;
   constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {
     this.score = reviewResult.then((reviewResult) => reviewResult?.score);
