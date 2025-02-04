@@ -53,3 +53,17 @@ export async function getLogoUrl(extensionPath: string): Promise<string> {
 export function rangeStr(range: Range) {
   return `[${range.start.line + 1}:${range.start.character}→${range.end.line + 1}:${range.end.character}]`;
 }
+
+/**
+ * Navigate to the position in the file specified by uri. If we have no position, just navigate
+ * to the top of the file.
+ * 
+ * @param uri 
+ * @param position 
+ * @returns 
+ */
+export async function goToFunctionLocationOrTop(uri: vscode.Uri, position?: vscode.Position) {
+  const pos = position || new vscode.Position(0, 0);
+  const location = new vscode.Location(uri, pos);
+  return vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
+}
