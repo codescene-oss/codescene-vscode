@@ -6,7 +6,7 @@ import { FnToRefactor } from '../refactoring/capabilities';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import Telemetry from '../telemetry';
-import { isError } from '../utils';
+import { goToFunctionLocationOrTop, isError } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
 import { fileChangesDetectedContent, functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
@@ -132,7 +132,7 @@ export class CodeSceneTabPanel implements Disposable {
         );
         return;
       case 'goto-function-location':
-        void this.goToFunctionLocation(ackParams.document.uri, ackParams.fnToRefactor.range.start);
+        void goToFunctionLocationOrTop(ackParams.document.uri, ackParams.fnToRefactor.range.start);
         return;
     }
   }
@@ -140,7 +140,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string, isStale?: boolean) {
     const commands: { [key: string]: () => void } = {
       gotoFunctionLocation: async () => {
-        this.goToFunctionLocation(refactoring.document.uri, refactoring.fnToRefactor.range.start).then(
+        goToFunctionLocationOrTop(refactoring.document.uri, refactoring.fnToRefactor.range.start).then(
           () => {
             this.highlightCode(refactoring, isStale);
           },
@@ -206,8 +206,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleDocumentationMessage(params: InteractiveDocsParams, command: string) {
     switch (command) {
       case 'goto-function-location':
-        if (!params.issueInfo.position) return;
-        void this.goToFunctionLocation(params.document.uri, params.issueInfo.position);
+        void goToFunctionLocationOrTop(params.document.uri, params.issueInfo.position);
         return;
       case 'request-and-present-refactoring':
         void vscode.commands.executeCommand(
@@ -220,11 +219,6 @@ export class CodeSceneTabPanel implements Disposable {
       default:
         throw new Error(`Command not implemented: "${command}"!`);
     }
-  }
-
-  private goToFunctionLocation(uri: Uri, pos: vscode.Position) {
-    const location = new vscode.Location(uri, pos);
-    return vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
   }
 
   private async updateWebView(params: CodeSceneTabPanelParams) {

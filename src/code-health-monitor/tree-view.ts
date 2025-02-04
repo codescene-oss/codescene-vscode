@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
-import { isDefined, pluralize } from '../utils';
+import { goToFunctionLocationOrTop, isDefined, pluralize } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
@@ -87,11 +87,8 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   }
 
   private goToLocation(selection?: DeltaTreeViewItem) {
-    if (selection instanceof DeltaFunctionInfo && selection.range) {
-      const uri = selection.parent.document.uri;
-      const pos = selection.range.start;
-      const location = new vscode.Location(uri, pos);
-      void vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
+    if (selection instanceof DeltaFunctionInfo) {
+      void goToFunctionLocationOrTop(selection.parent.document.uri, selection.range?.start);
     }
   }
 
