@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.11](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.10...v0.9.11) (2025-02-11)
+
+
+### Bug fixes
+
+* **devtools-binary:** Parsing certain python conditionals ([a85eb2a](https://github.com/codescene-oss/codescene-vscode/commit/a85eb2a7b6553924b151f7f2b9ed44428a5060b7))
+
 ### [0.9.10](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.9...v0.9.10) (2025-02-11)
 
 
