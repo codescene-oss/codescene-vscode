@@ -55,15 +55,18 @@ export function rangeStr(range: Range) {
 }
 
 /**
- * Navigate to the position in the file specified by uri. If we have no position, just navigate
- * to the top of the file.
- * 
- * @param uri 
- * @param position 
- * @returns 
+ * Navigate to the position in the file specified by uri. If we have no position, just make sure
+ * the document is shown.
+ *
+ * @param uri
+ * @param position
+ * @returns
  */
-export async function goToFunctionLocationOrTop(uri: vscode.Uri, position?: vscode.Position) {
-  const pos = position || new vscode.Position(0, 0);
-  const location = new vscode.Location(uri, pos);
-  return vscode.commands.executeCommand('editor.action.goToLocations', uri, pos, [location]);
+export async function showDocAtPosition(document: vscode.TextDocument, position?: vscode.Position) {
+  if (!isDefined(position)) {
+    await vscode.window.showTextDocument(document);
+    return;
+  }
+  const location = new vscode.Location(document.uri, position);
+  return vscode.commands.executeCommand('editor.action.goToLocations', document.uri, position, [location]);
 }

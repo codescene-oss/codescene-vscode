@@ -1,4 +1,4 @@
-import vscode, { Disposable, Uri, ViewColumn, WebviewPanel } from 'vscode';
+import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
@@ -6,7 +6,7 @@ import { FnToRefactor } from '../refactoring/capabilities';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import Telemetry from '../telemetry';
-import { goToFunctionLocationOrTop, isError } from '../utils';
+import { isError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
 import { fileChangesDetectedContent, functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
@@ -132,7 +132,7 @@ export class CodeSceneTabPanel implements Disposable {
         );
         return;
       case 'goto-function-location':
-        void goToFunctionLocationOrTop(ackParams.document.uri, ackParams.fnToRefactor.range.start);
+        void showDocAtPosition(ackParams.document, ackParams.fnToRefactor.range.start);
         return;
     }
   }
@@ -140,7 +140,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string, isStale?: boolean) {
     const commands: { [key: string]: () => void } = {
       gotoFunctionLocation: async () => {
-        goToFunctionLocationOrTop(refactoring.document.uri, refactoring.fnToRefactor.range.start).then(
+        showDocAtPosition(refactoring.document, refactoring.fnToRefactor.range.start).then(
           () => {
             this.highlightCode(refactoring, isStale);
           },
@@ -206,7 +206,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleDocumentationMessage(params: InteractiveDocsParams, command: string) {
     switch (command) {
       case 'goto-function-location':
-        void goToFunctionLocationOrTop(params.document.uri, params.issueInfo.position);
+        void showDocAtPosition(params.document, params.issueInfo.position);
         return;
       case 'request-and-present-refactoring':
         void vscode.commands.executeCommand(
