@@ -72,11 +72,6 @@ export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: 
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
   }
 
-  const expressionDiagnostics = reviewResult['expression-level-code-smells']
-    .map((cs) => reviewCodeSmellToDiagnostics(cs, document))
-    .filter(isDefined);
-  diagnostics.push(...expressionDiagnostics);
-
   const fileLevelDiagnostics = reviewResult['file-level-code-smells']
     .map((cs) => reviewCodeSmellToDiagnostics(cs, document))
     .filter(isDefined);

@@ -129,9 +129,9 @@ function targetsInRange(refactoringTargets: RefactoringTarget[], fnRange: Range)
 function rangeFromEnclosingFn(enclosingFn: EnclosingFn) {
   return new Range(
     enclosingFn['start-line'] - 1,
-    enclosingFn['start-column'],
+    enclosingFn['start-column'] - 1, // <- check this!
     enclosingFn['end-line'] - 1,
-    enclosingFn['end-column']
+    enclosingFn['end-column'] - 1
   );
 }
 

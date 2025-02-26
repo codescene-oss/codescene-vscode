@@ -84,8 +84,8 @@ const enclosingFn1: EnclosingFn = {
   'end-line': 1,
   body: 'const a = () => {};',
   'function-type': 'FatArrrowFn',
-  'start-column': 0,
-  'end-column': 19,
+  'start-column': 1,
+  'end-column': 20,
   'active-code-size': 1,
 };
 
@@ -95,8 +95,8 @@ const enclosingFn2: EnclosingFn = {
   'end-line': 101,
   body: 'function notSoGoodXX(\n  intersects,\n  endRel,\n  startRel,\n  endX,\n  endY,\n  minX,\n  minY,\n  maxX,\n  maxY,\n  slope\n) {\n  if (\n    !intersects &&\n    !!(endRel & Relationship.RIGHT) &&\n    !(startRel & Relationship.RIGHT)\n  ) {\n    // potentially intersects right\n    y = endY - (endX - maxX) * slope;\n    intersects = y >= minY && y <= maxY;\n  }\n\n  switch (param.type) {\n    case "Identifier":\n      nodes.push(param);\n      break;\n\n    case "ObjectPattern":\n      for (const prop of param.properties) {\n        if (prop.type === "RestElement") {\n          extract_identifiers(prop.argument, nodes);\n        } else {\n          extract_identifiers(prop.value, nodes);\n        }\n      }\n\n      break;\n\n    case "ArrayPattern":\n      for (const element of param.elements) {\n        if (element) extract_identifiers(element, nodes);\n      }\n\n      break;\n\n    case "RestElement":\n      extract_identifiers(param.argument, nodes);\n      break;\n\n    case "AssignmentPattern":\n      extract_identifiers(param.left, nodes);\n      break;\n  }\n}',
   'function-type': 'StandaloneFn',
-  'start-column': 0,
-  'end-column': 1,
+  'start-column': 1,
+  'end-column': 2,
   'active-code-size': 54,
 };
 
