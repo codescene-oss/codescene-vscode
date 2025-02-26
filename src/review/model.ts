@@ -4,7 +4,6 @@ export interface ReviewResult {
   score?: number;
   'file-level-code-smells': CodeSmell[];
   'function-level-code-smells': ReviewFunction[];
-  'expression-level-code-smells': CodeSmell[];
   'raw-score': string;
 }
 

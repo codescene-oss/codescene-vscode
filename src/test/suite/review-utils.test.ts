@@ -69,8 +69,13 @@ suite('reviewIssueToDiagnostics', () => {
     const reviewResult: ReviewResult = {
       score: 9.81,
       'file-level-code-smells': [],
-      'function-level-code-smells': [],
-      'expression-level-code-smells': [expressionCodeSmell],
+      'function-level-code-smells': [
+        {
+          function: 'foo',
+          range: functionCodeSmellRange,
+          'code-smells': [expressionCodeSmell],
+        },
+      ],
       'raw-score': '',
     };
 
@@ -101,12 +106,11 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics[1].severity, vscode.DiagnosticSeverity.Warning, 'Wrong severity');
   });
 
-  test('handles file, funcition and expression level code smells', async () => {
+  test('handles file and function level code smells', async () => {
     const reviewResult: ReviewResult = {
       score: 9.81,
       'file-level-code-smells': [fileCodeSmell],
       'function-level-code-smells': [functionCodeSmell],
-      'expression-level-code-smells': [expressionCodeSmell],
       'raw-score': '',
     };
     const document = await vscode.workspace.openTextDocument({
@@ -115,12 +119,12 @@ suite('reviewIssueToDiagnostics', () => {
                       d) {
                     return 1;
                   }
-                }`,
+                }`, 
       language: 'typescript',
     });
 
     const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-    assert.strictEqual(diagnostics.length, 4);
+    assert.strictEqual(diagnostics.length, 3);
 
     for (const d of diagnostics) {
       let expectedRange;
