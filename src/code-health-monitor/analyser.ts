@@ -121,9 +121,9 @@ export class DeltaAnalyser {
       return finding['change-details']
         .filter((changeDetail) => hasImprovementOpportunity(changeDetail['change-type']))
         .map((changeDetail) => {
-          if (!changeDetail.position) return;
+          if (!changeDetail.line) return;
           return {
-            line: changeDetail.position.line,
+            line: changeDetail.line,
             category: changeDetail.category,
           };
         })

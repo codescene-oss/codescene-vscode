@@ -30,12 +30,7 @@ export interface ChangeDetail {
   'change-type': ChangeType;
   category: string;
   description: string;
-  position?: Position;
-}
-
-export interface Position {
-  line: number;
-  column: number;
+  line?: number;
 }
 
 export interface FunctionInfo {

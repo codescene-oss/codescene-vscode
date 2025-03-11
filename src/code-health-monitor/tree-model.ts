@@ -206,8 +206,8 @@ export class DeltaIssue implements DeltaTreeViewItem {
   readonly position?: vscode.Position;
 
   constructor(readonly parent: DeltaFunctionInfo | FileWithIssues, readonly changeDetail: ChangeDetail) {
-    if (changeDetail.position) {
-      this.position = new vscode.Position(changeDetail.position.line - 1, changeDetail.position.column - 1);
+    if (changeDetail.line) {
+      this.position = new vscode.Position(changeDetail.line - 1, 0);
     }
   }
 
