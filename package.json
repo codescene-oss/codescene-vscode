@@ -230,7 +230,7 @@
     "@types/vscode-webview": "^1.57.4",
     "@vscode-elements/elements": "^1.8.0",
     "@vscode/codicons": "^0.0.35",
-    "axios": "^1.7.4",
+    "axios": "^1.8.2",
     "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.6",
     "lodash.debounce": "^4.0.8",
