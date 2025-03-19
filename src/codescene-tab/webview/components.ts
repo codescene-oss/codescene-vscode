@@ -41,8 +41,6 @@ export function functionLocationContent({
   fnName?: string;
   isStale?: boolean;
 }) {
-  const fileName = basename(filePath);
-
   const fnNameHtml = fnName
     ? `<span class="codicon codicon-symbol-method"></span>
        <span class="${isStale ? 'strikeout' : ''}">${fnName}</span>`
@@ -50,7 +48,7 @@ export function functionLocationContent({
 
   return /*html*/ `
     <div id="function-location" class="flex-row">
-      <span class="codicon codicon-file"></span><span class="file-name">${fileName}</span>
+      <span class="codicon codicon-file"></span><span class="file-name">${basename(filePath)}</span>
       ${fnNameHtml}
       <span class="line-no ${isStale ? 'strikeout' : ''}">
       ${position ? `[Ln ${position.line + 1}]` : ''}

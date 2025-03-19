@@ -1,17 +1,16 @@
 // Functions for handling enabling and disabling the ACE "addon" components
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
+import { getConfiguration } from '../configuration';
 import { AceFeature } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-interop/api';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { logOutputChannel } from '../log';
 import { assertError, reportError } from '../utils';
-import { RefactoringAPI } from './api';
 import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
 import { RefactoringRequest } from './request';
 import { createTmpDiffUriScheme } from './utils';
-import { DevtoolsAPI } from '../devtools-interop/api';
-import { getConfiguration } from '../configuration';
 
 /**
  * Work in progress API just to keep us from creating too many contact points between
@@ -64,14 +63,14 @@ async function enable(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI
   stateEmitter.fire({ state: 'loading' });
 
   try {
-    const preflightResponse = await RefactoringAPI.instance.preFlight();
+    const preflightResponse = await devtoolsApi.preflight();
     const capabilities = new RefactoringCapabilities(preflightResponse, devtoolsApi);
 
     // Make sure to dispose old commands and diff uri scheme so we won't get duplicates (same as in disable())
     aceDisposables.forEach((d) => d.dispose());
     aceDisposables.length = 0;
 
-    aceDisposables.push(new CsRefactoringCommands());
+    aceDisposables.push(new CsRefactoringCommands(devtoolsApi));
     aceDisposables.push(createTmpDiffUriScheme());
 
     /* Add disposables to both subscription context and the extension state list
