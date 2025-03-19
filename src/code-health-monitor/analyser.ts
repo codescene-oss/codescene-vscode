@@ -1,12 +1,11 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
-import { LimitingExecutor } from '../executor';
+import { DevtoolsAPI } from '../devtools-interop/api';
 import { logOutputChannel } from '../log';
-import { RefactoringTarget } from '../refactoring/capabilities';
 import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
-import { DeltaForFile, hasImprovementOpportunity } from './model';
+import { DeltaForFile } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -20,12 +19,11 @@ export class DeltaAnalyser {
   private analysisEmitter: vscode.EventEmitter<DeltaAnalysisEvent> = new vscode.EventEmitter<DeltaAnalysisEvent>();
   readonly onDidAnalyse = this.analysisEmitter.event;
   private analysesRunning = 0;
-  private executor = new LimitingExecutor();
 
-  constructor(private binaryPath: string) {}
+  constructor(private devtoolsApi: DevtoolsAPI) {}
 
-  static init(binaryPath: string) {
-    DeltaAnalyser._instance = new DeltaAnalyser(binaryPath);
+  static init(devtoolsApi: DevtoolsAPI) {
+    DeltaAnalyser._instance = new DeltaAnalyser(devtoolsApi);
   }
 
   static get instance() {
@@ -80,11 +78,7 @@ export class DeltaAnalyser {
     }
 
     let deltaForFile: DeltaForFile | undefined;
-    const { stdout, stderr, exitCode } = await this.executor.execute(
-      { command: this.binaryPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
-      undefined,
-      inputJsonString
-    );
+    const { stdout, stderr, exitCode } = await this.devtoolsApi.deltaForFile(document, inputJsonString);
 
     switch (exitCode) {
       case 'ABORT_ERR':
@@ -117,20 +111,10 @@ export class DeltaAnalyser {
     const aceCapabilities = CsExtensionState.aceCapabilities;
     if (!aceCapabilities) return;
 
-    const refactoringTargets: RefactoringTarget[] = deltaForFile['function-level-findings'].flatMap((finding) => {
-      return finding['change-details']
-        .filter((changeDetail) => hasImprovementOpportunity(changeDetail['change-type']))
-        .map((changeDetail) => {
-          if (!changeDetail.line) return;
-          return {
-            line: changeDetail.line,
-            category: changeDetail.category,
-          };
-        })
-        .filter(isDefined);
-    });
-
-    const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(document, refactoringTargets);
+    const functionsToRefactor = await CsExtensionState.aceCapabilities?.getFnsToRefactorFromDelta(
+      document,
+      deltaForFile
+    );
     if (!functionsToRefactor) return;
 
     // Add a refactorableFn property to the findings that matches function name and range
@@ -138,13 +122,9 @@ export class DeltaAnalyser {
       const findingRange = vscodeRange(finding.function.range);
       if (!findingRange) return;
       const refactorableFunctionForFinding = functionsToRefactor.find(
-        (fn) => fn.name === finding.function.name && fn.range.intersection(findingRange)
+        (fn) => fn.name === finding.function.name && fn.vscodeRange.intersection(findingRange)
       );
       finding.refactorableFn = refactorableFunctionForFinding;
     });
   }
-}
-
-function taskId(document: vscode.TextDocument) {
-  return `${document.uri.fsPath} v${document.version}`;
 }

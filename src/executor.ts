@@ -17,9 +17,40 @@ export interface Command {
 }
 
 export interface Executor {
+  logStats(): void;
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
 }
 
+class AvgTime {
+  invocations = 0;
+  private totalDuration = 0;
+  addRun(duration: number) {
+    this.invocations++;
+    this.totalDuration += duration;
+  }
+  get averageDuration() {
+    return this.invocations > 0 ? this.totalDuration / this.invocations : 0;
+  }
+}
+
+class Stats {
+  private stats: Map<string, AvgTime> = new Map<string, AvgTime>();
+  addRun(command: Command, duration: number) {
+    const shortArgs = command.args.slice(0, 2);
+    const shortCmd = command.command.substring(command.command.lastIndexOf('/') + 1, command.command.length);
+    const cmdKey = [shortCmd, ...shortArgs].join(' ');
+    if (!this.stats.has(cmdKey)) {
+      this.stats.set(cmdKey, new AvgTime());
+    }
+    this.stats.get(cmdKey)!.addRun(duration);
+  }
+  logStats() {
+    logOutputChannel.info('Executor avg times:');
+    for (const [cmdKey, avgTime] of this.stats) {
+      logOutputChannel.info(`  ${cmdKey}: ${avgTime.averageDuration}ms (${avgTime.invocations} invocations)`);
+    }
+  }
+}
 /**
  * Executes a process and returns its output.
  *
@@ -38,6 +69,12 @@ export class SimpleExecutor implements Executor {
     }
   }
 
+  private stats: Stats = new Stats();
+
+  logStats(): void {
+    this.stats.logStats();
+  }
+
   execute(command: Command, options: ExecOptions = {}, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
 
@@ -53,6 +90,9 @@ export class SimpleExecutor implements Executor {
         logOutputChannel.trace(
           `[pid ${childProcess.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
         );
+
+        this.stats.addRun(command, end - start);
+
         resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
       });
 
@@ -102,6 +142,10 @@ export class LimitingExecutor implements Executor {
         this.runningCommands.delete(taskId);
       }
     });
+  }
+
+  logStats(): void {
+    this.executor.logStats();
   }
 
   abort(taskId: string) {

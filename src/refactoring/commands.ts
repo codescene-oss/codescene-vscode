@@ -6,11 +6,12 @@ import Telemetry from '../telemetry';
 import { FnToRefactor } from './capabilities';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
+import { DevtoolsAPI } from '../devtools-interop/api';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
 
-  constructor() {
+  constructor(readonly devtoolsApi: DevtoolsAPI) {
     this.disposables.push(
       vscode.commands.registerCommand(
         'codescene.requestAndPresentRefactoring',
@@ -35,7 +36,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
       return;
     }
 
-    const request = new RefactoringRequest(fnToRefactor, document, skipCache);
+    const request = new RefactoringRequest(fnToRefactor, document, this.devtoolsApi, skipCache);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneTabPanel.show(request);
   }
@@ -44,7 +45,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     const {
       document,
       fnToRefactor,
-      fnToRefactor: { range },
+      fnToRefactor: { vscodeRange },
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
@@ -55,10 +56,10 @@ export class CsRefactoringCommands implements vscode.Disposable {
         );
       }
       const workSpaceEdit = new WorkspaceEdit();
-      workSpaceEdit.replace(document.uri, range, response.code);
+      workSpaceEdit.replace(document.uri, vscodeRange, response.code);
       await vscode.workspace.applyEdit(workSpaceEdit);
       // Select the replaced code in the editor, starting from the original position
-      void selectCode(document, response.code, range.start);
+      void selectCode(document, response.code, vscodeRange.start);
 
       // Immediately trigger a re-review of the new file-content
       // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
@@ -70,7 +71,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
   private async showDiffForRefactoringCmd(refactoring: RefactoringRequest) {
     const {
       document,
-      fnToRefactor: { range },
+      fnToRefactor: { vscodeRange },
     } = refactoring;
 
     const response = await refactoring.promise;
@@ -78,7 +79,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
     // imposes a save dialog on the user when closing the diff.
     const originalCodeTmpDoc = await createTempDocument('Original', {
-      content: document.getText(range),
+      content: document.getText(vscodeRange),
       languageId: document.languageId,
     });
     const refactoringTmpDoc = await createTempDocument('Refactoring', {

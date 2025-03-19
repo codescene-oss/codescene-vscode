@@ -42,13 +42,13 @@ export async function activate(context: vscode.ExtensionContext) {
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
-      const devtoolsApi = new DevtoolsAPI(binaryPath);
+      const devtoolsApi = new DevtoolsAPI(binaryPath, context);
       Telemetry.init(context.extension, devtoolsApi);
 
       try {
         await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
         Reviewer.init(binaryPath, context);
-        DeltaAnalyser.init(binaryPath);
+        DeltaAnalyser.init(devtoolsApi);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context, devtoolsApi);
         finalizeActivation(controlCenterViewProvider);
@@ -99,7 +99,7 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   context.subscriptions.push(codeLensProvider);
   context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
 
-  registerCodeActionProvider(context);
+  registerCodeActionProvider(context, devtoolsApi);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
   const debouncedEnableAce = debounce(() => {

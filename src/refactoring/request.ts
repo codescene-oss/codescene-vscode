@@ -1,8 +1,8 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter, TextDocument } from 'vscode';
+import { DevtoolsAPI } from '../devtools-interop/api';
 import { AceRequestEvent } from './addon';
-import { RefactoringAPI } from './api';
 import { FnToRefactor } from './capabilities';
 import { RefactorResponse } from './model';
 
@@ -18,7 +18,12 @@ export class RefactoringRequest {
   private abortController = new AbortController();
   readonly signal = this.abortController.signal;
 
-  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, readonly skipCache = false) {
+  constructor(
+    readonly fnToRefactor: FnToRefactor,
+    readonly document: TextDocument,
+    readonly devtoolsApi: DevtoolsAPI,
+    readonly skipCache = false
+  ) {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
@@ -26,8 +31,8 @@ export class RefactoringRequest {
   }
 
   private initiate() {
-    this.promise = RefactoringAPI.instance
-      .fetchRefactoring(this)
+    this.promise = this.devtoolsApi
+      .post(this)
       .then((response) => {
         return response;
       })

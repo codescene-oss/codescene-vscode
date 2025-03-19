@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-interop/api';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
-import { RefactoringTarget } from '../refactoring/capabilities';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
-import { getCsDiagnosticCode } from './utils';
+import { vscodeRange } from './utils';
 
-export function register(context: vscode.ExtensionContext) {
-  const codeActionProvider = new ReviewCodeActionProvider();
+export function register(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
+  const codeActionProvider = new ReviewCodeActionProvider(devtoolsApi);
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(reviewDocumentSelector(), codeActionProvider),
     codeActionProvider
@@ -19,7 +20,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
   readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.Empty];
   private disposables: vscode.Disposable[] = [];
 
-  constructor() {}
+  constructor(private devtoolsApi: DevtoolsAPI) {}
 
   async provideCodeActions(
     document: vscode.TextDocument,
@@ -30,27 +31,21 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     const review = Reviewer.instance.reviewCache.get(document);
     if (!review) return;
 
-    const diagnostics: vscode.Diagnostic[] = await review.review.diagnostics;
+    const diagnostics: CsDiagnostic[] = await review.review.diagnostics;
     const actions: vscode.CodeAction[] = [];
     const diagnosticsInRange = diagnostics.filter((diagnostic) => diagnostic.range.contains(range));
 
-    const refactoringTargets = diagnosticsInRange
-      .map((diagnostic) => {
-        const category = getCsDiagnosticCode(diagnostic.code);
-        if (!category) return;
-        return {
-          category,
-          line: diagnostic.range.start.line + 1,
-        } as RefactoringTarget;
-      })
+    const codeSmells = diagnosticsInRange
+      .filter((diagnostic) => diagnostic.range.contains(range))
+      .map((diagnostic) => diagnostic.codeSmell)
       .filter(isDefined);
 
-    const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, refactoringTargets)
-    )?.[0];
+    const fnToRefactor = (await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, codeSmells))?.[0];
 
     if (fnToRefactor) {
+      const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
       const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
+      refactorAction.diagnostics = [refactorHighligting];
       refactorAction.command = {
         command: 'codescene.requestAndPresentRefactoring',
         title: 'Refactor using CodeScene ACE',
@@ -59,16 +54,18 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       actions.push(refactorAction);
     }
 
-    diagnosticsInRange.forEach((diagnostic) => {
-      const category = getCsDiagnosticCode(diagnostic.code);
+    codeSmells.forEach((codeSmell) => {
+      const { category, 'highlight-range': range } = codeSmell;
+      const highLightRange = vscodeRange(range)!;
+
       if (!category) return;
       const title = `Explain ${category}`;
       const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
-      action.diagnostics = [diagnostic];
+      action.diagnostics = diagnosticsInRange;
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codeaction'],
+        arguments: [toDocsParams(category, document, highLightRange.start, fnToRefactor), 'codeaction'],
       };
       actions.push(action);
     });

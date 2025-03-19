@@ -5,6 +5,7 @@ import { logOutputChannel } from '../log';
 import { FnToRefactor } from '../refactoring/capabilities';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
+import { CodeSmell } from '../review/model';
 import Telemetry from '../telemetry';
 import { isError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
@@ -83,16 +84,16 @@ export class CodeSceneTabPanel implements Disposable {
 
   private isFunctionUnchangedInDocument(document: vscode.TextDocument, fnToRefactor?: FnToRefactor) {
     if (!fnToRefactor) return false;
-    const contentAtRange = document.getText(fnToRefactor.range);
-    if (contentAtRange === fnToRefactor.content) return false;
+    const contentAtRange = document.getText(fnToRefactor.vscodeRange);
+    if (contentAtRange === fnToRefactor.body) return false;
 
-    const ixOfContent = document.getText().indexOf(fnToRefactor.content);
+    const ixOfContent = document.getText().indexOf(fnToRefactor.body);
     if (ixOfContent >= 0) {
       // Content matches, but function has been moved - update fnToRefactorRange!
       const newPos = document.positionAt(ixOfContent);
-      const r = fnToRefactor.range;
+      const r = fnToRefactor.vscodeRange;
       const newRange = r.with(newPos, r.end.translate(newPos.line - r.start.line));
-      fnToRefactor.range = newRange;
+      fnToRefactor.vscodeRange = newRange;
       return false;
     }
     return true;
@@ -132,7 +133,7 @@ export class CodeSceneTabPanel implements Disposable {
         );
         return;
       case 'goto-function-location':
-        void showDocAtPosition(ackParams.document, ackParams.fnToRefactor.range.start);
+        void showDocAtPosition(ackParams.document, ackParams.fnToRefactor.vscodeRange.start);
         return;
     }
   }
@@ -140,7 +141,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string, isStale?: boolean) {
     const commands: { [key: string]: () => void } = {
       gotoFunctionLocation: async () => {
-        showDocAtPosition(refactoring.document, refactoring.fnToRefactor.range.start).then(
+        showDocAtPosition(refactoring.document, refactoring.fnToRefactor.vscodeRange.start).then(
           () => {
             this.highlightCode(refactoring, isStale);
           },
@@ -230,14 +231,14 @@ export class CodeSceneTabPanel implements Disposable {
       await this.presentDocumentation(params, params.isStale);
       return;
     } else {
-      this.presentAceAcknowledgement(params.fnToRefactor);
+      this.presentAceAcknowledgement(params.fnToRefactor, params.document);
     }
   }
 
-  private presentAceAcknowledgement(fnToRefactor: FnToRefactor) {
+  private presentAceAcknowledgement(fnToRefactor: FnToRefactor, document: vscode.TextDocument) {
     const fnLocContent = functionLocationContent({
-      filePath: fnToRefactor.filePath,
-      position: fnToRefactor.range.start,
+      filePath: document.fileName,
+      position: fnToRefactor.vscodeRange.start,
       fnName: fnToRefactor.name,
     });
 
@@ -278,8 +279,8 @@ export class CodeSceneTabPanel implements Disposable {
     const { fnToRefactor, promise, document } = refactoring;
 
     const fnLocContent = functionLocationContent({
-      filePath: fnToRefactor.filePath,
-      position: fnToRefactor.range.start,
+      filePath: document.fileName,
+      position: fnToRefactor.vscodeRange.start,
       fnName: fnToRefactor.name,
       isStale,
     });
@@ -331,7 +332,7 @@ export class CodeSceneTabPanel implements Disposable {
       const highlightCode = !isStale && result.confidence.level > 1;
       const editor = targetEditor(document);
       if (highlightCode && editor) {
-        editor.selection = new vscode.Selection(fnToRefactor.range.start, fnToRefactor.range.end);
+        editor.selection = new vscode.Selection(fnToRefactor.vscodeRange.start, fnToRefactor.vscodeRange.end);
       }
     });
   }
@@ -353,11 +354,18 @@ export class CodeSceneTabPanel implements Disposable {
     // This is the case when presenting documentation from a codelens or codeaction,
     // and unfortunately in the case of presenting from a delta analysis with an unsupported code smell...
     if (issueInfo.position) {
-      return (
-        await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
-          { category: issueInfo.category, line: issueInfo.position.line + 1 },
-        ])
-      )?.[0];
+      // Small hack, using the category and issue line info and create a codesmell for use below
+      const codeSmell: CodeSmell = {
+        details: '',
+        category: issueInfo.category,
+        'highlight-range': {
+          'start-line': issueInfo.position.line,
+          'end-line': -1,
+          'start-column': -1,
+          'end-column': -1,
+        },
+      };
+      return (await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, [codeSmell]))?.[0];
     }
   }
 
@@ -368,7 +376,7 @@ export class CodeSceneTabPanel implements Disposable {
     let fnToRefactor = await this.getOrFindFnToRefactor(params);
 
     const fnLocContent = functionLocationContent({
-      filePath: document.uri.fsPath,
+      filePath: document.fileName,
       position: issueInfo.position,
       fnName: issueInfo.fnName || fnToRefactor?.name,
       isStale,

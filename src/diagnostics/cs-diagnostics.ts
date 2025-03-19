@@ -1,9 +1,31 @@
 import * as vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { isGeneralDiagnostic } from '../review/utils';
+import { CodeSmell } from '../review/model';
 
 export const csSource = 'CodeScene';
+
+export class CsDiagnostic extends vscode.Diagnostic {
+  constructor(
+    range: vscode.Range,
+    message: string,
+    severity: vscode.DiagnosticSeverity,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    private _codeSmell?: CodeSmell
+  ) {
+    let msg;
+    if (_codeSmell) {
+      msg = `${_codeSmell.category} (${_codeSmell.details})`;
+    } else {
+      msg = message;
+    }
+    super(range, msg, severity);
+  }
+
+  public get codeSmell() {
+    return this._codeSmell;
+  }
+}
 
 export default class CsDiagnostics {
   // The collection of diagnostics presented in the Problems tab
@@ -17,7 +39,7 @@ export default class CsDiagnostics {
     }
   }
 
-  static set(uri: vscode.Uri, diagnostics: vscode.Diagnostic[]) {
+  static set(uri: vscode.Uri, diagnostics: CsDiagnostic[]) {
     CsDiagnostics.collection.set(uri, diagnostics);
   }
 
@@ -27,9 +49,9 @@ export default class CsDiagnostics {
     }
 
     void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
-      // Remove the diagnostic showing the code health score. It should only be shown as a codelens, not in the problems view.
-      const importantDiagnostics = diagnostics.filter((d) => !isGeneralDiagnostic(d));
-      CsDiagnostics.set(document.uri, importantDiagnostics);
+      // Only include diagnostics with actual code smells in the problems view.
+      const diagnosticsWithCodeSmells = diagnostics.filter((d) => d.codeSmell !== null);
+      CsDiagnostics.set(document.uri, diagnosticsWithCodeSmells);
     });
   }
 }

@@ -4,6 +4,7 @@ import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { LimitingExecutor, SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { StatsCollector } from '../stats';
@@ -31,7 +32,7 @@ export interface ReviewOpts {
 }
 
 export class CsReview {
-  readonly diagnostics: Promise<vscode.Diagnostic[]>;
+  readonly diagnostics: Promise<CsDiagnostic[]>;
   readonly score: Promise<number | undefined>;
   readonly rawScore: Promise<void | string>;
   constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {

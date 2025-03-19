@@ -3,18 +3,17 @@ import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { scorePresentation } from '../code-health-monitor/model';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
-import { toDocsParams } from '../documentation/commands';
-import { logOutputChannel } from '../log';
-import { isDefined } from '../utils';
-import Reviewer, { ReviewCacheItem } from './reviewer';
-import { getCsDiagnosticCode, isGeneralDiagnostic, removeDetails } from './utils';
 import { CsExtensionState } from '../cs-extension-state';
+import { toDocsParams } from '../documentation/commands';
+import { isDefined } from '../utils';
+import { CodeSmell } from './model';
+import Reviewer, { ReviewCacheItem } from './reviewer';
 
 class CsCodeLens extends vscode.CodeLens {
   constructor(
     range: vscode.Range,
     public readonly document: vscode.TextDocument,
-    public readonly diagnostic: vscode.Diagnostic
+    public readonly codeSmell: CodeSmell
   ) {
     super(range);
   }
@@ -58,7 +57,7 @@ export class CsReviewCodeLensProvider
 
   async resolveCodeLens(codeLens: vscode.CodeLens | CsCodeLens, token: vscode.CancellationToken) {
     if (codeLens instanceof CsCodeLens) {
-      codeLens.command = await this.openInteractiveDocsCommand(codeLens.diagnostic, codeLens.document);
+      codeLens.command = await this.openInteractiveDocsCommand(codeLens, codeLens.document);
     }
     return codeLens;
   }
@@ -92,31 +91,24 @@ export class CsReviewCodeLensProvider
 
     return diagnostics
       .map((diagnostic) => {
-        if (!isGeneralDiagnostic(diagnostic)) {
-          return new CsCodeLens(diagnostic.range, document, diagnostic);
+        if (diagnostic.codeSmell) {
+          return new CsCodeLens(diagnostic.range, document, diagnostic.codeSmell);
         }
       })
       .filter(isDefined);
   }
 
-  private async openInteractiveDocsCommand(diagnostic: vscode.Diagnostic, document: vscode.TextDocument) {
-    const category = getCsDiagnosticCode(diagnostic.code);
-    if (!category) {
-      logOutputChannel.warn(`Unknown diagnostic code "${diagnostic.code}"`);
-      return;
-    }
-
+  private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
+    const { codeSmell, range } = codeLens;
     const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
-        { category, line: diagnostic.range.start.line + 1 },
-      ])
+      await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, [codeSmell])
     )?.[0];
 
-    const title = `$(warning) ${removeDetails(diagnostic.message)}`;
+    const title = `$(warning) ${codeSmell.category}`;
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codelens (review)'],
+      arguments: [toDocsParams(codeSmell.category, document, range.start, fnToRefactor), 'codelens (review)'],
     };
   }
 
