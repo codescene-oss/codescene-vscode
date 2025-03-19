@@ -8,9 +8,9 @@ import vscode, {
   window,
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { CreditsInfoError } from '../devtools-interop/api';
+import { CreditsInfo } from '../devtools-interop/model';
 import { logOutputChannel } from '../log';
-import { ACECreditsError } from '../refactoring/api';
-import { AceCredits } from '../refactoring/model';
 import Telemetry from '../telemetry';
 import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
@@ -245,7 +245,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     }
 
     // Custom presentation if we're out of credits
-    if (aceFeature.error instanceof ACECreditsError) {
+    if (aceFeature.error instanceof CreditsInfoError) {
       text = 'out of credits';
       outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
     }
@@ -268,7 +268,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     `;
   }
 
-  private creditBannerContent(creditInfo: AceCredits) {
+  private creditBannerContent(creditInfo: CreditsInfo) {
     if (!creditInfo.resetTime) return;
 
     const differenceInDays = Math.floor((creditInfo.resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
