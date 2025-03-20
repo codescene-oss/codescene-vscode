@@ -3,8 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter, TextDocument } from 'vscode';
 import { DevtoolsAPI } from '../devtools-interop/api';
 import { AceRequestEvent } from './addon';
-import { FnToRefactor } from './capabilities';
-import { RefactorResponse } from './model';
+import { FnToRefactor, RefactorResponse } from '../devtools-interop/refactor-models';
 
 export class RefactoringRequest {
   private static readonly refactoringRequestEmitter = new EventEmitter<AceRequestEvent>();
