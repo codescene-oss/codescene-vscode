@@ -8,7 +8,7 @@ import vscode, {
   ViewColumn,
   window,
 } from 'vscode';
-import { RefactorResponse } from '../refactoring/model';
+import { RefactorResponse } from '../devtools-interop/refactor-models';
 import { isDefined } from '../utils';
 
 function singleLineCommentSeparator(languageId: string) {

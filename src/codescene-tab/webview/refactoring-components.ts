@@ -1,6 +1,6 @@
 import { commands } from 'vscode';
-import { FnToRefactor } from '../../refactoring/capabilities';
-import { RefactorConfidence, RefactorResponse } from '../../refactoring/model';
+import { FnToRefactor } from '../../devtools-interop/refactor-models';
+import { RefactorConfidence, RefactorResponse } from '../../devtools-interop/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
 import { readRawMarkdownDocs } from './utils';

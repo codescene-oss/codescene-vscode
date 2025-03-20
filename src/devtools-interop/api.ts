@@ -1,27 +1,28 @@
 import { ExecOptions } from 'child_process';
 import { Command, LimitingExecutor, SimpleExecutor } from '../executor';
-import { PreFlightResponse, RefactorResponse } from '../refactoring/model';
 import { getFileExtension } from '../utils';
 import { CodeSmell } from './../review/model';
+import { CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
-  CodeHealthRulesResult,
   CreditsInfo,
   CreditsInfoError as CreditsInfoErrorModel,
-  DevtoolsError as DevtoolsErrorModel,
-} from './model';
+  FnToRefactor,
+  PreFlightResponse,
+  RefactorResponse,
+} from './refactor-models';
 
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { DeltaForFile } from '../code-health-monitor/model';
 import { CsExtensionState } from '../cs-extension-state';
 import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
-import { FnToRefactor } from '../refactoring/capabilities';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
 
 export class DevtoolsAPI {
   private simpleExecutor: SimpleExecutor = new SimpleExecutor();
   private limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
+  private preflightJson?: string;
 
   constructor(private binaryPath: string, context: ExtensionContext) {
     context.subscriptions.push(
@@ -103,29 +104,31 @@ export class DevtoolsAPI {
     );
   }
 
+  /**
+   * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
+   * @returns 
+   */
   async preflight() {
     const args = ['refactor', 'preflight'];
-    return this.executeAsJson<PreFlightResponse>(args);
+    const response = await this.executeAsJson<PreFlightResponse>(args);
+    this.preflightJson = JSON.stringify(response);
+    return response;
   }
 
-  async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[], preflight: PreFlightResponse) {
+  async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
     if (codeSmells.length === 0) return [];
-    return this.fnsToRefactor(document, preflight, ['--code-smells', JSON.stringify(codeSmells)]);
+    return this.fnsToRefactor(document, ['--code-smells', JSON.stringify(codeSmells)]);
   }
 
-  async fnsToRefactorFromDelta(document: TextDocument, delta: DeltaForFile, preflight: PreFlightResponse) {
-    return this.fnsToRefactor(document, preflight, ['--delta-result', JSON.stringify(delta)]);
+  async fnsToRefactorFromDelta(document: TextDocument, delta: DeltaForFile) {
+    return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
 
-  private async fnsToRefactor(document: TextDocument, preflight: PreFlightResponse, args: string[]) {
-    const arglist = [
-      'refactor',
-      'fns-to-refactor',
-      '--extension',
-      getFileExtension(document.fileName),
-      '--preflight',
-      JSON.stringify(preflight),
-    ].concat(args);
+  private async fnsToRefactor(document: TextDocument, args: string[]) {
+    const arglist = ['refactor', 'fns-to-refactor', '--extension', getFileExtension(document.fileName)].concat(args);
+    if (this.preflightJson) {
+      arglist.push('--preflight', this.preflightJson);
+    }
     const ret = await this.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     return ret;

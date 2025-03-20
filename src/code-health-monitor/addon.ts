@@ -1,12 +1,11 @@
 import vscode from 'vscode';
 import { Branch, GitExtension, Repository } from '../../types/git';
-import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { CodeHealthMonitorView } from './tree-view';
 
-export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+export function activate(context: vscode.ExtensionContext) {
   const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
   if (!gitExtension) {
     void vscode.window.showErrorMessage(

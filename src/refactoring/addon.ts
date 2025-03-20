@@ -2,7 +2,7 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
-import { AceFeature } from '../cs-extension-state';
+import {  AceFeature, CsFeature } from '../cs-extension-state';
 import { DevtoolsAPI } from '../devtools-interop/api';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { logOutputChannel } from '../log';
@@ -17,7 +17,7 @@ import { createTmpDiffUriScheme } from './utils';
  * the ACE functionality and the rest of the extension
  */
 export interface AceAPI {
-  onDidChangeState: vscode.Event<AceFeature>;
+  onDidChangeState: vscode.Event<CsFeature>;
   onDidRefactoringRequest: vscode.Event<AceRequestEvent>;
   onDidRequestFail: vscode.Event<Error | AxiosError>;
 }
@@ -63,8 +63,8 @@ async function enable(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI
   stateEmitter.fire({ state: 'loading' });
 
   try {
-    const preflightResponse = await devtoolsApi.preflight();
-    const capabilities = new RefactoringCapabilities(preflightResponse, devtoolsApi);
+    await devtoolsApi.preflight();
+    const capabilities = new RefactoringCapabilities(devtoolsApi);
 
     // Make sure to dispose old commands and diff uri scheme so we won't get duplicates (same as in disable())
     aceDisposables.forEach((d) => d.dispose());
@@ -78,10 +78,6 @@ async function enable(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI
      * is deactivated or if the online features are disabled */
     context.subscriptions.push(...aceDisposables);
 
-    // Force update diagnosticCollection to request initial refactorings
-    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document);
-    });
     stateEmitter.fire({ state: 'enabled', refactorCapabilities: capabilities });
 
     logOutputChannel.info('ACE enabled!');

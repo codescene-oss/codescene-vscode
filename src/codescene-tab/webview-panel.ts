@@ -1,8 +1,8 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { FnToRefactor } from '../devtools-interop/refactor-models';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
-import { FnToRefactor } from '../refactoring/capabilities';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import { CodeSmell } from '../review/model';

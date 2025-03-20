@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { issueToDocsParams } from '../documentation/commands';
-import { FnToRefactor } from '../refactoring/capabilities';
+import { FnToRefactor } from '../devtools-interop/refactor-models';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize, round } from '../utils';
 import { DeltaAnalysisState } from './analyser';

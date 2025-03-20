@@ -1,4 +1,4 @@
-import { FnToRefactor } from '../refactoring/capabilities';
+import { FnToRefactor } from '../devtools-interop/refactor-models';
 import { Range } from '../review/model';
 import { formatScore } from '../review/utils';
 
