@@ -3,10 +3,10 @@ import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { CsExtensionState } from '../cs-extension-state';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
-import { FnToRefactor } from './capabilities';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
 import { DevtoolsAPI } from '../devtools-interop/api';
+import { FnToRefactor } from '../devtools-interop/refactor-models';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];

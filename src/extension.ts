@@ -92,7 +92,7 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   addReviewListeners(context);
   setupStatsCollector(context);
 
-  activateCHMonitor(context, csContext.aceApi);
+  activateCHMonitor(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();

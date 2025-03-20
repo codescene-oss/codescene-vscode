@@ -9,7 +9,7 @@ import vscode, {
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { CreditsInfoError } from '../devtools-interop/api';
-import { CreditsInfo } from '../devtools-interop/model';
+import { CreditsInfo } from '../devtools-interop/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { pluralize } from '../utils';

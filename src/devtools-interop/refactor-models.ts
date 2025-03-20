@@ -1,4 +1,23 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+import { Range as ReviewRange } from '../review/model';
+import { Range } from 'vscode';
+
+export interface CreditsInfoError {
+  'credits-info': CreditsInfo;
+  message: string;
+  [property: string]: any;
+}
+
+export interface CreditsInfo {
+  limit: number;
+  /**
+   * Credit reset date in ISO-8601 format
+   */
+  reset?: string;
+  used: number;
+  [property: string]: any;
+}
+
 export type PreFlightResponse = {
   version: number;
   'file-types': string[];
@@ -10,6 +29,25 @@ export type RefactorSupport = {
   'max-input-loc': number;
   'code-smells': string[];
 };
+
+export interface FnToRefactor {
+  name: string;
+  range: ReviewRange;
+  body: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'file-type': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'function-type': string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'refactoring-targets': RefactoringTarget[];
+
+  vscodeRange: Range; // For internal use, not part of the devtools binary API
+}
+
+export interface RefactoringTarget {
+  line: number; // 1-indexed line numbers (from Devtools API)
+  category: string;
+}
 
 interface Review {
   category: string; // Type of issue
