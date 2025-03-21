@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { RefactorResponse } from '../../devtools-interop/refactor-models';
+import { RefactorResponse } from '../../devtools-api/refactor-models';
 import { decorateCode } from '../../refactoring/utils';
 
 const originalCode = 'const a = 1;\nconst b = 2;\nconst c = 3;\n';

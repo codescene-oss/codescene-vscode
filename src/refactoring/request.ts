@@ -1,9 +1,9 @@
 import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter, TextDocument } from 'vscode';
-import { DevtoolsAPI } from '../devtools-interop/api';
+import { DevtoolsAPI } from '../devtools-api';
+import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
 import { AceRequestEvent } from './addon';
-import { FnToRefactor, RefactorResponse } from '../devtools-interop/refactor-models';
 
 export class RefactoringRequest {
   private static readonly refactoringRequestEmitter = new EventEmitter<AceRequestEvent>();
@@ -17,12 +17,7 @@ export class RefactoringRequest {
   private abortController = new AbortController();
   readonly signal = this.abortController.signal;
 
-  constructor(
-    readonly fnToRefactor: FnToRefactor,
-    readonly document: TextDocument,
-    readonly devtoolsApi: DevtoolsAPI,
-    readonly skipCache = false
-  ) {
+  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, readonly skipCache = false) {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
@@ -30,8 +25,7 @@ export class RefactoringRequest {
   }
 
   private initiate() {
-    this.promise = this.devtoolsApi
-      .post(this)
+    this.promise = DevtoolsAPI.postRefactoring(this)
       .then((response) => {
         return response;
       })

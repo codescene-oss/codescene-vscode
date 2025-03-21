@@ -1,16 +1,16 @@
 import { TextDocument } from 'vscode';
 import { DeltaForFile } from '../code-health-monitor/model';
-import { DevtoolsAPI } from '../devtools-interop/api';
+import { DevtoolsAPI } from '../devtools-api';
 import { CodeSmell } from '../review/model';
 
 export class RefactoringCapabilities {
-  constructor(private devtoolsAPI: DevtoolsAPI) {}
+  constructor() {}
 
   async getFnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
-    return await this.devtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells);
+    return await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells);
   }
 
   async getFnsToRefactorFromDelta(document: TextDocument, deltaResult: DeltaForFile) {
-    return await this.devtoolsAPI.fnsToRefactorFromDelta(document, deltaResult);
+    return await DevtoolsAPI.fnsToRefactorFromDelta(document, deltaResult);
   }
 }

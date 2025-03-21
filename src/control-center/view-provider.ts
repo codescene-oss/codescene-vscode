@@ -8,8 +8,8 @@ import vscode, {
   window,
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { CreditsInfoError } from '../devtools-interop/api';
-import { CreditsInfo } from '../devtools-interop/refactor-models';
+import { CreditsInfoError } from '../devtools-api';
+import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { pluralize } from '../utils';

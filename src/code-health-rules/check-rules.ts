@@ -1,18 +1,18 @@
 import path from 'path';
 import { window } from 'vscode';
-import { DevtoolsAPI } from '../devtools-interop/api';
+import { DevtoolsAPI } from '../devtools-api';
 
 /**
  * Function to show matching code health rule for currently opened file.
  * @returns void
  */
-export async function checkCodeHealthRules(devtoolsApi: DevtoolsAPI) {
+export async function checkCodeHealthRules() {
   const editor = window.activeTextEditor;
   if (editor && editor.document) {
     const absoluteFilePath = editor.document.uri.fsPath;
     const fileName = path.basename(absoluteFilePath);
     const folder = path.dirname(absoluteFilePath);
-    const { rulesMsg, errorMsg } = await devtoolsApi.checkRules(folder, fileName);
+    const { rulesMsg, errorMsg } = await DevtoolsAPI.checkRules(folder, fileName);
     if (errorMsg) {
       void window.showErrorMessage(errorMsg);
       return;
