@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
-import { FnToRefactor } from '../devtools-interop/refactor-models';
+import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 
 export function register(context: vscode.ExtensionContext) {

@@ -1,17 +1,16 @@
 import vscode, { WorkspaceEdit } from 'vscode';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { CsExtensionState } from '../cs-extension-state';
+import { FnToRefactor } from '../devtools-api/refactor-models';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
-import { DevtoolsAPI } from '../devtools-interop/api';
-import { FnToRefactor } from '../devtools-interop/refactor-models';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
 
-  constructor(readonly devtoolsApi: DevtoolsAPI) {
+  constructor() {
     this.disposables.push(
       vscode.commands.registerCommand(
         'codescene.requestAndPresentRefactoring',
@@ -36,7 +35,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
       return;
     }
 
-    const request = new RefactoringRequest(fnToRefactor, document, this.devtoolsApi, skipCache);
+    const request = new RefactoringRequest(fnToRefactor, document, skipCache);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneTabPanel.show(request);
   }

@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { Command, LimitingExecutor, SimpleExecutor } from '../executor';
+import { CodeSmell } from '../review/model';
 import { getFileExtension } from '../utils';
-import { CodeSmell } from './../review/model';
 import { CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
@@ -21,11 +21,17 @@ import { vscodeRange } from '../review/utils';
 import { TelemetryEvent } from './telemetry-model';
 
 export class DevtoolsAPI {
-  private simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  private limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
-  private preflightJson?: string;
+  private static instance: DevtoolsAPI;
 
-  constructor(private binaryPath: string, context: ExtensionContext) {
+  public simpleExecutor: SimpleExecutor = new SimpleExecutor();
+  public limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
+  public preflightJson?: string;
+
+  static init(binaryPath: string, context: ExtensionContext) {
+    DevtoolsAPI.instance = new DevtoolsAPI(binaryPath, context);
+  }
+
+  private constructor(public binaryPath: string, context: ExtensionContext) {
     context.subscriptions.push(
       vscode.commands.registerCommand('codescene.printDevtoolsApiStats', () => {
         this.simpleExecutor.logStats();
@@ -79,27 +85,28 @@ export class DevtoolsAPI {
   /**
    * Executes the command for creating a code health rules template.
    */
-  codeHealthRulesTemplate() {
-    return this.runBinary(['code-health-rules-template']);
+  static codeHealthRulesTemplate() {
+    return this.instance.runBinary(['code-health-rules-template']);
   }
 
   /**
    * Executes the command for checking code health rule match against file
    */
-  async checkRules(rootPath: string, filePath: string) {
+  static async checkRules(rootPath: string, filePath: string) {
+    // TODO - make this use the runBinary function instead!
     const command: Command = {
-      command: this.binaryPath,
+      command: DevtoolsAPI.instance.binaryPath,
       args: ['check-rules', filePath],
       ignoreError: true,
     };
-    const { stdout, stderr } = await this.simpleExecutor.execute(command, { cwd: rootPath });
+    const { stdout, stderr } = await DevtoolsAPI.instance.simpleExecutor.execute(command, { cwd: rootPath });
     const err = stderr.trim();
     return { rulesMsg: stdout.trim(), errorMsg: err !== '' ? err : undefined } as CodeHealthRulesResult;
   }
 
-  async deltaForFile(document: TextDocument, inputJsonString: string) {
-    return await this.limitingExecutor.execute(
-      { command: this.binaryPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
+  static async deltaForFile(document: TextDocument, inputJsonString: string) {
+    return await DevtoolsAPI.instance.limitingExecutor.execute(
+      { command: DevtoolsAPI.instance.binaryPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
       undefined,
       inputJsonString
     );
@@ -109,33 +116,37 @@ export class DevtoolsAPI {
    * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
    * @returns
    */
-  async preflight() {
+  static async preflight() {
     const args = ['refactor', 'preflight'];
-    const response = await this.executeAsJson<PreFlightResponse>(args);
-    this.preflightJson = JSON.stringify(response);
+    const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>(args);
+    DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
     return response;
   }
 
-  async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
+  static aceAvailable() {
+    return DevtoolsAPI.instance.preflightJson !== undefined;
+  }
+
+  static async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
     if (codeSmells.length === 0) return [];
     return this.fnsToRefactor(document, ['--code-smells', JSON.stringify(codeSmells)]);
   }
 
-  async fnsToRefactorFromDelta(document: TextDocument, delta: DeltaForFile) {
+  static async fnsToRefactorFromDelta(document: TextDocument, delta: DeltaForFile) {
     return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
 
-  private async fnsToRefactor(document: TextDocument, args: string[]) {
+  static async fnsToRefactor(document: TextDocument, args: string[]) {
     const arglist = ['refactor', 'fns-to-refactor', '--extension', getFileExtension(document.fileName)].concat(args);
-    if (this.preflightJson) {
-      arglist.push('--preflight', this.preflightJson);
+    if (DevtoolsAPI.instance.preflightJson) {
+      arglist.push('--preflight', DevtoolsAPI.instance.preflightJson);
     }
-    const ret = await this.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
+    const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     return ret;
   }
 
-  async post(request: RefactoringRequest) {
+  static async postRefactoring(request: RefactoringRequest) {
     const { fnToRefactor, skipCache, signal } = request;
 
     const args = ['refactor', 'post', '--fn-to-refactor', JSON.stringify(fnToRefactor)];
@@ -146,15 +157,14 @@ export class DevtoolsAPI {
       args.push('--token', session.accessToken);
     }
 
-    const stdout = await this.runBinary(args, { signal });
+    const stdout = await DevtoolsAPI.instance.runBinary(args, { signal });
     return JSON.parse(stdout) as RefactorResponse;
   }
 
-  postTelemetry(event: TelemetryEvent) {
+  static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return this.runBinary(['telemetry', '--event', jsonEvent]);
+    return DevtoolsAPI.instance.runBinary(['telemetry', '--event', jsonEvent]);
   }
-
 }
 
 function taskId(document: TextDocument) {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Range as ReviewRange } from '../review/model';
 import { Range } from 'vscode';
+import { Range as ReviewRange } from '../review/model';
 
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;

@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-interop/api';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
@@ -8,8 +7,8 @@ import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { vscodeRange } from './utils';
 
-export function register(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
-  const codeActionProvider = new ReviewCodeActionProvider(devtoolsApi);
+export function register(context: vscode.ExtensionContext) {
+  const codeActionProvider = new ReviewCodeActionProvider();
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(reviewDocumentSelector(), codeActionProvider),
     codeActionProvider
@@ -20,7 +19,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
   readonly providedCodeActionKinds = [vscode.CodeActionKind.QuickFix, vscode.CodeActionKind.Empty];
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private devtoolsApi: DevtoolsAPI) {}
+  constructor() {}
 
   async provideCodeActions(
     document: vscode.TextDocument,
@@ -40,7 +39,9 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .map((diagnostic) => diagnostic.codeSmell)
       .filter(isDefined);
 
-    const fnToRefactor = (await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, codeSmells))?.[0];
+    const fnToRefactor = (
+      await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, codeSmells)
+    )?.[0];
 
     if (fnToRefactor) {
       const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');

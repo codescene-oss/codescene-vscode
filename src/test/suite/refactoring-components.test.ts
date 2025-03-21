@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { reasonsContent } from '../../codescene-tab/webview/refactoring-components';
-import { RefactorResponse } from '../../devtools-interop/refactor-models';
+import { RefactorResponse } from '../../devtools-api/refactor-models';
 
 const code = 'function foo() {}\n';
 

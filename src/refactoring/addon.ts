@@ -2,9 +2,8 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
-import {  AceFeature, CsFeature } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-interop/api';
-import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { AceFeature, CsFeature } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import { assertError, reportError } from '../utils';
 import { RefactoringCapabilities } from './capabilities';
@@ -32,7 +31,7 @@ export type AceRequestEvent = {
  * Aside from the AceAPI, this "addon" also contributes
  * the codescene.ace.activate command
  */
-export function activate(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI): AceAPI {
+export function activate(context: vscode.ExtensionContext): AceAPI {
   context.subscriptions.push(
     vscode.commands.registerCommand('codescene.ace.activate', () => {
       const enableACE = getConfiguration('enableAutoRefactor');
@@ -40,7 +39,7 @@ export function activate(context: vscode.ExtensionContext, devtoolsApi: Devtools
         disable();
         return;
       }
-      void enable(context, devtoolsApi);
+      void enable(context);
     })
   );
 
@@ -59,18 +58,18 @@ const stateEmitter = new vscode.EventEmitter<AceFeature>();
  *
  * @param context
  */
-async function enable(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
+async function enable(context: vscode.ExtensionContext) {
   stateEmitter.fire({ state: 'loading' });
 
   try {
-    await devtoolsApi.preflight();
-    const capabilities = new RefactoringCapabilities(devtoolsApi);
+    await DevtoolsAPI.preflight();
+    const capabilities = new RefactoringCapabilities();
 
     // Make sure to dispose old commands and diff uri scheme so we won't get duplicates (same as in disable())
     aceDisposables.forEach((d) => d.dispose());
     aceDisposables.length = 0;
 
-    aceDisposables.push(new CsRefactoringCommands(devtoolsApi));
+    aceDisposables.push(new CsRefactoringCommands());
     aceDisposables.push(createTmpDiffUriScheme());
 
     /* Add disposables to both subscription context and the extension state list

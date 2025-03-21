@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { CsExtensionState, CsStateProperties } from './cs-extension-state';
+import { CreditsInfoError } from './devtools-api';
 import { isDefined } from './utils';
-import { CreditsInfoError } from './devtools-interop/api';
 
 export class CsStatusBar {
   private readonly statusBarItem: vscode.StatusBarItem;
