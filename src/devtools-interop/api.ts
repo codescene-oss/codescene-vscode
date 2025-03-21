@@ -18,6 +18,7 @@ import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
+import { TelemetryEvent } from './telemetry-model';
 
 export class DevtoolsAPI {
   private simpleExecutor: SimpleExecutor = new SimpleExecutor();
@@ -106,7 +107,7 @@ export class DevtoolsAPI {
 
   /**
    * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
-   * @returns 
+   * @returns
    */
   async preflight() {
     const args = ['refactor', 'preflight'];
@@ -149,12 +150,11 @@ export class DevtoolsAPI {
     return JSON.parse(stdout) as RefactorResponse;
   }
 
-  /**
-   * Executes the command for signing a payload.
-   */
-  sign(payload: string) {
-    return this.runBinary(['sign'], {}, payload);
+  postTelemetry(event: TelemetryEvent) {
+    const jsonEvent = JSON.stringify(event);
+    return this.runBinary(['telemetry', '--event', jsonEvent]);
   }
+
 }
 
 function taskId(document: TextDocument) {
