@@ -85,10 +85,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       openAiPrivacyPrinciples: () => this.openLink('https://codescene.com/product/ace/principles'),
       openContactCodescene: () => this.openLink('https://codescene.com/company/contact-us'),
       raiseSupportTicket: () => this.openLink('https://supporthub.codescene.com/kb-tickets/new'),
-      copyMachineId: () =>
-        void vscode.env.clipboard.writeText(vscode.env.machineId).then(() => {
-          void vscode.window.showInformationMessage('Copied machine-id to clipboard.');
-        }),
     };
 
     const cmd = commands[message.command];
@@ -144,7 +140,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         ${this.accountGroup()}
         ${this.statusGroup()}
         ${this.moreGroup()}
-        <div class="clickable" id="machine-id" title="Click to copy">machine-id:<br>${vscode.env.machineId}</div>
     `;
   }
 
