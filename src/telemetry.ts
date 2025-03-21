@@ -1,8 +1,8 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
 import { CsExtensionState } from './cs-extension-state';
-import { DevtoolsAPI } from './devtools-interop/api';
-import { TelemetryEvent } from './devtools-interop/telemetry-model';
+import { DevtoolsAPI } from './devtools-api';
+import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
 
 export default class Telemetry {
@@ -11,7 +11,7 @@ export default class Telemetry {
   private static eventPrefix = 'vscode';
   private telemetryLogger: vscode.TelemetryLogger;
 
-  constructor(private extension: vscode.Extension<any>, private devtoolsApi: DevtoolsAPI) {
+  constructor(private extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
       sendEventData: (eventName, eventData) => {
         // The telemetry-sender apparently adds the extension id to the event name - replace it manually here to keep it simple for Amplitude users
@@ -28,9 +28,9 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-  static init(extension: vscode.Extension<any>, devtoolsApi: DevtoolsAPI): void {
+  static init(extension: vscode.Extension<any>): void {
     logOutputChannel.info('Initializing telemetry logger');
-    Telemetry._instance = new Telemetry(extension, devtoolsApi);
+    Telemetry._instance = new Telemetry(extension);
   }
 
   static logUsage(eventName: string, eventData?: any) {
@@ -57,6 +57,6 @@ export default class Telemetry {
     if (process.env.X_CODESCENE_INTERNAL) {
       telemetryEvent['internal'] = true;
     }
-    return this.devtoolsApi.postTelemetry(telemetryEvent);
+    return DevtoolsAPI.postTelemetry(telemetryEvent);
   }
 }

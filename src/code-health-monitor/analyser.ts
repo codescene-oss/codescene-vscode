@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-interop/api';
+import { DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
@@ -20,10 +20,10 @@ export class DeltaAnalyser {
   readonly onDidAnalyse = this.analysisEmitter.event;
   private analysesRunning = 0;
 
-  constructor(private devtoolsApi: DevtoolsAPI) {}
+  constructor() {}
 
-  static init(devtoolsApi: DevtoolsAPI) {
-    DeltaAnalyser._instance = new DeltaAnalyser(devtoolsApi);
+  static init() {
+    DeltaAnalyser._instance = new DeltaAnalyser();
   }
 
   static get instance() {
@@ -78,7 +78,7 @@ export class DeltaAnalyser {
     }
 
     let deltaForFile: DeltaForFile | undefined;
-    const { stdout, stderr, exitCode } = await this.devtoolsApi.deltaForFile(document, inputJsonString);
+    const { stdout, stderr, exitCode } = await DevtoolsAPI.deltaForFile(document, inputJsonString);
 
     switch (exitCode) {
       case 'ABORT_ERR':
