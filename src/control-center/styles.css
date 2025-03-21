@@ -41,16 +41,6 @@
   background-color: var(--vscode-debugExceptionWidget-background);
 }
 
-#machine-id {
-  font-size: 8px;
-  color: var(--vscode-disabledForeground);
-  text-align: center;
-  margin: 12px 0 10px 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .out-of-credits-banner {
   background-color: var(--vscode-button-secondaryBackground);
   border-radius: 4px;
