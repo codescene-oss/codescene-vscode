@@ -2,11 +2,10 @@
 import { AxiosError } from 'axios';
 import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
-import { AceFeature, CsFeature } from '../cs-extension-state';
+import { CsFeature } from '../cs-extension-state';
 import { DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import { assertError, reportError } from '../utils';
-import { RefactoringCapabilities } from './capabilities';
 import { CsRefactoringCommands } from './commands';
 import { RefactoringRequest } from './request';
 import { createTmpDiffUriScheme } from './utils';
@@ -18,7 +17,7 @@ import { createTmpDiffUriScheme } from './utils';
 export interface AceAPI {
   onDidChangeState: vscode.Event<CsFeature>;
   onDidRefactoringRequest: vscode.Event<AceRequestEvent>;
-  onDidRequestFail: vscode.Event<Error | AxiosError>;
+  onDidRequestFail: vscode.Event<Error>;
 }
 
 export type AceRequestEvent = {
@@ -51,7 +50,7 @@ export function activate(context: vscode.ExtensionContext): AceAPI {
 }
 
 const aceDisposables: vscode.Disposable[] = [];
-const stateEmitter = new vscode.EventEmitter<AceFeature>();
+const stateEmitter = new vscode.EventEmitter<CsFeature>();
 /**
  * If config is enabled and we have a session, try to enable ACE capabilities by getting a preflight response.
  * If disabled manually by the config option, the capabilities are disabled with an appropriate message.
@@ -63,7 +62,6 @@ async function enable(context: vscode.ExtensionContext) {
 
   try {
     await DevtoolsAPI.preflight();
-    const capabilities = new RefactoringCapabilities();
 
     // Make sure to dispose old commands and diff uri scheme so we won't get duplicates (same as in disable())
     aceDisposables.forEach((d) => d.dispose());
@@ -77,10 +75,8 @@ async function enable(context: vscode.ExtensionContext) {
      * is deactivated or if the online features are disabled */
     context.subscriptions.push(...aceDisposables);
 
-    stateEmitter.fire({ state: 'enabled', refactorCapabilities: capabilities });
-
+    stateEmitter.fire({ state: 'enabled' });
     logOutputChannel.info('ACE enabled!');
-    return capabilities;
   } catch (e) {
     const error = assertError(e) || new Error('Unknown error');
     stateEmitter.fire({ state: 'error', error });
@@ -91,6 +87,7 @@ async function enable(context: vscode.ExtensionContext) {
 function disable() {
   aceDisposables.forEach((d) => d.dispose());
   aceDisposables.length = 0;
+  DevtoolsAPI.disableAce();
   stateEmitter.fire({ state: 'disabled' });
   logOutputChannel.info('ACE disabled!');
 }

@@ -9,7 +9,7 @@ export class RefactoringRequest {
   private static readonly refactoringRequestEmitter = new EventEmitter<AceRequestEvent>();
   static readonly onDidRefactoringRequest = RefactoringRequest.refactoringRequestEmitter.event;
 
-  private static readonly errorEmitter = new EventEmitter<Error | AxiosError>();
+  private static readonly errorEmitter = new EventEmitter<Error>();
   static readonly onDidRequestFail = RefactoringRequest.errorEmitter.event;
 
   readonly traceId: string;
