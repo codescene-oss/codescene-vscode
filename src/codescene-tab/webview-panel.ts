@@ -1,5 +1,6 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
@@ -365,7 +366,7 @@ export class CodeSceneTabPanel implements Disposable {
           'end-column': -1,
         },
       };
-      return (await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, [codeSmell]))?.[0];
+      return await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
     }
   }
 

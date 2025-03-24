@@ -3,7 +3,7 @@ import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { scorePresentation } from '../code-health-monitor/model';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
-import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { toDocsParams } from '../documentation/commands';
 import { isDefined } from '../utils';
 import { CodeSmell } from './model';
@@ -100,9 +100,7 @@ export class CsReviewCodeLensProvider
 
   private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
     const { codeSmell, range } = codeLens;
-    const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, [codeSmell])
-    )?.[0];
+    const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
 
     const title = `$(warning) ${codeSmell.category}`;
     return {

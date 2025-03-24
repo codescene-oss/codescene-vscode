@@ -123,8 +123,17 @@ export class DevtoolsAPI {
     return response;
   }
 
-  static aceAvailable() {
+  static aceEnabled() {
     return DevtoolsAPI.instance.preflightJson !== undefined;
+  }
+
+  static disableAce() {
+    DevtoolsAPI.instance.preflightJson = undefined;
+  }
+
+  static async fnsToRefactorFromCodeSmell(document: TextDocument, codeSmell: CodeSmell) {
+    const result = await this.fnsToRefactor(document, ['--code-smells', JSON.stringify([codeSmell])]);
+    return result?.[0];
   }
 
   static async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
@@ -136,11 +145,20 @@ export class DevtoolsAPI {
     return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
 
-  static async fnsToRefactor(document: TextDocument, args: string[]) {
-    const arglist = ['refactor', 'fns-to-refactor', '--extension', getFileExtension(document.fileName)].concat(args);
-    if (DevtoolsAPI.instance.preflightJson) {
-      arglist.push('--preflight', DevtoolsAPI.instance.preflightJson);
-    }
+  /**
+   * If no preflight json is available, ACE is considered disabled. No functions will
+   * be presented as refactorable by early return here.
+   */
+  private static async fnsToRefactor(document: TextDocument, args: string[]) {
+    if (!DevtoolsAPI.instance.preflightJson) return;
+    const arglist = [
+      'refactor',
+      'fns-to-refactor',
+      '--extension',
+      getFileExtension(document.fileName),
+      '--preflight',
+      DevtoolsAPI.instance.preflightJson,
+    ].concat(args);
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     return ret;

@@ -5,7 +5,6 @@ import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { logOutputChannel } from './log';
 import { AceAPI } from './refactoring/addon';
-import { RefactoringCapabilities } from './refactoring/capabilities';
 import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
 
@@ -25,11 +24,9 @@ export interface CsFeature {
 type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
-export type AceFeature = CsFeature & { refactorCapabilities?: RefactoringCapabilities };
-
 interface CsFeatures {
   analysis: AnalysisFeature;
-  ace: AceFeature;
+  ace: CsFeature;
 }
 
 export interface CsStateProperties {
@@ -103,13 +100,6 @@ export class CsExtensionState {
 
   static get extensionUri(): Uri {
     return CsExtensionState._instance.extensionUri;
-  }
-
-  /**
-   * Returns the preflight response if ACE is enabled, otherwise undefined.
-   */
-  static get aceCapabilities(): RefactoringCapabilities | undefined {
-    return CsExtensionState._instance.stateProperties.features.ace.refactorCapabilities;
   }
 
   /**
@@ -191,10 +181,10 @@ export class CsExtensionState {
     CsExtensionState._instance.updateStatusViews();
   }
 
-  static setACEState({ refactorCapabilities, state, error }: AceFeature) {
+  static setACEState({ state, error }: CsFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      ace: { refactorCapabilities, state: featureState({ state, error }), error },
+      ace: { state: featureState({ state, error }), error },
     };
     CsExtensionState._instance.updateStatusViews();
   }
