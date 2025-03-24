@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
@@ -40,7 +40,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .filter(isDefined);
 
     const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFnsToRefactorFromCodeSmells(document, codeSmells)
+      await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells)
     )?.[0];
 
     if (fnToRefactor) {

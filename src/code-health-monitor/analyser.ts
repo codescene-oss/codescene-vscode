@@ -108,10 +108,7 @@ export class DeltaAnalyser {
    * NOTE - Mutates the delta result by adding info about refactorable functions to the 'function-level-findings' list.
    */
   private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: DeltaForFile) {
-    const aceCapabilities = CsExtensionState.aceCapabilities;
-    if (!aceCapabilities) return;
-
-    const functionsToRefactor = await CsExtensionState.aceCapabilities?.getFnsToRefactorFromDelta(
+    const functionsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(
       document,
       deltaForFile
     );
