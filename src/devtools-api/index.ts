@@ -1,5 +1,5 @@
 import { ExecOptions } from 'child_process';
-import { Command, LimitingExecutor, SimpleExecutor } from '../executor';
+import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
 import { CodeSmell } from '../review/model';
 import { assertError, getFileExtension, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
@@ -19,6 +19,23 @@ import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
 import { TelemetryEvent } from './telemetry-model';
+
+interface BinaryOpts {
+  // args to pass to the binary
+  args: string[];
+
+  // ExecOptions (signal, cwd etc...)
+  execOptions?: ExecOptions;
+
+  // optional string to send on stdin
+  input?: string;
+
+  /* 
+  optional taskid for the invocation, ensuring only one task with the same id is running.
+  see LimitingExecutor for details
+  */
+  taskId?: string;
+}
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPI;
@@ -43,42 +60,67 @@ export class DevtoolsAPI {
   /**
    * Runs the devtools binary
    *
-   * @param args args for the binary
-   * @param options ExecOptions (signal, cwd etc...)
-   * @param input optional string to send on stdin
+   * @param opts Options for running the devtools binary
    * @returns stdout of the command
    * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
    */
-  private async runBinary(args: string[], options: ExecOptions = {}, input?: string) {
-    const command: Command = {
-      command: this.binaryPath,
-      args,
-      ignoreError: true,
-    };
-    const result = await this.simpleExecutor.execute(command, options, input);
+  private async runBinary(opts: BinaryOpts) {
+    const { args, execOptions: options, input, taskId } = opts;
+
+    let result: ExecResult;
+    if (taskId) {
+      const task: Task = {
+        command: this.binaryPath,
+        args,
+        taskId,
+        ignoreError: true,
+      };
+      result = await this.limitingExecutor.execute(task, options, input);
+    } else {
+      const command: Command = {
+        command: this.binaryPath,
+        args,
+        ignoreError: true,
+      };
+      result = await this.simpleExecutor.execute(command, options, input);
+    }
     const { stdout, stderr, exitCode } = result;
     if (exitCode === 0) {
       return stdout.trim();
     }
 
+    this.handleExitCode(exitCode, stderr, args);
+  }
+
+  /**
+   * Handles the exit code of the devtools binary
+   *
+   * @param exitCode exit code from the devtools binary
+   * @param stderr stderr from the devtools binary
+   * @param args args for logging purposes
+   * @throws appropriate Errors
+   */
+  private handleExitCode(exitCode: number | string, stderr: string, args: string[]): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
         const devtoolsError = JSON.parse(stderr) as DevtoolsErrorModel;
-        logOutputChannel.error(`Error running '${args.join(' ')}': ${devtoolsError.message}`);
+        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
         const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
-        logOutputChannel.error(`Error running '${args.join(' ')}': ${creditsInfoError.message}`);
+        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
         throw new CreditsInfoError(creditsInfoError.message, creditsInfoError['credits-info']);
+      case 'ABORT_ERR':
+        throw new AbortError();
 
       default:
-        logOutputChannel.error(`Error running '${args.join(' ')}': ${stderr}`);
+        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${stderr}`);
         throw new Error(stderr);
     }
   }
 
-  private async executeAsJson<T>(args: string[], options?: ExecOptions, input?: string) {
-    const output = await this.runBinary(args, options, input);
+  private async executeAsJson<T>(opts: BinaryOpts) {
+    const output = await this.runBinary(opts);
     return JSON.parse(output) as T;
   }
 
@@ -86,7 +128,7 @@ export class DevtoolsAPI {
    * Executes the command for creating a code health rules template.
    */
   static codeHealthRulesTemplate() {
-    return this.instance.runBinary(['code-health-rules-template']);
+    return this.instance.runBinary({ args: ['code-health-rules-template'] });
   }
 
   /**
@@ -105,11 +147,11 @@ export class DevtoolsAPI {
   }
 
   static async deltaForFile(document: TextDocument, inputJsonString: string) {
-    return await DevtoolsAPI.instance.limitingExecutor.execute(
-      { command: DevtoolsAPI.instance.binaryPath, args: ['delta'], taskId: taskId(document), ignoreError: true },
-      undefined,
-      inputJsonString
-    );
+    return this.instance.runBinary({
+      args: ['delta'],
+      input: inputJsonString,
+      taskId: taskId(document),
+    });
   }
 
   // Event emitters for devtools API callbacks
@@ -127,7 +169,7 @@ export class DevtoolsAPI {
     const args = ['refactor', 'preflight'];
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
     try {
-      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>(args);
+      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({ args });
       DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       logOutputChannel.info('ACE enabled!');
@@ -168,15 +210,18 @@ export class DevtoolsAPI {
    */
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
-    const arglist = [
+    const baseArgs = [
       'refactor',
       'fns-to-refactor',
       '--extension',
       getFileExtension(document.fileName),
       '--preflight',
       DevtoolsAPI.instance.preflightJson!, // aceEnabled implies preflightJson is defined
-    ].concat(args);
-    const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
+    ];
+    const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
+      args: baseArgs.concat(args),
+      input: document.getText(),
+    });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     return ret;
   }
@@ -207,7 +252,7 @@ export class DevtoolsAPI {
         args.push('--token', session.accessToken);
       }
 
-      const stdout = await DevtoolsAPI.instance.runBinary(args, { signal });
+      const stdout = await DevtoolsAPI.instance.runBinary({ args, execOptions: { signal } });
       return JSON.parse(stdout) as RefactorResponse;
     } catch (e) {
       const error = assertError(e) || new Error('Unknown refactoring error');
@@ -220,7 +265,7 @@ export class DevtoolsAPI {
 
   static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return DevtoolsAPI.instance.runBinary(['telemetry', '--event', jsonEvent]);
+    return DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--event', jsonEvent] });
   }
 }
 
@@ -239,3 +284,5 @@ export class DevtoolsError extends Error {
     super(error.message);
   }
 }
+
+export class AbortError extends Error {}

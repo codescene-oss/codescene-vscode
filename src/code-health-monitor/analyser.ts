@@ -1,15 +1,11 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
-import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-api';
-import { logOutputChannel } from '../log';
+import { AbortError, DevtoolsAPI } from '../devtools-api';
 import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
 import { DeltaForFile } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
-export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
-export type DeltaAnalysisResult = DeltaForFile | DeltaAnalysisState;
 
 export class DeltaAnalyser {
   private static _instance: DeltaAnalyser;
@@ -78,29 +74,26 @@ export class DeltaAnalyser {
     }
 
     let deltaForFile: DeltaForFile | undefined;
-    const { stdout, stderr, exitCode } = await DevtoolsAPI.deltaForFile(document, inputJsonString);
 
-    switch (exitCode) {
-      case 'ABORT_ERR':
-        this.endAnalysisEvent(document, deltaForFile);
-        return;
-      case 1:
-        logOutputChannel.debug(`Delta analysis output: '${stdout.trim()}'`);
-        logOutputChannel.error(`CodeScene delta analysis failed: '${stderr.trim()}' (exit ${exitCode})`);
-        this.errorEmitter.fire(new Error(stderr));
-        this.endAnalysisEvent(document, deltaForFile);
-        return;
-    }
-
-    if (exitCode === 0) {
-      if (stdout.trim() === '') {
+    try {
+      const result = await DevtoolsAPI.deltaForFile(document, inputJsonString);
+      if (result.trim() === '') {
+        // empty result => undefined delta, indicating no change
         this.endAnalysisEvent(document, deltaForFile);
         return;
       }
-      deltaForFile = JSON.parse(stdout) as DeltaForFile;
+      deltaForFile = JSON.parse(result) as DeltaForFile;
       await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
       this.endAnalysisEvent(document, deltaForFile);
       return deltaForFile;
+    } catch (e) {
+      if (e instanceof AbortError) {
+        this.endAnalysisEvent(document, deltaForFile);
+      } else if (e instanceof Error) {
+        this.errorEmitter.fire(e);
+      }
+    } finally {
+      this.endAnalysisEvent(document, deltaForFile);
     }
   }
 
@@ -108,10 +101,7 @@ export class DeltaAnalyser {
    * NOTE - Mutates the delta result by adding info about refactorable functions to the 'function-level-findings' list.
    */
   private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: DeltaForFile) {
-    const functionsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(
-      document,
-      deltaForFile
-    );
+    const functionsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(document, deltaForFile);
     if (!functionsToRefactor) return;
 
     // Add a refactorableFn property to the findings that matches function name and range
