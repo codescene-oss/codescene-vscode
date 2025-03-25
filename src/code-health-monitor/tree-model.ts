@@ -3,7 +3,6 @@ import { FnToRefactor } from '../devtools-api/refactor-models';
 import { issueToDocsParams } from '../documentation/commands';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize, round } from '../utils';
-import { DeltaAnalysisState } from './analyser';
 import {
   ChangeDetail,
   ChangeType,
@@ -20,10 +19,7 @@ export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
 const warningColor = new vscode.ThemeColor('editorWarning.foreground');
 export const errorColor = new vscode.ThemeColor('errorForeground');
 
-export function countInTree(
-  tree: Array<DeltaTreeViewItem | DeltaAnalysisState>,
-  fn: (item: ChangeType) => boolean
-): number {
+export function countInTree(tree: Array<DeltaTreeViewItem>, fn: (item: ChangeType) => boolean): number {
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaIssue) {
@@ -33,7 +29,7 @@ export function countInTree(
   }, 0);
 }
 
-export function refactoringsCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): number {
+export function refactoringsCount(tree: Array<DeltaTreeViewItem>): number {
   return tree.reduce((prev, curr) => {
     if (typeof curr === 'string') return prev;
     if (curr instanceof DeltaFunctionInfo) {
