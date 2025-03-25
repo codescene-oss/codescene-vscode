@@ -1,8 +1,8 @@
 import { ExecOptions } from 'child_process';
 import { Command, LimitingExecutor, SimpleExecutor } from '../executor';
 import { CodeSmell } from '../review/model';
-import { getFileExtension } from '../utils';
-import { CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
+import { assertError, getFileExtension, reportError } from '../utils';
+import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
   CreditsInfoError as CreditsInfoErrorModel,
@@ -13,7 +13,7 @@ import {
 
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { DeltaForFile } from '../code-health-monitor/model';
-import { CsExtensionState } from '../cs-extension-state';
+import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
@@ -112,15 +112,31 @@ export class DevtoolsAPI {
     );
   }
 
+  // Event emitters for devtools API callbacks
+  private static readonly preflightRequestEmitter = new vscode.EventEmitter<CsFeature>();
+  public static readonly onDidChangePreflightState = DevtoolsAPI.preflightRequestEmitter.event; // (successful preflight is synonymous with activation)
+
   /**
    * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
-   * @returns
+   *
+   * Fires onDidChangePreflightState
+   *
+   * @returns preflightResponse
    */
   static async preflight() {
     const args = ['refactor', 'preflight'];
-    const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>(args);
-    DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
-    return response;
+    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
+    try {
+      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>(args);
+      DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
+      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
+      logOutputChannel.info('ACE enabled!');
+      return response;
+    } catch (e) {
+      const error = assertError(e) || new Error('Unknown error');
+      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error });
+      reportError('Unable to enable refactoring capabilities', error);
+    }
   }
 
   static aceEnabled() {
@@ -129,6 +145,7 @@ export class DevtoolsAPI {
 
   static disableAce() {
     DevtoolsAPI.instance.preflightJson = undefined;
+    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
   }
 
   static async fnsToRefactorFromCodeSmell(document: TextDocument, codeSmell: CodeSmell) {
@@ -150,33 +167,55 @@ export class DevtoolsAPI {
    * be presented as refactorable by early return here.
    */
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
-    if (!DevtoolsAPI.instance.preflightJson) return;
+    if (!DevtoolsAPI.aceEnabled()) return;
     const arglist = [
       'refactor',
       'fns-to-refactor',
       '--extension',
       getFileExtension(document.fileName),
       '--preflight',
-      DevtoolsAPI.instance.preflightJson,
+      DevtoolsAPI.instance.preflightJson!, // aceEnabled implies preflightJson is defined
     ].concat(args);
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>(arglist, {}, document.getText());
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     return ret;
   }
 
+  private static readonly refactoringRequestEmitter = new vscode.EventEmitter<AceRequestEvent>();
+  public static readonly onDidRefactoringRequest = DevtoolsAPI.refactoringRequestEmitter.event;
+  private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
+  public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
+
+  /**
+   * Posts a refactoring using devtools binary
+   *
+   * Fires onDidRefactoringRequest and ondidRefactoringFail events
+   *
+   * @param request refactoring request
+   * @returns refactoring response
+   */
   static async postRefactoring(request: RefactoringRequest) {
-    const { fnToRefactor, skipCache, signal } = request;
+    const { document, fnToRefactor, skipCache, signal } = request;
 
-    const args = ['refactor', 'post', '--fn-to-refactor', JSON.stringify(fnToRefactor)];
-    if (skipCache) args.push('--skip-cache');
+    DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
+    try {
+      const args = ['refactor', 'post', '--fn-to-refactor', JSON.stringify(fnToRefactor)];
+      if (skipCache) args.push('--skip-cache');
 
-    const session = CsExtensionState.stateProperties.session;
-    if (session && isCodeSceneSession(session)) {
-      args.push('--token', session.accessToken);
+      const session = CsExtensionState.stateProperties.session;
+      if (session && isCodeSceneSession(session)) {
+        args.push('--token', session.accessToken);
+      }
+
+      const stdout = await DevtoolsAPI.instance.runBinary(args, { signal });
+      return JSON.parse(stdout) as RefactorResponse;
+    } catch (e) {
+      const error = assertError(e) || new Error('Unknown refactoring error');
+      DevtoolsAPI.refactoringErrorEmitter.fire(error);
+      throw error;
+    } finally {
+      DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
     }
-
-    const stdout = await DevtoolsAPI.instance.runBinary(args, { signal });
-    return JSON.parse(stdout) as RefactorResponse;
   }
 
   static postTelemetry(event: TelemetryEvent) {

@@ -13,7 +13,7 @@ import { register as registerCsDocProvider } from './documentation/csdoc-provide
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
-import { AceAPI, activate as activateAce } from './refactoring/addon';
+import { initAce, enableAce, disableAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -27,7 +27,6 @@ import debounce = require('lodash.debounce');
 
 interface CsContext {
   csWorkspace: CsWorkspace;
-  aceApi: AceAPI;
 }
 
 /**
@@ -69,12 +68,12 @@ export async function activate(context: vscode.ExtensionContext) {
 async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
-    aceApi: activateAce(context),
   };
   CsServerVersion.init();
 
-  CsExtensionState.addListeners(context, csContext.aceApi);
-  csContext.aceApi.onDidChangeState((event) => {
+  CsExtensionState.addListeners(context);
+  initAce(context);
+  DevtoolsAPI.onDidChangePreflightState((event) => {
     CsExtensionState.setACEState(event);
     if (event.state === 'enabled' || event.state === 'disabled') {
       Reviewer.instance.refreshDeltas();
@@ -84,7 +83,6 @@ async function startExtension(context: vscode.ExtensionContext) {
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
-  void vscode.commands.executeCommand('codescene.ace.activate');
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
@@ -100,18 +98,12 @@ async function startExtension(context: vscode.ExtensionContext) {
   registerCodeActionProvider(context);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedEnableAce = debounce(() => {
-    void vscode.commands.executeCommand('codescene.ace.activate');
+  const debouncedEnableAce = debounce((enable: boolean) => {
+    enable ? enableAce() : disableAce();
   }, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableAce();
-    })
-  );
-
-  context.subscriptions.push(
-    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
-      debouncedEnableAce();
+      debouncedEnableAce(e.value);
     })
   );
 }

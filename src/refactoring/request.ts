@@ -1,17 +1,9 @@
-import { AxiosError } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { EventEmitter, TextDocument } from 'vscode';
+import { TextDocument } from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
-import { AceRequestEvent } from './addon';
 
 export class RefactoringRequest {
-  private static readonly refactoringRequestEmitter = new EventEmitter<AceRequestEvent>();
-  static readonly onDidRefactoringRequest = RefactoringRequest.refactoringRequestEmitter.event;
-
-  private static readonly errorEmitter = new EventEmitter<Error>();
-  static readonly onDidRequestFail = RefactoringRequest.errorEmitter.event;
-
   readonly traceId: string;
   promise: Promise<RefactorResponse>;
   private abortController = new AbortController();
@@ -21,24 +13,7 @@ export class RefactoringRequest {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
-    this.promise = this.initiate();
-  }
-
-  private initiate() {
-    this.promise = DevtoolsAPI.postRefactoring(this)
-      .then((response) => {
-        return response;
-      })
-      .catch((error) => {
-        RefactoringRequest.errorEmitter.fire(error);
-        throw error;
-      })
-      .finally(() => {
-        // Fire updates for all finished requests
-        RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'end', request: this });
-      });
-    RefactoringRequest.refactoringRequestEmitter.fire({ document: this.document, type: 'start', request: this });
-    return this.promise;
+    this.promise = DevtoolsAPI.postRefactoring(this);
   }
 
   get eventData() {
