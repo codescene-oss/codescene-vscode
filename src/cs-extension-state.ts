@@ -3,8 +3,8 @@ import { AnalysisEvent } from './analysis-common';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
+import { DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
-import { AceAPI } from './refactoring/addon';
 import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
 
@@ -105,7 +105,7 @@ export class CsExtensionState {
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners(context: vscode.ExtensionContext, aceApi: AceAPI) {
+  static addListeners(context: vscode.ExtensionContext) {
     context.subscriptions.push(
       Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
       Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
@@ -113,10 +113,10 @@ export class CsExtensionState {
       DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
     context.subscriptions.push(
-      aceApi.onDidRequestFail((error) => {
+      DevtoolsAPI.onDidRefactoringFail((error) => {
         CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
       }),
-      aceApi.onDidRefactoringRequest(async (evt) => {
+      DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
         if (evt.type === 'end') {
           try {
             await evt.request.promise;
@@ -161,8 +161,7 @@ export class CsExtensionState {
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
-      // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      // CsExtensionState.setACEState('Not signed in'); // Ace cannot be active if not signed in
+      // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
     }
 
