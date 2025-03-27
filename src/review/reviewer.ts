@@ -1,13 +1,13 @@
-import { basename, dirname } from 'path';
+import { dirname } from 'path';
 import vscode, { Disposable } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
+import { AbortError, DevtoolsAPI } from '../devtools-api';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
-import { LimitingExecutor, SimpleExecutor } from '../executor';
+import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { StatsCollector } from '../stats';
 import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
 
@@ -16,8 +16,8 @@ export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(binaryPath: string, context: vscode.ExtensionContext): void {
-    Reviewer._instance = new CachingReviewer(new FilteringReviewer(new SimpleReviewer(binaryPath)));
+  static init(context: vscode.ExtensionContext): void {
+    Reviewer._instance = new CachingReviewer();
     context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
   }
@@ -136,6 +136,8 @@ class ReviewCache {
 }
 
 class CachingReviewer implements Disposable {
+  private reviewer = new FilteringReviewer();
+
   private disposables: vscode.Disposable[] = [];
   readonly reviewCache = new ReviewCache();
 
@@ -146,7 +148,7 @@ class CachingReviewer implements Disposable {
 
   private reviewsRunning = 0;
 
-  constructor(private reviewer: InternalReviewer) {
+  constructor() {
     const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     this.disposables.push(
       deleteFileWatcher,
@@ -169,27 +171,14 @@ class CachingReviewer implements Disposable {
     }
   }
 
-  /**
-   * ReviewErrors with exit !== 1 are reported separately (or not at all),
-   * as they are not considered fatal.
-   */
   private handleReviewError(e: Error, document: vscode.TextDocument) {
-    if (e instanceof ReviewError) {
-      switch (e.exitCode) {
-        case 2:
-          logOutputChannel.warn(e.message);
-          void vscode.window.showWarningMessage(e.message);
-          return;
-        case 'ABORT_ERR':
-          // Delete the cache entry for this document if the review was aborted (document closed)
-          // Otherwise it won't be reviewed immediately when the document is opened again
-          this.reviewCache.delete(document.uri.fsPath);
-          return;
-        default:
-          logOutputChannel.error(e.message);
-          this.errorEmitter.fire(e); // Fire errors for all other errors
-          return;
-      }
+    if (e instanceof AbortError) {
+      // Delete the cache entry for this document if the review was aborted (document closed)
+      // Otherwise it won't be reviewed immediately when the document is opened again
+      this.reviewCache.delete(document.uri.fsPath);
+    } else {
+      logOutputChannel.error(e.message);
+      this.errorEmitter.fire(e); // Fire errors for all other errors
     }
   }
 
@@ -266,96 +255,6 @@ class CachingReviewer implements Disposable {
   }
 }
 
-interface InternalReviewer {
-  review(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<ReviewResult | void>;
-  abort(document: vscode.TextDocument): void;
-}
-
-class ReviewError extends Error {
-  constructor(public exitCode: number | string, public message: string) {
-    super();
-  }
-}
-
-function taskId(document: vscode.TextDocument) {
-  return `${document.uri.fsPath} v${document.version}`;
-}
-
-class SimpleReviewer implements InternalReviewer {
-  private readonly executor: LimitingExecutor = new LimitingExecutor();
-
-  constructor(private cliPath: string) {}
-
-  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult | void> {
-    if (reviewOpts.baseline) {
-      return this.baselineReview(document);
-    } else {
-      return this.contentReview(document);
-    }
-  }
-
-  private async baselineReview(document: vscode.TextDocument): Promise<ReviewResult | void> {
-    const { fileName, documentDirectory } = this.fileParts(document);
-    const headPath = `HEAD:./${fileName}`;
-    const { stdout, stderr, exitCode, duration } = await this.executor.execute(
-      {
-        command: this.cliPath,
-        args: ['review', headPath],
-        taskId: taskId(document) + '-baseline',
-        ignoreError: true,
-      },
-      { cwd: documentDirectory }
-    );
-
-    if (exitCode === 0 && stdout.trim() !== '') {
-      logOutputChannel.trace(`Baseline review for ${headPath} succeeded`);
-      StatsCollector.instance.recordAnalysis(document.fileName, duration);
-      return JSON.parse(stdout) as ReviewResult;
-    }
-    // Just return void otherwise - this just means that we don't have any baseline to compare to
-    logOutputChannel.trace(
-      `Baseline review for ${headPath} failed: ${stderr.trim()} (exit ${exitCode}) - no baseline available`
-    );
-  }
-
-  private async contentReview(document: vscode.TextDocument): Promise<ReviewResult> {
-    const { fileName, documentDirectory } = this.fileParts(document);
-
-    const { stdout, stderr, exitCode, duration } = await this.executor.execute(
-      {
-        command: this.cliPath,
-        args: ['review', '--file-name', fileName],
-        taskId: taskId(document),
-        ignoreError: true, // Set to true so executor won't reject promises. Handle exitCode/stderr below instead
-      },
-      { cwd: documentDirectory },
-      document.getText()
-    );
-
-    if (exitCode !== 0) {
-      logOutputChannel.debug(`Reviewer output: '${stdout.trim()}'`);
-      throw new ReviewError(exitCode, `CodeScene review failed: '${stderr.trim()}' (exit ${exitCode})`);
-    }
-
-    StatsCollector.instance.recordAnalysis(document.fileName, duration);
-    return JSON.parse(stdout) as ReviewResult;
-  }
-
-  private fileParts(document: vscode.TextDocument) {
-    const fileName = basename(document.fileName);
-
-    // Get the fsPath of the current document because we want to execute the
-    // 'cs review' command in the same directory as the current document
-    // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
-    const documentDirectory = dirname(document.fileName);
-    return { fileName, documentDirectory };
-  }
-
-  abort(document: vscode.TextDocument): void {
-    this.executor.abort(taskId(document));
-  }
-}
-
 /**
  * A reviewer that respects .gitignore settings.
  *
@@ -363,11 +262,11 @@ class SimpleReviewer implements InternalReviewer {
  * (i.e. it's opened as a standalone file), then this reviewer will basically be
  * downgraded to the injected reviewer (which for normal use is the CachingReviewer)
  */
-class FilteringReviewer implements InternalReviewer {
+class FilteringReviewer {
   private gitExecutor: SimpleExecutor | null = null;
   private gitExecutorCache = new Map<string, boolean>();
 
-  constructor(private reviewer: InternalReviewer) {
+  constructor() {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders) {
       this.gitExecutor = new SimpleExecutor();
@@ -413,10 +312,14 @@ class FilteringReviewer implements InternalReviewer {
       return;
     }
 
-    return this.reviewer.review(document, reviewOpts);
+    if (reviewOpts.baseline) {
+      return DevtoolsAPI.reviewBaseline(document);
+    } else {
+      return DevtoolsAPI.reviewContent(document);
+    }
   }
 
   abort(document: vscode.TextDocument): void {
-    this.reviewer.abort(document);
+    DevtoolsAPI.abortReviews(document);
   }
 }
