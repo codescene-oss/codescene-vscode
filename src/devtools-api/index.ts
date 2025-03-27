@@ -1,6 +1,6 @@
 import { ExecOptions } from 'child_process';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { CodeSmell } from '../review/model';
+import { CodeSmell, ReviewResult } from '../review/model';
 import { assertError, getFileExtension, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
@@ -11,6 +11,7 @@ import {
   RefactorResponse,
 } from './refactor-models';
 
+import { basename, dirname } from 'path';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { DeltaForFile } from '../code-health-monitor/model';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
@@ -18,6 +19,7 @@ import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
+import { StatsCollector } from '../stats';
 import { TelemetryEvent } from './telemetry-model';
 
 interface BinaryOpts {
@@ -84,74 +86,125 @@ export class DevtoolsAPI {
       };
       result = await this.simpleExecutor.execute(command, options, input);
     }
-    const { stdout, stderr, exitCode } = result;
-    if (exitCode === 0) {
-      return stdout.trim();
+
+    if (result.exitCode === 0) {
+      return result;
     }
 
-    this.handleExitCode(exitCode, stderr, args);
+    this.handleNonZeroExitCodes(args, result);
   }
 
   /**
    * Handles the exit code of the devtools binary
+   * Output on debug level, avoiding the default level of info. Error presentation should be done
+   * higher in the call stack.
    *
    * @param exitCode exit code from the devtools binary
    * @param stderr stderr from the devtools binary
    * @param args args for logging purposes
    * @throws appropriate Errors
    */
-  private handleExitCode(exitCode: number | string, stderr: string, args: string[]): never {
+  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
         const devtoolsError = JSON.parse(stderr) as DevtoolsErrorModel;
-        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
+        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
         const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
-        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
+        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
         throw new CreditsInfoError(creditsInfoError.message, creditsInfoError['credits-info']);
       case 'ABORT_ERR':
         throw new AbortError();
 
       default:
-        logOutputChannel.error(`devtools exit(${exitCode}) '${args.join(' ')}': ${stderr}`);
-        throw new Error(stderr);
+        const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
+        logOutputChannel.error(msg);
+        throw new Error(msg);
     }
   }
 
   private async executeAsJson<T>(opts: BinaryOpts) {
     const output = await this.runBinary(opts);
-    return JSON.parse(output) as T;
+    return JSON.parse(output.stdout) as T;
   }
 
   /**
    * Executes the command for creating a code health rules template.
    */
-  static codeHealthRulesTemplate() {
-    return this.instance.runBinary({ args: ['code-health-rules-template'] });
+  static async codeHealthRulesTemplate() {
+    const result = await DevtoolsAPI.instance.runBinary({ args: ['code-health-rules-template'] });
+    return result.stdout;
   }
 
   /**
    * Executes the command for checking code health rule match against file
    */
   static async checkRules(rootPath: string, filePath: string) {
-    // TODO - make this use the runBinary function instead!
-    const command: Command = {
-      command: DevtoolsAPI.instance.binaryPath,
+    const { stdout, stderr } = await DevtoolsAPI.instance.runBinary({
       args: ['check-rules', filePath],
-      ignoreError: true,
-    };
-    const { stdout, stderr } = await DevtoolsAPI.instance.simpleExecutor.execute(command, { cwd: rootPath });
-    const err = stderr.trim();
-    return { rulesMsg: stdout.trim(), errorMsg: err !== '' ? err : undefined } as CodeHealthRulesResult;
+      execOptions: { cwd: rootPath },
+    });
+    return { rulesMsg: stdout, errorMsg: stderr !== '' ? stderr : undefined } as CodeHealthRulesResult;
   }
 
+  static reviewContent(document: vscode.TextDocument) {
+    const fp = fileParts(document);
+    const binaryOpts = {
+      args: ['review', '--file-name', fp.fileName],
+      taskId: taskId('review', document),
+      execOptions: { cwd: fp.documentDirectory },
+      input: document.getText(),
+    };
+
+    return DevtoolsAPI.review(document, binaryOpts);
+  }
+
+  static async reviewBaseline(document: vscode.TextDocument) {
+    const fp = fileParts(document);
+    const headPath = `HEAD:./${fp.fileName}`;
+    const binaryOpts = {
+      args: ['review', headPath],
+      taskId: taskId('review-base', document),
+      execOptions: { cwd: fp.documentDirectory },
+    };
+
+    try {
+      return await DevtoolsAPI.review(document, binaryOpts);
+    } catch (e) {
+      if (e instanceof DevtoolsError) {
+        // Just return on regular devtoolerrors - this just means that we don't have any baseline to compare to
+        return;
+      }
+      throw e;
+    }
+  }
+
+  private static async review(document: TextDocument, opts: BinaryOpts) {
+    const { stdout, duration } = await DevtoolsAPI.instance.runBinary(opts);
+    StatsCollector.instance.recordAnalysis(document.fileName, duration);
+    return JSON.parse(stdout) as ReviewResult;
+  }
+
+  static abortReviews(document: TextDocument) {
+    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review', document));
+    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review-base', document));
+  }
+
+  /**
+   * @param document
+   * @param inputJsonString
+   * @returns DeltaForFile if any changes were detected or undefined when no improvements/degradations were found.
+   */
   static async deltaForFile(document: TextDocument, inputJsonString: string) {
-    return this.instance.runBinary({
+    const result = await DevtoolsAPI.instance.runBinary({
       args: ['delta'],
       input: inputJsonString,
-      taskId: taskId(document),
+      taskId: taskId('delta', document),
     });
+
+    if (result.stdout === '') return undefined; // empty result => undefined delta indicating no change
+    return JSON.parse(result.stdout) as DeltaForFile;
   }
 
   // Event emitters for devtools API callbacks
@@ -216,7 +269,7 @@ export class DevtoolsAPI {
       '--extension',
       getFileExtension(document.fileName),
       '--preflight',
-      DevtoolsAPI.instance.preflightJson!, // aceEnabled implies preflightJson is defined
+      DevtoolsAPI.instance.preflightJson!, // aceEnabled() implies preflightJson is defined
     ];
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
       args: baseArgs.concat(args),
@@ -252,8 +305,7 @@ export class DevtoolsAPI {
         args.push('--token', session.accessToken);
       }
 
-      const stdout = await DevtoolsAPI.instance.runBinary({ args, execOptions: { signal } });
-      return JSON.parse(stdout) as RefactorResponse;
+      return await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({ args, execOptions: { signal } });
     } catch (e) {
       const error = assertError(e) || new Error('Unknown refactoring error');
       DevtoolsAPI.refactoringErrorEmitter.fire(error);
@@ -265,14 +317,28 @@ export class DevtoolsAPI {
 
   static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--event', jsonEvent] });
+    return DevtoolsAPI.instance.executeAsJson<{ status: number }>({ args: ['telemetry', '--event', jsonEvent] });
   }
 }
 
-function taskId(document: TextDocument) {
-  return `${document.fileName} v${document.version}`;
+type CmdId = 'review' | 'review-base' | 'delta';
+function taskId(cmdId: CmdId, document: TextDocument) {
+  return `${cmdId} ${document.fileName} v${document.version}`;
 }
 
+interface FileParts {
+  fileName: string;
+  documentDirectory: string;
+}
+function fileParts(document: vscode.TextDocument): FileParts {
+  const fileName = basename(document.fileName);
+
+  // Get the fsPath of the current document because we want to execute the
+  // 'cs review' command in the same directory as the current document
+  // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
+  const documentDirectory = dirname(document.fileName);
+  return { fileName, documentDirectory };
+}
 export class CreditsInfoError extends Error {
   constructor(message: string, readonly creditsInfo: CreditsInfo) {
     super(message);

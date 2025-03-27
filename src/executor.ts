@@ -82,18 +82,18 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
+          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
         logOutputChannel.trace(
-          `[pid ${childProcess.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
+          `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
         );
 
         this.stats.addRun(command, end - start);
 
-        resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
+        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
       });
 
       if (isDefined(input) && childProcess.stdin) {

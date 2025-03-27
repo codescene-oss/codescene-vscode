@@ -76,20 +76,13 @@ export class DeltaAnalyser {
     let deltaForFile: DeltaForFile | undefined;
 
     try {
-      const result = await DevtoolsAPI.deltaForFile(document, inputJsonString);
-      if (result.trim() === '') {
-        // empty result => undefined delta, indicating no change
-        this.endAnalysisEvent(document, deltaForFile);
-        return;
+      deltaForFile = await DevtoolsAPI.deltaForFile(document, inputJsonString);
+      if (deltaForFile) {
+        await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
       }
-      deltaForFile = JSON.parse(result) as DeltaForFile;
-      await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
-      this.endAnalysisEvent(document, deltaForFile);
       return deltaForFile;
     } catch (e) {
-      if (e instanceof AbortError) {
-        this.endAnalysisEvent(document, deltaForFile);
-      } else if (e instanceof Error) {
+      if (e instanceof Error && !(e instanceof AbortError)) {
         this.errorEmitter.fire(e);
       }
     } finally {
