@@ -7,9 +7,9 @@ const originalCode = 'const a = 1;\nconst b = 2;\nconst c = 3;\n';
 suite('Refactor utils Test Suite', () => {
   const refactorResponse: RefactorResponse = {
     code: originalCode,
-    'reasons-with-details': [],
+    reasons: [],
     'refactoring-properties': { 'added-code-smells': [], 'removed-code-smells': [] },
-    confidence: { level: 3, 'recommended-action': { description: '', details: '' }, description: '', title: '' },
+    confidence: { level: 3, 'recommended-action': { description: '', details: '' }, title: '' },
     metadata: {},
   };
 
@@ -19,12 +19,10 @@ suite('Refactor utils Test Suite', () => {
   });
 
   test('Return code with decorations if there are reasons-with-details containing linter info', async () => {
-    refactorResponse['reasons-with-details'] = [
-      { summary: 'Issue 1', details: [{ message: 'Issue 1', lines: [1], columns: [1] }] },
-    ];
+    refactorResponse.reasons = [{ summary: 'Issue 1', details: [{ message: 'Issue 1', lines: [1], columns: [1] }] }];
     let code = decorateCode(refactorResponse, 'javascript');
     assert.equal(code, 'const a = 1;\n// ⚠️ Issue 1\nconst b = 2;\nconst c = 3;\n');
-    refactorResponse['reasons-with-details'] = [
+    refactorResponse.reasons = [
       { summary: 'Issue 1', details: [{ message: 'Issue 1', lines: [0], columns: [1] }] },
       { summary: 'Issue 2', details: [{ message: 'Issue 2', lines: [2], columns: [1] }] },
     ];
@@ -34,7 +32,7 @@ suite('Refactor utils Test Suite', () => {
   });
 
   test('Handle reason-with-details with multiline messages', async () => {
-    refactorResponse['reasons-with-details'] = [
+    refactorResponse.reasons = [
       { summary: 'Issue 1', details: [{ message: 'Issue 1\nThis is weird', lines: [1], columns: [1] }] },
       { summary: 'Issue 2', details: [{ message: 'Issue 2', lines: [2], columns: [1] }] },
     ];

@@ -264,9 +264,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
   }
 
   private creditBannerContent(creditInfo: CreditsInfo) {
-    if (!creditInfo.resetTime) return;
-
-    const differenceInDays = Math.floor((creditInfo.resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (!creditInfo.reset) return;
+    const resetTime = new Date(creditInfo.reset);
+    const differenceInDays = Math.floor((resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
     const content = /* html*/ `
     <div class="out-of-credits-banner">
@@ -278,7 +278,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         You'll get new credits in ${differenceInDays} ${pluralize(
       'day',
       differenceInDays
-    )}. (${creditInfo.resetTime.toLocaleString()})
+    )}. (${resetTime.toLocaleString()})
       </p>
     </div>
     `;
