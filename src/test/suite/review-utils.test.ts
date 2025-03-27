@@ -1,6 +1,6 @@
 import assert from 'assert';
 import vscode from 'vscode';
-import { CodeSmell, Range, ReviewFunction, ReviewResult } from '../../review/model';
+import { CodeSmell, Range, Function, Review } from '../../devtools-api/review-model';
 import { reviewFunctionToDiagnostics, reviewResultToDiagnostics } from '../../review/utils';
 
 suite('reviewIssueToDiagnostics', () => {
@@ -24,7 +24,7 @@ suite('reviewIssueToDiagnostics', () => {
     'end-column': 40,
   };
 
-  const functionCodeSmell: ReviewFunction = {
+  const functionCodeSmell: Function = {
     function: 'foo',
     range: functionCodeSmellRange,
     'code-smells': [
@@ -66,7 +66,7 @@ suite('reviewIssueToDiagnostics', () => {
   });
 
   test('handles multi-line complex conditional', async () => {
-    const reviewResult: ReviewResult = {
+    const reviewResult: Review = {
       score: 9.81,
       'file-level-code-smells': [],
       'function-level-code-smells': [
@@ -107,7 +107,7 @@ suite('reviewIssueToDiagnostics', () => {
   });
 
   test('handles file and function level code smells', async () => {
-    const reviewResult: ReviewResult = {
+    const reviewResult: Review = {
       score: 9.81,
       'file-level-code-smells': [fileCodeSmell],
       'function-level-code-smells': [functionCodeSmell],

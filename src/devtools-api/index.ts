@@ -1,6 +1,6 @@
 import { ExecOptions } from 'child_process';
+import { CodeSmell, Review } from '../devtools-api/review-model';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { CodeSmell, ReviewResult } from '../review/model';
 import { assertError, getFileExtension, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
@@ -13,14 +13,14 @@ import {
 
 import { basename, dirname } from 'path';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
-import { DeltaForFile } from '../code-health-monitor/model';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
-import { TelemetryEvent } from './telemetry-model';
+import { Delta } from './delta-model';
+import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 
 interface BinaryOpts {
   // args to pass to the binary
@@ -183,7 +183,7 @@ export class DevtoolsAPI {
   private static async review(document: TextDocument, opts: BinaryOpts) {
     const { stdout, duration } = await DevtoolsAPI.instance.runBinary(opts);
     StatsCollector.instance.recordAnalysis(document.fileName, duration);
-    return JSON.parse(stdout) as ReviewResult;
+    return JSON.parse(stdout) as Review;
   }
 
   static abortReviews(document: TextDocument) {
@@ -194,9 +194,9 @@ export class DevtoolsAPI {
   /**
    * @param document
    * @param inputJsonString
-   * @returns DeltaForFile if any changes were detected or undefined when no improvements/degradations were found.
+   * @returns Delta if any changes were detected or undefined when no improvements/degradations were found.
    */
-  static async deltaForFile(document: TextDocument, inputJsonString: string) {
+  static async delta(document: TextDocument, inputJsonString: string) {
     const result = await DevtoolsAPI.instance.runBinary({
       args: ['delta'],
       input: inputJsonString,
@@ -204,7 +204,7 @@ export class DevtoolsAPI {
     });
 
     if (result.stdout === '') return undefined; // empty result => undefined delta indicating no change
-    return JSON.parse(result.stdout) as DeltaForFile;
+    return JSON.parse(result.stdout) as Delta;
   }
 
   // Event emitters for devtools API callbacks
@@ -253,7 +253,7 @@ export class DevtoolsAPI {
     return this.fnsToRefactor(document, ['--code-smells', JSON.stringify(codeSmells)]);
   }
 
-  static async fnsToRefactorFromDelta(document: TextDocument, delta: DeltaForFile) {
+  static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
     return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
 
@@ -317,7 +317,7 @@ export class DevtoolsAPI {
 
   static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return DevtoolsAPI.instance.executeAsJson<{ status: number }>({ args: ['telemetry', '--event', jsonEvent] });
+    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({ args: ['telemetry', '--event', jsonEvent] });
   }
 }
 

@@ -22,3 +22,10 @@ export interface TelemetryEvent {
   'user-id'?: string;
   [property: string]: any;
 }
+
+/**
+ * Telemetry API Response model
+ */
+export interface TelemetryResponse {
+  status: number;
+}

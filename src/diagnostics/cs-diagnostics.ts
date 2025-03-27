@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
+import { CodeSmell } from '../devtools-api/review-model';
 import { reviewDocumentSelector } from '../language-support';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CodeSmell } from '../review/model';
 
 export const csSource = 'CodeScene';
 
