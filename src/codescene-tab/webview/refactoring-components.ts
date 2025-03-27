@@ -1,10 +1,10 @@
 import { commands } from 'vscode';
-import { FnToRefactor, RefactorConfidence, RefactorResponse } from '../../devtools-api/refactor-models';
+import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
 import { readRawMarkdownDocs } from './utils';
 
-export function refactoringSummary(confidence: RefactorConfidence) {
+export function refactoringSummary(confidence: Confidence) {
   const {
     level,
     'recommended-action': { details: actionDetails, description: action },
@@ -84,23 +84,23 @@ async function autoRefactorContent(response: RefactorResponse, code: CodeWithLan
 
 function reasonsContent(response: RefactorResponse) {
   const {
-    'reasons-with-details': reasonsWithDetails,
+    reasons,
     confidence: { 'review-header': reviewHeader, level },
   } = response;
 
-  let reasons;
+  let reasonsText;
   if (response.confidence.level === 0) {
-    reasons =
+    reasonsText =
       "The LLMs couldn't provide an ideal refactoring due to the specific complexities of the code. Though not an endorsed solution, it is displayed as a guide to help refine your approach.";
   } else {
-    const reasonListItems = reasonsWithDetails.map((reason) => `<li>${reason.summary}</li>`);
-    reasons = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
+    const reasonListItems = reasons.map((reason) => `<li>${reason.summary}</li>`);
+    reasonsText = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
   }
 
   // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
   const safeHeader = reviewHeader || 'Reasons for review';
   const isCollapsed = level > 2;
-  return reasons ? collapsibleContent(safeHeader, reasons, isCollapsed) : '';
+  return reasonsText ? collapsibleContent(safeHeader, reasonsText, isCollapsed) : '';
 }
 
 function acceptAndRejectButtons() {
