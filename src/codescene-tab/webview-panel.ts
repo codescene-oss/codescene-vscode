@@ -6,7 +6,7 @@ import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
-import { CodeSmell } from '../review/model';
+import { CodeSmell } from '../devtools-api/review-model';
 import Telemetry from '../telemetry';
 import { isError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';

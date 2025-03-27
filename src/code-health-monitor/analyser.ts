@@ -3,9 +3,9 @@ import { AnalysisEvent } from '../analysis-common';
 import { AbortError, DevtoolsAPI } from '../devtools-api';
 import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
-import { DeltaForFile } from './model';
+import { Delta } from '../devtools-api/delta-model';
 
-export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
+export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: Delta };
 
 export class DeltaAnalyser {
   private static _instance: DeltaAnalyser;
@@ -31,7 +31,7 @@ export class DeltaAnalyser {
     this.analysisEmitter.fire({ type: 'start', document });
   }
 
-  private endAnalysisEvent(document: vscode.TextDocument, result?: DeltaForFile) {
+  private endAnalysisEvent(document: vscode.TextDocument, result?: Delta) {
     this.analysesRunning--;
     this.analysisEmitter.fire({ type: 'end', document, result });
     if (this.analysesRunning === 0) {
@@ -73,10 +73,10 @@ export class DeltaAnalyser {
       return;
     }
 
-    let deltaForFile: DeltaForFile | undefined;
+    let deltaForFile: Delta | undefined;
 
     try {
-      deltaForFile = await DevtoolsAPI.deltaForFile(document, inputJsonString);
+      deltaForFile = await DevtoolsAPI.delta(document, inputJsonString);
       if (deltaForFile) {
         await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
       }
@@ -93,7 +93,7 @@ export class DeltaAnalyser {
   /**
    * NOTE - Mutates the delta result by adding info about refactorable functions to the 'function-level-findings' list.
    */
-  private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: DeltaForFile) {
+  private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: Delta) {
     const functionsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(document, deltaForFile);
     if (!functionsToRefactor) return;
 

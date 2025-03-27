@@ -1,6 +1,7 @@
 import vscode from 'vscode';
+import { ChangeType, Delta } from '../devtools-api/delta-model';
+import { formatScore } from '../review/utils';
 import { pluralize } from '../utils';
-import { hasImprovementOpportunity } from './model';
 import { DeltaTreeViewItem, countInTree } from './tree-model';
 
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
@@ -40,4 +41,18 @@ export function toFileWithIssuesUri(uri: vscode.Uri, children?: DeltaTreeViewIte
     authority: 'codescene',
     query: queryParams.toString(),
   });
+}
+
+export function scorePresentation(delta: Delta) {
+  if (delta['old-score'] === delta['new-score']) return formatScore(delta['old-score']);
+  const oldScorePresentation = delta['old-score'] || 'n/a';
+  const newScorePresentation = delta['new-score'] || 'n/a';
+  return `${oldScorePresentation} → ${newScorePresentation}`;
+}
+export function isDegradation(changeType: ChangeType) {
+  return changeType === 'degraded' || changeType === 'introduced';
+}
+
+export function hasImprovementOpportunity(changeType: ChangeType) {
+  return isDegradation(changeType) || changeType === 'improved';
 }
