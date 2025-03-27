@@ -1,13 +1,18 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { Range } from 'vscode';
-import { Range as ReviewRange } from '../devtools-api/review-model';
+import { Range as VscodeRange } from 'vscode';
+import { Range } from '../devtools-api/review-model';
 
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;
+  /**
+   * Error message.
+   */
   message: string;
-  [property: string]: any;
 }
 
+/**
+ * ACE Credit info
+ */
 export interface CreditsInfo {
   limit: number;
   /**
@@ -15,7 +20,37 @@ export interface CreditsInfo {
    */
   reset?: string;
   used: number;
-  [property: string]: any;
+}
+
+/**
+ * A structure for use in subsequent calls to the refactor endpoint.
+ */
+export interface FnToRefactor {
+  body: string;
+  'file-type': string;
+  'function-type'?: string;
+  /**
+   * Function name (for presentation)
+   */
+  name: string;
+  /**
+   * Range of the function. Use to keep track of what code to replace in the original file.
+   */
+  range: Range;
+  /**
+   * List of refactoring targets (code-smells).
+   */
+  'refactoring-targets': RefactoringTarget[];
+
+  vscodeRange: VscodeRange; // For internal use, not part of the devtools binary API
+}
+
+export interface RefactoringTarget {
+  category: string;
+  /**
+   * Start line for the code smell.
+   */
+  line: number;
 }
 
 export type PreFlightResponse = {
@@ -30,79 +65,67 @@ export type RefactorSupport = {
   'code-smells': string[];
 };
 
-export interface FnToRefactor {
-  name: string;
-  range: ReviewRange;
-  body: string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'file-type': string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'function-type': string;
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  'refactoring-targets': RefactoringTarget[];
-
-  vscodeRange: Range; // For internal use, not part of the devtools binary API
+export interface RefactorResponse {
+  /**
+   * Refactored code
+   */
+  code: string;
+  confidence: Confidence;
+  /**
+   * ACE Credit info
+   */
+  'credits-info'?: CreditsInfo;
+  metadata: Metadata;
+  /**
+   * List of reasons for refactoring failure
+   */
+  reasons: Reason[];
+  'refactoring-properties': RefactoringProperties;
 }
 
-export interface RefactoringTarget {
-  line: number; // 1-indexed line numbers (from Devtools API)
-  category: string;
-}
-
-interface Review {
-  category: string; // Type of issue
-  'start-line': number; // Start line of the issue relative to the source snippet
-  'end-line'?: number; // Currently optional line of the issue relative to the source snippet
-}
-
-interface SourceSnippet {
-  'file-type': string; // file extension
-  'function-type': string; // Function type (specified by cli tool)
-  body: string; // Function body
-}
-
-export interface RefactorRequest {
-  review: Review[];
-  'source-snippet': SourceSnippet;
-}
-
-export interface RefactorConfidence {
-  description: string;
-  title: string;
+export interface Confidence {
+  /**
+   * Confidence level
+   */
   level: number;
-  'recommended-action': { description: string; details: string };
+  'recommended-action': RecommendedAction;
+  /**
+   * Header for use when presenting the reason summaries
+   */
   'review-header'?: string;
+  /**
+   * Title for presentation
+   */
+  title: string;
 }
 
-interface RefactorProperties {
-  'added-code-smells': string[];
-  'removed-code-smells': string[];
+interface RecommendedAction {
+  description: string;
+  details: string;
 }
 
-interface ReasonDetails {
-  message: string;
-  lines: number[];
-  columns: number[];
-}
-
-export interface ReasonsWithDetails {
-  summary: string;
-  details?: ReasonDetails[];
-}
-
-interface Metadata {
+export interface Metadata {
   'cached?'?: boolean;
 }
-export interface RefactorResponse {
-  confidence: RefactorConfidence;
-  'reasons-with-details': ReasonsWithDetails[];
-  'refactoring-properties': RefactorProperties;
-  code: string;
-  metadata: Metadata;
+
+export interface Reason {
+  details?: ReasonDetails[];
+  summary: string;
 }
 
-export interface AceCredits {
-  resetTime?: Date;
-  limit: number;
-  used: number;
+export interface ReasonDetails {
+  /**
+   * 2-tuple pointing to the start-col and end-col of the issue. 0-based.
+   */
+  columns: number[];
+  /**
+   * 2-tuple pointing to the start-line and end-line of the issue. 0-based.
+   */
+  lines: number[];
+  message: string;
+}
+
+export interface RefactoringProperties {
+  'added-code-smells': string[];
+  'removed-code-smells': string[];
 }

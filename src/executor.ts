@@ -36,9 +36,15 @@ class AvgTime {
 class Stats {
   private stats: Map<string, AvgTime> = new Map<string, AvgTime>();
   addRun(command: Command, duration: number) {
-    const shortArgs = command.args.slice(0, 2);
-    const shortCmd = command.command.substring(command.command.lastIndexOf('/') + 1, command.command.length);
-    const cmdKey = [shortCmd, ...shortArgs].join(' ');
+    const { args, command: binaryPath } = command;
+    if (args.length < 1) return;
+
+    let csCommand = args[0];
+    if (args[0] === 'refactor') { // keep actual refactoring command as well (i.e. preflight/fns-to-refactor/post)
+      csCommand = args.slice(0, 2).join(' ');
+    }
+    const shortCmd = binaryPath.substring(binaryPath.lastIndexOf('/') + 1, binaryPath.length);
+    const cmdKey = `${shortCmd} ${csCommand}`;
     if (!this.stats.has(cmdKey)) {
       this.stats.set(cmdKey, new AvgTime());
     }

@@ -24,8 +24,8 @@ function singleLineCommentSeparator(languageId: string) {
 }
 
 export function decorateCode(refactorResponse: RefactorResponse, languageId: string) {
-  const { code, 'reasons-with-details': reasonsWithDetails } = refactorResponse;
-  const allDetails = reasonsWithDetails.flatMap((reason) => reason.details).filter(isDefined);
+  const { code, reasons } = refactorResponse;
+  const allDetails = reasons.flatMap((reason) => reason.details).filter(isDefined);
   if (allDetails.length === 0) return code;
 
   const codeLines = code.split('\n');
