@@ -3,16 +3,8 @@ import { FnToRefactor } from '../devtools-api/refactor-models';
 import { issueToDocsParams } from '../documentation/commands';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize, round } from '../utils';
-import {
-  ChangeDetail,
-  ChangeType,
-  DeltaForFile,
-  FunctionInfo,
-  isDegradation,
-  scorePresentation,
-  sortOrder,
-} from './model';
-import { toFileWithIssuesUri } from './presentation';
+import { isDegradation, scorePresentation, toFileWithIssuesUri } from './presentation';
+import { ChangeDetail, ChangeType, Delta, Function, sortOrder } from '../devtools-api/delta-model';
 
 const fgColor = new vscode.ThemeColor('foreground');
 export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
@@ -52,11 +44,11 @@ export class FileWithIssues implements DeltaTreeViewItem {
   private fileLevelIssues: DeltaIssue[] = [];
   public functionLevelIssues: DeltaFunctionInfo[] = [];
 
-  constructor(public deltaForFile: DeltaForFile, public document: vscode.TextDocument) {
+  constructor(public deltaForFile: Delta, public document: vscode.TextDocument) {
     this.update(deltaForFile, document);
   }
 
-  private createCodeHealthInfo(deltaForFile: DeltaForFile) {
+  private createCodeHealthInfo(deltaForFile: Delta) {
     const scoreLabel = `Code Health: ${scorePresentation(deltaForFile)}`;
     const scoreInfo = new vscode.TreeItem(scoreLabel);
     const exploreText = 'Explore the functions below for more details.';
@@ -103,7 +95,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
     return (this.scoreChange / oldScore) * 100;
   }
 
-  update(deltaForFile: DeltaForFile, document: vscode.TextDocument) {
+  update(deltaForFile: Delta, document: vscode.TextDocument) {
     this.deltaForFile = deltaForFile;
     this.document = document;
     this.codeHealthInfo = this.createCodeHealthInfo(deltaForFile);
@@ -145,7 +137,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly range?: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
-  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public fnToRefactor?: FnToRefactor) {
+  constructor(readonly parent: FileWithIssues, fnMeta: Function, public fnToRefactor?: FnToRefactor) {
     this.fnName = fnMeta.name;
     this.range = vscodeRange(fnMeta.range);
   }

@@ -1,19 +1,19 @@
 import * as vscode from 'vscode';
+import { CodeSmell, Function, Range, Review } from '../devtools-api/review-model';
 import { CsDiagnostic, csSource } from '../diagnostics/cs-diagnostics';
 import { isDefined } from '../utils';
-import { CodeSmell, Range, ReviewFunction, ReviewResult } from './model';
 
 const chScorePrefix = 'Code health score: ';
 const noApplicationCode = 'No application code detected for scoring';
 
-function createGeneralDiagnostic(reviewResult: ReviewResult) {
+function createGeneralDiagnostic(reviewResult: Review) {
   const scoreText = isDefined(reviewResult.score)
     ? `${chScorePrefix}${formatScore(reviewResult.score)}`
     : `${chScorePrefix}${noApplicationCode}`;
   return new CsDiagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
 }
 
-export function reviewFunctionToDiagnostics(reviewFunction: ReviewFunction, document: vscode.TextDocument) {
+export function reviewFunctionToDiagnostics(reviewFunction: Function, document: vscode.TextDocument) {
   return reviewFunction['code-smells'].map((cs) => reviewCodeSmellToDiagnostics(cs, document)).filter(isDefined);
 }
 
@@ -61,7 +61,7 @@ export function removeDetails(diagnosticMessage: string) {
   return diagnosticMessage;
 }
 
-export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
+export function reviewResultToDiagnostics(reviewResult: Review, document: vscode.TextDocument) {
   let diagnostics: CsDiagnostic[] = [];
   for (const fun of reviewResult['function-level-code-smells']) {
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));

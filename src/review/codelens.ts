@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
-import { scorePresentation } from '../code-health-monitor/model';
+import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
+import { CodeSmell } from '../devtools-api/review-model';
 import { toDocsParams } from '../documentation/commands';
 import { isDefined } from '../utils';
-import { CodeSmell } from './model';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 
 class CsCodeLens extends vscode.CodeLens {

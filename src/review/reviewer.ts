@@ -2,13 +2,13 @@ import { dirname } from 'path';
 import vscode, { Disposable } from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
 import { DeltaAnalyser } from '../code-health-monitor/analyser';
-import { DeltaForFile } from '../code-health-monitor/model';
 import { getConfiguration } from '../configuration';
 import { AbortError, DevtoolsAPI } from '../devtools-api';
+import { Delta } from '../devtools-api/delta-model';
+import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { ReviewResult } from './model';
 import { formatScore, reviewResultToDiagnostics } from './utils';
 
 export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
@@ -35,7 +35,7 @@ export class CsReview {
   readonly diagnostics: Promise<CsDiagnostic[]>;
   readonly score: Promise<number | undefined>;
   readonly rawScore: Promise<void | string>;
-  constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | ReviewResult>) {
+  constructor(readonly document: vscode.TextDocument, readonly reviewResult: Promise<void | Review>) {
     this.score = reviewResult.then((reviewResult) => reviewResult?.score);
     this.diagnostics = reviewResult.then((reviewResult) => {
       if (!reviewResult) {
@@ -54,7 +54,7 @@ export class CsReview {
 export class ReviewCacheItem {
   private baselineScore?: Promise<void | string>;
   public documentVersion: number;
-  public delta?: DeltaForFile;
+  public delta?: Delta;
 
   constructor(public document: vscode.TextDocument, public review: CsReview) {
     this.documentVersion = document.version;
@@ -305,7 +305,7 @@ class FilteringReviewer {
     return ignored;
   }
 
-  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<ReviewResult | void> {
+  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<Review | void> {
     const ignored = await this.isIgnored(document);
 
     if (ignored) {
