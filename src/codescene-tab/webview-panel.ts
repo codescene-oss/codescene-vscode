@@ -2,13 +2,13 @@ import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
+import { CodeSmell } from '../devtools-api/review-model';
 import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
-import { CodeSmell } from '../devtools-api/review-model';
 import Telemetry from '../telemetry';
-import { isError, showDocAtPosition } from '../utils';
+import { assertError, isError, reportError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
 import { fileChangesDetectedContent, functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
@@ -314,13 +314,15 @@ export class CodeSceneTabPanel implements Disposable {
         summaryContent,
         await refactoringContent(response, document.languageId, isStale),
       ]);
-    } catch (error) {
+    } catch (e) {
       const title = 'Refactoring Failed';
       const actionHtml = `
         There was an error when performing this refactoring. 
         Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
 
       const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
+      const error = assertError(e) || new Error('Unknown error');
+      reportError({ context: 'Refactoring error', error, consoleOnly: true });
 
       Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);

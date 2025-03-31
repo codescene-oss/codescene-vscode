@@ -53,13 +53,13 @@ export async function activate(context: vscode.ExtensionContext) {
       } catch (e) {
         const error = assertError(e) || new Error('Unknown error');
         CsExtensionState.setAnalysisState({ state: 'error', error });
-        reportError('Unable to start extension', error);
+        reportError({ context: 'Unable to start extension', error });
       }
     },
     (e) => {
       const error = assertError(e) || new Error('Unknown error');
       CsExtensionState.setAnalysisState({ state: 'error', error });
-      reportError('Unable to start extension', error);
+      reportError({ context: 'Unable to start extension', error });
       Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
