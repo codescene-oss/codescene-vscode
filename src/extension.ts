@@ -13,7 +13,7 @@ import { register as registerCsDocProvider } from './documentation/csdoc-provide
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
-import { initAce, enableAce, disableAce } from './refactoring';
+import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -98,12 +98,12 @@ async function startExtension(context: vscode.ExtensionContext) {
   registerCodeActionProvider(context);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedEnableAce = debounce((enable: boolean) => {
-    enable ? enableAce() : disableAce();
+  const debouncedSetEnabledAce = debounce((enabled: boolean) => {
+    void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
   }, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableAce(e.value);
+      debouncedSetEnabledAce(e.value);
     })
   );
 }

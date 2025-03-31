@@ -66,7 +66,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       retryAce: () => {
         logOutputChannel.show();
         logOutputChannel.info('Retrying ACE activation...');
-        void vscode.commands.executeCommand('codescene.ace.activate');
+        void vscode.commands.executeCommand('codescene.ace.setEnabled');
       },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
