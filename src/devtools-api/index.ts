@@ -225,12 +225,11 @@ export class DevtoolsAPI {
       const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({ args });
       DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
-      logOutputChannel.info('ACE enabled!');
       return response;
     } catch (e) {
       const error = assertError(e) || new Error('Unknown error');
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error });
-      reportError('Unable to enable refactoring capabilities', error);
+      reportError({ context: 'Unable to enable refactoring capabilities', error });
     }
   }
 
@@ -346,8 +345,8 @@ export class CreditsInfoError extends Error {
 }
 
 export class DevtoolsError extends Error {
-  constructor(readonly error: DevtoolsErrorModel) {
-    super(error.message);
+  constructor(readonly devtoolsError: DevtoolsErrorModel) {
+    super(devtoolsError.message);
   }
 }
 
