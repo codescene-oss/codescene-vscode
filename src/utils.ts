@@ -23,12 +23,22 @@ export function assertError(val: unknown): Error | undefined {
   return val;
 }
 
-export function reportError(pre: string, error: Error) {
-  const message = `${pre}. ${error.message}`;
+interface ReportErrorProps {
+  context: string;
+  error: Error;
+  consoleOnly?: boolean;
+}
+
+export function reportError({ context, error, consoleOnly = false }: ReportErrorProps) {
+  const message = `${context}. ${error.message}`;
   delete error.stack;
   logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
-  void vscode.window.showErrorMessage(message);
-  void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+  if (consoleOnly) {
+    logOutputChannel.show();
+  } else {
+    void vscode.window.showErrorMessage(message);
+    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+  }
 }
 
 export function pluralize(noun: string, count: number) {
