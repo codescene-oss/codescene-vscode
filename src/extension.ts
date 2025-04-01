@@ -51,15 +51,16 @@ export async function activate(context: vscode.ExtensionContext) {
         await startExtension(context);
         finalizeActivation(controlCenterViewProvider);
       } catch (e) {
-        const error = assertError(e) || new Error('Unknown error');
-        CsExtensionState.setAnalysisState({ state: 'error', error });
-        reportError({ context: 'Unable to start extension', error });
+        CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
+        reportError({ context: 'Unable to start extension', e });
+        void vscode.commands.executeCommand('codescene.controlCenterView.focus');
       }
     },
     (e) => {
-      const error = assertError(e) || new Error('Unknown error');
+      const error = assertError(e);
       CsExtensionState.setAnalysisState({ state: 'error', error });
-      reportError({ context: 'Unable to start extension', error });
+      reportError({ context: 'Unable to start extension', e });
+      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
       Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
