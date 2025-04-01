@@ -14,13 +14,13 @@ import {
 import { basename, dirname } from 'path';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
-import { isCodeSceneSession } from '../cs-rest-api';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
+import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 
 interface BinaryOpts {
   // args to pass to the binary
@@ -352,6 +352,11 @@ function fileParts(document: vscode.TextDocument): FileParts {
   const documentDirectory = dirname(document.fileName);
   return { fileName, documentDirectory };
 }
+
+function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
+  return (<CodeSceneAuthenticationSession>x).url !== undefined;
+}
+
 
 function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
   return `[traceId ${traceId ? traceId : '-'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
