@@ -128,7 +128,7 @@ export class LimitingExecutor implements Executor {
     this.executor = executor;
   }
 
-  execute(command: Task, options: ExecOptions = {}, input?: string) {
+  async execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
 
     // Check if running already
@@ -140,14 +140,16 @@ export class LimitingExecutor implements Executor {
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    return this.executor.execute(command, { ...options, signal: abortController.signal }, input).finally(() => {
+    try {
+      return await this.executor.execute(command, { ...options, signal: abortController.signal }, input);
+    } finally {
       // Remove the abortController from the map.
       // The process has exited, and we don't want to risk calling abort() on
       // a process that has already exited (what if the pid has been reused?)
       if (this.runningCommands.get(taskId) === abortController) {
         this.runningCommands.delete(taskId);
       }
-    });
+    }
   }
 
   logStats(): void {
