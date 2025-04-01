@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
+import { AbortError } from './devtools-api';
 
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
@@ -11,25 +12,33 @@ export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== undefined && value !== null;
 }
 
-export function isError(value: unknown): value is Error {
+function isError(value: unknown): value is Error {
   return value instanceof Error;
 }
 
-export function assertError(val: unknown): Error | undefined {
+export function assertError(val: unknown) {
   if (!isError(val)) {
-    logOutputChannel.error(`Unknown error: ${val}`);
-    return;
+    return new Error(`Unknown error caught: ${val}`);
   }
   return val;
 }
 
 interface ReportErrorProps {
   context: string;
-  error: Error;
+  e: unknown; // From catch clause
   consoleOnly?: boolean;
 }
 
-export function reportError({ context, error, consoleOnly = false }: ReportErrorProps) {
+/**
+ * Unified error reporting for catch clauses
+ *
+ * Print the error to logOutputChannel and show an error message, or optionally focus the log output.
+ */
+export function reportError({ context, e, consoleOnly = false }: ReportErrorProps) {
+  // Ignore abort errors - they are expected when sending abort signal to the devtools API
+  if (e instanceof AbortError) return;
+
+  const error = assertError(e);
   const message = `${context}. ${error.message}`;
   delete error.stack;
   logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
@@ -37,7 +46,6 @@ export function reportError({ context, error, consoleOnly = false }: ReportError
     logOutputChannel.show();
   } else {
     void vscode.window.showErrorMessage(message);
-    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
   }
 }
 

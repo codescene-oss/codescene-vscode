@@ -13,6 +13,7 @@ import {
 
 import { basename, dirname } from 'path';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
+import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
@@ -20,7 +21,6 @@ import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
-import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 
 interface BinaryOpts {
   // args to pass to the binary
@@ -231,9 +231,8 @@ export class DevtoolsAPI {
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
     } catch (e) {
-      const error = assertError(e) || new Error('Unknown error');
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error });
-      reportError({ context: 'Unable to enable refactoring capabilities', error });
+      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error: assertError(e) });
+      reportError({ context: 'Unable to enable refactoring capabilities', e });
     }
   }
 
@@ -319,10 +318,11 @@ export class DevtoolsAPI {
       );
       return response;
     } catch (e) {
-      const error = assertError(e) || new Error('Unknown refactoring error');
-      DevtoolsAPI.refactoringErrorEmitter.fire(error);
-      logError(error, fnToRefactor);
-      throw error;
+      reportError({ context: 'Refactoring error', e, consoleOnly: true });
+      if (!(e instanceof AbortError)) {
+        DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
+      }
+      throw e; // Some general error reporting above, but pass along the error for further handling
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
     }
@@ -357,19 +357,8 @@ function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuth
   return (<CodeSceneAuthenticationSession>x).url !== undefined;
 }
 
-
 function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
-  return `[traceId ${traceId ? traceId : '-'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
-}
-
-function logError(error: Error, fnToRefactor: FnToRefactor) {
-  let traceId;
-  if (error instanceof DevtoolsError) {
-    traceId = error['trace-id'];
-  } else if (error instanceof CreditsInfoError) {
-    traceId = error.traceId;
-  }
-  logOutputChannel.error(`Refactor error for ${logIdString(fnToRefactor, traceId)}: ${error.message}`);
+  return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 
 export class CreditsInfoError extends Error {
