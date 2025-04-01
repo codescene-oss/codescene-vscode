@@ -74,13 +74,7 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   CsExtensionState.addListeners(context);
   initAce(context);
-  DevtoolsAPI.onDidChangePreflightState((event) => {
-    CsExtensionState.setACEState(event);
-    if (event.state === 'enabled' || event.state === 'disabled') {
-      Reviewer.instance.refreshDeltas();
-    }
-  });
-
+  
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
