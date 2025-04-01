@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { assertError, getFileExtension, reportError } from '../utils';
+import { assertError, getFileExtension, rangeStr, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
@@ -113,7 +113,11 @@ export class DevtoolsAPI {
       case 11: // exit code for CreditInfoError
         const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
-        throw new CreditsInfoError(creditsInfoError.message, creditsInfoError['credits-info']);
+        throw new CreditsInfoError(
+          creditsInfoError.message,
+          creditsInfoError['credits-info'],
+          creditsInfoError['trace-id']
+        );
       case 'ABORT_ERR':
         throw new AbortError();
 
@@ -304,10 +308,20 @@ export class DevtoolsAPI {
         args.push('--token', session.accessToken);
       }
 
-      return await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({ args, execOptions: { signal } });
+      logOutputChannel.debug(
+        `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
+      );
+      const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({ args, execOptions: { signal } });
+      logOutputChannel.debug(
+        `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
+          skipCache === true ? ' (retry)' : ''
+        }`
+      );
+      return response;
     } catch (e) {
       const error = assertError(e) || new Error('Unknown refactoring error');
       DevtoolsAPI.refactoringErrorEmitter.fire(error);
+      logError(error, fnToRefactor);
       throw error;
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
@@ -338,15 +352,34 @@ function fileParts(document: vscode.TextDocument): FileParts {
   const documentDirectory = dirname(document.fileName);
   return { fileName, documentDirectory };
 }
+
+function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
+  return `[traceId ${traceId ? traceId : '-'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
+}
+
+function logError(error: Error, fnToRefactor: FnToRefactor) {
+  let traceId;
+  if (error instanceof DevtoolsError) {
+    traceId = error['trace-id'];
+  } else if (error instanceof CreditsInfoError) {
+    traceId = error.traceId;
+  }
+  logOutputChannel.error(`Refactor error for ${logIdString(fnToRefactor, traceId)}: ${error.message}`);
+}
+
 export class CreditsInfoError extends Error {
-  constructor(message: string, readonly creditsInfo: CreditsInfo) {
+  constructor(message: string, readonly creditsInfo: CreditsInfo, readonly traceId: string) {
     super(message);
   }
 }
 
 export class DevtoolsError extends Error {
-  constructor(readonly devtoolsError: DevtoolsErrorModel) {
-    super(devtoolsError.message);
+  [property: string]: any;
+  constructor(devtoolsErrorObj: DevtoolsErrorModel) {
+    super(devtoolsErrorObj.message);
+    Object.getOwnPropertyNames(devtoolsErrorObj).forEach((propName) => {
+      this[propName] = devtoolsErrorObj[propName];
+    });
   }
 }
 

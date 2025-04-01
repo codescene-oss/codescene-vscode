@@ -8,6 +8,10 @@ export interface CreditsInfoError {
    * Error message.
    */
   message: string;
+  /**
+   * Trace id for the request, use for debugging requests
+   */
+  'trace-id': string;
 }
 
 /**
@@ -81,6 +85,10 @@ export interface RefactorResponse {
    */
   reasons: Reason[];
   'refactoring-properties': RefactoringProperties;
+  /**
+   * Trace id for the request, use for debugging requests
+   */
+  'trace-id': string;
 }
 
 export interface Confidence {
