@@ -8,7 +8,7 @@ import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { decorateCode, targetEditor } from '../refactoring/utils';
 import Telemetry from '../telemetry';
-import { assertError, isError, reportError, showDocAtPosition } from '../utils';
+import { reportError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
 import { fileChangesDetectedContent, functionLocationContent } from './webview/components';
 import { docsForCategory } from './webview/documentation-components';
@@ -114,10 +114,8 @@ export class CodeSceneTabPanel implements Disposable {
       } else {
         await this.handleAceAcknowledgementMessage(this.state, message.command);
       }
-    } catch (error) {
-      if (!isError(error)) return;
-      void vscode.window.showErrorMessage(error.message);
-      logOutputChannel.error(error.message);
+    } catch (e) {
+      reportError({ context: 'CodeScene tab message handling', e });
     }
   }
 
@@ -142,23 +140,17 @@ export class CodeSceneTabPanel implements Disposable {
   private async handleRefactoringMessage(refactoring: RefactoringRequest, command: string, isStale?: boolean) {
     const commands: { [key: string]: () => void } = {
       gotoFunctionLocation: async () => {
-        showDocAtPosition(refactoring.document, refactoring.fnToRefactor.vscodeRange.start).then(
-          () => {
-            this.highlightCode(refactoring, isStale);
-          },
-          () => {}
-        );
+        await showDocAtPosition(refactoring.document, refactoring.fnToRefactor.vscodeRange.start);
+        void this.highlightCode(refactoring, isStale);
       },
       apply: async () => {
-        vscode.commands.executeCommand('codescene.applyRefactoring', refactoring).then(
-          () => {
-            this.dispose();
-          },
-          (error) => {
-            logOutputChannel.error(error);
-            this.dispose();
-          }
-        );
+        try {
+          await vscode.commands.executeCommand('codescene.applyRefactoring', refactoring);
+          this.dispose();
+        } catch (e) {
+          reportError({ context: 'Error applying refactoring', e });
+          this.dispose();
+        }
       },
       reject: () => {
         this.deselectRefactoring(refactoring);
@@ -300,7 +292,7 @@ export class CodeSceneTabPanel implements Disposable {
         metadata: { 'cached?': isCached },
       } = response;
 
-      this.highlightCode(refactoring, isStale);
+      await this.highlightCode(refactoring, isStale);
 
       const summaryContent = !isStale
         ? refactoringSummary(response.confidence)
@@ -321,23 +313,20 @@ export class CodeSceneTabPanel implements Disposable {
         Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
 
       const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
-      const error = assertError(e) || new Error('Unknown error');
-      reportError({ context: 'Refactoring error', error, consoleOnly: true });
 
       Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
     }
   }
 
-  private highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
+  private async highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
     const { fnToRefactor, document } = refactoring;
-    void refactoring.promise.then((result) => {
-      const highlightCode = !isStale && result.confidence.level > 1;
-      const editor = targetEditor(document);
-      if (highlightCode && editor) {
-        editor.selection = new vscode.Selection(fnToRefactor.vscodeRange.start, fnToRefactor.vscodeRange.end);
-      }
-    });
+    const result = await refactoring.promise;
+    const highlightCode = !isStale && result.confidence.level > 1;
+    const editor = targetEditor(document);
+    if (highlightCode && editor) {
+      editor.selection = new vscode.Selection(fnToRefactor.vscodeRange.start, fnToRefactor.vscodeRange.end);
+    }
   }
 
   private updateRefactoringContent(title: string, content: string | string[]) {
@@ -412,6 +401,9 @@ export class CodeSceneTabPanel implements Disposable {
   }
 
   dispose() {
+    if (this.state instanceof RefactoringRequest) {
+      this.state.abort();
+    }
     CodeSceneTabPanel._instance = undefined;
     this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
