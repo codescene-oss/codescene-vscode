@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.14](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.13...v0.9.14) (2025-04-02)
+
+
+### Bug fixes
+
+* **devtools-binary:** Optimize C# parsing for large files ([90dc6cc](https://github.com/codescene-oss/codescene-vscode/commit/90dc6cc491ccf29aacdd0d720871d8d4bd8fd21a))
+
 ### [0.9.13](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.12...v0.9.13) (2025-03-12)
 
 
