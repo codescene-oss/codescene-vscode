@@ -1,11 +1,8 @@
 import vscode, { Uri } from 'vscode';
-import { AnalysisEvent } from './analysis-common';
-import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
-import { DevtoolsAPI } from './devtools-api';
+import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
-import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
 
 export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
@@ -107,10 +104,8 @@ export class CsExtensionState {
    */
   static addListeners(context: vscode.ExtensionContext) {
     context.subscriptions.push(
-      Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
-      Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
-      DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
-      DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
+      DevtoolsAPI.onDidAnalysisStateChange(CsExtensionState._instance.handleAnalysisEvent),
+      DevtoolsAPI.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
     context.subscriptions.push(
       DevtoolsAPI.onDidRefactoringFail((error) => {
@@ -137,10 +132,10 @@ export class CsExtensionState {
   }
 
   private handleAnalysisEvent(event: AnalysisEvent) {
-    if (event.type === 'end') return;
-    const analysisState = (CsExtensionState.stateProperties.features.analysis.analysisState =
-      event.type === 'idle' ? 'idle' : 'running');
-    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, analysisState });
+    CsExtensionState.setAnalysisState({
+      ...CsExtensionState.stateProperties.features.analysis,
+      analysisState: event.state,
+    });
   }
 
   private handleAnalysisError(error: Error) {
