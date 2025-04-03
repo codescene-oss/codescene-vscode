@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import { AnalysisEvent } from '../analysis-common';
-import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
@@ -28,15 +26,10 @@ export class CsReviewCodeLensProvider
   private disposables: vscode.Disposable[] = [];
 
   constructor() {
-    const updateOnAnalysisEnd = (event: AnalysisEvent) => {
-      if (event.type === 'end') {
-        this.changeCodeLensesEmitter.fire();
-      }
-    };
     this.disposables.push(
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.changeCodeLensesEmitter.fire()),
-      Reviewer.instance.onDidReview(updateOnAnalysisEnd),
-      DeltaAnalyser.instance.onDidAnalyse(updateOnAnalysisEnd)
+      DevtoolsAPI.onDidReviewComplete(() => this.changeCodeLensesEmitter.fire()),
+      DevtoolsAPI.onDidDeltaAnalysisComplete(() => this.changeCodeLensesEmitter.fire())
     );
   }
 

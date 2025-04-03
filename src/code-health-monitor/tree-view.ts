@@ -1,8 +1,8 @@
 import vscode from 'vscode';
+import { DeltaAnalysisEvent, DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize, showDocAtPosition } from '../utils';
-import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
 
@@ -32,11 +32,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
         void this.treeDataProvider.selectSortFn();
       }),
-      DeltaAnalyser.instance.onDidAnalyse((event) => {
-        if (event.type === 'end') {
-          this.treeDataProvider.syncTree(event);
-        }
-      }),
+      DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.treeDataProvider.syncTree(e)),
       this.view.onDidChangeVisibility((e) => {
         Telemetry.logUsage('code-health-monitor/visibility', { visible: e.visible });
       }),
