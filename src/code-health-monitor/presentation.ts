@@ -19,7 +19,7 @@ class FileWithIssuesDecorationProvider implements vscode.FileDecorationProvider 
       const badge = queryParams.get('issues');
       if (!badge || Number(badge) < 1) return;
       return {
-        badge,
+        badge: (Number(badge) > 99) ? "99" : badge,
         tooltip: `${badge} ${pluralize('issue', Number(badge))} can be improved`,
       };
     }
