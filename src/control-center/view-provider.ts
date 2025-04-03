@@ -8,9 +8,9 @@ import vscode, {
   window,
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { CreditsInfoError } from '../devtools-api';
+import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
-import { ACECreditsError } from '../refactoring/api';
-import { AceCredits } from '../refactoring/model';
 import Telemetry from '../telemetry';
 import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
@@ -66,7 +66,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       retryAce: () => {
         logOutputChannel.show();
         logOutputChannel.info('Retrying ACE activation...');
-        void vscode.commands.executeCommand('codescene.ace.activate');
+        void vscode.commands.executeCommand('codescene.ace.setEnabled');
       },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
@@ -85,10 +85,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       openAiPrivacyPrinciples: () => this.openLink('https://codescene.com/product/ace/principles'),
       openContactCodescene: () => this.openLink('https://codescene.com/company/contact-us'),
       raiseSupportTicket: () => this.openLink('https://supporthub.codescene.com/kb-tickets/new'),
-      copyMachineId: () =>
-        void vscode.env.clipboard.writeText(vscode.env.machineId).then(() => {
-          void vscode.window.showInformationMessage('Copied machine-id to clipboard.');
-        }),
     };
 
     const cmd = commands[message.command];
@@ -144,7 +140,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         ${this.accountGroup()}
         ${this.statusGroup()}
         ${this.moreGroup()}
-        <div class="clickable" id="machine-id" title="Click to copy">machine-id:<br>${vscode.env.machineId}</div>
     `;
   }
 
@@ -245,7 +240,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     }
 
     // Custom presentation if we're out of credits
-    if (aceFeature.error instanceof ACECreditsError) {
+    if (aceFeature.error instanceof CreditsInfoError) {
       text = 'out of credits';
       outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
     }
@@ -268,10 +263,10 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     `;
   }
 
-  private creditBannerContent(creditInfo: AceCredits) {
-    if (!creditInfo.resetTime) return;
-
-    const differenceInDays = Math.floor((creditInfo.resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  private creditBannerContent(creditInfo: CreditsInfo) {
+    if (!creditInfo.reset) return;
+    const resetTime = new Date(creditInfo.reset);
+    const differenceInDays = Math.floor((resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
     const content = /* html*/ `
     <div class="out-of-credits-banner">
@@ -283,7 +278,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         You'll get new credits in ${differenceInDays} ${pluralize(
       'day',
       differenceInDays
-    )}. (${creditInfo.resetTime.toLocaleString()})
+    )}. (${resetTime.toLocaleString()})
       </p>
     </div>
     `;

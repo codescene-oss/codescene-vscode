@@ -1,24 +1,19 @@
 import * as vscode from 'vscode';
-import { csSource } from '../diagnostics/cs-diagnostics';
+import { CodeSmell, Function, Range, Review } from '../devtools-api/review-model';
+import { CsDiagnostic, csSource } from '../diagnostics/cs-diagnostics';
 import { isDefined } from '../utils';
-import { CodeSmell, Range, ReviewFunction, ReviewResult } from './model';
 
 const chScorePrefix = 'Code health score: ';
 const noApplicationCode = 'No application code detected for scoring';
 
-export function isGeneralDiagnostic(diagnostic: vscode.Diagnostic) {
-  const { message } = diagnostic;
-  return message.startsWith(chScorePrefix);
-}
-
-function createGeneralDiagnostic(reviewResult: ReviewResult) {
+function createGeneralDiagnostic(reviewResult: Review) {
   const scoreText = isDefined(reviewResult.score)
     ? `${chScorePrefix}${formatScore(reviewResult.score)}`
     : `${chScorePrefix}${noApplicationCode}`;
-  return new vscode.Diagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
+  return new CsDiagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
 }
 
-export function reviewFunctionToDiagnostics(reviewFunction: ReviewFunction, document: vscode.TextDocument) {
+export function reviewFunctionToDiagnostics(reviewFunction: Function, document: vscode.TextDocument) {
   return reviewFunction['code-smells'].map((cs) => reviewCodeSmellToDiagnostics(cs, document)).filter(isDefined);
 }
 
@@ -43,7 +38,7 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   } else {
     message = category;
   }
-  const diagnostic = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+  const diagnostic = new CsDiagnostic(range, message, vscode.DiagnosticSeverity.Warning, codeSmell);
   diagnostic.source = csSource;
   diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document);
   return diagnostic;
@@ -66,8 +61,8 @@ export function removeDetails(diagnosticMessage: string) {
   return diagnosticMessage;
 }
 
-export function reviewResultToDiagnostics(reviewResult: ReviewResult, document: vscode.TextDocument) {
-  let diagnostics: vscode.Diagnostic[] = [];
+export function reviewResultToDiagnostics(reviewResult: Review, document: vscode.TextDocument) {
+  let diagnostics: CsDiagnostic[] = [];
   for (const fun of reviewResult['function-level-code-smells']) {
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
   }

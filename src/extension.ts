@@ -1,19 +1,18 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
-import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
-import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
+import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsExtensionState } from './cs-extension-state';
-import { DevtoolsAPI } from './devtools-interop/api';
+import { DevtoolsAPI } from './devtools-api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
-import { AceAPI, activate as activateAce } from './refactoring/addon';
+import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -27,8 +26,6 @@ import debounce = require('lodash.debounce');
 
 interface CsContext {
   csWorkspace: CsWorkspace;
-  devtoolsApi: DevtoolsAPI;
-  aceApi: AceAPI;
 }
 
 /**
@@ -42,57 +39,49 @@ export async function activate(context: vscode.ExtensionContext) {
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
-      const devtoolsApi = new DevtoolsAPI(binaryPath);
-      Telemetry.init(context.extension, devtoolsApi);
+      DevtoolsAPI.init(binaryPath, context);
+      Telemetry.init(context.extension);
 
       try {
         await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
-        Reviewer.init(binaryPath, context);
-        DeltaAnalyser.init(binaryPath);
+        Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
-        await startExtension(context, devtoolsApi);
+        await startExtension(context);
         finalizeActivation(controlCenterViewProvider);
       } catch (e) {
-        const error = assertError(e) || new Error('Unknown error');
-        CsExtensionState.setAnalysisState({ state: 'error', error });
-        reportError('Unable to start extension', error);
+        CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
+        reportError({ context: 'Unable to start extension', e });
+        void vscode.commands.executeCommand('codescene.controlCenterView.focus');
       }
     },
     (e) => {
-      const error = assertError(e) || new Error('Unknown error');
+      const error = assertError(e);
       CsExtensionState.setAnalysisState({ state: 'error', error });
-      reportError('Unable to start extension', error);
+      reportError({ context: 'Unable to start extension', e });
+      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
       Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
 }
 
-async function startExtension(context: vscode.ExtensionContext, devtoolsApi: DevtoolsAPI) {
+async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
-    devtoolsApi,
-    aceApi: activateAce(context, devtoolsApi),
   };
   CsServerVersion.init();
 
-  CsExtensionState.addListeners(context, csContext.aceApi);
-  csContext.aceApi.onDidChangeState((event) => {
-    CsExtensionState.setACEState(event);
-    if (event.state === 'enabled' || event.state === 'disabled') {
-      Reviewer.instance.refreshDeltas();
-    }
-  });
+  CsExtensionState.addListeners(context);
+  initAce(context);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
-  void vscode.commands.executeCommand('codescene.ace.activate');
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
   setupStatsCollector(context);
 
-  activateCHMonitor(context, csContext.aceApi);
+  activateCHMonitor(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
@@ -102,18 +91,12 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   registerCodeActionProvider(context);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedEnableAce = debounce(() => {
-    void vscode.commands.executeCommand('codescene.ace.activate');
+  const debouncedSetEnabledAce = debounce((enabled: boolean) => {
+    void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
   }, 500);
   context.subscriptions.push(
     onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableAce();
-    })
-  );
-
-  context.subscriptions.push(
-    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
-      debouncedEnableAce();
+      debouncedSetEnabledAce(e.value);
     })
   );
 }
@@ -140,7 +123,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   });
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
-  registerCHRulesCommands(context, csContext.devtoolsApi);
+  registerCHRulesCommands(context);
 }
 
 /**

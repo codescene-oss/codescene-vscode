@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { CsExtensionState, CsStateProperties } from './cs-extension-state';
-import { ACECreditsError } from './refactoring/api';
+import { CreditsInfoError } from './devtools-api';
 import { isDefined } from './utils';
 
 export class CsStatusBar {
@@ -71,9 +71,9 @@ export class CsStatusBar {
   }
 
   /**
-   * Don't report ACE credits errors
+   * Don't show errors related to credit outages
    */
   private reportableAceError(error?: Error) {
-    return isDefined(error) && !(error instanceof ACECreditsError);
+    return isDefined(error) && !(error instanceof CreditsInfoError);
   }
 }

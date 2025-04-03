@@ -17,9 +17,46 @@ export interface Command {
 }
 
 export interface Executor {
+  logStats(): void;
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
 }
 
+class AvgTime {
+  invocations = 0;
+  private totalDuration = 0;
+  addRun(duration: number) {
+    this.invocations++;
+    this.totalDuration += duration;
+  }
+  get averageDuration() {
+    return this.invocations > 0 ? this.totalDuration / this.invocations : 0;
+  }
+}
+
+class Stats {
+  private stats: Map<string, AvgTime> = new Map<string, AvgTime>();
+  addRun(command: Command, duration: number) {
+    const { args, command: binaryPath } = command;
+    if (args.length < 1) return;
+
+    let csCommand = args[0];
+    if (args[0] === 'refactor') { // keep actual refactoring command as well (i.e. preflight/fns-to-refactor/post)
+      csCommand = args.slice(0, 2).join(' ');
+    }
+    const shortCmd = binaryPath.substring(binaryPath.lastIndexOf('/') + 1, binaryPath.length);
+    const cmdKey = `${shortCmd} ${csCommand}`;
+    if (!this.stats.has(cmdKey)) {
+      this.stats.set(cmdKey, new AvgTime());
+    }
+    this.stats.get(cmdKey)!.addRun(duration);
+  }
+  logStats() {
+    logOutputChannel.info('Executor avg times:');
+    for (const [cmdKey, avgTime] of this.stats) {
+      logOutputChannel.info(`  ${cmdKey}: ${avgTime.averageDuration}ms (${avgTime.invocations} invocations)`);
+    }
+  }
+}
 /**
  * Executes a process and returns its output.
  *
@@ -38,6 +75,12 @@ export class SimpleExecutor implements Executor {
     }
   }
 
+  private stats: Stats = new Stats();
+
+  logStats(): void {
+    this.stats.logStats();
+  }
+
   execute(command: Command, options: ExecOptions = {}, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
 
@@ -45,15 +88,18 @@ export class SimpleExecutor implements Executor {
       const start = Date.now();
       const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess.pid}] "${logName}" failed with error: ${error}`);
+          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
         logOutputChannel.trace(
-          `[pid ${childProcess.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
+          `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
         );
-        resolve({ stdout, stderr, exitCode: error?.code || 0, duration: end - start });
+
+        this.stats.addRun(command, end - start);
+
+        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
       });
 
       if (isDefined(input) && childProcess.stdin) {
@@ -82,7 +128,7 @@ export class LimitingExecutor implements Executor {
     this.executor = executor;
   }
 
-  execute(command: Task, options: ExecOptions = {}, input?: string) {
+  async execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
 
     // Check if running already
@@ -94,14 +140,20 @@ export class LimitingExecutor implements Executor {
     const abortController = new AbortController();
     this.runningCommands.set(taskId, abortController);
 
-    return this.executor.execute(command, { ...options, signal: abortController.signal }, input).finally(() => {
+    try {
+      return await this.executor.execute(command, { ...options, signal: abortController.signal }, input);
+    } finally {
       // Remove the abortController from the map.
       // The process has exited, and we don't want to risk calling abort() on
       // a process that has already exited (what if the pid has been reused?)
       if (this.runningCommands.get(taskId) === abortController) {
         this.runningCommands.delete(taskId);
       }
-    });
+    }
+  }
+
+  logStats(): void {
+    this.executor.logStats();
   }
 
   abort(taskId: string) {
