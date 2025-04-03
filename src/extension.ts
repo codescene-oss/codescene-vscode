@@ -1,7 +1,6 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
-import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
@@ -46,7 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
         Reviewer.init(context);
-        DeltaAnalyser.init();
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
         finalizeActivation(controlCenterViewProvider);
@@ -74,7 +72,7 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   CsExtensionState.addListeners(context);
   initAce(context);
-  
+
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);

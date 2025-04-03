@@ -1,7 +1,5 @@
 import { dirname } from 'path';
 import vscode, { Disposable } from 'vscode';
-import { AnalysisEvent } from '../analysis-common';
-import { DeltaAnalyser } from '../code-health-monitor/analyser';
 import { getConfiguration } from '../configuration';
 import { AbortError, DevtoolsAPI } from '../devtools-api';
 import { Delta } from '../devtools-api/delta-model';
@@ -10,8 +8,6 @@ import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { formatScore, reviewResultToDiagnostics } from './utils';
-
-export type ReviewEvent = AnalysisEvent & { document?: vscode.TextDocument };
 
 export default class Reviewer {
   private static _instance: CachingReviewer;
@@ -72,14 +68,14 @@ export class ReviewCacheItem {
   async runDeltaAnalysis() {
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
-    this.delta = await DeltaAnalyser.instance.deltaForScores(this.document, oldScore, newScore);
+    this.delta = await DevtoolsAPI.delta(this.document, oldScore, newScore);
   }
 
   /**
    * Deletes the delta for this item, and makes sure that (empty) DeltaAnalysisEvents are triggered properly
    */
   async deleteDelta() {
-    this.delta = await DeltaAnalyser.instance.deltaForScores(this.document);
+    this.delta = await DevtoolsAPI.delta(this.document);
   }
 
   resetBaseline() {
@@ -141,13 +137,6 @@ class CachingReviewer implements Disposable {
   private disposables: vscode.Disposable[] = [];
   readonly reviewCache = new ReviewCache();
 
-  private readonly errorEmitter = new vscode.EventEmitter<Error>();
-  readonly onDidReviewFail = this.errorEmitter.event;
-  private readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
-  readonly onDidReview = this.reviewEmitter.event;
-
-  private reviewsRunning = 0;
-
   constructor() {
     const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     this.disposables.push(
@@ -158,19 +147,6 @@ class CachingReviewer implements Disposable {
     );
   }
 
-  private startReviewEvent(document: vscode.TextDocument) {
-    this.reviewsRunning++;
-    this.reviewEmitter.fire({ type: 'start', document });
-  }
-
-  private endReviewEvent(document: vscode.TextDocument) {
-    this.reviewsRunning--;
-    this.reviewEmitter.fire({ type: 'end', document });
-    if (this.reviewsRunning === 0) {
-      this.reviewEmitter.fire({ type: 'idle' });
-    }
-  }
-
   private handleReviewError(e: Error, document: vscode.TextDocument) {
     if (e instanceof AbortError) {
       // Delete the cache entry for this document if the review was aborted (document closed)
@@ -178,7 +154,6 @@ class CachingReviewer implements Disposable {
       this.reviewCache.delete(document.uri.fsPath);
     } else {
       logOutputChannel.error(e.message);
-      this.errorEmitter.fire(e); // Fire errors for all other errors
     }
   }
 
@@ -189,7 +164,6 @@ class CachingReviewer implements Disposable {
       if (reviewCacheItem) return reviewCacheItem.review;
     }
 
-    this.startReviewEvent(document);
     const reviewPromise = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
@@ -197,10 +171,7 @@ class CachingReviewer implements Disposable {
         if (!reviewResult) this.reviewCache.delete(document.uri.fsPath);
         return reviewResult;
       })
-      .catch((e) => this.handleReviewError(e, document))
-      .finally(() => {
-        this.endReviewEvent(document);
-      });
+      .catch((e) => this.handleReviewError(e, document));
 
     const csReview = new CsReview(document, reviewPromise);
 
@@ -219,16 +190,12 @@ class CachingReviewer implements Disposable {
    * @returns
    */
   async baselineScore(document: vscode.TextDocument) {
-    this.startReviewEvent(document);
     return this.reviewer
       .review(document, { baseline: true })
       .then((reviewResult) => {
         return reviewResult && reviewResult['raw-score'];
       })
-      .catch((e) => this.handleReviewError(e, document))
-      .finally(() => {
-        this.endReviewEvent(document);
-      });
+      .catch((e) => this.handleReviewError(e, document));
   }
 
   /**

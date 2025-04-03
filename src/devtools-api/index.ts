@@ -20,6 +20,7 @@ import { RefactoringRequest } from '../refactoring/request';
 import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
+import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 
 interface BinaryOpts {
@@ -152,7 +153,30 @@ export class DevtoolsAPI {
     return { rulesMsg: stdout, errorMsg: stderr !== '' ? stderr : undefined } as CodeHealthRulesResult;
   }
 
-  static reviewContent(document: vscode.TextDocument) {
+  private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
+  /** Emits events when review or delta analysis state changes (running/idle?) */
+  public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
+  private static analysesRunning = 0;
+
+  private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
+  public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
+
+  private static startAnalysisEvent() {
+    DevtoolsAPI.analysesRunning++;
+    DevtoolsAPI.analysisStateEmitter.fire({ state: 'running' });
+  }
+
+  private static endAnalysisEvent() {
+    DevtoolsAPI.analysesRunning--;
+    if (DevtoolsAPI.analysesRunning === 0) {
+      DevtoolsAPI.analysisStateEmitter.fire({ state: 'idle' });
+    }
+  }
+
+  private static readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
+  public static readonly onDidReviewComplete = DevtoolsAPI.reviewEmitter.event;
+
+  static async reviewContent(document: vscode.TextDocument) {
     const fp = fileParts(document);
     const binaryOpts = {
       args: ['review', '--file-name', fp.fileName],
@@ -161,7 +185,18 @@ export class DevtoolsAPI {
       input: document.getText(),
     };
 
-    return DevtoolsAPI.review(document, binaryOpts);
+    DevtoolsAPI.startAnalysisEvent();
+    try {
+      const reviewResult = await DevtoolsAPI.review(document, binaryOpts);
+      DevtoolsAPI.reviewEmitter.fire({ document, result: reviewResult });
+      return reviewResult;
+    } catch (e) {
+      if (!(e instanceof AbortError)) {
+        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
+      }
+    } finally {
+      DevtoolsAPI.endAnalysisEvent();
+    }
   }
 
   static async reviewBaseline(document: vscode.TextDocument) {
@@ -173,6 +208,7 @@ export class DevtoolsAPI {
       execOptions: { cwd: fp.documentDirectory },
     };
 
+    DevtoolsAPI.startAnalysisEvent();
     try {
       return await DevtoolsAPI.review(document, binaryOpts);
     } catch (e) {
@@ -180,7 +216,12 @@ export class DevtoolsAPI {
         // Just return on regular devtoolerrors - this just means that we don't have any baseline to compare to
         return;
       }
+      if (!(e instanceof AbortError)) {
+        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
+      }
       throw e;
+    } finally {
+      DevtoolsAPI.endAnalysisEvent();
     }
   }
 
@@ -195,20 +236,44 @@ export class DevtoolsAPI {
     DevtoolsAPI.instance.limitingExecutor.abort(taskId('review-base', document));
   }
 
+  private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
+  public static readonly onDidDeltaAnalysisComplete = DevtoolsAPI.deltaAnalysisEmitter.event;
+
   /**
+   * Runs delta analysis and returns the result. Also fires onDidDeltaAnalysisComplete when analysis is complete.
+   *
    * @param document
-   * @param inputJsonString
+   * @param oldScore raw base64 encoded score
+   * @param newScore raw base64 encoded score
    * @returns Delta if any changes were detected or undefined when no improvements/degradations were found.
    */
-  static async delta(document: TextDocument, inputJsonString: string) {
-    const result = await DevtoolsAPI.instance.runBinary({
-      args: ['delta'],
-      input: inputJsonString,
-      taskId: taskId('delta', document),
-    });
+  static async delta(document: TextDocument, oldScore?: string | void, newScore?: string | void) {
+    const inputJsonString = jsonForScores(oldScore, newScore);
+    if (!inputJsonString) return;
 
-    if (result.stdout === '') return undefined; // empty result => undefined delta indicating no change
-    return JSON.parse(result.stdout) as Delta;
+    DevtoolsAPI.startAnalysisEvent();
+    try {
+      const result = await DevtoolsAPI.instance.runBinary({
+        args: ['delta'],
+        input: inputJsonString,
+        taskId: taskId('delta', document),
+      });
+      let deltaResult;
+      if (result.stdout !== '') {
+        // stdout === '' means there were no changes detected - return undefined to indicate this
+        deltaResult = JSON.parse(result.stdout) as Delta;
+        await addRefactorableFunctionsToDeltaResult(document, deltaResult);
+      }
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
+      return deltaResult;
+    } catch (e) {
+      if (!(e instanceof AbortError)) {
+        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
+      }
+      throw e;
+    } finally {
+      DevtoolsAPI.endAnalysisEvent();
+    }
   }
 
   // Event emitters for devtools API callbacks
@@ -378,3 +443,17 @@ export class DevtoolsError extends Error {
 }
 
 export class AbortError extends Error {}
+
+export type AnalysisEvent = {
+  state: 'running' | 'idle';
+};
+
+export type ReviewEvent = {
+  document: vscode.TextDocument;
+  result?: Review;
+};
+
+export type DeltaAnalysisEvent = {
+  document: vscode.TextDocument;
+  result?: Delta;
+};
