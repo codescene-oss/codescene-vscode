@@ -23,115 +23,11 @@ import { Delta } from './delta-model';
 import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 
-interface BinaryOpts {
-  // args to pass to the binary
-  args: string[];
-
-  // ExecOptions (signal, cwd etc...)
-  execOptions?: ExecOptions;
-
-  // optional string to send on stdin
-  input?: string;
-
-  /* 
-  optional taskid for the invocation, ensuring only one task with the same id is running.
-  see LimitingExecutor for details
-  */
-  taskId?: string;
-}
-
 export class DevtoolsAPI {
-  private static instance: DevtoolsAPI;
-
-  public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
-  public preflightJson?: string;
+  private static instance: DevtoolsAPIImpl;
 
   static init(binaryPath: string, context: ExtensionContext) {
-    DevtoolsAPI.instance = new DevtoolsAPI(binaryPath, context);
-  }
-
-  private constructor(public binaryPath: string, context: ExtensionContext) {
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codescene.printDevtoolsApiStats', () => {
-        this.simpleExecutor.logStats();
-        logOutputChannel.show();
-      })
-    );
-  }
-
-  /**
-   * Runs the devtools binary
-   *
-   * @param opts Options for running the devtools binary
-   * @returns stdout of the command
-   * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
-   */
-  private async runBinary(opts: BinaryOpts) {
-    const { args, execOptions: options, input, taskId } = opts;
-
-    let result: ExecResult;
-    if (taskId) {
-      const task: Task = {
-        command: this.binaryPath,
-        args,
-        taskId,
-        ignoreError: true,
-      };
-      result = await this.limitingExecutor.execute(task, options, input);
-    } else {
-      const command: Command = {
-        command: this.binaryPath,
-        args,
-        ignoreError: true,
-      };
-      result = await this.simpleExecutor.execute(command, options, input);
-    }
-
-    if (result.exitCode === 0) {
-      return result;
-    }
-
-    this.handleNonZeroExitCodes(args, result);
-  }
-
-  /**
-   * Handles the exit code of the devtools binary
-   * Output on debug level, avoiding the default level of info. Error presentation should be done
-   * higher in the call stack.
-   *
-   * @param exitCode exit code from the devtools binary
-   * @param stderr stderr from the devtools binary
-   * @param args args for logging purposes
-   * @throws appropriate Errors
-   */
-  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
-    switch (exitCode) {
-      case 10: // exit code for DevtoolsErrorModel
-        const devtoolsError = JSON.parse(stderr) as DevtoolsErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
-        throw new DevtoolsError(devtoolsError);
-      case 11: // exit code for CreditInfoError
-        const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
-        throw new CreditsInfoError(
-          creditsInfoError.message,
-          creditsInfoError['credits-info'],
-          creditsInfoError['trace-id']
-        );
-      case 'ABORT_ERR':
-        throw new AbortError();
-
-      default:
-        const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
-        logOutputChannel.error(msg);
-        throw new Error(msg);
-    }
-  }
-
-  private async executeAsJson<T>(opts: BinaryOpts) {
-    const output = await this.runBinary(opts);
-    return JSON.parse(output.stdout) as T;
+    DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
   }
 
   /**
@@ -397,6 +293,112 @@ export class DevtoolsAPI {
     const jsonEvent = JSON.stringify(event);
     return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({ args: ['telemetry', '--event', jsonEvent] });
   }
+}
+
+class DevtoolsAPIImpl {
+  public simpleExecutor: SimpleExecutor = new SimpleExecutor();
+  public limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
+  public preflightJson?: string;
+
+  constructor(public binaryPath: string, context: ExtensionContext) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand('codescene.printDevtoolsApiStats', () => {
+        this.simpleExecutor.logStats();
+        logOutputChannel.show();
+      })
+    );
+  }
+
+  /**
+   * Runs the devtools binary
+   *
+   * @param opts Options for running the devtools binary
+   * @returns stdout of the command
+   * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
+   */
+  async runBinary(opts: BinaryOpts) {
+    const { args, execOptions: options, input, taskId } = opts;
+
+    let result: ExecResult;
+    if (taskId) {
+      const task: Task = {
+        command: this.binaryPath,
+        args,
+        taskId,
+        ignoreError: true,
+      };
+      result = await this.limitingExecutor.execute(task, options, input);
+    } else {
+      const command: Command = {
+        command: this.binaryPath,
+        args,
+        ignoreError: true,
+      };
+      result = await this.simpleExecutor.execute(command, options, input);
+    }
+
+    if (result.exitCode === 0) {
+      return result;
+    }
+
+    this.handleNonZeroExitCodes(args, result);
+  }
+
+  /**
+   * Handles the exit code of the devtools binary
+   * Output on debug level, avoiding the default level of info. Error presentation should be done
+   * higher in the call stack.
+   *
+   * @param exitCode exit code from the devtools binary
+   * @param stderr stderr from the devtools binary
+   * @param args args for logging purposes
+   * @throws appropriate Errors
+   */
+  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
+    switch (exitCode) {
+      case 10: // exit code for DevtoolsErrorModel
+        const devtoolsError = JSON.parse(stderr) as DevtoolsErrorModel;
+        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
+        throw new DevtoolsError(devtoolsError);
+      case 11: // exit code for CreditInfoError
+        const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
+        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
+        throw new CreditsInfoError(
+          creditsInfoError.message,
+          creditsInfoError['credits-info'],
+          creditsInfoError['trace-id']
+        );
+      case 'ABORT_ERR':
+        throw new AbortError();
+
+      default:
+        const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
+        logOutputChannel.error(msg);
+        throw new Error(msg);
+    }
+  }
+
+  async executeAsJson<T>(opts: BinaryOpts) {
+    const output = await this.runBinary(opts);
+    return JSON.parse(output.stdout) as T;
+  }
+}
+
+interface BinaryOpts {
+  // args to pass to the binary
+  args: string[];
+
+  // ExecOptions (signal, cwd etc...)
+  execOptions?: ExecOptions;
+
+  // optional string to send on stdin
+  input?: string;
+
+  /* 
+  optional taskid for the invocation, ensuring only one task with the same id is running.
+  see LimitingExecutor for details
+  */
+  taskId?: string;
 }
 
 type CmdId = 'review' | 'review-base' | 'delta';
