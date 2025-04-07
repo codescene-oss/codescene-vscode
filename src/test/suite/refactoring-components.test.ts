@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { reasonsContent } from '../../codescene-tab/webview/refactoring-components';
-import { RefactorResponse } from '../../refactoring/model';
+import { RefactorResponse } from '../../devtools-api/refactor-models';
 
 const code = 'function foo() {}\n';
 
@@ -8,10 +8,9 @@ suite('Refactor panel components Test Suite', () => {
   test('Expected reasons for conf 0', async () => {
     const response: RefactorResponse = {
       code,
-      'reasons-with-details': [{ summary: 'summary' }],
+      reasons: [{ summary: 'summary' }],
       'refactoring-properties': { 'added-code-smells': [], 'removed-code-smells': [] },
       confidence: {
-        description: 'no-confidence',
         level: 0,
         title: 'Refactoring results',
         'recommended-action': {
@@ -21,6 +20,7 @@ suite('Refactor panel components Test Suite', () => {
         'review-header': 'Reason for unverified refactoring',
       },
       metadata: {},
+      'trace-id': 'trace-id',
     };
     const content = reasonsContent(response);
     assert.match(
@@ -32,10 +32,9 @@ suite('Refactor panel components Test Suite', () => {
   test('Expected reasons for full conf (4), with no reasons(-with-details)', async () => {
     const response: RefactorResponse = {
       code,
-      'reasons-with-details': [],
+      reasons: [],
       'refactoring-properties': { 'added-code-smells': [], 'removed-code-smells': [] },
       confidence: {
-        description: 'full-confidence',
         level: 4,
         title: 'Refactoring suggestion',
         'recommended-action': {
@@ -45,6 +44,7 @@ suite('Refactor panel components Test Suite', () => {
         'review-header': 'Refactoring notes',
       },
       metadata: {},
+      'trace-id': 'trace-id',
     };
     const content = reasonsContent(response);
     assert.equal(content, '');
