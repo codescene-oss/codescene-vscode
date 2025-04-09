@@ -21,6 +21,10 @@ function main() {
   addClickListenerToElementById('privacy-principles', () => sendMessage('openAiPrivacyPrinciples'));
   addClickListenerToElementById('contact-codescene', () => sendMessage('openContactCodescene'));
   addClickListenerToElementById('support-ticket-link', () => sendMessage('raiseSupportTicket'));
+
+  // device-id
+  addClickListenerToElementById('device-id', () => sendMessage('copyDeviceId'));
+
 }
 
 function addClickListenerToElementById(elementId: string, listener: () => void) {
