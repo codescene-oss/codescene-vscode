@@ -293,6 +293,10 @@ export class DevtoolsAPI {
     const jsonEvent = JSON.stringify(event);
     return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({ args: ['telemetry', '--event', jsonEvent] });
   }
+
+  static async getDeviceId() {
+    return (await DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--device-id'] })).stdout;
+  }
 }
 
 class DevtoolsAPIImpl {
@@ -317,7 +321,7 @@ class DevtoolsAPIImpl {
    * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
    */
   async runBinary(opts: BinaryOpts) {
-    const { args, execOptions: options, input, taskId } = opts;
+    const { args, execOptions, input, taskId } = opts;
 
     let result: ExecResult;
     if (taskId) {
@@ -327,14 +331,14 @@ class DevtoolsAPIImpl {
         taskId,
         ignoreError: true,
       };
-      result = await this.limitingExecutor.execute(task, options, input);
+      result = await this.limitingExecutor.execute(task, execOptions, input);
     } else {
       const command: Command = {
         command: this.binaryPath,
         args,
         ignoreError: true,
       };
-      result = await this.simpleExecutor.execute(command, options, input);
+      result = await this.simpleExecutor.execute(command, execOptions, input);
     }
 
     if (result.exitCode === 0) {

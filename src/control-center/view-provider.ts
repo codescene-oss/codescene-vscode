@@ -8,7 +8,7 @@ import vscode, {
   window,
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { CreditsInfoError } from '../devtools-api';
+import { CreditsInfoError, DevtoolsAPI } from '../devtools-api';
 import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
@@ -24,6 +24,7 @@ export function registerControlCenterViewProvider(context: ExtensionContext) {
 export class ControlCenterViewProvider implements WebviewViewProvider, Disposable {
   private view?: WebviewView;
   private disposables: Disposable[] = [];
+  private deviceId?: string;
 
   constructor() {}
 
@@ -54,9 +55,13 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     );
   }
 
-  // Just to be able to send visibility status on startup. Can't do that on resolveWebviewView since we don't know if DevtoolsAPI is available.
-  public sendStartupTelemetry() {
+  /**
+   * Call this when DevtoolsAPI is guaranteed to be initialized
+   * Will send visibility status for the control-center as well as fetching the device-id from the API
+   */
+  public async activationFinalized() {
     Telemetry.logUsage('control-center/visibility', { visible: this.view?.visible ? true : false });
+    this.deviceId = await DevtoolsAPI.getDeviceId();
   }
 
   private handleMessages(message: any) {
@@ -85,6 +90,12 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       openAiPrivacyPrinciples: () => this.openLink('https://codescene.com/product/ace/principles'),
       openContactCodescene: () => this.openLink('https://codescene.com/company/contact-us'),
       raiseSupportTicket: () => this.openLink('https://supporthub.codescene.com/kb-tickets/new'),
+      copyDeviceId: () => {
+        if (!this.deviceId) return;
+        void vscode.env.clipboard.writeText(this.deviceId).then(() => {
+          void vscode.window.showInformationMessage('Copied device-id to clipboard.');
+        });
+      },
     };
 
     const cmd = commands[message.command];
@@ -140,7 +151,14 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         ${this.accountGroup()}
         ${this.statusGroup()}
         ${this.moreGroup()}
+        ${this.deviceIdDiv()}
     `;
+  }
+
+  private deviceIdDiv() {
+    return this.deviceId
+      ? `<div class="clickable" id="device-id" title="Click to copy">device-id: ${this.deviceId}</div>`
+      : '';
   }
 
   private accountGroup() {
