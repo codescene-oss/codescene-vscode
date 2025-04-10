@@ -23,6 +23,7 @@ import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-co
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { Baseline } from './code-health-monitor/tree-view';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -65,6 +66,9 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startExtension(context: vscode.ExtensionContext) {
+  const baseline = context.globalState.get('baseline');
+  if (!baseline) context.globalState.update('baseline', Baseline.BranchCreation); // Default value
+
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
   };

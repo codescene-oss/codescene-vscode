@@ -184,6 +184,12 @@ class CachingReviewer implements Disposable {
     this.reviewCache.refreshDeltas();
   }
 
+  refreshAllDeltasAndBaselines() {
+    for (const [_, item] of this.reviewCache['_cache'].entries()) {
+      item.resetBaseline();
+    }
+  }
+
   /**
    * Review a baseline score and return the raw score - to be used by the delta analysis
    * @param document
