@@ -29,6 +29,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
       ),
+      vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
+        void this.treeDataProvider.selectBaseline(context);
+      }),
       vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
         void this.treeDataProvider.selectSortFn();
       }),
@@ -102,6 +105,10 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     });
   }
 
+  get onBaselineChanged() {
+    return this.treeDataProvider.onBaselineChanged;
+  }
+
   isVisible() {
     return this.view.visible;
   }
@@ -116,10 +123,22 @@ interface SortOption extends vscode.QuickPickItem {
   sortFn: (a: FileWithIssues, b: FileWithIssues) => number;
 }
 
+export enum Baseline {
+  Head = 'head',
+  BranchCreation = 'branch creation',
+}
+
+interface BaselineOption extends vscode.QuickPickItem, Pick<SortOption, 'label'> {
+  value: Baseline;
+}
+
 class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeViewItem> {
   private treeDataChangedEmitter: vscode.EventEmitter<DeltaTreeViewItem | void> =
     new vscode.EventEmitter<DeltaTreeViewItem>();
   readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | void> = this.treeDataChangedEmitter.event;
+
+  private baselineChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
   public tree: Array<DeltaTreeViewItem> = [];
@@ -144,10 +163,41 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     },
   ];
 
+  private baselineOptions: BaselineOption[] = [
+    {
+      label: 'Branch creation commit',
+      description: 'Compare changes since the branch was created',
+      value: Baseline.BranchCreation,
+    },
+    {
+      label: 'HEAD commit',
+      description: 'Compare changes made in the most recent commit',
+      value: Baseline.Head,
+    },
+  ];
+
   constructor() {}
 
   setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
     this.parentView = view;
+  }
+
+  public async selectBaseline(context: vscode.ExtensionContext) {
+    const currentBaseline = context.globalState.get('baseline');
+    if (!currentBaseline) this.baselineOptions[0].picked = true;
+    else {
+      const selectedBaseline = this.baselineOptions.find((o) => o.value === (currentBaseline as string));
+      if (selectedBaseline) selectedBaseline.picked = true;
+    }
+
+    const selected = await vscode.window.showQuickPick(this.baselineOptions, {
+      placeHolder: 'Select the comparison baseline for the Code Health Monitor',
+    });
+
+    if (selected && selected !== currentBaseline) {
+      context.globalState.update('baseline', selected.value);
+      this.baselineChangedEmitter.fire();
+    }
   }
 
   public async selectSortFn() {

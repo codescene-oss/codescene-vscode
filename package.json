@@ -86,6 +86,11 @@
       {
         "command": "codescene.printDevtoolsApiStats",
         "title": "CodeScene: Print Devtools API stats"
+      },
+      {
+        "command": "codescene.codeHealthMonitorSelectBaseline",
+        "title": "Select monitor baseline...",
+        "icon": "$(list-tree)"
       }
     ],
     "viewsContainers": {
@@ -142,6 +147,11 @@
         },
         {
           "command": "codescene.codeHealthMonitorSort",
+          "when": "view === codescene.codeHealthMonitorView",
+          "group": "navigation@§"
+        },
+        {
+          "command": "codescene.codeHealthMonitorSelectBaseline",
           "when": "view === codescene.codeHealthMonitorView",
           "group": "navigation@§"
         }
