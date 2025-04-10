@@ -22,6 +22,7 @@ import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
 import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
+import { getBaselineCommit } from '../code-health-monitor/addon';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -103,7 +104,10 @@ export class DevtoolsAPI {
 
   static async reviewBaseline(document: vscode.TextDocument) {
     const fp = fileParts(document);
-    const headPath = `HEAD:./${fp.fileName}`;
+
+    const commitHash = await getBaselineCommit(document.uri);
+    const headPath = `${commitHash}:./${fp.fileName}`;
+
     const binaryOpts = {
       args: ['review', headPath],
       taskId: taskId('review-base', document),
