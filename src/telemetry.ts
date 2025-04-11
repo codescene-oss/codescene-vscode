@@ -16,9 +16,7 @@ export default class Telemetry {
       sendEventData: (eventName, eventData) => {
         // The telemetry-sender apparently adds the extension id to the event name - replace it manually here to keep it simple for Amplitude users
         const evtName = eventName.replace(extension.id, Telemetry.eventPrefix);
-        this.postTelemetry(evtName, eventData).catch((error) => {
-          logOutputChannel.debug(`Error posting telemetry: ${error}`);
-        });
+        void this.postTelemetry(evtName, eventData);
       },
       sendErrorData: (error) => {
         logOutputChannel.error(error);
