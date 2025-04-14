@@ -135,7 +135,7 @@
     "viewsWelcome": [
       {
         "view": "codescene.codeHealthMonitorView",
-        "contents": "The Code Health Monitor view compares the current state of your code with the latest commit and presents any introduced code smells."
+        "contents": "The Code Health Monitor view compares the current state of your code against the selected baseline and presents any introduced code smells."
       }
     ],
     "menus": {

@@ -14,7 +14,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   constructor(context: vscode.ExtensionContext) {
     registerDeltaAnalysisDecorations(context);
 
-    this.treeDataProvider = new DeltaAnalysisTreeProvider();
+    this.treeDataProvider = new DeltaAnalysisTreeProvider(context);
 
     this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
@@ -126,6 +126,7 @@ interface SortOption extends vscode.QuickPickItem {
 export enum Baseline {
   Head = 'head',
   BranchCreation = 'branch creation',
+  Default = 'default',
 }
 
 interface BaselineOption extends vscode.QuickPickItem, Pick<SortOption, 'label'> {
@@ -165,6 +166,12 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   private baselineOptions: BaselineOption[] = [
     {
+      label: 'Automatic (default)',
+      description:
+        'Compare changes against a perfect score (10.0) for default branch or detached HEAD, and branch creation commit for other branches',
+      value: Baseline.Default,
+    },
+    {
       label: 'Branch creation commit',
       description: 'Compare changes since the branch was created',
       value: Baseline.BranchCreation,
@@ -176,7 +183,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     },
   ];
 
-  constructor() {}
+  constructor(private readonly context: vscode.ExtensionContext) {}
 
   setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
     this.parentView = view;
@@ -184,17 +191,18 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   public async selectBaseline(context: vscode.ExtensionContext) {
     const currentBaseline = context.globalState.get('baseline');
-    if (!currentBaseline) this.baselineOptions[0].picked = true;
-    else {
-      const selectedBaseline = this.baselineOptions.find((o) => o.value === (currentBaseline as string));
-      if (selectedBaseline) selectedBaseline.picked = true;
-    }
 
-    const selected = await vscode.window.showQuickPick(this.baselineOptions, {
+    const optionsWithStatus = this.baselineOptions.map((option) => ({
+      ...option,
+      picked: option.value === currentBaseline,
+      iconPath: option.value === currentBaseline ? new vscode.ThemeIcon('check') : undefined,
+    }));
+
+    const selected = await vscode.window.showQuickPick(optionsWithStatus, {
       placeHolder: 'Select the comparison baseline for the Code Health Monitor',
     });
 
-    if (selected && selected !== currentBaseline) {
+    if (selected && selected.value !== currentBaseline) {
       context.globalState.update('baseline', selected.value);
       this.baselineChangedEmitter.fire();
     }
@@ -211,6 +219,20 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
   }
 
+  private addBaselineInfo() {
+    const baseline = this.context.globalState.get('baseline');
+
+    const data = this.baselineOptions.find((option) => option.value === baseline);
+    const label = `Baseline: ${data?.label}`;
+
+    const treeItem = new vscode.TreeItem(label);
+    treeItem.iconPath = new vscode.ThemeIcon('info');
+    treeItem.tooltip = data?.description;
+    treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
+
+    return new DeltaInfoItem(treeItem);
+  }
+
   private update() {
     if (this.fileIssueMap.size > 0) {
       // const statusItem = this.statusTreeItem();
@@ -221,8 +243,9 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
+      const item = this.addBaselineInfo();
       const aceInfoItem = this.aceSummaryItem(filesWithIssues);
-      this.tree = aceInfoItem ? [aceInfoItem, ...filesWithIssues] : filesWithIssues;
+      this.tree = aceInfoItem ? [item, aceInfoItem, ...filesWithIssues] : [item, ...filesWithIssues];
     } else {
       this.tree = [];
     }

@@ -66,8 +66,7 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startExtension(context: vscode.ExtensionContext) {
-  const baseline = context.globalState.get('baseline');
-  if (!baseline) context.globalState.update('baseline', Baseline.BranchCreation); // Default value
+  initializeBaseline(context);
 
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
@@ -182,6 +181,13 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {}
 
 function disableRemoteFeatures() {}
+
+function initializeBaseline(context: vscode.ExtensionContext) {
+  const baseline = context.globalState.get('baseline');
+  if (!baseline) {
+    context.globalState.update('baseline', Baseline.Default);
+  }
+}
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
