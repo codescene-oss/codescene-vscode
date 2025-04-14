@@ -55,11 +55,50 @@ const repoState = new Map<string, Branch>();
 
 export async function getBaselineCommit(fileUri: Uri): Promise<string | undefined> {
   if (currentBaseline === Baseline.Head) return 'HEAD';
-
+  if (currentBaseline === Baseline.Default) return await getDefaultPoint(fileUri);
   return await getBranchCreationPoint(fileUri);
 }
 
 const execAsync = promisify(exec);
+
+async function getDefaultPoint(fileUri: Uri) {
+  if (!gitApi) return;
+
+  const currentRepo = gitApi.getRepository(fileUri);
+  const repositoryPath = currentRepo?.rootUri.path;
+  if (!repositoryPath) return;
+
+  const defaultBranch = await getDefaultBranchName(repositoryPath);
+  const currentBranch = await getCurrentBranch(repositoryPath);
+
+  if (currentBranch === defaultBranch) {
+    return '';
+  } else {
+    return await getBranchCreationPoint(fileUri);
+  }
+}
+
+async function getCurrentBranch(repositoryPath: string) {
+  const { stdout } = await execAsync(`git rev-parse --abbrev-ref HEAD`, { cwd: repositoryPath });
+
+  return stdout.trim();
+}
+
+async function getDefaultBranchName(repositoryPath: string) {
+  try {
+    const { stdout } = await execAsync(`git remote show origin`, { cwd: repositoryPath });
+    const defaultBranchMatch = stdout.match(/HEAD branch: (.+)/);
+
+    if (defaultBranchMatch) {
+      return defaultBranchMatch[1];
+    } else {
+      return '';
+    }
+  } catch (err) {
+    logOutputChannel.error(`Error occurred while retrieving default branch for repository ${repositoryPath}: ${err}`);
+    return '';
+  }
+}
 
 /**
  * Retrieves the commit hash where the current branch was created from, based on the file URI.
@@ -75,8 +114,10 @@ async function getBranchCreationPoint(fileUri: Uri) {
     const repositoryPath = currentRepo?.rootUri.path;
     if (!repositoryPath) return;
 
-    const { stdout: branchName } = await execAsync(`git rev-parse --abbrev-ref HEAD`, { cwd: repositoryPath });
-    const { stdout: reflog } = await execAsync(`git reflog ${branchName.trim()} --no-abbrev`, { cwd: repositoryPath });
+    const currentBranch = await getCurrentBranch(repositoryPath);
+    const { stdout: reflog } = await execAsync(`git reflog ${currentBranch} --no-abbrev`, {
+      cwd: repositoryPath,
+    });
 
     return reflog
       .split('\n')
