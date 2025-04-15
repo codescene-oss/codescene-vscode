@@ -10,6 +10,19 @@ export interface Review {
    * If file is scorable, this will be a number between 1.0 and 10.0
    */
   score?: number;
+  /**
+   * Optional map with error info about code-health-rules. Present if there were any issues
+   * parsing the rules-file.
+   */
+  'code-health-rules-error'?: CodeHealthRulesError;
+}
+
+export interface CodeHealthRulesError {
+  description: string;
+  /**
+   * How to resolve the error.
+   */
+  remedy: string;
 }
 
 export interface CodeSmell {
