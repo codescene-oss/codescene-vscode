@@ -1,7 +1,6 @@
 import vscode from 'vscode';
 import { Branch, GitExtension, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
-import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { CodeHealthMonitorView } from './tree-view';
 
@@ -15,7 +14,6 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const codeHealthMonitorView = new CodeHealthMonitorView(context);
-  registerCodeLens(context);
   registerCodeHealthDetailsView(context);
 
   const gitApi = gitExtension.getAPI(1);

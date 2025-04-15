@@ -75,7 +75,6 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
       void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails', selection);
-      void vscode.commands.executeCommand('codescene-noace.monitorCodeLens.showForFunction', selection);
     } else {
       // else just clear the view
       void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails');

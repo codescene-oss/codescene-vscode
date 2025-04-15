@@ -3,7 +3,7 @@ import { reviewDocumentSelector } from '../language-support';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
 import { isGeneralDiagnostic } from '../review/utils';
 
-export const csSource = 'CodeScene';
+export const csSource = 'CodeScene'; // Maybe rename this as well?
 
 export default class CsDiagnostics {
   // The collection of diagnostics presented in the Problems tab
