@@ -52,15 +52,6 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
 
     const codeLenses = [];
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
-    if (functionInfo.fnToRefactor) {
-      codeLenses.push(
-        new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
-          title: '$(sparkle) CodeScene ACE',
-          command: 'codescene-noace.requestAndPresentRefactoring',
-          arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
-        })
-      );
-    }
     let order = 1;
     if (!reviewCodeLensesEnabled()) {
       functionInfo.children.forEach((issue) => {

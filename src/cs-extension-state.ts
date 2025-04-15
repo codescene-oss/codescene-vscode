@@ -4,7 +4,6 @@ import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { logOutputChannel } from './log';
-import { RefactoringCapabilities } from './refactoring/capabilities';
 import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
 
@@ -24,11 +23,8 @@ export interface CsFeature {
 type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
-export type AceFeature = CsFeature & { refactorCapabilities?: RefactoringCapabilities };
-
 interface CsFeatures {
   analysis: AnalysisFeature;
-  ace: AceFeature;
 }
 
 export interface CsStateProperties {
@@ -37,7 +33,6 @@ export interface CsStateProperties {
 }
 
 const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
-const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 
 /**
  * This class is used to handle the state of the extension. One part is managing and presenting
@@ -56,7 +51,6 @@ export class CsExtensionState {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
-        ace: { state: 'loading' },
       },
     };
     this.extensionUri = context.extensionUri;
@@ -71,7 +65,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey]);
+    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -88,27 +82,12 @@ export class CsExtensionState {
     await this._instance.context.globalState.update(acceptedTermsAndPoliciesKey, value);
   }
 
-  static get acknowledgedAceUsage() {
-    return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
-  }
-
-  static async setAcknowledgedAceUsage(value?: boolean) {
-    await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
-  }
-
   static get stateProperties() {
     return CsExtensionState._instance.stateProperties;
   }
 
   static get extensionUri(): Uri {
     return CsExtensionState._instance.extensionUri;
-  }
-
-  /**
-   * Returns the preflight response if ACE is enabled, otherwise undefined.
-   */
-  static get aceCapabilities(): RefactoringCapabilities | undefined {
-    return CsExtensionState._instance.stateProperties.features.ace.refactorCapabilities;
   }
 
   /**
@@ -126,8 +105,6 @@ export class CsExtensionState {
   static clearErrors() {
     CsExtensionState.stateProperties.features.analysis.error = undefined;
     CsExtensionState.stateProperties.features.analysis.state = 'enabled';
-    CsExtensionState.stateProperties.features.ace.error = undefined;
-    CsExtensionState.stateProperties.features.ace.state = 'enabled';
     CsExtensionState._instance.updateStatusViews();
   }
 
@@ -172,14 +149,6 @@ export class CsExtensionState {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
       analysis: { state: featureState({ state, error }), error, analysisState },
-    };
-    CsExtensionState._instance.updateStatusViews();
-  }
-
-  static setACEState({ refactorCapabilities, state, error }: AceFeature) {
-    CsExtensionState.stateProperties.features = {
-      ...CsExtensionState.stateProperties.features,
-      ace: { refactorCapabilities, state: featureState({ state, error }), error },
     };
     CsExtensionState._instance.updateStatusViews();
   }

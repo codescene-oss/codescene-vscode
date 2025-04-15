@@ -1,4 +1,3 @@
-import { FnToRefactor } from '../refactoring/capabilities';
 import { Range } from '../review/model';
 import { formatScore } from '../review/utils';
 
@@ -21,9 +20,6 @@ export function scorePresentation(delta: DeltaForFile) {
 export interface FunctionFinding {
   function: FunctionInfo;
   'change-details': ChangeDetail[];
-
-  /* Present if the function finding is deemed refactorable. See Analyser.addRefactorableFunctionsToDeltaResult() */
-  refactorableFn?: FnToRefactor;
 }
 
 export interface ChangeDetail {

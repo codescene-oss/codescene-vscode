@@ -1,6 +1,5 @@
 import vscode from 'vscode';
 import { CsExtensionState, CsStateProperties } from './cs-extension-state';
-import { ACECreditsError } from './refactoring/api';
 import { isDefined } from './utils';
 
 export class CsStatusBar {
@@ -51,9 +50,9 @@ export class CsStatusBar {
   }
 
   private indicateErrors(stateProperties: CsStateProperties) {
-    const { analysis, ace } = stateProperties.features;
+    const { analysis } = stateProperties.features;
 
-    if (analysis.state === 'error' || ace.state === 'error') {
+    if (analysis.state === 'error') {
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       this.statusBarItem.tooltip = 'Show in control center';
@@ -61,19 +60,12 @@ export class CsStatusBar {
       return;
     }
 
-    if (isDefined(analysis.error) || this.reportableAceError(ace.error)) {
+    if (isDefined(analysis.error)) {
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
       this.statusBarItem.tooltip = 'Click to open output log and clear errors.';
       this.statusBarItem.command = 'codescene.extensionState.clearErrors';
       return;
     }
-  }
-
-  /**
-   * Don't report ACE credits errors
-   */
-  private reportableAceError(error?: Error) {
-    return isDefined(error) && !(error instanceof ACECreditsError);
   }
 }

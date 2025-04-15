@@ -9,10 +9,7 @@ import vscode, {
 } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
-import { ACECreditsError } from '../refactoring/api';
-import { AceCredits } from '../refactoring/model';
 import Telemetry from '../telemetry';
-import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
@@ -66,12 +63,15 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
-          .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode')
+          .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode-noace')
           .then(
             () => {},
             (err) => {
               logOutputChannel.info('Not inside a workspace, opening general/user settings instead.');
-              void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+              void vscode.commands.executeCommand(
+                'workbench.action.openSettings',
+                '@ext:codescene.codescene-vscode-noace'
+              );
             }
           );
       },
@@ -207,28 +207,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     }" id="code-health-analysis-badge" title="${meta.error}">${meta.text}</div>
     </div>
     `;
-  }
-
-  private creditBannerContent(creditInfo: AceCredits) {
-    if (!creditInfo.resetTime) return;
-
-    const differenceInDays = Math.floor((creditInfo.resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-    const content = /* html*/ `
-    <div class="out-of-credits-banner">
-      <div class="icon-and-text">
-        <span class="codicon codicon-warning warning"></span>
-        <span class="bold">You're out of ACE credits</span>
-      </div>
-      <p>
-        You'll get new credits in ${differenceInDays} ${pluralize(
-      'day',
-      differenceInDays
-    )}. (${creditInfo.resetTime.toLocaleString()})
-      </p>
-    </div>
-    `;
-    return content;
   }
 
   private moreGroup() {

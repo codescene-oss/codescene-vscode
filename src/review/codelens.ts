@@ -106,17 +106,11 @@ export class CsReviewCodeLensProvider
       return;
     }
 
-    const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, [
-        { category, line: diagnostic.range.start.line + 1 },
-      ])
-    )?.[0];
-
     const title = `$(warning) ${removeDetails(diagnostic.message)}`;
     return {
       title,
       command: 'codescene-noace.openInteractiveDocsPanel',
-      arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codelens (review)'],
+      arguments: [toDocsParams(category, document, diagnostic.range.start), 'codelens (review)'],
     };
   }
 
