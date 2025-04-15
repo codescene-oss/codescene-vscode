@@ -25,14 +25,7 @@
     "code quality",
     "code metrics",
     "cyclomatic complexity",
-    "refactoring",
-    "technical debt",
-    "ai",
-    "anthropic",
-    "openai",
-    "gemini",
-    "gpt",
-    "ai code review"
+    "technical debt"
   ],
   "activationEvents": [
     "onStartupFinished"
