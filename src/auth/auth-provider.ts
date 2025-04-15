@@ -21,7 +21,7 @@ import Telemetry from '../telemetry';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export const AUTH_TYPE = 'codescene';
+export const AUTH_TYPE = 'codescene-noace';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const SESSIONS_STORAGE_KEY = `${AUTH_TYPE}.sessions`;
 

@@ -1,20 +1,19 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
-import { FnToRefactor } from '../refactoring/capabilities';
 import Telemetry from '../telemetry';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'codescene.openInteractiveDocsPanel',
+      'codescene-noace.openInteractiveDocsPanel',
       (params: InteractiveDocsParams, source: string) => {
         Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params.issueInfo.category });
         CodeSceneTabPanel.show(params);
       }
     ),
     // A query param friendly version of openInteractiveDocsPanel
-    vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
+    vscode.commands.registerCommand('codescene-noace.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
       const { category, lineNo, charNo, documentUri } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
       const params: InteractiveDocsParams = {
@@ -23,7 +22,7 @@ export function register(context: vscode.ExtensionContext) {
       };
       CodeSceneTabPanel.show(params);
     }),
-    vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
+    vscode.commands.registerCommand('codescene-noace.openCodeHealthDocs', () => {
       Telemetry.logUsage('openCodeHealthDocs');
       void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
     })
@@ -47,7 +46,6 @@ export interface IssueInfo {
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document: vscode.TextDocument;
-  fnToRefactor?: FnToRefactor;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
@@ -62,7 +60,6 @@ export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsPar
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
   params.issueInfo.fnName = fnInfo?.fnName;
-  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 
@@ -70,9 +67,8 @@ export function toDocsParams(
   category: string,
   document: vscode.TextDocument,
   position?: vscode.Position,
-  fnToRefactor?: FnToRefactor
 ): InteractiveDocsParams {
-  return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
+  return { issueInfo: { category, position }, document };
 }
 
 export function categoryToDocsCode(issueCategory: string) {

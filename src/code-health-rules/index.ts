@@ -6,13 +6,13 @@ import { DevtoolsAPI } from '../devtools-interop/api';
 
 export function register(context: ExtensionContext, devtoolsApi: DevtoolsAPI) {
   context.subscriptions.push(
-    commands.registerCommand('codescene.createRulesTemplate', () => {
+    commands.registerCommand('codescene-noace.createRulesTemplate', () => {
       Telemetry.logUsage('createRulesTemplate');
       createRulesTemplate(devtoolsApi).catch((error: Error) => {
         void window.showErrorMessage(error.message);
       });
     }),
-    commands.registerCommand('codescene.checkRules', () => {
+    commands.registerCommand('codescene-noace.checkRules', () => {
       Telemetry.logUsage('checkRules');
       void checkCodeHealthRules(devtoolsApi);
     })

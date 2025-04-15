@@ -1,10 +1,9 @@
 import vscode from 'vscode';
-import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize, showDocAtPosition } from '../utils';
 import { DeltaAnalyser, DeltaAnalysisEvent } from './analyser';
 import { registerDeltaAnalysisDecorations } from './presentation';
-import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
+import { DeltaFunctionInfo, DeltaTreeViewItem, FileWithIssues } from './tree-model';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -16,7 +15,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
     this.treeDataProvider = new DeltaAnalysisTreeProvider();
 
-    this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
+    this.view = vscode.window.createTreeView('codescene-noace.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
       canSelectMany: false,
@@ -26,10 +25,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
     this.disposables.push(
       this.view,
-      vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
-        this.revealAutoRefactorings()
-      ),
-      vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
+      vscode.commands.registerCommand('codescene-noace.codeHealthMonitorSort', async () => {
         void this.treeDataProvider.selectSortFn();
       }),
       DeltaAnalyser.instance.onDidAnalyse((event) => {
@@ -78,11 +74,10 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
-      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
-      void vscode.commands.executeCommand('codescene.monitorCodeLens.showForFunction', selection);
+      void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails', selection);
     } else {
       // else just clear the view
-      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
+      void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails');
     }
   }
 
@@ -90,20 +85,6 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     if (selection instanceof DeltaFunctionInfo) {
       void showDocAtPosition(selection.parent.document, selection.range?.start);
     }
-  }
-
-  private revealAutoRefactorings() {
-    this.treeDataProvider.tree.forEach((treeItem) => {
-      if (
-        treeItem instanceof FileWithIssues &&
-        treeItem.functionLevelIssues.some((issue) => issue.isRefactoringSupported)
-      ) {
-        this.view.reveal(treeItem, { expand: true, select: false, focus: false }).then(
-          () => {},
-          (error) => logOutputChannel.error(`Failed to reveal auto-refactorings: ${error}`)
-        );
-      }
-    });
   }
 
   isVisible() {
@@ -175,8 +156,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
-      const aceInfoItem = this.aceSummaryItem(filesWithIssues);
-      this.tree = aceInfoItem ? [aceInfoItem, ...filesWithIssues] : filesWithIssues;
+      this.tree = filesWithIssues;
     } else {
       this.tree = [];
     }
@@ -185,8 +165,8 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   syncTree({ document, result }: DeltaAnalysisEvent) {
     const evtData = (fileWithIssues: FileWithIssues) => {
-      const { nIssues, nRefactorableFunctions, scoreChange } = fileWithIssues;
-      return { visible: this.parentView?.visible, scoreChange, nIssues, nRefactorableFunctions };
+      const { nIssues, scoreChange } = fileWithIssues;
+      return { visible: this.parentView?.visible, scoreChange, nIssues };
     };
 
     // Find the tree item matching the event document
@@ -209,23 +189,6 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
 
     this.update();
-  }
-
-  private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
-    const refactorings = refactoringsCount(filesWithIssues);
-    if (refactorings === 0) {
-      return;
-    }
-    const label = `${refactorings} ${pluralize('auto-refactoring', refactorings)} available`;
-    const tooltip = `Click to expand available refactorings`;
-    const aceTreeItem = new vscode.TreeItem(label);
-    aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
-    aceTreeItem.tooltip = tooltip;
-    aceTreeItem.command = {
-      command: 'codescene.codeHealthMonitor.revealAutoRefactorings',
-      title: 'Expand Auto-Refactorings',
-    };
-    return new DeltaInfoItem(aceTreeItem);
   }
 
   getTreeItem(element: DeltaTreeViewItem): vscode.TreeItem {

@@ -7,7 +7,7 @@ export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContex
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new FileWithIssuesDecorationProvider()));
 }
 
-const fileWithIssuesScheme = 'codescene-file-with-issues';
+const fileWithIssuesScheme = 'codescene-noace-file-with-issues';
 
 class FileWithIssuesDecorationProvider implements vscode.FileDecorationProvider {
   provideFileDecoration(

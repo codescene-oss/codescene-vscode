@@ -1,12 +1,10 @@
 import vscode from 'vscode';
 import { Branch, GitExtension, Repository } from '../../types/git';
-import { AceAPI } from '../refactoring/addon';
 import Reviewer from '../review/reviewer';
-import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { CodeHealthMonitorView } from './tree-view';
 
-export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
+export function activate(context: vscode.ExtensionContext) {
   const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
   if (!gitExtension) {
     void vscode.window.showErrorMessage(
@@ -16,7 +14,6 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   }
 
   const codeHealthMonitorView = new CodeHealthMonitorView(context);
-  registerCodeLens(context);
   registerCodeHealthDetailsView(context);
 
   const gitApi = gitExtension.getAPI(1);
@@ -25,7 +22,7 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   context.subscriptions.push(
     codeHealthMonitorView,
     ...repoStateListeners,
-    vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
+    vscode.commands.registerCommand('codescene-noace.codeHealthMonitorHelp', () => {
       void vscode.commands.executeCommand(
         'markdown.showPreviewToSide',
         vscode.Uri.parse(`csdoc:code-health-monitor.md`)

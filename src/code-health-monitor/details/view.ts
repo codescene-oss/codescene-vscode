@@ -1,6 +1,5 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Webview, WebviewViewProvider } from 'vscode';
-import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
@@ -10,8 +9,8 @@ import { DeltaFunctionInfo, sortIssues } from '../tree-model';
 export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('codescene.codeHealthDetailsView', viewProvider),
-    vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
+    vscode.window.registerWebviewViewProvider('codescene-noace.codeHealthDetailsView', viewProvider),
+    vscode.commands.registerCommand('codescene-noace.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
       viewProvider.update(functionInfo)
     )
   );
@@ -57,19 +56,11 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private messageHandler(message: any) {
     switch (message.command) {
-      case 'request-and-present-refactoring':
-        void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
-          this.functionInfo?.parent.document,
-          'code-health-details',
-          this.functionInfo?.fnToRefactor
-        );
-        return;
       case 'interactive-docs':
         const issue = this.functionInfo?.children[message.issueIndex];
         if (issue) {
           void vscode.commands.executeCommand(
-            'codescene.openInteractiveDocsPanel',
+            'codescene-noace.openInteractiveDocsPanel',
             issueToDocsParams(issue, this.functionInfo),
             'code-health-details'
           );
@@ -118,10 +109,10 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     let content = '';
     if (functionInfo) {
       content = this.functionInfoContent(functionInfo);
-      const { isRefactoringSupported, children } = functionInfo;
+      const { children } = functionInfo;
       Telemetry.logUsage('code-health-details/function-selected', {
         visible: this.view?.visible,
-        isRefactoringSupported,
+        isRefactoringSupported: false,
         nIssues: children.length,
       });
     } else {
@@ -139,9 +130,6 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   private functionInfoContent(functionInfo: DeltaFunctionInfo) {
     return `
     ${this.fileAndCodeSmellSummary(functionInfo)}
-    <div class="block">
-      ${refactoringButton(functionInfo.fnToRefactor)}
-    </div>
     ${this.issueDetails(functionInfo)}
     `;
   }

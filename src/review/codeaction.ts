@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
-import { CsExtensionState } from '../cs-extension-state';
 import { toDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
-import { RefactoringTarget } from '../refactoring/capabilities';
-import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { getCsDiagnosticCode } from './utils';
 
@@ -34,31 +31,6 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     const actions: vscode.CodeAction[] = [];
     const diagnosticsInRange = diagnostics.filter((diagnostic) => diagnostic.range.contains(range));
 
-    const refactoringTargets = diagnosticsInRange
-      .map((diagnostic) => {
-        const category = getCsDiagnosticCode(diagnostic.code);
-        if (!category) return;
-        return {
-          category,
-          line: diagnostic.range.start.line + 1,
-        } as RefactoringTarget;
-      })
-      .filter(isDefined);
-
-    const fnToRefactor = (
-      await CsExtensionState.aceCapabilities?.getFunctionsToRefactor(document, refactoringTargets)
-    )?.[0];
-
-    if (fnToRefactor) {
-      const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
-      refactorAction.command = {
-        command: 'codescene.requestAndPresentRefactoring',
-        title: 'Refactor using CodeScene ACE',
-        arguments: [document, 'codeaction', fnToRefactor],
-      };
-      actions.push(refactorAction);
-    }
-
     diagnosticsInRange.forEach((diagnostic) => {
       const category = getCsDiagnosticCode(diagnostic.code);
       if (!category) return;
@@ -66,9 +38,9 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
       action.diagnostics = [diagnostic];
       action.command = {
-        command: 'codescene.openInteractiveDocsPanel',
+        command: 'codescene-noace.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codeaction'],
+        arguments: [toDocsParams(category, document, diagnostic.range.start), 'codeaction'],
       };
       actions.push(action);
     });

@@ -1,8 +1,7 @@
 import vscode from 'vscode';
 import { issueToDocsParams } from '../documentation/commands';
-import { FnToRefactor } from '../refactoring/capabilities';
 import { vscodeRange } from '../review/utils';
-import { isDefined, pluralize, round } from '../utils';
+import { pluralize, round } from '../utils';
 import { DeltaAnalysisState } from './analyser';
 import {
   ChangeDetail,
@@ -30,16 +29,6 @@ export function countInTree(
       return prev + (fn(curr.changeDetail['change-type']) ? 1 : 0);
     }
     return prev + (curr.children ? countInTree(curr.children, fn) : 0);
-  }, 0);
-}
-
-export function refactoringsCount(tree: Array<DeltaTreeViewItem | DeltaAnalysisState>): number {
-  return tree.reduce((prev, curr) => {
-    if (typeof curr === 'string') return prev;
-    if (curr instanceof DeltaFunctionInfo) {
-      return prev + (curr.isRefactoringSupported ? 1 : 0);
-    }
-    return prev + (curr.children ? refactoringsCount(curr.children) : 0);
   }, 0);
 }
 
@@ -94,10 +83,6 @@ export class FileWithIssues implements DeltaTreeViewItem {
     return this.fileLevelIssues.length + this.functionLevelIssues.length;
   }
 
-  get nRefactorableFunctions() {
-    return this.functionLevelIssues.filter((fn) => fn.isRefactoringSupported).length;
-  }
-
   get scoreChange() {
     return this.deltaForFile['score-change'];
   }
@@ -114,7 +99,7 @@ export class FileWithIssues implements DeltaTreeViewItem {
     // Remove these from the tree, and show in file level details view later
     // this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
     this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
-      const functionInfo = new DeltaFunctionInfo(this, finding.function, finding.refactorableFn);
+      const functionInfo = new DeltaFunctionInfo(this, finding.function);
       finding['change-details'].forEach((changeDetail) =>
         functionInfo.children.push(new DeltaIssue(functionInfo, changeDetail))
       );
@@ -149,7 +134,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly range?: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
-  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo, public fnToRefactor?: FnToRefactor) {
+  constructor(readonly parent: FileWithIssues, fnMeta: FunctionInfo) {
     this.fnName = fnMeta.name;
     this.range = vscodeRange(fnMeta.range);
   }
@@ -157,7 +142,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(this.fnName, vscode.TreeItemCollapsibleState.None);
     item.iconPath = this.iconPath;
-    item.description = this.isRefactoringSupported ? 'Auto-Refactor' : undefined;
     item.tooltip = this.tooltip();
 
     return item;
@@ -185,13 +169,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
     const fixed = countInTree(this.children, (t: ChangeType) => t === 'fixed');
     fixed && tips.push(`${fixed} ${pluralize('issue', issues)} fixed`);
 
-    this.isRefactoringSupported && tips.push('Auto-refactor available');
-
     return tips.join(' • ');
-  }
-
-  public get isRefactoringSupported() {
-    return isDefined(this.fnToRefactor);
   }
 }
 
@@ -217,7 +195,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
     item.tooltip = this.changeDetail.description;
     const fnInfo = this.parent instanceof DeltaFunctionInfo ? this.parent : undefined;
     item.command = {
-      command: 'codescene.openInteractiveDocsPanel',
+      command: 'codescene-noace.openInteractiveDocsPanel',
       title: 'Open interactive documentation',
       arguments: [issueToDocsParams(this, fnInfo), 'code-health-tree-view'],
     };
@@ -244,11 +222,6 @@ export function sortFnInfo(a: DeltaFunctionInfo, b: DeltaFunctionInfo) {
   // If one of the items has an undefined range, sort it last (functions with fixed issues might have null range)
   if (!a.range) return 1;
   if (!b.range) return -1;
-
-  // Refactorability first
-  const aRef = a.isRefactoringSupported ? -1 : 1;
-  const bRef = b.isRefactoringSupported ? -1 : 1;
-  if (aRef !== bRef) return aRef - bRef;
 
   // Then by child change detail status.
   const aChangeDetailsStatus = avgChangeDetailOrder(a);

@@ -1,12 +1,9 @@
 import vscode from 'vscode';
 import { AnalysisEvent } from '../analysis-common';
-import { CsExtensionState } from '../cs-extension-state';
 import { LimitingExecutor } from '../executor';
 import { logOutputChannel } from '../log';
-import { RefactoringTarget } from '../refactoring/capabilities';
-import { vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
-import { DeltaForFile, hasImprovementOpportunity } from './model';
+import { DeltaForFile } from './model';
 
 export type DeltaAnalysisEvent = AnalysisEvent & { document: vscode.TextDocument; result?: DeltaForFile };
 export type DeltaAnalysisState = 'running' | 'failed' | 'no-issues-found';
@@ -104,44 +101,9 @@ export class DeltaAnalyser {
         return;
       }
       deltaForFile = JSON.parse(stdout) as DeltaForFile;
-      await this.addRefactorableFunctionsToDeltaResult(document, deltaForFile);
       this.endAnalysisEvent(document, deltaForFile);
       return deltaForFile;
     }
-  }
-
-  /**
-   * NOTE - Mutates the delta result by adding info about refactorable functions to the 'function-level-findings' list.
-   */
-  private async addRefactorableFunctionsToDeltaResult(document: vscode.TextDocument, deltaForFile: DeltaForFile) {
-    const aceCapabilities = CsExtensionState.aceCapabilities;
-    if (!aceCapabilities) return;
-
-    const refactoringTargets: RefactoringTarget[] = deltaForFile['function-level-findings'].flatMap((finding) => {
-      return finding['change-details']
-        .filter((changeDetail) => hasImprovementOpportunity(changeDetail['change-type']))
-        .map((changeDetail) => {
-          if (!changeDetail.line) return;
-          return {
-            line: changeDetail.line,
-            category: changeDetail.category,
-          };
-        })
-        .filter(isDefined);
-    });
-
-    const functionsToRefactor = await aceCapabilities.getFunctionsToRefactor(document, refactoringTargets);
-    if (!functionsToRefactor) return;
-
-    // Add a refactorableFn property to the findings that matches function name and range
-    deltaForFile['function-level-findings'].forEach((finding) => {
-      const findingRange = vscodeRange(finding.function.range);
-      if (!findingRange) return;
-      const refactorableFunctionForFinding = functionsToRefactor.find(
-        (fn) => fn.name === finding.function.name && fn.range.intersection(findingRange)
-      );
-      finding.refactorableFn = refactorableFunctionForFinding;
-    });
   }
 }
 

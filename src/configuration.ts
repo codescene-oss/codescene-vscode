@@ -2,12 +2,12 @@ import * as vscode from 'vscode';
 import { logOutputChannel } from './log';
 
 export function getConfiguration<T>(section: string, defaultValue?: T): T | undefined {
-  if (!defaultValue) return vscode.workspace.getConfiguration('codescene').get<T>(section);
-  return vscode.workspace.getConfiguration('codescene').get<T>(section, defaultValue);
+  if (!defaultValue) return vscode.workspace.getConfiguration('codescene-noace').get<T>(section);
+  return vscode.workspace.getConfiguration('codescene-noace').get<T>(section, defaultValue);
 }
 
 export function setConfiguration(section: string, value: any) {
-  const codesceneConfig = vscode.workspace.getConfiguration('codescene');
+  const codesceneConfig = vscode.workspace.getConfiguration('codescene-noace');
   codesceneConfig.update(section, value).then(
     () => {},
     (err) => {
@@ -21,7 +21,7 @@ export function onDidChangeConfiguration(
   listener: (e: { event: vscode.ConfigurationChangeEvent; value: any }) => any
 ) {
   return vscode.workspace.onDidChangeConfiguration((e) => {
-    if (e.affectsConfiguration('codescene.' + section)) {
+    if (e.affectsConfiguration('codescene-noace.' + section)) {
       listener({ event: e, value: getConfiguration(section) });
     }
   });
