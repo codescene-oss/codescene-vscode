@@ -28,7 +28,7 @@ export function reportError(pre: string, error: Error) {
   delete error.stack;
   logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
   void vscode.window.showErrorMessage(message);
-  void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+  void vscode.commands.executeCommand('codescene-noace.controlCenterView.focus');
 }
 
 export function pluralize(noun: string, count: number) {

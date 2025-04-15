@@ -2,9 +2,9 @@ import { DocumentSelector, languages, Range, TextDocument } from 'vscode';
 import { DevtoolsAPI } from '../devtools-interop/api';
 import { EnclosingFn } from '../devtools-interop/model';
 import { logOutputChannel } from '../log';
-import { PreFlightResponse, RefactorSupport } from './model';
-import { RefactoringRequest } from './request';
 import { getFileExtension } from '../utils';
+import { PreFlightResponse } from './model';
+import { RefactoringRequest } from './request';
 
 export interface FnToRefactor {
   name: string;

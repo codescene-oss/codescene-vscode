@@ -217,7 +217,7 @@ export class DeltaIssue implements DeltaTreeViewItem {
     item.tooltip = this.changeDetail.description;
     const fnInfo = this.parent instanceof DeltaFunctionInfo ? this.parent : undefined;
     item.command = {
-      command: 'codescene.openInteractiveDocsPanel',
+      command: 'codescene-noace.openInteractiveDocsPanel',
       title: 'Open interactive documentation',
       arguments: [issueToDocsParams(this, fnInfo), 'code-health-tree-view'],
     };

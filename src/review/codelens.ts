@@ -70,7 +70,7 @@ export class CsReviewCodeLensProvider
     if (isDefined(delta)) {
       codeLens.command = {
         title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
-        command: 'codescene.codeHealthMonitorView.focus',
+        command: 'codescene-noace.codeHealthMonitorView.focus',
       };
       return codeLens;
     } else {
@@ -115,7 +115,7 @@ export class CsReviewCodeLensProvider
     const title = `$(warning) ${removeDetails(diagnostic.message)}`;
     return {
       title,
-      command: 'codescene.openInteractiveDocsPanel',
+      command: 'codescene-noace.openInteractiveDocsPanel',
       arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codelens (review)'],
     };
   }

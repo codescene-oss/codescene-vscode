@@ -16,7 +16,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
     this.treeDataProvider = new DeltaAnalysisTreeProvider();
 
-    this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
+    this.view = vscode.window.createTreeView('codescene-noace.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
       showCollapseAll: true,
       canSelectMany: false,
@@ -26,10 +26,10 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
     this.disposables.push(
       this.view,
-      vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
+      vscode.commands.registerCommand('codescene-noace.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
       ),
-      vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
+      vscode.commands.registerCommand('codescene-noace.codeHealthMonitorSort', async () => {
         void this.treeDataProvider.selectSortFn();
       }),
       DeltaAnalyser.instance.onDidAnalyse((event) => {
@@ -78,11 +78,11 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
-      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
-      void vscode.commands.executeCommand('codescene.monitorCodeLens.showForFunction', selection);
+      void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails', selection);
+      void vscode.commands.executeCommand('codescene-noace.monitorCodeLens.showForFunction', selection);
     } else {
       // else just clear the view
-      void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
+      void vscode.commands.executeCommand('codescene-noace.codeHealthDetailsView.showDetails');
     }
   }
 
@@ -222,7 +222,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
     aceTreeItem.tooltip = tooltip;
     aceTreeItem.command = {
-      command: 'codescene.codeHealthMonitor.revealAutoRefactorings',
+      command: 'codescene-noace.codeHealthMonitor.revealAutoRefactorings',
       title: 'Expand Auto-Refactorings',
     };
     return new DeltaInfoItem(aceTreeItem);

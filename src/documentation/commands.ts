@@ -7,14 +7,14 @@ import Telemetry from '../telemetry';
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'codescene.openInteractiveDocsPanel',
+      'codescene-noace.openInteractiveDocsPanel',
       (params: InteractiveDocsParams, source: string) => {
         Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params.issueInfo.category });
         CodeSceneTabPanel.show(params);
       }
     ),
     // A query param friendly version of openInteractiveDocsPanel
-    vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
+    vscode.commands.registerCommand('codescene-noace.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
       const { category, lineNo, charNo, documentUri } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
       const params: InteractiveDocsParams = {
@@ -23,7 +23,7 @@ export function register(context: vscode.ExtensionContext) {
       };
       CodeSceneTabPanel.show(params);
     }),
-    vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
+    vscode.commands.registerCommand('codescene-noace.openCodeHealthDocs', () => {
       Telemetry.logUsage('openCodeHealthDocs');
       void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
     })

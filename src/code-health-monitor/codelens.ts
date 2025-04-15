@@ -8,10 +8,10 @@ export function register(context: vscode.ExtensionContext) {
   const codeLensProvider = new CodeHealthMonitorCodeLens();
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider),
-    vscode.commands.registerCommand('codescene.monitorCodeLens.showForFunction', (functionInfo: DeltaFunctionInfo) => {
+    vscode.commands.registerCommand('codescene-noace.monitorCodeLens.showForFunction', (functionInfo: DeltaFunctionInfo) => {
       codeLensProvider.showFor(functionInfo);
     }),
-    vscode.commands.registerCommand('codescene.monitorCodeLens.dismiss', (documentUri: Uri) => {
+    vscode.commands.registerCommand('codescene-noace.monitorCodeLens.dismiss', (documentUri: Uri) => {
       codeLensProvider.dismiss(documentUri);
     })
   );
@@ -56,7 +56,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
       codeLenses.push(
         new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
           title: '$(sparkle) CodeScene ACE',
-          command: 'codescene.requestAndPresentRefactoring',
+          command: 'codescene-noace.requestAndPresentRefactoring',
           arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
         })
       );
@@ -68,7 +68,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         codeLenses.push(
           new vscode.CodeLens(this.lensRange(issue.position, order++), {
             title: `$(warning) ${issue.changeDetail.category}`,
-            command: 'codescene.openInteractiveDocsPanel',
+            command: 'codescene-noace.openInteractiveDocsPanel',
             arguments: [issueToDocsParams(issue, functionInfo), 'codelens (code-health-monitor)'],
           })
         );
@@ -82,7 +82,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         ),
         {
           title: '$(circle-slash) Dismiss',
-          command: 'codescene.monitorCodeLens.dismiss',
+          command: 'codescene-noace.monitorCodeLens.dismiss',
           arguments: [functionInfo.parent.document.uri],
         }
       )

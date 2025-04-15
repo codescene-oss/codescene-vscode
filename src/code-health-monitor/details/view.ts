@@ -10,8 +10,8 @@ import { DeltaFunctionInfo, sortIssues } from '../tree-model';
 export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('codescene.codeHealthDetailsView', viewProvider),
-    vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
+    vscode.window.registerWebviewViewProvider('codescene-noace.codeHealthDetailsView', viewProvider),
+    vscode.commands.registerCommand('codescene-noace.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
       viewProvider.update(functionInfo)
     )
   );
@@ -59,7 +59,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     switch (message.command) {
       case 'request-and-present-refactoring':
         void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
+          'codescene-noace.requestAndPresentRefactoring',
           this.functionInfo?.parent.document,
           'code-health-details',
           this.functionInfo?.fnToRefactor
@@ -69,7 +69,7 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
         const issue = this.functionInfo?.children[message.issueIndex];
         if (issue) {
           void vscode.commands.executeCommand(
-            'codescene.openInteractiveDocsPanel',
+            'codescene-noace.openInteractiveDocsPanel',
             issueToDocsParams(issue, this.functionInfo),
             'code-health-details'
           );

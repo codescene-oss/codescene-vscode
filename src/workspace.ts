@@ -20,15 +20,15 @@ export class CsWorkspace {
   }
 
   getProjectId(): number | undefined {
-    return this.context.workspaceState.get('codescene.projectId');
+    return this.context.workspaceState.get('codescene-noace.projectId');
   }
 
   /**
    * Updates the codescene.isWorkspaceAssociated context variable. This can be used in package.json to conditionally enable/disable views.
    */
   updateIsWorkspaceAssociatedContext(projectId: number | undefined) {
-    void this.context.workspaceState.update('codescene.projectId', projectId);
-    void vscode.commands.executeCommand('setContext', 'codescene.isWorkspaceAssociated', projectId !== undefined);
+    void this.context.workspaceState.update('codescene-noace.projectId', projectId);
+    void vscode.commands.executeCommand('setContext', 'codescene-noace.isWorkspaceAssociated', projectId !== undefined);
     this.projectAssociationChangedEmitter.fire(undefined);
   }
 

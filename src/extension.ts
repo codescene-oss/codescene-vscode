@@ -3,7 +3,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor } from './code-health-monitor/addon';
 import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { register as registerCHRulesCommands } from './code-health-rules';
-import { getConfiguration, onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
+import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
 import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-interop/api';
@@ -13,7 +13,6 @@ import { register as registerCsDocProvider } from './documentation/csdoc-provide
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
-import { AceAPI, activate as activateAce } from './refactoring/addon';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -28,7 +27,6 @@ import debounce = require('lodash.debounce');
 interface CsContext {
   csWorkspace: CsWorkspace;
   devtoolsApi: DevtoolsAPI;
-  aceApi: AceAPI;
 }
 
 /**
@@ -71,28 +69,20 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
     devtoolsApi,
-    aceApi: activateAce(context, devtoolsApi),
   };
   CsServerVersion.init();
 
-  CsExtensionState.addListeners(context, csContext.aceApi);
-  csContext.aceApi.onDidChangeState((event) => {
-    CsExtensionState.setACEState(event);
-    if (event.state === 'enabled' || event.state === 'disabled') {
-      Reviewer.instance.refreshDeltas();
-    }
-  });
+  CsExtensionState.addListeners(context);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
-  void vscode.commands.executeCommand('codescene.ace.activate');
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
   setupStatsCollector(context);
 
-  activateCHMonitor(context, csContext.aceApi);
+  activateCHMonitor(context);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
@@ -100,22 +90,6 @@ async function startExtension(context: vscode.ExtensionContext, devtoolsApi: Dev
   context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
 
   registerCodeActionProvider(context);
-
-  // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedEnableAce = debounce(() => {
-    void vscode.commands.executeCommand('codescene.ace.activate');
-  }, 500);
-  context.subscriptions.push(
-    onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedEnableAce();
-    })
-  );
-
-  context.subscriptions.push(
-    onDidChangeConfiguration('devtoolsPortalUrl', (e) => {
-      debouncedEnableAce();
-    })
-  );
 }
 
 /**
@@ -127,7 +101,7 @@ function finalizeActivation(ccProvider: ControlCenterViewProvider) {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('on_activate_extension');
   ccProvider.sendStartupTelemetry();
-  void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
+  void vscode.commands.executeCommand('setContext', 'codescene-noace.asyncActivationFinished', true);
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
@@ -135,7 +109,7 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   registerTermsAndPoliciesCmds(context);
   registerDocumentationCommands(context);
 
-  const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
+  const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene-noace.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
   });
   context.subscriptions.push(toggleReviewCodeLensesCmd);
@@ -201,7 +175,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 
   // Register manual sign in command
   context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.signIn', async () => {
+    vscode.commands.registerCommand('codescene-noace.signIn', async () => {
       vscode.authentication
         .getSession(AUTH_TYPE, [], { createIfNone: true })
         .then(onGetSessionSuccess(context, csContext), onGetSessionError());

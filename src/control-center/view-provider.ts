@@ -17,7 +17,7 @@ import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
   const provider = new ControlCenterViewProvider();
-  context.subscriptions.push(window.registerWebviewViewProvider('codescene.controlCenterView', provider));
+  context.subscriptions.push(window.registerWebviewViewProvider('codescene-noace.controlCenterView', provider));
   return provider;
 }
 
@@ -63,11 +63,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     const commands: { [key: string]: () => void } = {
       openAiPricing: () => this.openLink('https://codescene.com/product/ai-coding#pricing'),
       showLogOutput: () => logOutputChannel.show(),
-      retryAce: () => {
-        logOutputChannel.show();
-        logOutputChannel.info('Retrying ACE activation...');
-        void vscode.commands.executeCommand('codescene.ace.activate');
-      },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
@@ -165,7 +160,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     <div class="group">
         <div class="header">STATUS</div>
         ${this.codeHealthAnalysisRow()}
-        ${this.aceStatusRow()}
     </div>  
     `;
   }
@@ -212,59 +206,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       meta.text === 'error' ? 'clickable' : ''
     }" id="code-health-analysis-badge" title="${meta.error}">${meta.text}</div>
     </div>
-    `;
-  }
-
-  private aceStatusRow() {
-    const aceFeature = CsExtensionState.stateProperties.features.ace;
-
-    let iconClass = 'codicon-sparkle',
-      text = '',
-      tooltip,
-      outOfCreditsBanner;
-
-    switch (aceFeature.state) {
-      case 'loading':
-        iconClass = 'codicon-loading codicon-modifier-spin';
-        text = 'initializing';
-        break;
-      case 'enabled':
-        iconClass = 'codicon-sparkle';
-        text = 'activated';
-        break;
-      case 'disabled':
-        iconClass = 'codicon-circle-slash';
-        text = 'deactivated';
-        tooltip = 'Disabled in configuration';
-        break;
-      case 'error':
-        iconClass = 'codicon-error';
-        tooltip = 'Click to retry connecting to CodeScene ACE';
-        text = 'error';
-        break;
-    }
-
-    // Custom presentation if we're out of credits
-    if (aceFeature.error instanceof ACECreditsError) {
-      text = 'out of credits';
-      outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
-    }
-
-    // Always in error if analysis error (fail to init or other error)
-    if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
-      iconClass = 'codicon-error';
-      text = 'error';
-    }
-
-    return /*html*/ `
-        <div class="row">
-            <div class="icon-and-text"><span class="codicon ${iconClass}"></span><span>CodeScene ACE</span></div>
-            <div class="badge badge-${text} ${text === 'error' ? 'clickable' : ''}" 
-              id="ace-badge"
-              title="${tooltip ? tooltip : ''}">${text}
-            </div>
-        </div>
-        ${outOfCreditsBanner ? outOfCreditsBanner : ''}
     `;
   }
 

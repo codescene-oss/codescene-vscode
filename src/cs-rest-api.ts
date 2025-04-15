@@ -33,7 +33,7 @@ export class CsRestApi {
 
   static get instance() {
     if (!CsRestApi._instance) {
-      const extension = vscode.extensions.getExtension('codescene.codescene-vscode');
+      const extension = vscode.extensions.getExtension('codescene.codescene-vscode-noace');
       if (!extension) {
         const msg = 'Could not initiate Rest API!';
         logOutputChannel.error(msg);

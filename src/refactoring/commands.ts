@@ -13,12 +13,12 @@ export class CsRefactoringCommands implements vscode.Disposable {
   constructor() {
     this.disposables.push(
       vscode.commands.registerCommand(
-        'codescene.requestAndPresentRefactoring',
+        'codescene-noace.requestAndPresentRefactoring',
         this.requestAndPresentRefactoringCmd,
         this
       ),
-      vscode.commands.registerCommand('codescene.applyRefactoring', this.applyRefactoringCmd, this),
-      vscode.commands.registerCommand('codescene.showDiffForRefactoring', this.showDiffForRefactoringCmd, this)
+      vscode.commands.registerCommand('codescene-noace.applyRefactoring', this.applyRefactoringCmd, this),
+      vscode.commands.registerCommand('codescene-noace.showDiffForRefactoring', this.showDiffForRefactoringCmd, this)
     );
   }
 

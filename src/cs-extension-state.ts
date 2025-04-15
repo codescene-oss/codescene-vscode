@@ -4,7 +4,6 @@ import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { logOutputChannel } from './log';
-import { AceAPI } from './refactoring/addon';
 import { RefactoringCapabilities } from './refactoring/capabilities';
 import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
@@ -62,7 +61,7 @@ export class CsExtensionState {
     };
     this.extensionUri = context.extensionUri;
     context.subscriptions.push(
-      vscode.commands.registerCommand('codescene.extensionState.clearErrors', () => {
+      vscode.commands.registerCommand('codescene-noace.extensionState.clearErrors', () => {
         CsExtensionState.clearErrors();
         logOutputChannel.show();
       })
@@ -115,26 +114,12 @@ export class CsExtensionState {
   /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners(context: vscode.ExtensionContext, aceApi: AceAPI) {
+  static addListeners(context: vscode.ExtensionContext) {
     context.subscriptions.push(
       Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
       Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
       DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
       DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
-    );
-    context.subscriptions.push(
-      aceApi.onDidRequestFail((error) => {
-        CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
-      }),
-      aceApi.onDidRefactoringRequest(async (evt) => {
-        if (evt.type === 'end') {
-          try {
-            await evt.request.promise;
-            // Reset error state when a request succeeds again
-            CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
-          } catch (error) {}
-        }
-      })
     );
   }
 
@@ -168,7 +153,7 @@ export class CsExtensionState {
    */
   static setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
-    void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
+    void vscode.commands.executeCommand('setContext', 'codescene-noace.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...

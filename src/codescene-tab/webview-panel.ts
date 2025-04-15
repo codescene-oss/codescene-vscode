@@ -125,7 +125,7 @@ export class CodeSceneTabPanel implements Disposable {
         await CsExtensionState.setAcknowledgedAceUsage(true);
         Telemetry.logUsage('ace-info/acknowledged');
         void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
+          'codescene-noace.requestAndPresentRefactoring',
           ackParams.document,
           'ace-acknowledgement',
           ackParams.fnToRefactor
@@ -148,7 +148,7 @@ export class CodeSceneTabPanel implements Disposable {
         );
       },
       apply: async () => {
-        vscode.commands.executeCommand('codescene.applyRefactoring', refactoring).then(
+        vscode.commands.executeCommand('codescene-noace.applyRefactoring', refactoring).then(
           () => {
             this.dispose();
           },
@@ -165,7 +165,7 @@ export class CodeSceneTabPanel implements Disposable {
       },
       retry: async () => {
         await vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
+          'codescene-noace.requestAndPresentRefactoring',
           refactoring.document,
           'retry',
           refactoring.fnToRefactor,
@@ -177,7 +177,7 @@ export class CodeSceneTabPanel implements Disposable {
         await this.copyCode(refactoring);
       },
       showDiff: () => {
-        void vscode.commands.executeCommand('codescene.showDiffForRefactoring', refactoring);
+        void vscode.commands.executeCommand('codescene-noace.showDiffForRefactoring', refactoring);
       },
       showLogoutput: () => {
         logOutputChannel.show();
@@ -210,7 +210,7 @@ export class CodeSceneTabPanel implements Disposable {
         return;
       case 'request-and-present-refactoring':
         void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
+          'codescene-noace.requestAndPresentRefactoring',
           params.document,
           'interactive-docs',
           params.fnToRefactor

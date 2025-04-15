@@ -52,7 +52,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     if (fnToRefactor) {
       const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
       refactorAction.command = {
-        command: 'codescene.requestAndPresentRefactoring',
+        command: 'codescene-noace.requestAndPresentRefactoring',
         title: 'Refactor using CodeScene ACE',
         arguments: [document, 'codeaction', fnToRefactor],
       };
@@ -66,7 +66,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       const action = new vscode.CodeAction(title, vscode.CodeActionKind.Empty);
       action.diagnostics = [diagnostic];
       action.command = {
-        command: 'codescene.openInteractiveDocsPanel',
+        command: 'codescene-noace.openInteractiveDocsPanel',
         title,
         arguments: [toDocsParams(category, document, diagnostic.range.start, fnToRefactor), 'codeaction'],
       };

@@ -1,11 +1,11 @@
 {
-  "name": "codescene-vscode",
+  "name": "codescene-vscode-noace",
   "repository": {
     "type": "git",
-    "url": "https://github.com/codescene-oss/codescene-vscode.git"
+    "url": "https://github.com/codescene-oss/codescene-vscode-noace.git"
   },
   "icon": "assets/cs-logo.png",
-  "displayName": "CodeScene",
+  "displayName": "CodeScene w/o ACE",
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
@@ -41,82 +41,82 @@
   "contributes": {
     "commands": [
       {
-        "command": "codescene.createRulesTemplate",
+        "command": "codescene-noace.createRulesTemplate",
         "title": "CodeScene: Create Rules Template"
       },
       {
-        "command": "codescene.checkRules",
+        "command": "codescene-noace.checkRules",
         "title": "CodeScene: Check code health rule match for selected file",
-        "when": "codescene.asyncActivationFinished"
+        "when": "codescene-noace.asyncActivationFinished"
       },
       {
-        "command": "codescene.codeHealthMonitorHelp",
+        "command": "codescene-noace.codeHealthMonitorHelp",
         "title": "CodeScene: Code Health Monitoring help",
         "icon": "$(question)"
       },
       {
-        "command": "codescene.codeHealthMonitorSort",
+        "command": "codescene-noace.codeHealthMonitorSort",
         "title": "Sort files by...",
         "icon": "$(sort-precedence)"
       },
       {
-        "command": "codescene.openCodeHealthDocs",
+        "command": "codescene-noace.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },
       {
-        "command": "codescene.toggleReviewCodeLenses",
+        "command": "codescene-noace.toggleReviewCodeLenses",
         "title": "CodeScene: Toggle Review CodeLenses"
       },
       {
-        "command": "codescene.showLogOutput",
+        "command": "codescene-noace.showLogOutput",
         "title": "CodeScene: Show output log"
       },
       {
-        "command": "codescene.signIn",
+        "command": "codescene-noace.signIn",
         "title": "CodeScene: Sign in to CodeScene (see Server Url setting)"
       },
       {
-        "command": "codescene.revokeTerms",
+        "command": "codescene-noace.revokeTerms",
         "title": "CodeScene: Revoke Terms and Policies agreement"
       },
       {
-        "command": "codescene.revokeAceAcknowledgement",
+        "command": "codescene-noace.revokeAceAcknowledgement",
         "title": "CodeScene: Revoke acknowledging ACE usage"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "codescene-activity-bar",
+          "id": "codescene-noace-activity-bar",
           "title": "CodeScene",
           "icon": "$(cs-logo)"
         }
       ]
     },
     "views": {
-      "codescene-activity-bar": [
+      "codescene-noace-activity-bar": [
         {
-          "id": "codescene.statusView",
+          "id": "codescene-noace.statusView",
           "name": "Status",
           "type": "webview",
           "icon": "$(cs-logo)",
           "when": "false"
         },
         {
-          "id": "codescene.codeHealthMonitorView",
+          "id": "codescene-noace.codeHealthMonitorView",
           "name": "Code Health Monitoring",
           "icon": "$(cs-logo)",
-          "when": "codescene.asyncActivationFinished"
+          "when": "codescene-noace.asyncActivationFinished"
         },
         {
-          "id": "codescene.codeHealthDetailsView",
+          "id": "codescene-noace.codeHealthDetailsView",
           "name": "Code Health Details",
           "icon": "$(cs-logo)",
           "type": "webview",
-          "when": "codescene.asyncActivationFinished"
+          "when": "codescene-noace.asyncActivationFinished"
         },
         {
-          "id": "codescene.controlCenterView",
+          "id": "codescene-noace.controlCenterView",
           "name": "Control Center",
           "icon": "$(cs-logo)",
           "type": "webview"
@@ -125,20 +125,20 @@
     },
     "viewsWelcome": [
       {
-        "view": "codescene.codeHealthMonitorView",
+        "view": "codescene-noace.codeHealthMonitorView",
         "contents": "The Code Health Monitor view compares the current state of your code with the latest commit and presents any introduced code smells."
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "codescene.codeHealthMonitorHelp",
-          "when": "view === codescene.codeHealthMonitorView",
+          "command": "codescene-noace.codeHealthMonitorHelp",
+          "when": "view === codescene-noace.codeHealthMonitorView",
           "group": "navigation@2"
         },
         {
-          "command": "codescene.codeHealthMonitorSort",
-          "when": "view === codescene.codeHealthMonitorView",
+          "command": "codescene-noace.codeHealthMonitorSort",
+          "when": "view === codescene-noace.codeHealthMonitorView",
           "group": "navigation@§"
         }
       ],
@@ -147,30 +147,24 @@
     "configuration": {
       "title": "CodeScene",
       "properties": {
-        "codescene.enableReviewCodeLenses": {
+        "codescene-noace.enableReviewCodeLenses": {
           "type": "boolean",
           "default": true,
           "description": "Show CodeLenses for review diagnostics",
           "order": 1
         },
-        "codescene.gitignore": {
+        "codescene-noace.gitignore": {
           "type": "boolean",
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
           "order": 8
         },
-        "codescene.enableAutoRefactor": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable CodeScene ACE",
-          "order": 15
-        },
-        "codescene.serverUrl": {
+        "codescene-noace.serverUrl": {
           "type": "string",
           "default": "https://codescene.io",
           "order": 19
         },
-        "codescene.devtoolsPortalUrl": {
+        "codescene-noace.devtoolsPortalUrl": {
           "type": "string",
           "default": "https://devtools.codescene.io",
           "order": 25

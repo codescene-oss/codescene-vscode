@@ -25,7 +25,7 @@ export function activate(context: vscode.ExtensionContext, aceApi?: AceAPI) {
   context.subscriptions.push(
     codeHealthMonitorView,
     ...repoStateListeners,
-    vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
+    vscode.commands.registerCommand('codescene-noace.codeHealthMonitorHelp', () => {
       void vscode.commands.executeCommand(
         'markdown.showPreviewToSide',
         vscode.Uri.parse(`csdoc:code-health-monitor.md`)
