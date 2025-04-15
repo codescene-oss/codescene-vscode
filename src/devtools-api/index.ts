@@ -84,6 +84,12 @@ export class DevtoolsAPI {
     DevtoolsAPI.startAnalysisEvent();
     try {
       const reviewResult = await DevtoolsAPI.review(document, binaryOpts);
+      if (reviewResult['code-health-rules-error']) {
+        // TODO - maybe show a popup notification? Might become spammy when having multiple files open...
+        const {description, remedy} = reviewResult['code-health-rules-error'];
+        logOutputChannel.warn(`${description}`);
+        logOutputChannel.warn(`${remedy}`);
+      }
       DevtoolsAPI.reviewEmitter.fire({ document, result: reviewResult });
       return reviewResult;
     } catch (e) {
