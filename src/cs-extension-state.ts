@@ -1,12 +1,8 @@
 import vscode, { Uri } from 'vscode';
-import { AnalysisEvent } from './analysis-common';
-import { DeltaAnalyser } from './code-health-monitor/analyser';
 import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
+import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
-import { AceAPI } from './refactoring/addon';
-import { RefactoringCapabilities } from './refactoring/capabilities';
-import Reviewer from './review/reviewer';
 import { isDefined } from './utils';
 
 export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
@@ -25,11 +21,9 @@ export interface CsFeature {
 type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
-export type AceFeature = CsFeature & { refactorCapabilities?: RefactoringCapabilities };
-
 interface CsFeatures {
   analysis: AnalysisFeature;
-  ace: AceFeature;
+  ace: CsFeature;
 }
 
 export interface CsStateProperties {
@@ -106,27 +100,18 @@ export class CsExtensionState {
   }
 
   /**
-   * Returns the preflight response if ACE is enabled, otherwise undefined.
-   */
-  static get aceCapabilities(): RefactoringCapabilities | undefined {
-    return CsExtensionState._instance.stateProperties.features.ace.refactorCapabilities;
-  }
-
-  /**
    * Call this after the Reviewer and DeltaAnalyser have been initialized.
    */
-  static addListeners(context: vscode.ExtensionContext, aceApi: AceAPI) {
+  static addListeners(context: vscode.ExtensionContext) {
     context.subscriptions.push(
-      Reviewer.instance.onDidReview(CsExtensionState._instance.handleAnalysisEvent),
-      Reviewer.instance.onDidReviewFail(CsExtensionState._instance.handleAnalysisError),
-      DeltaAnalyser.instance.onDidAnalyse(CsExtensionState._instance.handleAnalysisEvent),
-      DeltaAnalyser.instance.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
+      DevtoolsAPI.onDidAnalysisStateChange(CsExtensionState._instance.handleAnalysisEvent),
+      DevtoolsAPI.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
     context.subscriptions.push(
-      aceApi.onDidRequestFail((error) => {
+      DevtoolsAPI.onDidRefactoringFail((error) => {
         CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
       }),
-      aceApi.onDidRefactoringRequest(async (evt) => {
+      DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
         if (evt.type === 'end') {
           try {
             await evt.request.promise;
@@ -147,10 +132,10 @@ export class CsExtensionState {
   }
 
   private handleAnalysisEvent(event: AnalysisEvent) {
-    if (event.type === 'end') return;
-    const analysisState = (CsExtensionState.stateProperties.features.analysis.analysisState =
-      event.type === 'idle' ? 'idle' : 'running');
-    CsExtensionState.setAnalysisState({ ...CsExtensionState.stateProperties.features.analysis, analysisState });
+    CsExtensionState.setAnalysisState({
+      ...CsExtensionState.stateProperties.features.analysis,
+      analysisState: event.state,
+    });
   }
 
   private handleAnalysisError(error: Error) {
@@ -171,8 +156,7 @@ export class CsExtensionState {
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
     if (!signedIn) {
-      // this.csWorkspace.clearProjectAssociation(); <- when re-working Change Coupling...
-      // CsExtensionState.setACEState('Not signed in'); // Ace cannot be active if not signed in
+      // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
     }
 
@@ -191,10 +175,10 @@ export class CsExtensionState {
     CsExtensionState._instance.updateStatusViews();
   }
 
-  static setACEState({ refactorCapabilities, state, error }: AceFeature) {
+  static setACEState({ state, error }: CsFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      ace: { refactorCapabilities, state: featureState({ state, error }), error },
+      ace: { state: featureState({ state, error }), error },
     };
     CsExtensionState._instance.updateStatusViews();
   }

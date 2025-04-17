@@ -19,7 +19,7 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '23b3e1c0b8bb8132641ae4337f000b9e98a22027';
+const REQUIRED_DEVTOOLS_VERSION = 'fd48baae4aa6fde45286587d8b963d8ae07f29af';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -128,6 +128,7 @@ async function verifyBinaryVersion({
   });
   if (result.exitCode !== 0) {
     if (throwOnError) throw new Error(`Error when verifying devtools binary version: ${result.stderr}`);
+    logOutputChannel.info(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
     return false;
   }
   return result.stdout.trim() === REQUIRED_DEVTOOLS_VERSION;
@@ -143,8 +144,6 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
   const binaryPath = artifactInfo.absoluteBinaryPath;
 
   if (await verifyBinaryVersion({ binaryPath })) return binaryPath;
-
-  logOutputChannel.info('Failed verifying CodeScene devtools binary, re-downloading...');
 
   await download(artifactInfo);
   await unzipFile(artifactInfo);

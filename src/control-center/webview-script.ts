@@ -22,7 +22,9 @@ function main() {
   addClickListenerToElementById('contact-codescene', () => sendMessage('openContactCodescene'));
   addClickListenerToElementById('support-ticket-link', () => sendMessage('raiseSupportTicket'));
 
-  addClickListenerToElementById('machine-id', () => sendMessage('copyMachineId'));
+  // device-id
+  addClickListenerToElementById('device-id', () => sendMessage('copyDeviceId'));
+
 }
 
 function addClickListenerToElementById(elementId: string, listener: () => void) {
