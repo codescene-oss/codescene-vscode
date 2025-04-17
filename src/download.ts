@@ -27,7 +27,7 @@ const artifacts: { [platform: string]: { [arch: string]: string } } = {
     arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   linux: {
-    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
+    x64: `cs-ide-linux-amd64-0000000000000000000000000000000000000000.zip`,
     arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   win32: {

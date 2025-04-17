@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -203,7 +203,6 @@
     "@typescript-eslint/eslint-plugin": "^5.51.0",
     "@typescript-eslint/parser": "^5.45.0",
     "@vscode/test-electron": "^2.2.0",
-    "esbuild": "^0.25.1",
     "esbuild-plugin-copy": "^2.1.1",
     "eslint": "^8.33.0",
     "glob": "^8.0.3",
