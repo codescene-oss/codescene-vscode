@@ -20,6 +20,7 @@ export class DownloadError extends Error {
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const REQUIRED_DEVTOOLS_VERSION = '23b3e1c0b8bb8132641ae4337f000b9e98a22027';
+const REQUIRED_DEVTOOLS_VERSION_LINUX_X64 = '06505edaaee859f80e0178074a11aff144d5ebeb';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -130,7 +131,13 @@ async function verifyBinaryVersion({
     if (throwOnError) throw new Error(`Error when verifying devtools binary version: ${result.stderr}`);
     return false;
   }
-  return result.stdout.trim() === REQUIRED_DEVTOOLS_VERSION;
+  let version = REQUIRED_DEVTOOLS_VERSION;
+  
+  if (process.platform === 'linux' && process.arch === 'x64') {
+    version = REQUIRED_DEVTOOLS_VERSION_LINUX_X64;
+  }
+
+  return result.stdout.trim() === version;
 }
 
 /**
