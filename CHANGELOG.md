@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.9.15](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.14...v0.9.15) (2025-04-18)
+
+
+### Bug fixes
+
+* **code-health-monitor:** No badge if >99 issues in code health monitor ([5f5911c](https://github.com/codescene-oss/codescene-vscode/commit/5f5911c14828da7e657f28b36d3e52ff007a7bd0))
+
 ### [0.9.14](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.13...v0.9.14) (2025-04-02)
 
 
