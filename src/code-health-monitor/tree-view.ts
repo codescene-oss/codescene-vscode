@@ -168,17 +168,17 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     {
       label: 'Automatic (default)',
       description:
-        'Compare changes against a perfect score (10.0) for default branch or detached HEAD, and branch creation commit for other branches',
+        'Compare changes against the most recent commit for default branch, and branch creation commit for other branches. Fallback comparison is perfect score (10.0).',
       value: Baseline.Default,
     },
     {
       label: 'Branch creation commit',
-      description: 'Compare changes since the branch was created',
+      description: 'Compare changes since the branch was created. Fallback comparison is perfect score (10.0).',
       value: Baseline.BranchCreation,
     },
     {
       label: 'HEAD commit',
-      description: 'Compare changes made in the most recent commit',
+      description: 'Compare changes made in the most recent commit. Fallback comparison is perfect score (10.0).',
       value: Baseline.Head,
     },
   ];
