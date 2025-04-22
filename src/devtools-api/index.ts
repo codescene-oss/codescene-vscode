@@ -107,10 +107,10 @@ export class DevtoolsAPI {
 
     const commitHash = await getBaselineCommit(document.uri);
     if (!commitHash) return;
-    const headPath = `${commitHash}:./${fp.fileName}`;
+    const path = `${commitHash}:./${fp.fileName}`;
 
     const binaryOpts = {
-      args: ['review', headPath],
+      args: ['review', path],
       taskId: taskId('review-base', document),
       execOptions: { cwd: fp.documentDirectory },
     };

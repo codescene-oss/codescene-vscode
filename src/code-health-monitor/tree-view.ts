@@ -247,9 +247,9 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
-      const item = this.addBaselineInfo();
+      const baselineInfoItem = this.addBaselineInfo();
       const aceInfoItem = this.aceSummaryItem(filesWithIssues);
-      this.tree = aceInfoItem ? [item, aceInfoItem, ...filesWithIssues] : [item, ...filesWithIssues];
+      this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
     } else {
       this.tree = [];
     }
