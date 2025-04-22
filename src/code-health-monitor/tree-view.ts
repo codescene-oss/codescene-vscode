@@ -5,6 +5,7 @@ import Telemetry from '../telemetry';
 import { isDefined, pluralize, showDocAtPosition } from '../utils';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
+import { onFileDeletedFromGit } from '../git-utils';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -36,6 +37,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
         void this.treeDataProvider.selectSortFn();
       }),
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.treeDataProvider.syncTree(e)),
+      onFileDeletedFromGit((e) => {
+        this.treeDataProvider.removeTreeEntry(e);
+      }),
       this.view.onDidChangeVisibility((e) => {
         Telemetry.logUsage('code-health-monitor/visibility', { visible: e.visible });
       }),
@@ -267,8 +271,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
         Telemetry.logUsage('code-health-monitor/file-updated', evtData(fileWithIssues));
       } else {
         // If there are no longer any issues, remove the entry from the tree
-        this.fileIssueMap.delete(document.uri.fsPath);
-        Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible });
+        this.removeTreeEntry(document.uri.fsPath);
       }
     } else if (result) {
       // No existing file entry found - add one if there are changes
@@ -278,6 +281,11 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     }
 
     this.update();
+  }
+
+  removeTreeEntry(filePath: string) {
+    this.fileIssueMap.delete(filePath);
+    Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible });
   }
 
   private aceSummaryItem(filesWithIssues: FileWithIssues[]) {

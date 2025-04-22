@@ -1,14 +1,20 @@
 import vscode, { Uri } from 'vscode';
-import { API, Branch, GitExtension, Repository } from '../../types/git';
+import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { Baseline, CodeHealthMonitorView } from './tree-view';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { logOutputChannel } from '../log';
+import {
+  acquireGitApi,
+  getBranchCreationCommit,
+  getLatestCommits,
+  isMainBranch,
+  removeStaleFiles,
+  resetBaselineForFilesChanged,
+} from '../git-utils';
 
 let gitApi: API | undefined;
+let lastCommit: string | undefined;
 let currentBaseline: string | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -40,152 +46,144 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-function acquireGitApi() {
-  const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
-  if (!gitExtension) {
-    void vscode.window.showErrorMessage(
-      'Unable to load vscode.git extension. Code Health Monitor will be unavailable.'
-    );
+/**
+ * Determines the appropriate baseline commit for a given file according to the active baseline strategy.
+ *
+ * This commit serves as the reference point for calculating delta results in a baseline review.
+ * If no suitable commit is found, the comparison defaults to a perfect score (10.0).
+ *
+ * The strategy options are:
+ * - Head: compares with the most recent commit (HEAD).
+ * - Default: compares with the HEAD commit if on the default branch; otherwise, compares with the branch creation point.
+ * - BranchCreation: compares with the commit where the current branch was created.
+ */
+export async function getBaselineCommit(fileUri: Uri): Promise<string | undefined> {
+  if (!gitApi) return;
+
+  const repo = gitApi!.getRepository(fileUri);
+  if (!repo) return '';
+
+  switch (currentBaseline) {
+    case Baseline.Head:
+      return await getHeadPoint(repo);
+    case Baseline.Default:
+      return await getDefaultPoint(repo);
+    case Baseline.BranchCreation:
+      return await getBranchCreationCommit(repo);
+  }
+}
+
+/**
+ * Retrieves the commit point for the HEAD of the current repository for a given file.
+ *
+ * If no suitable commit is found, it defaults to comparing against a perfect score (10.0).
+ */
+async function getHeadPoint(repo: Repository) {
+  const commits = await getLatestCommits(repo);
+  const head = repo.state.HEAD;
+
+  if (commits.length !== 2 || !head) {
+    return '';
+  }
+
+  return 'HEAD';
+}
+
+/**
+ * Determines the default comparison point for a file based on the current Git branch context.
+ *
+ * Default behavior:
+ * - If on the main branch, the comparison point is the HEAD commit.
+ * - If on a non-main branch, the comparison point is the branch creation commit.
+ * - If the branch cannot be determined, fallback logic compares to a perfect score.
+ */
+async function getDefaultPoint(repo: Repository) {
+  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+
+  if (isMain) {
+    return await getHeadPoint(repo);
+  } else {
+    return await getBranchCreationCommit(repo);
+  }
+}
+
+/**
+ * Reacts to changes in the repository's HEAD commit by:
+ * - Skipping logic if the commit hasn't changed,
+ * - Removing monitor entries for files no longer in the current branch,
+ * - Triggering baseline-specific handling logic.
+ */
+async function onRepoStateChange(repo: Repository) {
+  const hasRepoChanged = lastCommit !== repo.state.HEAD?.commit;
+  if (!hasRepoChanged) {
     return;
   }
-  return gitExtension.getAPI(1);
+  lastCommit = repo.state.HEAD?.commit;
+
+  await removeStaleFiles(repo, currentBaseline);
+  void handleBaselineChange(repo);
 }
 
-const repoState = new Map<string, Branch>();
-
-export async function getBaselineCommit(fileUri: Uri): Promise<string | undefined> {
-  if (currentBaseline === Baseline.Head) return 'HEAD';
-  if (currentBaseline === Baseline.Default) return await getDefaultPoint(fileUri);
-  return await getBranchCreationPoint(fileUri);
-}
-
-const execAsync = promisify(exec);
-
-async function getDefaultPoint(fileUri: Uri) {
-  if (!gitApi) return;
-
-  const currentRepo = gitApi.getRepository(fileUri);
-  const repositoryPath = currentRepo?.rootUri.path;
-  if (!repositoryPath) return;
-
-  const defaultBranch = await getDefaultBranchName(repositoryPath);
-  const currentBranch = await getCurrentBranch(repositoryPath);
-
-  if (currentBranch === defaultBranch) {
-    return '';
-  } else {
-    return await getBranchCreationPoint(fileUri);
-  }
-}
-
-async function getCurrentBranch(repositoryPath: string) {
-  const { stdout } = await execAsync(`git rev-parse --abbrev-ref HEAD`, { cwd: repositoryPath });
-
-  return stdout.trim();
-}
-
-async function getDefaultBranchName(repositoryPath: string) {
-  try {
-    const { stdout } = await execAsync(`git remote show origin`, { cwd: repositoryPath });
-    const defaultBranchMatch = stdout.match(/HEAD branch: (.+)/);
-
-    if (defaultBranchMatch) {
-      return defaultBranchMatch[1];
-    } else {
-      return '';
-    }
-  } catch (err) {
-    logOutputChannel.error(`Error occurred while retrieving default branch for repository ${repositoryPath}: ${err}`);
-    return '';
-  }
-}
-
-/**
- * Retrieves the commit hash where the current branch was created from, based on the file URI.
- * @param fileUri - The URI of the file in the repository.
- * @returns The commit hash of the branch creation point or undefined if not found.
- */
-async function getBranchCreationPoint(fileUri: Uri) {
-  if (!gitApi) return;
-
-  try {
-    const CREATION_KEYWORD = 'created from';
-    const currentRepo = gitApi.getRepository(fileUri);
-    const repositoryPath = currentRepo?.rootUri.path;
-    if (!repositoryPath) return;
-
-    const currentBranch = await getCurrentBranch(repositoryPath);
-    const { stdout: reflog } = await execAsync(`git reflog ${currentBranch} --no-abbrev`, {
-      cwd: repositoryPath,
-    });
-
-    return reflog
-      .split('\n')
-      .reverse()
-      .find((line) => line.toLowerCase().includes(CREATION_KEYWORD))
-      ?.split(' ')?.[0];
-  } catch (err) {
-    logOutputChannel.error(`Error occurred while retrieving branch creation point for file ${fileUri.fsPath}: ${err}`);
-    return undefined;
-  }
-}
-
-/**
- * Listens for changes in a repository's state and resets the
- * baseline review/score for all changed files.
- * @param repo
- */
-function onRepoStateChange(repo: Repository) {
-  if (currentBaseline == Baseline.BranchCreation) {
-    handleBranchCreationBaselineChange(repo);
-  } else {
-    handleHeadBaselineChange(repo);
+async function handleBaselineChange(repo: Repository) {
+  switch (currentBaseline) {
+    case Baseline.Head:
+      return handleHeadRepoStateChange(repo);
+    case Baseline.Default:
+      return handleDefaultRepoStateChange(repo);
+    case Baseline.BranchCreation:
+      return handleBranchCreationRepoStateChange(repo);
   }
 }
 
 /**
  * Handles baseline changes when the baseline is set to branch creation.
- * @param repo - The repository whose state has changed.
  */
-async function handleBranchCreationBaselineChange(repo: Repository) {
-  const first = await getBranchCreationPoint(repo.rootUri);
+async function handleBranchCreationRepoStateChange(repo: Repository) {
+  const first = await getBranchCreationCommit(repo);
   const second = repo.state.HEAD?.commit;
+
+  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+
+  if (isMain) {
+    Reviewer.instance.refreshAllDeltasAndBaselines();
+    return;
+  }
 
   const shouldDiff = first && second && first !== second;
   if (!shouldDiff) return;
 
   const changes = await repo.diffBetween(first, second);
-  changes.forEach((change) => Reviewer.instance.reviewCache.resetBaseline(change.uri.fsPath));
+  changes.forEach((change) => {
+    Reviewer.instance.reviewCache.resetBaseline(change.uri.fsPath);
+  });
+}
+
+/**
+ * Handles baseline changes when the baseline is set to default.
+ */
+async function handleDefaultRepoStateChange(repo: Repository) {
+  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+  if (isMain) {
+    void handleHeadRepoStateChange(repo);
+  } else {
+    void handleBranchCreationRepoStateChange(repo);
+  }
 }
 
 /**
  * Handles baseline changes when the baseline is set to HEAD.
- * @param repo - The repository whose state has changed.
  */
-function handleHeadBaselineChange(repo: Repository) {
+async function handleHeadRepoStateChange(repo: Repository) {
   if (!repo.state.HEAD) return;
-  const headRef = { ...repo.state.HEAD };
-  const prevRef = repoState.get(repo.rootUri.fsPath);
-  if (!prevRef) {
-    repoState.set(repo.rootUri.fsPath, headRef);
+  const head = { ...repo.state.HEAD };
+
+  const commits = await getLatestCommits(repo);
+  const [headRef, prevRef] = commits;
+
+  if (commits.length !== 2 || head.commit !== headRef) {
+    void Reviewer.instance.refreshAllDeltasAndBaselines();
     return;
   }
-  if (prevRef.commit === headRef.commit) return;
 
-  void resetBaselineForFilesChanged(headRef, prevRef, repo);
-  repoState.set(repo.rootUri.fsPath, headRef);
-}
-
-async function resetBaselineForFilesChanged(headRef: Branch, prevRef: Branch, repo: Repository) {
-  // Need the refs sorted by "ahead" to get them in the required order for the diffBetween call
-  // The command run by the git vscode extension is 'git diff first...second'
-  const [ref1, ref2] = [headRef, prevRef].sort((a, b) => Number(a.ahead) - Number(b.ahead));
-  if (ref1.commit && ref2.commit) {
-    const changes = await repo.diffBetween(ref1.commit, ref2.commit);
-    changes.forEach((change) => {
-      // TODO - do we need special handling for added/deleted files?
-      // if (change.status === Status.DELETED) return;
-      Reviewer.instance.reviewCache.resetBaseline(change.uri.fsPath);
-    });
-  }
+  void resetBaselineForFilesChanged({ prevRef, headRef, repo });
 }

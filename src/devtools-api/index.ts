@@ -106,6 +106,7 @@ export class DevtoolsAPI {
     const fp = fileParts(document);
 
     const commitHash = await getBaselineCommit(document.uri);
+    if (!commitHash) return;
     const headPath = `${commitHash}:./${fp.fileName}`;
 
     const binaryOpts = {
