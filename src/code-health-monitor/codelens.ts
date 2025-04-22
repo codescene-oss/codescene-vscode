@@ -52,14 +52,20 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
 
     const codeLenses = [];
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
+
+    const requestAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
+      title: '$(sparkle) CodeScene ACE',
+      command: 'codescene.requestAndPresentRefactoring',
+      arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
+    });
+    const dismissAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
+      title: '$(circle-slash) Dismiss',
+      command: 'codescene.monitorCodeLens.dismiss',
+      arguments: [functionInfo.parent.document.uri],
+    });
+
     if (functionInfo.fnToRefactor) {
-      codeLenses.push(
-        new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
-          title: '$(sparkle) CodeScene ACE',
-          command: 'codescene.requestAndPresentRefactoring',
-          arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
-        })
-      );
+      codeLenses.push(requestAceLens, dismissAceLens);
     }
     let order = 1;
     if (!reviewCodeLensesEnabled()) {
@@ -74,18 +80,11 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
         );
       });
     }
-    codeLenses.push(
-      new vscode.CodeLens(
-        new vscode.Range(
-          functionStartLine.with({ character: order++ }),
-          functionStartLine.with({ character: order++ })
-        ),
-        {
-          title: '$(circle-slash) Dismiss',
-          command: 'codescene.monitorCodeLens.dismiss',
-          arguments: [functionInfo.parent.document.uri],
-        }
-      )
+    // Put this lens last on the line
+    order++;
+    dismissAceLens.range = new vscode.Range(
+      functionStartLine.with({ character: order }),
+      functionStartLine.with({ character: order })
     );
 
     this.codeLensesMap.set(documentUri, codeLenses);
