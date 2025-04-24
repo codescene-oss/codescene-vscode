@@ -19,7 +19,7 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '23b3e1c0b8bb8132641ae4337f000b9e98a22027';
+const REQUIRED_DEVTOOLS_VERSION = '06505edaaee859f80e0178074a11aff144d5ebeb';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const REQUIRED_DEVTOOLS_VERSION_LINUX_X64 = '06505edaaee859f80e0178074a11aff144d5ebeb';
 
