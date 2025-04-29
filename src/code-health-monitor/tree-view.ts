@@ -17,7 +17,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   constructor(context: vscode.ExtensionContext) {
     registerDeltaAnalysisDecorations(context);
 
-    this.treeDataProvider = new DeltaAnalysisTreeProvider(context);
+    this.treeDataProvider = new DeltaAnalysisTreeProvider();
 
     this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
@@ -33,7 +33,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
         this.revealAutoRefactorings()
       ),
       vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
-        void this.treeDataProvider.selectBaseline(context);
+        void this.treeDataProvider.selectBaseline();
       }),
       vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
         void this.treeDataProvider.selectSortFn();
@@ -176,13 +176,13 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     },
   ];
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor() {}
 
   setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
     this.parentView = view;
   }
 
-  public async selectBaseline(context: vscode.ExtensionContext) {
+  public async selectBaseline() {
     const currentBaseline = CsExtensionState.baseline;
 
     const optionsWithStatus = this.baselineOptions.map((option) => ({
