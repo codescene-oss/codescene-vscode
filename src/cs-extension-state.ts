@@ -18,6 +18,12 @@ export interface CsFeature {
   error?: Error;
 }
 
+export enum Baseline {
+  head = 1,
+  branchCreation = 2,
+  default = 3,
+}
+
 type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
@@ -33,6 +39,7 @@ export interface CsStateProperties {
 
 const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
+const baselineKey = 'baseline';
 
 /**
  * This class is used to handle the state of the extension. One part is managing and presenting
@@ -43,6 +50,9 @@ export class CsExtensionState {
   readonly stateProperties: CsStateProperties;
   readonly statusBar: CsStatusBar;
   readonly extensionUri: Uri;
+
+  private baselineChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -66,7 +76,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey]);
+    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey, baselineKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -89,6 +99,19 @@ export class CsExtensionState {
 
   static async setAcknowledgedAceUsage(value?: boolean) {
     await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
+  }
+
+  static get baseline(): Baseline {
+    return this._instance.context.globalState.get<Baseline>(baselineKey) || Baseline.default;
+  }
+
+  static async setBaseline(value: Baseline) {
+    await this._instance.context.globalState.update(baselineKey, value);
+    this._instance.baselineChangedEmitter.fire();
+  }
+
+  static get onBaselineChanged() {
+    return this._instance.onBaselineChanged;
   }
 
   static get stateProperties() {

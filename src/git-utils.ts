@@ -8,6 +8,11 @@ const gitExecutor = new SimpleExecutor();
 const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
 
+export let repoState: {
+  branch: string | undefined;
+  commit: string | undefined;
+};
+
 export function acquireGitApi() {
   const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
   if (!gitExtension) {
@@ -17,50 +22,6 @@ export function acquireGitApi() {
     return;
   }
   return gitExtension.getAPI(1);
-}
-
-export async function removeStaleFiles(repo: Repository, currentBaseline: string | undefined) {
-  const files = await getFilesNotInBranch({
-    currentBranch: repo.state.HEAD?.name,
-    repositoryPath: repo.rootUri.path,
-    currentBaseline,
-  });
-
-  files.forEach((file) => {
-    handleFileDeletion(file);
-  });
-}
-
-interface FilesNotInBranchArgs {
-  currentBranch: string | undefined;
-  repositoryPath: string;
-  currentBaseline: string | undefined;
-}
-
-export async function getFilesNotInBranch({
-  currentBranch,
-  repositoryPath,
-  currentBaseline,
-}: FilesNotInBranchArgs): Promise<string[]> {
-  try {
-    const previousBranch = await getPreviousBranch(repositoryPath);
-    if (!previousBranch || !currentBaseline) return [];
-
-    const { stdout: diff } = await gitExecutor.execute(
-      { command: 'git', args: ['diff', '--name-only', '--diff-filter=D', `${previousBranch}..${currentBranch}`] },
-      { cwd: repositoryPath }
-    );
-
-    if (!diff) return [];
-    else
-      return diff
-        .split('\n')
-        .filter((file) => file)
-        .map((file) => `${repositoryPath}/${file}`);
-  } catch (error) {
-    logOutputChannel.error(`Could not obtain files currently not in branch: ${error}`);
-    return [];
-  }
 }
 
 /**
@@ -82,12 +43,12 @@ export async function getBranchCreationCommit(repo: Repository) {
       { cwd: repoPath }
     );
 
-    const CREATION_KEYWORD = 'created from';
+    const creationKeyword = 'created from';
 
     const creationLine = reflog
       .split('\n')
       .reverse()
-      .find((line) => line.toLowerCase().includes(CREATION_KEYWORD));
+      .find((line) => line.toLowerCase().includes(creationKeyword));
 
     return creationLine?.split(' ')?.[0] ?? '';
   } catch (err) {
@@ -163,20 +124,6 @@ export async function getLatestCommits(repo: Repository, amount: number = 2) {
   }
 }
 
-/**
- * Attempts to determine the previously checked-out Git branch
- * by inspecting the most recent entry in the reflog.
- */
-async function getPreviousBranch(repositoryPath: string) {
-  const { stdout: reflog } = await gitExecutor.execute(
-    { command: 'git', args: ['reflog', '-1'] },
-    { cwd: repositoryPath }
-  );
-
-  const match = reflog.match(/checkout: moving from ([^ ]+) to /);
-  return match ? match[1] : null;
-}
-
 interface ResetBaselineArgs {
   prevRef: string;
   headRef: string;
@@ -199,4 +146,19 @@ export async function resetBaselineForFilesChanged({ prevRef, headRef, repo }: R
       Reviewer.instance.reviewCache.resetBaseline(change.uri.fsPath);
     });
   }
+}
+
+export function updateGitState(repo: Repository) {
+  const head = repo.state.HEAD;
+  if (!head) return;
+
+  const hasRepoChanged = repoState?.commit !== head.commit;
+  if (!hasRepoChanged) {
+    return;
+  }
+
+  repoState = {
+    commit: head.commit,
+    branch: head.name,
+  };
 }

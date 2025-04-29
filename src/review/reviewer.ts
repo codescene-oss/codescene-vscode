@@ -126,6 +126,10 @@ class ReviewCache {
     }
   }
 
+  clear() {
+    this._cache.clear();
+  }
+
   resetBaseline(fsPath: string) {
     this._cache.get(fsPath)?.resetBaseline();
   }
@@ -185,7 +189,7 @@ class CachingReviewer implements Disposable {
   }
 
   refreshAllDeltasAndBaselines() {
-    for (const [_, item] of this.reviewCache['_cache'].entries()) {
+    for (const [key, item] of this.reviewCache['_cache'].entries()) {
       item.resetBaseline();
     }
   }
@@ -221,6 +225,10 @@ class CachingReviewer implements Disposable {
 
   abort(document: vscode.TextDocument): void {
     this.reviewer.abort(document);
+  }
+
+  clearCache() {
+    this.reviewCache.clear();
   }
 
   dispose() {
