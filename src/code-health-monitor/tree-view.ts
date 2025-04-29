@@ -6,6 +6,8 @@ import { isDefined, pluralize, showDocAtPosition } from '../utils';
 import { registerDeltaAnalysisDecorations } from './presentation';
 import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
 import { onFileDeletedFromGit } from '../git-utils';
+import { onTreeDataCleared } from './addon';
+import { Baseline, CsExtensionState } from '../cs-extension-state';
 
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -109,10 +111,6 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     });
   }
 
-  get onBaselineChanged() {
-    return this.treeDataProvider.onBaselineChanged;
-  }
-
   isVisible() {
     return this.view.visible;
   }
@@ -127,12 +125,6 @@ interface SortOption extends vscode.QuickPickItem {
   sortFn: (a: FileWithIssues, b: FileWithIssues) => number;
 }
 
-export enum Baseline {
-  Head = 'head',
-  BranchCreation = 'branch creation',
-  Default = 'default',
-}
-
 interface BaselineOption extends vscode.QuickPickItem, Pick<SortOption, 'label'> {
   value: Baseline;
 }
@@ -141,9 +133,6 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   private treeDataChangedEmitter: vscode.EventEmitter<DeltaTreeViewItem | void> =
     new vscode.EventEmitter<DeltaTreeViewItem>();
   readonly onDidChangeTreeData: vscode.Event<DeltaTreeViewItem | void> = this.treeDataChangedEmitter.event;
-
-  private baselineChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
   public fileIssueMap: Map<string, FileWithIssues> = new Map();
   public tree: Array<DeltaTreeViewItem> = [];
@@ -173,17 +162,17 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       label: 'Automatic (default)',
       description:
         'Compare changes against the most recent commit for default branch, and branch creation commit for other branches. Fallback comparison is perfect score (10.0).',
-      value: Baseline.Default,
+      value: Baseline.default,
     },
     {
       label: 'Branch creation commit',
       description: 'Compare changes since the branch was created. Fallback comparison is perfect score (10.0).',
-      value: Baseline.BranchCreation,
+      value: Baseline.branchCreation,
     },
     {
       label: 'HEAD commit',
       description: 'Compare changes made in the most recent commit. Fallback comparison is perfect score (10.0).',
-      value: Baseline.Head,
+      value: Baseline.head,
     },
   ];
 
@@ -194,7 +183,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   }
 
   public async selectBaseline(context: vscode.ExtensionContext) {
-    const currentBaseline = context.globalState.get('baseline');
+    const currentBaseline = CsExtensionState.baseline;
 
     const optionsWithStatus = this.baselineOptions.map((option) => ({
       ...option,
@@ -207,8 +196,8 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     });
 
     if (selected && selected.value !== currentBaseline) {
-      context.globalState.update('baseline', selected.value);
-      this.baselineChangedEmitter.fire();
+      await CsExtensionState.setBaseline(selected.value);
+      this.update();
     }
   }
 
@@ -224,7 +213,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   }
 
   private addBaselineInfo() {
-    const baseline = this.context.globalState.get('baseline');
+    const baseline = CsExtensionState.baseline;
 
     const data = this.baselineOptions.find((option) => option.value === baseline);
     const label = `Baseline: ${data?.label}`;
@@ -286,6 +275,14 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   removeTreeEntry(filePath: string) {
     this.fileIssueMap.delete(filePath);
     Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible });
+  }
+
+  clearTree() {
+    this.fileIssueMap.clear();
+    this.fileIssueMap.forEach((file) =>
+      Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible })
+    );
+    this.update();
   }
 
   private aceSummaryItem(filesWithIssues: FileWithIssues[]) {

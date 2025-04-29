@@ -23,7 +23,6 @@ import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-co
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
-import { Baseline } from './code-health-monitor/tree-view';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -66,8 +65,6 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startExtension(context: vscode.ExtensionContext) {
-  initializeBaseline(context);
-
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
   };
@@ -148,14 +145,12 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     })
   );
 
-  // For live updates, we debounce the runs to avoid consuming too many resources.
-  const debouncedRun = debounce(CsDiagnostics.review, 1200);
   const docSelector = reviewDocumentSelector();
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-      // avoid debouncing non-matching documents
+      // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) return;
-      debouncedRun(e.document);
+      CsDiagnostics.review(e.document);
     })
   );
 
@@ -181,13 +176,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {}
 
 function disableRemoteFeatures() {}
-
-function initializeBaseline(context: vscode.ExtensionContext) {
-  const baseline = context.globalState.get('baseline');
-  if (!baseline) {
-    context.globalState.update('baseline', Baseline.Default);
-  }
-}
 
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
