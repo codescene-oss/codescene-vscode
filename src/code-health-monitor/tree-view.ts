@@ -42,6 +42,9 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       onFileDeletedFromGit((e) => {
         this.treeDataProvider.removeTreeEntry(e);
       }),
+      onTreeDataCleared(() => {
+        this.treeDataProvider.clearTree();
+      }),
       this.view.onDidChangeVisibility((e) => {
         Telemetry.logUsage('code-health-monitor/visibility', { visible: e.visible });
       }),
