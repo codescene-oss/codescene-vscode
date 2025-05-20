@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.10.0...v0.11.0) (2025-05-20)
+
+
+### Features
+
+* **code-health-monitor:** Add baseline selector to Code Health Monitor ([c8818bd](https://github.com/codescene-oss/codescene-vscode/commit/c8818bdfaea35e4168e13604fea9eb804969074d))
+* **code-health-monitor:** Add default baseline to Code Health Monitor ([6fc6e5f](https://github.com/codescene-oss/codescene-vscode/commit/6fc6e5fe3cea7dab2bb7c13c201207cf68bf5524))
+
 ## [0.10.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.15...v0.10.0) (2025-05-20)
 
 
