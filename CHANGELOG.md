@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.15...v0.10.0) (2025-05-20)
+
+
+### Bug fixes
+
+* **code-health-monitor:** Don't show "dismiss" lens without corresponding "ACE" lens ([7795e58](https://github.com/codescene-oss/codescene-vscode/commit/7795e58199127f45b28f2f11de094d47918f8194))
+* **delta:** Do not throw when aborting a delta-analysis ([a258c6f](https://github.com/codescene-oss/codescene-vscode/commit/a258c6f4ec14c01e0fd064aaf2c90b622aae3458))
+* **devtools-api:** Move analysis start/end event emission to the api ([9cdc8fc](https://github.com/codescene-oss/codescene-vscode/commit/9cdc8fc10a76ba2b14c8c1af798f7c5a61dd51df))
+* Remove duplicate preflightStateListener ([3eefd4b](https://github.com/codescene-oss/codescene-vscode/commit/3eefd4b409519271cf4e9a227c8a18b3e8c34cfa))
+
 ### [0.9.15](https://github.com/codescene-oss/codescene-vscode/compare/v0.9.14...v0.9.15) (2025-04-18)
 
 
