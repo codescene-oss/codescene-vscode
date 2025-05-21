@@ -90,20 +90,14 @@ suite('reviewIssueToDiagnostics', () => {
     });
 
     const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-    assert.strictEqual(diagnostics.length, 2); // We expect there to be a file-level-code-smell dignostics for the score
-    assert.strictEqual(diagnostics[0].message, 'Code health score: 9.81/10');
-    assert.strictEqual(diagnostics[0].range.start.line, 0);
-    assert.strictEqual(diagnostics[0].range.end.line, 0);
-    assert.strictEqual(diagnostics[0].range.start.character, 0);
-    assert.strictEqual(diagnostics[0].range.end.character, 0);
-    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Information, 'Wrong severity');
+    assert.strictEqual(diagnostics.length, 1);
 
-    assert.strictEqual(diagnostics[1].message, 'Complex Conditional (2 complex conditional expressions)');
-    assert.strictEqual(diagnostics[1].range.start.line, expressionCodeSmellRange['start-line'] - 1);
-    assert.strictEqual(diagnostics[1].range.end.line, expressionCodeSmellRange['end-line'] - 1);
-    assert.strictEqual(diagnostics[1].range.start.character, expressionCodeSmellRange['start-column'] - 1);
-    assert.strictEqual(diagnostics[1].range.end.character, expressionCodeSmellRange['end-column'] - 1);
-    assert.strictEqual(diagnostics[1].severity, vscode.DiagnosticSeverity.Warning, 'Wrong severity');
+    assert.strictEqual(diagnostics[0].message, 'Complex Conditional (2 complex conditional expressions)');
+    assert.strictEqual(diagnostics[0].range.start.line, expressionCodeSmellRange['start-line'] - 1);
+    assert.strictEqual(diagnostics[0].range.end.line, expressionCodeSmellRange['end-line'] - 1);
+    assert.strictEqual(diagnostics[0].range.start.character, expressionCodeSmellRange['start-column'] - 1);
+    assert.strictEqual(diagnostics[0].range.end.character, expressionCodeSmellRange['end-column'] - 1);
+    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning, 'Wrong severity');
   });
 
   test('handles file and function level code smells', async () => {
@@ -119,20 +113,17 @@ suite('reviewIssueToDiagnostics', () => {
                       d) {
                     return 1;
                   }
-                }`, 
+                }`,
       language: 'typescript',
     });
 
     const diagnostics = reviewResultToDiagnostics(reviewResult, document);
-    assert.strictEqual(diagnostics.length, 3);
+    assert.strictEqual(diagnostics.length, 2);
 
     for (const d of diagnostics) {
       let expectedRange;
       let expectedSeverity;
-      if (d.message === 'Code health score: 9.81/10') {
-        expectedRange = fileCodeSmellRange;
-        expectedSeverity = vscode.DiagnosticSeverity.Information;
-      } else if (d.message === 'Complex Conditional (2 complex conditional expressions)') {
+      if (d.message === 'Complex Conditional (2 complex conditional expressions)') {
         expectedRange = expressionCodeSmellRange;
         expectedSeverity = vscode.DiagnosticSeverity.Warning;
       } else if (d.message === 'Primitive Obsession (cc = 3)') {
