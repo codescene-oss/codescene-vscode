@@ -72,9 +72,12 @@ export class FileWithIssues implements DeltaTreeViewItem {
     };
 
     const { icon, tooltip } = iconAndTooltip();
+    const percentageChange = round(this.scorePercentageChange, 2);
+
     scoreInfo.tooltip = `${tooltip} ${exploreText}`;
     scoreInfo.iconPath = icon;
-    scoreInfo.description = `(${round(this.scorePercentageChange, 2)}%)`;
+    if (percentageChange !== 0) scoreInfo.description = `(${percentageChange}%)`;
+
     return new DeltaInfoItem(scoreInfo);
   }
 
@@ -120,8 +123,11 @@ export class FileWithIssues implements DeltaTreeViewItem {
 
   toTreeItem(): vscode.TreeItem {
     const item = new vscode.TreeItem(toFileWithIssuesUri(this.document.uri, this.children), this.collapsedState);
+    const percentageChange = round(this.scorePercentageChange, 2);
+
     item.iconPath = vscode.ThemeIcon.File;
-    item.description = `${round(this.scorePercentageChange, 2)}%`;
+    if (percentageChange !== 0) item.description = `${percentageChange}%`;
+
     return item;
   }
 
