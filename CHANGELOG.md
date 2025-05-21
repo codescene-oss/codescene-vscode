@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.11.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.0...v0.11.1) (2025-05-21)
+
+
+### Bug fixes
+
+* **codelens:** Remove 'Code Health:' prefix from score presentation ([335fb38](https://github.com/codescene-oss/codescene-vscode/commit/335fb3810f43f214b33a385614bc897480763f3f))
+* **diagnostics:** Don't show general diagnostic for Code Health ([8b9a042](https://github.com/codescene-oss/codescene-vscode/commit/8b9a042cd8660972c902bc46995af69dd6fa46c5))
+
 ## [0.11.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.10.0...v0.11.0) (2025-05-20)
 
 
