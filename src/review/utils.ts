@@ -3,15 +3,7 @@ import { CodeSmell, Function, Range, Review } from '../devtools-api/review-model
 import { CsDiagnostic, csSource } from '../diagnostics/cs-diagnostics';
 import { isDefined } from '../utils';
 
-const chScorePrefix = 'Code health score: ';
 const noApplicationCode = 'No application code detected for scoring';
-
-function createGeneralDiagnostic(reviewResult: Review) {
-  const scoreText = isDefined(reviewResult.score)
-    ? `${chScorePrefix}${formatScore(reviewResult.score)}`
-    : `${chScorePrefix}${noApplicationCode}`;
-  return new CsDiagnostic(new vscode.Range(0, 0, 0, 0), scoreText, vscode.DiagnosticSeverity.Information);
-}
 
 export function reviewFunctionToDiagnostics(reviewFunction: Function, document: vscode.TextDocument) {
   return reviewFunction['code-smells'].map((cs) => reviewCodeSmellToDiagnostics(cs, document)).filter(isDefined);
@@ -72,12 +64,7 @@ export function reviewResultToDiagnostics(reviewResult: Review, document: vscode
     .filter(isDefined);
   diagnostics.push(...fileLevelDiagnostics);
 
-  if (isDefined(reviewResult.score)) {
-    const scoreDiagnostic = createGeneralDiagnostic(reviewResult);
-    return [scoreDiagnostic, ...diagnostics];
-  } else {
-    return diagnostics;
-  }
+  return diagnostics;
 }
 
 export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }) {
