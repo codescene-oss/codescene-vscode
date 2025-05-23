@@ -61,13 +61,13 @@ export class CsReviewCodeLensProvider
     const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
     if (isDefined(delta)) {
       codeLens.command = {
-        title: `$(pulse) ${scorePresentation(delta)}`,
+        title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
         command: 'codescene.codeHealthMonitorView.focus',
       };
       return codeLens;
     } else {
       const scorePresentation = await cacheItem.review.scorePresentation;
-      codeLens.command = this.showCodeHealthDocsCommand(scorePresentation);
+      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`);
       return codeLens;
     }
   }
