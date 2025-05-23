@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.11.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.1...v0.11.2) (2025-05-23)
+
+
+### Bug fixes
+
+* **code-health-score:** Readd label to Code Health score presentation ([7ae9e1b](https://github.com/codescene-oss/codescene-vscode/commit/7ae9e1b28c999bbe7345a7626ba8ed4b8da30047))
+
 ### [0.11.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.0...v0.11.1) (2025-05-21)
 
 
