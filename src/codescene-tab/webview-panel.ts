@@ -322,7 +322,7 @@ export class CodeSceneTabPanel implements Disposable {
   private async highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
     const { fnToRefactor, document } = refactoring;
     const result = await refactoring.promise;
-    const highlightCode = !isStale && result.confidence.level > 1;
+    const highlightCode = !isStale;
     const editor = targetEditor(document);
     if (highlightCode && editor) {
       editor.selection = new vscode.Selection(fnToRefactor.vscodeRange.start, fnToRefactor.vscodeRange.end);

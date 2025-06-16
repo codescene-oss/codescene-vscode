@@ -18,7 +18,6 @@ export function customRefactoringSummary(level: number | 'error', action: string
     <div class="refactoring-summary ${levelClass}">
       <div class="refactoring-summary-header ${levelClass}">${action}</div>
       <span>${actionDetails}</span>
-      ${level === 0 ? '<br>' + retryButton() : ''}
     </div>
     `;
 }
@@ -32,12 +31,6 @@ function retryButton() {
 export function refactoringContent(response: RefactorResponse, languageId: string, isStale: boolean) {
   const decoratedCode = decorateCode(response, languageId);
   const code = { content: decoratedCode, languageId };
-  const { level } = response.confidence;
-  if (level === 0) {
-    return unverifiedRefactoring(response, code);
-  } else if (level === 1) {
-    return codeImprovementContent(response, code);
-  }
   return autoRefactorContent(response, code, isStale);
 }
 
@@ -88,14 +81,8 @@ function reasonsContent(response: RefactorResponse) {
     confidence: { 'review-header': reviewHeader, level },
   } = response;
 
-  let reasonsText;
-  if (response.confidence.level === 0) {
-    reasonsText =
-      "The LLMs couldn't provide an ideal refactoring due to the specific complexities of the code. Though not an endorsed solution, it is displayed as a guide to help refine your approach.";
-  } else {
-    const reasonListItems = reasons.map((reason) => `<li>${reason.summary}</li>`);
-    reasonsText = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
-  }
+  const reasonListItems = reasons.map((reason) => `<li>${reason.summary}</li>`);
+  let reasonsText = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
 
   // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
   const safeHeader = reviewHeader || 'Reasons for review';
