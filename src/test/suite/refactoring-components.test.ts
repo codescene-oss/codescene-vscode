@@ -23,10 +23,7 @@ suite('Refactor panel components Test Suite', () => {
       'trace-id': 'trace-id',
     };
     const content = reasonsContent(response);
-    assert.match(
-      content,
-      /The LLMs couldn't provide an ideal refactoring due to the specific complexities of the code. Though not an endorsed solution, it is displayed as a guide to help refine your approach./
-    );
+    assert.equal(content, '');
   });
 
   test('Expected reasons for full conf (4), with no reasons(-with-details)', async () => {
