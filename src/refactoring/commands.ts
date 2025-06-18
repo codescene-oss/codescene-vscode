@@ -48,17 +48,14 @@ export class CsRefactoringCommands implements vscode.Disposable {
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
-      const { level } = response.confidence;
-      if (level < 2) {
-        throw new Error(
-          `Don't apply refactoring for function "${fnToRefactor.name}" - confidence level too low (${response.confidence}).`
-        );
-      }
+      const editor = targetEditor(document);
+      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn, });
       const workSpaceEdit = new WorkspaceEdit();
       workSpaceEdit.replace(document.uri, vscodeRange, response.code);
       await vscode.workspace.applyEdit(workSpaceEdit);
       // Select the replaced code in the editor, starting from the original position
-      void selectCode(document, response.code, vscodeRange.start);
+      await selectCode(document, response.code, vscodeRange.start);
+      await vscode.commands.executeCommand('editor.action.formatSelection');
 
       // Immediately trigger a re-review of the new file-content
       // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)

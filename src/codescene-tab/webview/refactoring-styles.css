@@ -46,12 +46,8 @@
 .refactoring-summary.level-error {
   border-left-color: var(--vscode-errorForeground);
 }
-.refactoring-summary.level-0 {
-  border-left-color: var(--vscode-descriptionForeground);
-}
-.refactoring-summary.level-1 {
-  border-left-color: var(--vscode-focusBorder);
-}
+.refactoring-summary.level-0,
+.refactoring-summary.level-1,
 .refactoring-summary.level-2 {
   border-left-color: var(--codeScene-orange);
 }
@@ -67,9 +63,8 @@
 .refactoring-summary-header.level-error {
   color: var(--vscode-errorForeground);
 }
-.refactoring-summary-header.level-1 {
-  color: var(--vscode-focusBorder);
-}
+.refactoring-summary-header.level-0,
+.refactoring-summary-header.level-1,
 .refactoring-summary-header.level-2 {
   color: var(--codeScene-orange);
 }
