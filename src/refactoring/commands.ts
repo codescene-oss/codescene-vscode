@@ -48,13 +48,13 @@ export class CsRefactoringCommands implements vscode.Disposable {
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
+      const editor = targetEditor(document);
+      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn, });
       const workSpaceEdit = new WorkspaceEdit();
       workSpaceEdit.replace(document.uri, vscodeRange, response.code);
       await vscode.workspace.applyEdit(workSpaceEdit);
       // Select the replaced code in the editor, starting from the original position
       await selectCode(document, response.code, vscodeRange.start);
-      const editor = targetEditor(document);
-      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn, });
       await vscode.commands.executeCommand('editor.action.formatSelection');
 
       // Immediately trigger a re-review of the new file-content
