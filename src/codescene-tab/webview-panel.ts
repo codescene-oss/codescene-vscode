@@ -312,7 +312,7 @@ export class CodeSceneTabPanel implements Disposable {
         There was an error when performing this refactoring. 
         Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
 
-      const summaryContent = customRefactoringSummary('error', 'Refactoring Failed', actionHtml);
+      const summaryContent = customRefactoringSummary(-1, 'Refactoring Failed', actionHtml);
 
       Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
       this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);

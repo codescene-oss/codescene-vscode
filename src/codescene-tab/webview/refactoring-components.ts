@@ -12,14 +12,29 @@ export function refactoringSummary(confidence: Confidence) {
   return customRefactoringSummary(level, action, actionDetails);
 }
 
-export function customRefactoringSummary(level: number | 'error', action: string, actionDetails: string) {
-  const levelClass = `level-${level}`;
-  return /*html*/ `
-    <div class="refactoring-summary ${levelClass}">
-      <div class="refactoring-summary-header ${levelClass}">${action}</div>
-      <span>${actionDetails}</span>
-    </div>
-    `;
+// The texts here should be from the service, but updating there would make it change for customers - so for now hardcode in these fns 
+export function summaryHeader(level: number, levelClass: string, action: string) {
+  if (level >= 3) {
+    return `<div class="refactoring-summary-header ${levelClass}">Refactoring improves Code Health</div>`;
+  }
+  return `<div class="refactoring-summary-header ${levelClass}">${action}</div>`;
+}
+
+export function summaryDetails(level: number, actionDetails: string) {
+  if (level < 1) {
+    return '<span>The LLM failed to improve Code Health. The refactoring might still offer a structural step in the right direction - inspect and decide!</span>';
+  } 
+  return level < 3 ?`<span>${actionDetails}</span>` : '';
+}
+
+export function customRefactoringSummary(level: number, action: string, actionDetails: string) {
+  const levelClass = `level-${level > 0 ? level : 'error'}`;
+  return  /*html*/ `
+  <div class="refactoring-summary ${levelClass}">
+    ${summaryHeader(level, levelClass, action)}
+    ${summaryDetails(level, actionDetails)}
+  </div>
+  `;
 }
 
 function retryButton() {
