@@ -72,7 +72,7 @@ export function isMainBranch(currentBranch: string | undefined) {
 
 /**
  * Handles the deletion of a file from the repository.
-s *
+ *
  * Removes the file's review data from the review cache
  * and fires a Git file delete event for consumers (Code Health Monitor tree).
  */
