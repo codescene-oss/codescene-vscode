@@ -92,7 +92,7 @@ async function getHeadCommit(repo: Repository) {
  * - If the branch cannot be determined, fallback logic compares to a perfect score.
  */
 async function getDefaultCommit(repo: Repository) {
-  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+  const isMain = isMainBranch(repo.state.HEAD?.name);
 
   if (isMain) {
     return await getHeadCommit(repo);
@@ -133,7 +133,7 @@ async function handleBranchCreationRepoStateChange(repo: Repository) {
   const first = await getBranchCreationCommit(repo);
   const second = repo.state.HEAD?.commit;
 
-  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+  const isMain = isMainBranch(repo.state.HEAD?.name);
 
   if (isMain) {
     Reviewer.instance.refreshAllDeltasAndBaselines();
@@ -153,7 +153,7 @@ async function handleBranchCreationRepoStateChange(repo: Repository) {
  * Handles baseline changes when the baseline is set to default.
  */
 async function handleDefaultRepoStateChange(repo: Repository) {
-  const isMain = await isMainBranch({ currentBranch: repo.state.HEAD?.name, repoPath: repo.rootUri.path });
+  const isMain = isMainBranch(repo.state.HEAD?.name);
   if (isMain) {
     void handleHeadRepoStateChange(repo);
   } else {
