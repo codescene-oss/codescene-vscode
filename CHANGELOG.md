@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.12.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.2...v0.12.0) (2025-06-30)
+
+
+### Features
+
+* **ace:** introduce c# support ([3aa080d](https://github.com/codescene-oss/codescene-vscode/commit/3aa080de41d2fb3d6a230cc3737500cb52f704a6))
+
+
+### Bug fixes
+
+* **code-health-monitor:** Rework main branch detection logic ([caf9be2](https://github.com/codescene-oss/codescene-vscode/commit/caf9be2036a2836f4a7d5d5660e6772603a05cd3))
+
 ### [0.11.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.1...v0.11.2) (2025-05-23)
 
 
