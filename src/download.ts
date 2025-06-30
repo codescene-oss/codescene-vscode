@@ -19,9 +19,7 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '06505edaaee859f80e0178074a11aff144d5ebeb';
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION_LINUX_X64 = '06505edaaee859f80e0178074a11aff144d5ebeb';
+const REQUIRED_DEVTOOLS_VERSION = '4bbfed1b2a68783f54bc4da4e05c60ea2e4fe7c7';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -29,7 +27,7 @@ const artifacts: { [platform: string]: { [arch: string]: string } } = {
     arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   linux: {
-    x64: `cs-ide-linux-amd64-0000000000000000000000000000000000000000.zip`,
+    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
     arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
   },
   win32: {
@@ -133,13 +131,8 @@ async function verifyBinaryVersion({
     logOutputChannel.info(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
     return false;
   }
-  let version = REQUIRED_DEVTOOLS_VERSION;
 
-  if (process.platform === 'linux' && process.arch === 'x64') {
-    version = REQUIRED_DEVTOOLS_VERSION_LINUX_X64;
-  }
-
-  return result.stdout.trim() === version;
+  return result.stdout.trim() === REQUIRED_DEVTOOLS_VERSION;
 }
 
 /**
