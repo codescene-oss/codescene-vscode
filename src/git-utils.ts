@@ -62,7 +62,7 @@ export async function getBranchCreationCommit(repo: Repository) {
  *
  * Checks against a list of commonly used default branch names (main, master, develop, trunk, dev).
  */
-export function isMainBranch(currentBranch: string) {
+export function isMainBranch(currentBranch: string | undefined) {
   if (!currentBranch) return false;
 
   const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
