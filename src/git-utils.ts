@@ -35,7 +35,7 @@ export async function getBranchCreationCommit(repo: Repository) {
   const repoPath = repo.rootUri.path;
   if (!currentBranch || !repoPath) return '';
 
-  if (await isMainBranch({ currentBranch, repoPath })) return '';
+  if (isMainBranch(currentBranch)) return '';
 
   try {
     const { stdout: reflog } = await gitExecutor.execute(
@@ -57,50 +57,22 @@ export async function getBranchCreationCommit(repo: Repository) {
   }
 }
 
-interface IsMainBranchArgs {
-  currentBranch: string | undefined;
-  repoPath: string;
-}
 /**
  * Determines if the given branch could be the default branch.
  *
- * Checks against a list of commonly used default branch names (main, master, develop, trunk),
- * and also compares with the actual default branch retrieved from the remote (if any).
+ * Checks against a list of commonly used default branch names (main, master, develop, trunk, dev).
  */
-export async function isMainBranch({ currentBranch, repoPath }: IsMainBranchArgs) {
+export function isMainBranch(currentBranch: string) {
   if (!currentBranch) return false;
 
-  const possibleMainBranches = ['main', 'master', 'develop', 'trunk'];
-  const defaultBranch = await getPossibleDefaultBranchName(repoPath);
+  const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
 
-  return currentBranch === defaultBranch || possibleMainBranches.includes(currentBranch);
-}
-
-/**
- * Retrieves the default branch name of the remote origin.
- *
- * Parses the output of `git remote show origin` to extract the HEAD branch name.
- */
-async function getPossibleDefaultBranchName(repositoryPath: string) {
-  try {
-    const { stdout } = await gitExecutor.execute(
-      { command: 'git', args: ['remote', 'show', 'origin'] },
-      { cwd: repositoryPath }
-    );
-
-    return stdout
-      .split('\n')
-      .find((line) => line.includes('HEAD branch:'))
-      ?.split(':')?.[1]
-      ?.trim();
-  } catch (err) {
-    logOutputChannel.error(`Error occurred while retrieving default branch for repository ${repositoryPath}: ${err}`);
-  }
+  return possibleMainBranches.includes(currentBranch);
 }
 
 /**
  * Handles the deletion of a file from the repository.
- *
+s *
  * Removes the file's review data from the review cache
  * and fires a Git file delete event for consumers (Code Health Monitor tree).
  */
