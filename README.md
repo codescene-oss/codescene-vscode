@@ -20,6 +20,7 @@
 ![screenshot3](screenshots/auto-refactor-showcase.gif)
 
 ACE supported languages:
+- c#
 - java
 - javascript
 - typescript
