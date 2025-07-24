@@ -146,12 +146,19 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   );
 
   const docSelector = reviewDocumentSelector();
+  let reviewTimer: NodeJS.Timeout | undefined;
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
-      if (vscode.languages.match(docSelector, e.document) === 0) return;
-      CsDiagnostics.review(e.document);
-    })
+      if (vscode.languages.match(docSelector, e.document) === 0) {
+              return;
+      } 
+      clearTimeout(reviewTimer);
+      // Run review after 1 second of no edits
+      reviewTimer = setTimeout(() => {
+        CsDiagnostics.review(e.document);
+      }, 1000);    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
