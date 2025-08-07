@@ -60,11 +60,11 @@ export class CsServerVersion {
         } else if (error.code === 'ECONNREFUSED') {
           void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
         } else {
-          void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. ${error as Error}`);
+          void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         return { version: cloudVersion, url: url };
       } else {
-        void vscode.window.showErrorMessage(`Cannot connect to CodeScene server. ${error as Error}`);
+        void vscode.window.showErrorMessage(`Cannot connect to CodeScene server. Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
         return { version: cloudVersion, url: url };
       }
     }

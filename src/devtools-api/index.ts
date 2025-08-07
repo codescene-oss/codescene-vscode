@@ -176,7 +176,7 @@ export class DevtoolsAPI {
     } catch (e) {
       if (!(e instanceof AbortError)) {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        throw e;
+        reportError({ context: 'Unable to enable refactoring capabilities', e });
       }
     } finally {
       DevtoolsAPI.endAnalysisEvent();
