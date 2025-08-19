@@ -1,4 +1,4 @@
-# CodeScene - Code Analysis and Refactoring
+# CodeScene - Code Analysis
 [![CodeScene Code Health](https://codescene.io/projects/36131/status-badges/code-health)](https://codescene.io/projects/36131)
 
 ![screenshot3](screenshots/review-showcase.gif)
@@ -31,6 +31,12 @@ To customize the code analysis you can either use local [Code Comment Directives
 Code smells often lead to issues such as increased technical debt, more bugs, and reduced overall quality of the software.
 
 You can find detailed information for each code smell by either clicking the corresponding codelens in the editor, by examining the diagnostics (squigglies or in the Problems view), or by using the Quick Fix action menu (light bulb).
+
+## ACE AI-Powered Refactoring
+ACE (formerly available in beta)
+ACE, our AI-assisted code improvement tool, was previously included in the freemium version of this extension during its public beta phase.
+As of this version, ACE is no longer part of the public extension. It is now available exclusively to paying customers.
+Thank you to everyone who tested ACE during the beta and shared feedback.
 
 
 
