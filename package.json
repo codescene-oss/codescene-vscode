@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -26,13 +26,7 @@
     "code metrics",
     "cyclomatic complexity",
     "refactoring",
-    "technical debt",
-    "ai",
-    "anthropic",
-    "openai",
-    "gemini",
-    "gpt",
-    "ai code review"
+    "technical debt"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -172,12 +166,6 @@
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
           "order": 8
-        },
-        "codescene.enableAutoRefactor": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable CodeScene ACE",
-          "order": 15
         },
         "codescene.serverUrl": {
           "type": "string",

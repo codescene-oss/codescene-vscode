@@ -51,9 +51,9 @@ export class CsStatusBar {
   }
 
   private indicateErrors(stateProperties: CsStateProperties) {
-    const { analysis, ace } = stateProperties.features;
+    const { analysis /*, ace // CS-5069 Remove ACE */ } = stateProperties.features;
 
-    if (analysis.state === 'error' || ace.state === 'error') {
+    if (analysis.state === 'error' /*|| ace.state === 'error' // CS-5069 Remove ACE */) {
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       this.statusBarItem.tooltip = 'Show in control center';
@@ -61,7 +61,7 @@ export class CsStatusBar {
       return;
     }
 
-    if (isDefined(analysis.error) || this.reportableAceError(ace.error)) {
+    if (isDefined(analysis.error) /*|| this.reportableAceError(ace.error) // CS-5069 Remove ACE */) {
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
       this.statusBarItem.tooltip = 'Click to open output log and clear errors.';
@@ -73,7 +73,8 @@ export class CsStatusBar {
   /**
    * Don't show errors related to credit outages
    */
-  private reportableAceError(error?: Error) {
-    return isDefined(error) && !(error instanceof CreditsInfoError);
-  }
+  // CS-5069 Remove ACE from public version
+  // private reportableAceError(error?: Error) {
+  //   return isDefined(error) && !(error instanceof CreditsInfoError);
+  // }
 }
