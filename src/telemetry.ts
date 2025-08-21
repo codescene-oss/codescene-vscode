@@ -55,9 +55,11 @@ static async init(context: vscode.ExtensionContext): Promise<void> {
 }
 
   static logUsage(eventName: string, eventData?: any) {
-    if (!Telemetry._instance) {
-      logOutputChannel.warn(`[Telemetry] Attempted to log event "${eventName}" before telemetry was initialized`);
+    if (!getConfiguration('enableTelemetry')) {
       return;
+    } else if (!Telemetry._instance) {
+      logOutputChannel.warn(`[Telemetry] Attempted to log event "${eventName}" but telemetry is disabled`);
+      return; 
     }
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
