@@ -40,6 +40,7 @@ export interface CsStateProperties {
 const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
+const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
 /**
  * This class is used to handle the state of the extension. One part is managing and presenting
@@ -76,7 +77,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey, baselineKey]);
+    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -112,6 +113,14 @@ export class CsExtensionState {
 
   static get onBaselineChanged() {
     return this._instance.onBaselineChanged;
+  }
+
+  static get telemetryNoticeShown() {
+    return this._instance.context.globalState.get<boolean>(telemetryNoticeShownKey);
+  }
+
+  static async setTelemetryNoticeShown(value?: boolean) {
+    await this._instance.context.globalState.update(telemetryNoticeShownKey, value);
   }
 
   static get stateProperties() {
