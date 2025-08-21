@@ -27,26 +27,26 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-static async init(extension: vscode.Extension<any>): Promise<void> {
-  const enableTelemtry = getConfiguration('enableTelemetry');
+static async init(context: vscode.ExtensionContext): Promise<void> {
   try {
-    // Handle the first-time run notification
     await this.checkFirstRun();
 
-    // Check if telemetry is already initialized or not
-    if (this._instance) {
-      logOutputChannel.warn('Telemetry logger already initialized, skipping re-initialization');
-      return;
-    }
-
-    if (!enableTelemtry) {
+    const enableTelemetry = getConfiguration('enableTelemetry');
+    if (enableTelemetry) {
+      logOutputChannel.info('Initializing telemetry logger');
+      this._instance = new Telemetry(context.extension);
+    } else {
       logOutputChannel.info('Telemetry is disabled by user preference');
-      return;
     }
 
-    // Initialize the telemetry logger if telemetry is enabled
-    logOutputChannel.info('Initializing telemetry logger');
-    this._instance = new Telemetry(extension);
+    // Listen for changes in telemetry setting
+    const disposable = vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('enableTelemetry')) {
+        Telemetry.refreshConfig(context.extension);
+      }
+    });
+
+    context.subscriptions.push(disposable);
 
   } catch (error) {
     logOutputChannel.error('Error during telemetry initialization:', error);
@@ -96,5 +96,22 @@ static async init(extension: vscode.Extension<any>): Promise<void> {
       // Mark that the first run notice has been shown
       await CsExtensionState.setTelemetryNoticeShown(true);
     }
+  }
+
+  private static refreshConfig(extension: vscode.Extension<any>) {
+    const enableTelemetry = getConfiguration('enableTelemetry');
+    if (enableTelemetry && !this._instance) {
+      logOutputChannel.info('Enabling telemetry at runtime');
+      this._instance = new Telemetry(extension);
+    } else if (!enableTelemetry && this._instance) {
+      logOutputChannel.info('Disabling telemetry at runtime');
+      this._instance.dispose();
+      this._instance = undefined;
+    }
+  }
+
+  dispose() {
+    logOutputChannel.info('Telemetry logger disposed');
+    this.telemetryLogger.dispose();
   }
 }
