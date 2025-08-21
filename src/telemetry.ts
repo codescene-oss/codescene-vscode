@@ -1,5 +1,6 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
+import { getConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
@@ -26,10 +27,32 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-  static init(extension: vscode.Extension<any>): void {
+static async init(extension: vscode.Extension<any>): Promise<void> {
+  const enableTelemtry = getConfiguration('enableTelemetry');
+  try {
+    // Handle the first-time run notification
+    await this.checkFirstRun();
+
+    // Check if telemetry is already initialized or not
+    if (this._instance) {
+      logOutputChannel.warn('Telemetry logger already initialized, skipping re-initialization');
+      return;
+    }
+
+    if (!enableTelemtry) {
+      logOutputChannel.info('Telemetry is disabled by user preference');
+      return;
+    }
+
+    // Initialize the telemetry logger if telemetry is enabled
     logOutputChannel.info('Initializing telemetry logger');
-    Telemetry._instance = new Telemetry(extension);
+    this._instance = new Telemetry(extension);
+
+  } catch (error) {
+    logOutputChannel.error('Error during telemetry initialization:', error);
+    this._instance = undefined; // Ensure instance is cleared on error
   }
+}
 
   static logUsage(eventName: string, eventData?: any) {
     if (!Telemetry._instance) {
@@ -56,5 +79,22 @@ export default class Telemetry {
       telemetryEvent['internal'] = true;
     }
     return DevtoolsAPI.postTelemetry(telemetryEvent);
+  }
+
+  private static async checkFirstRun() {
+    if (!CsExtensionState.telemetryNoticeShown) {
+      const openSettings = 'Open Settings';
+      const selection = await vscode.window.showInformationMessage(
+        'Telemetry is enabled by default to help improve this extension. You can disable it in the settings.',
+        openSettings
+      );
+      
+      if (selection === openSettings) {
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+      }
+
+      // Mark that the first run notice has been shown
+      await CsExtensionState.setTelemetryNoticeShown(true);
+    }
   }
 }
