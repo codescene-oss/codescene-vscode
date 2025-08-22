@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { assertError, getFileExtension, NetworkErrors, rangeStr, reportError } from '../utils';
+import { assertError, getFileExtension, networkErrors, rangeStr, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
@@ -310,13 +310,13 @@ export class DevtoolsAPI {
   //   } catch (e) {
   //     if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
   //       DevtoolsAPI.handleOfflineBehavior();
-  //       return;
+  //     } else {
+  //       reportError({ context: 'Refactoring error', e, consoleOnly: true });
+  //       if (!(e instanceof AbortError)) {
+  //         DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
+  //       }
   //     }
 
-  //     reportError({ context: 'Refactoring error', e, consoleOnly: true });
-  //     if (!(e instanceof AbortError)) {
-  //       DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
-  //     }
   //     throw e; // Some general error reporting above, but pass along the error for further handling
   //   } finally {
   //     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
@@ -332,15 +332,15 @@ export class DevtoolsAPI {
     return (await DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--device-id'] })).stdout;
   }
 
-  private static shouldHandleOfflineBehavior(e: unknown): boolean {
-    const message = (e as Error).message;
+  // private static shouldHandleOfflineBehavior(e: unknown): boolean {
+  //   const message = (e as Error).message;
 
-    if (message === NetworkErrors.JavaConnectException) {
-      return true;
-    }
+  //   if (message === networkErrors.javaConnectException) {
+  //     return true;
+  //   }
 
-    return false;
-  }
+  //   return false;
+  // }
 
   /**
    * Handles the transition of the ACE feature into offline mode.
