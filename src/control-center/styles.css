@@ -41,6 +41,11 @@
   background-color: var(--vscode-debugExceptionWidget-background);
 }
 
+.badge-offline {
+  color: var(--vscode-disabledForeground);
+  background-color: var(--vscode-editorWidget-background);
+}
+
 #device-id {
   font-size: 8px;
   color: var(--vscode-disabledForeground);

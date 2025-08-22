@@ -29,6 +29,13 @@ interface ReportErrorProps {
   consoleOnly?: boolean;
 }
 
+export const NetworkErrors = {
+  JavaConnectException: 'java.net.ConnectException',
+  GetAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
+  EConnRefused: 'ECONNREFUSED',
+  // add more later if needed
+} as const;
+
 /**
  * Unified error reporting for catch clauses
  *
