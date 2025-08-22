@@ -29,10 +29,10 @@ interface ReportErrorProps {
   consoleOnly?: boolean;
 }
 
-export const NetworkErrors = {
-  JavaConnectException: 'java.net.ConnectException',
-  GetAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
-  EConnRefused: 'ECONNREFUSED',
+export const networkErrors = {
+  javaConnectException: 'java.net.ConnectException',
+  getAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
+  eConnRefused: 'ECONNREFUSED',
   // add more later if needed
 } as const;
 
@@ -47,7 +47,7 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
 
   const error = assertError(e);
 
-  const isNetworkError = error.message.toLowerCase().includes(NetworkErrors.GetAddrInfoNotFound.toLowerCase());
+  const isNetworkError = error.message.toLowerCase().includes(networkErrors.getAddrInfoNotFound.toLowerCase());
   let message = isNetworkError
     ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
     : `${context}. ${error.message}`;

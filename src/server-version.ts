@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import vscode from 'vscode';
 import { getServerUrl } from './configuration';
 import { logOutputChannel } from './log';
-import { NetworkErrors } from './utils';
+import { networkErrors } from './utils';
 
 export interface ServerVersion {
   server: string;
@@ -62,16 +62,17 @@ export class CsServerVersion {
   private static handleErrorState(error: unknown, url: string) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    if (!(error instanceof AxiosError))
+    if (!(error instanceof AxiosError)) {
       logOutputChannel.warn(`Cannot connect to CodeScene server. Error: ${errorMessage}`);
+    }
 
     const err = error as AxiosError;
     if (err.response?.status === 500) {
       // that's cloud dev that hasn't had a version template generated
       logOutputChannel.debug('Cloud dev version detected');
-    } else if (err.code === NetworkErrors.EConnRefused) {
+    } else if (err.code === networkErrors.eConnRefused) {
       void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
-    } else if (errorMessage.startsWith(NetworkErrors.GetAddrInfoNotFound)) {
+    } else if (errorMessage.startsWith(networkErrors.getAddrInfoNotFound)) {
       logOutputChannel.warn(
         `Cannot reach CodeScene server (${url}). Please check your internet connection or verify the server address is correct.`
       );
