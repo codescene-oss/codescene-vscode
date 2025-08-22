@@ -175,17 +175,17 @@ export class DevtoolsAPI {
       }
       DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
       return deltaResult;
-    } catch (e) {
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        // CS-5069 Remove ACE from public version
+     } catch (e) {
+      // CS-5069 Remove ACE from public version
+      // if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
         // DevtoolsAPI.handleOfflineBehavior();
         return;
-      }
+      // }
 
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        reportError({ context: 'Unable to enable refactoring capabilities', e });
-      }
+      // if (!(e instanceof AbortError)) {
+      //   DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
+      //   reportError({ context: 'Unable to enable refactoring capabilities', e });
+      // }
     } finally {
       DevtoolsAPI.endAnalysisEvent();
     }
