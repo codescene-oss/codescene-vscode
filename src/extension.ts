@@ -41,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
       DevtoolsAPI.init(binaryPath, context);
-      Telemetry.init(context.extension);
+      await Telemetry.init(context);
 
       try {
         await acceptTermsAndPolicies(context); // throws Error if terms are not accepted

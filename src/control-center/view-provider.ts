@@ -241,26 +241,31 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
   //     tooltip,
   //     outOfCreditsBanner;
 
-  //   switch (aceFeature.state) {
-  //     case 'loading':
-  //       iconClass = 'codicon-loading codicon-modifier-spin';
-  //       text = 'initializing';
-  //       break;
-  //     case 'enabled':
-  //       iconClass = 'codicon-sparkle';
-  //       text = 'activated';
-  //       break;
-  //     case 'disabled':
-  //       iconClass = 'codicon-circle-slash';
-  //       text = 'deactivated';
-  //       tooltip = 'Disabled in configuration';
-  //       break;
-  //     case 'error':
-  //       iconClass = 'codicon-error';
-  //       tooltip = 'Click to retry connecting to CodeScene ACE';
-  //       text = 'error';
-  //       break;
-  //   }
+    // switch (aceFeature.state) {
+    //   case 'loading':
+    //     iconClass = 'codicon-loading codicon-modifier-spin';
+    //     text = 'initializing';
+    //     break;
+    //   case 'enabled':
+    //     iconClass = 'codicon-sparkle';
+    //     text = 'activated';
+    //     break;
+    //   case 'disabled':
+    //     iconClass = 'codicon-circle-slash';
+    //     text = 'deactivated';
+    //     tooltip = 'Disabled in configuration';
+    //     break;
+    //   case 'error':
+    //     iconClass = 'codicon-error';
+    //     tooltip = 'Click to retry connecting to CodeScene ACE';
+    //     text = 'error';
+    //     break;
+    //   case 'offline':
+    //     iconClass = 'codicon-error';
+    //     text = 'offline';
+    //     tooltip = 'Internet connection unavailable';
+    //     break;
+    // }
 
   //   // Custom presentation if we're out of credits
   //   if (aceFeature.error instanceof CreditsInfoError) {

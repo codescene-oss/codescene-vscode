@@ -5,7 +5,7 @@ import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
 import { isDefined } from './utils';
 
-export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
+export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error' | 'offline';
 
 /**
  * state - indicates the state of the feature
@@ -42,6 +42,7 @@ const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
 // CS-5069 Remove ACE from public version
 // const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
+const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
 /**
  * This class is used to handle the state of the extension. One part is managing and presenting
@@ -79,7 +80,12 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, /*acknowledgedAceUsageKey, // CS-5069 Remove ACE */ baselineKey]);
+    this.context.globalState.setKeysForSync([
+      acceptedTermsAndPoliciesKey,
+      /*acknowledgedAceUsageKey, // CS-5069 Remove ACE */
+      baselineKey,
+      telemetryNoticeShownKey,
+    ]);
   }
 
   private static _instance: CsExtensionState;
@@ -116,6 +122,14 @@ export class CsExtensionState {
 
   static get onBaselineChanged() {
     return this._instance.onBaselineChanged;
+  }
+
+  static get telemetryNoticeShown() {
+    return this._instance.context.globalState.get<boolean>(telemetryNoticeShownKey);
+  }
+
+  static async setTelemetryNoticeShown(value?: boolean) {
+    await this._instance.context.globalState.update(telemetryNoticeShownKey, value);
   }
 
   static get stateProperties() {
