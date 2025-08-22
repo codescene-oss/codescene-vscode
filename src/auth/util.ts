@@ -45,7 +45,7 @@ export function promiseFromEvent<T, U>(
       },
       (error) => {
         subscription.dispose();
-        throw error;
+        throw error.message ? error.message : error;
       }
     ),
     cancel,
