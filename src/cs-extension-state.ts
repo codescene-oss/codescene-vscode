@@ -5,7 +5,7 @@ import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
 import { isDefined } from './utils';
 
-export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
+export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error' | 'offline';
 
 /**
  * state - indicates the state of the feature
@@ -77,7 +77,12 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acceptedTermsAndPoliciesKey, acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
+    this.context.globalState.setKeysForSync([
+      acceptedTermsAndPoliciesKey,
+      acknowledgedAceUsageKey,
+      baselineKey,
+      telemetryNoticeShownKey,
+    ]);
   }
 
   private static _instance: CsExtensionState;
