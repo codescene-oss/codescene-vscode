@@ -11,10 +11,11 @@ export function registerTermsAndPoliciesCmds(context: ExtensionContext) {
     }),
     // Mostly for testing, users should rarely need to revoke this since it is controlled by a setting as well
     // The acceptance is just for notifying the user about the feature
-    commands.registerCommand('codescene.revokeAceAcknowledgement', async () => {
-      await CsExtensionState.setAcknowledgedAceUsage(undefined);
-      void window.showInformationMessage('Accept ACE usage has now been revoked');
-    })
+    // CS-5069 Remove ACE from public version
+    // commands.registerCommand('codescene.revokeAceAcknowledgement', async () => {
+      // await CsExtensionState.setAcknowledgedAceUsage(undefined);
+      // void window.showInformationMessage('Accept ACE usage has now been revoked');
+    // })
   );
 }
 

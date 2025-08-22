@@ -1,6 +1,7 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Webview, WebviewViewProvider } from 'vscode';
-import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
+// CS-5069 Remove ACE from public version
+// import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
@@ -58,14 +59,15 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private messageHandler(message: any) {
     switch (message.command) {
-      case 'request-and-present-refactoring':
-        void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
-          this.functionInfo?.parent.document,
-          'code-health-details',
-          this.functionInfo?.fnToRefactor
-        );
-        return;
+    // CS-5069 Remove ACE from public version
+    //   case 'request-and-present-refactoring':
+    //     void vscode.commands.executeCommand(
+    //       'codescene.requestAndPresentRefactoring',
+    //       this.functionInfo?.parent.document,
+    //       'code-health-details',
+    //       this.functionInfo?.fnToRefactor
+    //     );
+    //     return;
       case 'interactive-docs':
         const issue = this.functionInfo?.children[message.issueIndex];
         if (issue) {
@@ -119,10 +121,10 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     let content = '';
     if (functionInfo) {
       content = this.functionInfoContent(functionInfo);
-      const { isRefactoringSupported, children } = functionInfo;
+      const {/* isRefactoringSupported,*/ children } = functionInfo;
       Telemetry.logUsage('code-health-details/function-selected', {
         visible: this.view?.visible,
-        isRefactoringSupported,
+        isRefactoringSupported: false, // CS-5069 Remove ACE from public version
         nIssues: children.length,
       });
     } else {
@@ -139,11 +141,12 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private functionInfoContent(functionInfo: DeltaFunctionInfo) {
     return `
-    ${this.fileAndCodeSmellSummary(functionInfo)}
-    <div class="block">
-      ${refactoringButton(functionInfo.fnToRefactor)}
-    </div>
-    ${this.issueDetails(functionInfo)}
+    ${this.fileAndCodeSmellSummary(functionInfo)}` +
+    // CS-5069 Remove ACE from public version
+    //  <div class="block">
+    //    ${refactoringButton(functionInfo.fnToRefactor)}
+    //  </div>
+    `${this.issueDetails(functionInfo)}
     `;
   }
 

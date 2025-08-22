@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.14.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.12.1...v0.14.0) (2025-08-22)
+
+
+### Features
+
+* **ace:** ACE was previously part of our freemium offering during its public beta. ACE is now live and available exclusively to paying customers. ([a9157f8](https://github.com/codescene-oss/codescene-vscode/commit/a9157f8eef583a1a58234c31dd9bebf87b8d3f33))
+
+## [0.13.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.12.1...v0.13.0) (2025-08-21)
+
+
+### Features
+
+* **telemetry:**  telemetry is now optional, enabled by deafult ([b811ff5](https://github.com/codescene-oss/codescene-vscode/commit/b811ff5b18725e33c826c582e6fc097fd860dfdb))
+
 ### [0.12.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.12.0...v0.12.1) (2025-07-24)
 
 ## [0.12.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.11.2...v0.12.0) (2025-06-30)
