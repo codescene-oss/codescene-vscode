@@ -46,7 +46,12 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
   if (e instanceof AbortError) return;
 
   const error = assertError(e);
-  const message = `${context}. ${error.message}`;
+
+  const isNetworkError = error.message.toLowerCase().includes(NetworkErrors.GetAddrInfoNotFound.toLowerCase());
+  let message = isNetworkError
+    ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
+    : `${context}. ${error.message}`;
+
   delete error.stack;
   logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
   if (consoleOnly) {

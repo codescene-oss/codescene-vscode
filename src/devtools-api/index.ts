@@ -358,7 +358,7 @@ export class DevtoolsAPI {
     }
 
     logOutputChannel.warn(
-      'CodeScene extension is running in offline mode. The requested action could not be completed. Please check your Internet connection to restore full functionality.'
+      'CodeScene extension is running in offline mode. The requested action could not be completed. Please check your internet connection to restore full functionality.'
     );
 
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'offline' });
