@@ -2,6 +2,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import vscode from 'vscode';
 import { getServerUrl } from './configuration';
 import { logOutputChannel } from './log';
+import { NetworkErrors } from './utils';
 
 export interface ServerVersion {
   server: string;
@@ -53,20 +54,29 @@ export class CsServerVersion {
         return { version: cloudVersion, url: url };
       }
     } catch (error) {
-      if (error instanceof AxiosError) {
-        if (error.response?.status === 500) {
-          // that's cloud dev that hasn't had a version template generated
-          logOutputChannel.debug('Cloud dev version detected');
-        } else if (error.code === 'ECONNREFUSED') {
-          void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
-        } else {
-          void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-        return { version: cloudVersion, url: url };
-      } else {
-        void vscode.window.showErrorMessage(`Cannot connect to CodeScene server. Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        return { version: cloudVersion, url: url };
-      }
+      CsServerVersion.handleErrorState(error, url);
+      return { version: cloudVersion, url: url };
+    }
+  }
+
+  private static handleErrorState(error: unknown, url: string) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    if (!(error instanceof AxiosError))
+      logOutputChannel.warn(`Cannot connect to CodeScene server. Error: ${errorMessage}`);
+
+    const err = error as AxiosError;
+    if (err.response?.status === 500) {
+      // that's cloud dev that hasn't had a version template generated
+      logOutputChannel.debug('Cloud dev version detected');
+    } else if (err.code === NetworkErrors.EConnRefused) {
+      void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
+    } else if (errorMessage.startsWith(NetworkErrors.GetAddrInfoNotFound)) {
+      logOutputChannel.warn(
+        `Cannot reach CodeScene server (${url}). Please check your internet connection or verify the server address is correct.`
+      );
+    } else {
+      void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Error message: ${errorMessage}`);
     }
   }
 
