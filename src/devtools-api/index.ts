@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { assertError, getFileExtension, rangeStr, reportError } from '../utils';
+import { assertError, getFileExtension, NetworkErrors, rangeStr, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
@@ -174,6 +174,11 @@ export class DevtoolsAPI {
       DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
       return deltaResult;
     } catch (e) {
+      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
+        DevtoolsAPI.handleOfflineBehavior();
+        return;
+      }
+
       if (!(e instanceof AbortError)) {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
         reportError({ context: 'Unable to enable refactoring capabilities', e });
@@ -203,6 +208,11 @@ export class DevtoolsAPI {
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
     } catch (e) {
+      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
+        DevtoolsAPI.handleOfflineBehavior();
+        return;
+      }
+
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error: assertError(e) });
       reportError({ context: 'Unable to enable refactoring capabilities', e });
     }
@@ -288,8 +298,16 @@ export class DevtoolsAPI {
           skipCache === true ? ' (retry)' : ''
         }`
       );
+
+      DevtoolsAPI.handleBackOnline();
+
       return response;
     } catch (e) {
+      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
+        DevtoolsAPI.handleOfflineBehavior();
+        return;
+      }
+
       reportError({ context: 'Refactoring error', e, consoleOnly: true });
       if (!(e instanceof AbortError)) {
         DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
@@ -307,6 +325,56 @@ export class DevtoolsAPI {
 
   static async getDeviceId() {
     return (await DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--device-id'] })).stdout;
+  }
+
+  private static shouldHandleOfflineBehavior(e: unknown): boolean {
+    const message = (e as Error).message;
+
+    if (message === NetworkErrors.JavaConnectException) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handles the transition of the ACE feature into offline mode.
+   *
+   * This method should be called when a network-related error is detected.
+   * It performs the following actions:
+   * - If not already offline, shows an information message to the user that the extension
+   *   is running in offline mode and some features may be unavailable.
+   * - Logs a warning in the output channel with additional context.
+   * - Fires a preflight event to update the ACE state to `offline`.
+   */
+  private static handleOfflineBehavior() {
+    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
+
+    // Only show when transitioning to offline mode
+    if (currentState !== 'offline') {
+      void vscode.window.showInformationMessage(
+        'CodeScene extension is running in offline mode. Some features may be unavailable.'
+      );
+    }
+
+    logOutputChannel.warn(
+      'CodeScene extension is running in offline mode. The requested action could not be completed. Please check your Internet connection to restore full functionality.'
+    );
+
+    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'offline' });
+  }
+
+  /**
+   * Restores the ACE feature state when the extension comes back online.
+   * This method should be called after a successful request to the CodeScene backend.
+   * No action is taken if the ACE feature state is not `offline`.
+   */
+  private static handleBackOnline() {
+    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
+    if (currentState === 'offline') {
+      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
+      void vscode.window.showInformationMessage('CodeScene extension is back online.');
+    }
   }
 }
 
