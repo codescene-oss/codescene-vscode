@@ -13,6 +13,7 @@ function main() {
   // Status
   addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('showLogOutput'));
   addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('retryAce'));
+  addClickEventForClass('ace-badge', 'badge-offline', () => sendMessage('retryAce'));
 
   // More
   addClickListenerToElementById('codescene-settings', () => sendMessage('openSettings'));
@@ -24,7 +25,6 @@ function main() {
 
   // device-id
   addClickListenerToElementById('device-id', () => sendMessage('copyDeviceId'));
-
 }
 
 function addClickListenerToElementById(elementId: string, listener: () => void) {

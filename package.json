@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -183,6 +183,12 @@
           "type": "string",
           "default": "https://codescene.io",
           "order": 19
+        },
+        "codescene.enableTelemetry": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable sending usage telemetry to CodeScene",
+          "order": 20
         }
       }
     },

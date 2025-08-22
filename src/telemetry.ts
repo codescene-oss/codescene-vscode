@@ -1,5 +1,6 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
+import { getConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
@@ -26,14 +27,35 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-  static init(extension: vscode.Extension<any>): void {
-    logOutputChannel.info('Initializing telemetry logger');
-    Telemetry._instance = new Telemetry(extension);
+static async init(context: vscode.ExtensionContext): Promise<void> {
+  try {
+    await this.checkFirstRun();
+
+    const enableTelemetry = getConfiguration('enableTelemetry');
+    if (enableTelemetry) {
+      logOutputChannel.info('Initializing telemetry logger');
+      this._instance = new Telemetry(context.extension);
+    } else {
+      logOutputChannel.info('Telemetry is disabled by user preference');
+    }
+
+    // Listen for changes in telemetry setting
+    const disposable = vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('enableTelemetry')) {
+        Telemetry.refreshConfig(context.extension);
+      }
+    });
+
+    context.subscriptions.push(disposable);
+
+  } catch (error) {
+    logOutputChannel.error('Error during telemetry initialization:', error);
+    this._instance = undefined; // Ensure instance is cleared on error
   }
+}
 
   static logUsage(eventName: string, eventData?: any) {
-    if (!Telemetry._instance) {
-      logOutputChannel.warn(`[Telemetry] Attempted to log event "${eventName}" before telemetry was initialized`);
+    if (!Telemetry._instance || !getConfiguration('enableTelemetry')) {
       return;
     }
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
@@ -56,5 +78,39 @@ export default class Telemetry {
       telemetryEvent['internal'] = true;
     }
     return DevtoolsAPI.postTelemetry(telemetryEvent);
+  }
+
+  private static async checkFirstRun() {
+    if (!CsExtensionState.telemetryNoticeShown) {
+      const openSettings = 'Open Settings';
+      const selection = await vscode.window.showInformationMessage(
+        'Telemetry is enabled by default to help improve this extension. You can disable it in the settings.',
+        openSettings
+      );
+      
+      if (selection === openSettings) {
+        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+      }
+
+      // Mark that the first run notice has been shown
+      await CsExtensionState.setTelemetryNoticeShown(true);
+    }
+  }
+
+  private static refreshConfig(extension: vscode.Extension<any>) {
+    const enableTelemetry = getConfiguration('enableTelemetry');
+    if (enableTelemetry && !this._instance) {
+      logOutputChannel.info('Enabling telemetry at runtime');
+      this._instance = new Telemetry(extension);
+    } else if (!enableTelemetry && this._instance) {
+      logOutputChannel.info('Disabling telemetry at runtime');
+      this._instance.dispose();
+      this._instance = undefined;
+    }
+  }
+
+  dispose() {
+    logOutputChannel.info('Telemetry logger disposed');
+    this.telemetryLogger.dispose();
   }
 }

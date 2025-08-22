@@ -255,6 +255,11 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
         tooltip = 'Click to retry connecting to CodeScene ACE';
         text = 'error';
         break;
+      case 'offline':
+        iconClass = 'codicon-error';
+        text = 'offline';
+        tooltip = 'Internet connection unavailable';
+        break;
     }
 
     // Custom presentation if we're out of credits
