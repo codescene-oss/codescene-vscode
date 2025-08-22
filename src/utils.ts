@@ -53,7 +53,7 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
     : `${context}. ${error.message}`;
 
   delete error.stack;
-  logOutputChannel.error(`${message} ${JSON.stringify(error)}`);
+  logOutputChannel.error(`${message} ${!isNetworkError ? JSON.stringify(error) : ''}`);
   if (consoleOnly) {
     logOutputChannel.show();
   } else {
