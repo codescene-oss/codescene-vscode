@@ -63,7 +63,7 @@ export class CsServerVersion {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     if (!(error instanceof AxiosError))
-      void vscode.window.showErrorMessage(`Cannot connect to CodeScene server. Error: ${errorMessage}`);
+      logOutputChannel.warn(`Cannot connect to CodeScene server. Error: ${errorMessage}`);
 
     const err = error as AxiosError;
     if (err.response?.status === 500) {
@@ -73,7 +73,7 @@ export class CsServerVersion {
       void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
     } else if (errorMessage.startsWith(NetworkErrors.GetAddrInfoNotFound)) {
       logOutputChannel.warn(
-        `Cannot reach CodeScene server (${url}). Please check your internet connection or verify the server address.`
+        `Cannot reach CodeScene server (${url}). Please check your internet connection or verify the server address is correct.`
       );
     } else {
       void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Error message: ${errorMessage}`);
