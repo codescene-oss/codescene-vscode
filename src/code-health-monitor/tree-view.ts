@@ -4,7 +4,7 @@ import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize, showDocAtPosition } from '../utils';
 import { registerDeltaAnalysisDecorations } from './presentation';
-import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
+import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues /*, refactoringsCount // CS-5069 Remove ACE */ } from './tree-model';
 import { onFileDeletedFromGit } from '../git-utils';
 import { onTreeDataCleared } from './addon';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
@@ -29,9 +29,10 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     this.treeDataProvider.onDidChangeTreeData(this.handleTreeDataChange, this, this.disposables);
     this.disposables.push(
       this.view,
-      vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
-        this.revealAutoRefactorings()
-      ),
+      // CS-5069 Remove ACE from public version
+      // vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
+      //   this.revealAutoRefactorings()
+      // ),
       vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
         void this.treeDataProvider.selectBaseline();
       }),
@@ -87,7 +88,8 @@ export class CodeHealthMonitorView implements vscode.Disposable {
   private updateFunctionInfoDetails(selection?: DeltaTreeViewItem) {
     if (selection instanceof DeltaFunctionInfo) {
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails', selection);
-      void vscode.commands.executeCommand('codescene.monitorCodeLens.showForFunction', selection);
+      // CS-5069 Remove ACE from public version
+      // void vscode.commands.executeCommand('codescene.monitorCodeLens.showForFunction', selection);
     } else {
       // else just clear the view
       void vscode.commands.executeCommand('codescene.codeHealthDetailsView.showDetails');
@@ -100,19 +102,20 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     }
   }
 
-  private revealAutoRefactorings() {
-    this.treeDataProvider.tree.forEach((treeItem) => {
-      if (
-        treeItem instanceof FileWithIssues &&
-        treeItem.functionLevelIssues.some((issue) => issue.isRefactoringSupported)
-      ) {
-        this.view.reveal(treeItem, { expand: true, select: false, focus: false }).then(
-          () => {},
-          (error) => logOutputChannel.error(`Failed to reveal auto-refactorings: ${error}`)
-        );
-      }
-    });
-  }
+  // CS-5069 Remove ACE from public version
+  // private revealAutoRefactorings() {
+  //   this.treeDataProvider.tree.forEach((treeItem) => {
+  //     if (
+  //       treeItem instanceof FileWithIssues &&
+  //       treeItem.functionLevelIssues.some((issue) => issue.isRefactoringSupported)
+  //     ) {
+  //       this.view.reveal(treeItem, { expand: true, select: false, focus: false }).then(
+  //         () => {},
+  //         (error) => logOutputChannel.error(`Failed to reveal auto-refactorings: ${error}`)
+  //       );
+  //     }
+  //   });
+  // }
 
   isVisible() {
     return this.view.visible;
@@ -239,9 +242,11 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
-      const baselineInfoItem = this.addBaselineInfo();
-      const aceInfoItem = this.aceSummaryItem(filesWithIssues);
-      this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
+      // CS-5069 Remove ACE from public version
+      // const baselineInfoItem = this.addBaselineInfo();
+      // const aceInfoItem = this.aceSummaryItem(filesWithIssues);
+      // this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
+      this.tree = filesWithIssues;
     } else {
       this.tree = [];
     }
@@ -250,8 +255,8 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
 
   syncTree({ document, result }: DeltaAnalysisEvent) {
     const evtData = (fileWithIssues: FileWithIssues) => {
-      const { nIssues, nRefactorableFunctions, scoreChange } = fileWithIssues;
-      return { visible: this.parentView?.visible, scoreChange, nIssues, nRefactorableFunctions };
+      const { nIssues, /*nRefactorableFunctions,  // CS-5069 Remove ACE */scoreChange } = fileWithIssues;
+      return { visible: this.parentView?.visible, scoreChange, nIssues, /* nRefactorableFunctions  // CS-5069 Remove ACE */ };
     };
 
     // Find the tree item matching the event document
@@ -288,22 +293,23 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
     this.update();
   }
 
-  private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
-    const refactorings = refactoringsCount(filesWithIssues);
-    if (refactorings === 0) {
-      return;
-    }
-    const label = `${refactorings} ${pluralize('auto-refactoring', refactorings)} available`;
-    const tooltip = `Click to expand available refactorings`;
-    const aceTreeItem = new vscode.TreeItem(label);
-    aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
-    aceTreeItem.tooltip = tooltip;
-    aceTreeItem.command = {
-      command: 'codescene.codeHealthMonitor.revealAutoRefactorings',
-      title: 'Expand Auto-Refactorings',
-    };
-    return new DeltaInfoItem(aceTreeItem);
-  }
+  // CS-5069 Remove ACE from public version
+  // private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
+  //   const refactorings = refactoringsCount(filesWithIssues);
+  //   if (refactorings === 0) {
+  //     return;
+  //   }
+  //   const label = `${refactorings} ${pluralize('auto-refactoring', refactorings)} available`;
+  //   const tooltip = `Click to expand available refactorings`;
+  //   const aceTreeItem = new vscode.TreeItem(label);
+  //   aceTreeItem.iconPath = new vscode.ThemeIcon('sparkle');
+  //   aceTreeItem.tooltip = tooltip;
+  //   aceTreeItem.command = {
+  //     command: 'codescene.codeHealthMonitor.revealAutoRefactorings',
+  //     title: 'Expand Auto-Refactorings',
+  //   };
+  //   return new DeltaInfoItem(aceTreeItem);
+  // }
 
   getTreeItem(element: DeltaTreeViewItem): vscode.TreeItem {
     return element.toTreeItem();

@@ -1,5 +1,6 @@
 import vscode from 'vscode';
-import { RefactoringRequest } from '../refactoring/request';
+// CS-5069 Remove ACE from public version
+// import { RefactoringRequest } from '../refactoring/request';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface CodeHealthRulesResult {
@@ -15,5 +16,6 @@ export interface DevtoolsError {
 export type AceRequestEvent = {
   document: vscode.TextDocument;
   type: 'start' | 'end';
-  request: RefactoringRequest;
+  // CS-5069 Remove ACE from public version
+  // request: RefactoringRequest;
 };

@@ -1,7 +1,8 @@
 import vscode, { Uri } from 'vscode';
 import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
-import { register as registerCodeLens } from './codelens';
+// CS-5069 Remove ACE from public version
+// import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
 import { CodeHealthMonitorView } from './tree-view';
 import {
@@ -25,7 +26,8 @@ export function activate(context: vscode.ExtensionContext) {
   if (!gitApi) return;
 
   const codeHealthMonitorView = new CodeHealthMonitorView(context);
-  registerCodeLens(context);
+  // CS-5069 Remove ACE from public version
+  // registerCodeLens(context);
   registerCodeHealthDetailsView(context);
 
   const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
