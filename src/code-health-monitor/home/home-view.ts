@@ -33,11 +33,7 @@ function getFileAndFunctionFromState(
   if (!locatedFile) return;
 
   const locatedFn = fn
-    ? locatedFile.functionLevelIssues.find(
-        (functionLevelIssues) =>
-          fn.name === functionLevelIssues.fnName &&
-          fn.startLine === functionLevelIssues.fnToRefactor?.range['start-line']
-      )
+    ? locatedFile.functionLevelIssues.find((functionLevelIssues) => fn.name === functionLevelIssues.fnName)
     : undefined;
 
   return {
@@ -45,7 +41,6 @@ function getFileAndFunctionFromState(
     fn: locatedFn
       ? {
           fnName: locatedFn?.fnName,
-          fnToRefactor: locatedFn.fnToRefactor,
         }
       : undefined,
   };
@@ -72,7 +67,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     fileDeltaData: [], // refined fileIssueMap in the CWF format
     commitBaseline: convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline),
     autoRefactor: {
-      activated: true, // indicate that the user has not approved the use of ACE yet
+      activated: false, // indicate that the user has not approved the use of ACE yet
       disabled: false, // disable the visible button if visible: true
       visible: true, // Show any type of ACE functionality
     },
@@ -221,19 +216,19 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   private handleAutoRefactor(payload: any) {
-    const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName, {
-      name: payload.fn.name,
-      startLine: payload.fn.range.startLine,
-    });
+    console.log('Autorefactor NYI');
+    // const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName, {
+    //   name: payload.fn.name,
+    //   startLine: payload.fn.range.startLine,
+    // });
 
-    if (!foundFileFunction) return;
+    // if (!foundFileFunction) return;
 
-    void vscode.commands.executeCommand(
-      'codescene.requestAndPresentRefactoring',
-      foundFileFunction.file.document,
-      'code-health-details',
-      foundFileFunction.fn?.fnToRefactor
-    );
+    // void vscode.commands.executeCommand(
+    //   'codescene.requestAndPresentRefactoring',
+    //   foundFileFunction.file.document,
+    //   'code-health-details',
+    // );
   }
 
   private handleOpenDocs(payload: any) {
@@ -247,8 +242,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     const docsParams = toDocsParams(
       convertCWFDocTypeToVSCode(payload.docType),
       foundFileFunction.file?.document,
-      getFunctionPosition(payload.fn),
-      foundFileFunction.fn?.fnToRefactor
+      getFunctionPosition(payload.fn)
     );
     if (docsParams) {
       void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
