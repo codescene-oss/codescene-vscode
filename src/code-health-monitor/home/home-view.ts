@@ -41,7 +41,10 @@ function getFileAndFunctionFromState(
 
   return {
     file: locatedFile,
-    fn: locatedFn,
+    fn: locatedFn ? {
+      fnName: locatedFn?.fnName,
+      fnToRefactor: locatedFn.fnToRefactor
+    } : undefined,
   };
 }
 
@@ -112,8 +115,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private updateFileDeltaData(event: DeltaAnalysisEvent) {
     const { document, result } = event;
     const evtData = (fileWithIssues: FileWithIssues) => {
-      const { nIssues, nRefactorableFunctions, scoreChange } = fileWithIssues;
-      return { visible: this.view?.visible, scoreChange, nIssues, nRefactorableFunctions };
+      const { nIssues, scoreChange } = fileWithIssues;
+      return { visible: this.view?.visible, scoreChange, nIssues };
     };
 
     // Find the tree item matching the event document
@@ -134,7 +137,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    console.log('detected change')
     if(this.view){
       const filesWithIssueCount = this.fileIssueMap.size;
       const resultsText =
