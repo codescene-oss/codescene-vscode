@@ -23,6 +23,7 @@ export function register(context: ExtensionContext) {
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
 }
 
+// Find the VSCode equivalent file/function from webview payload
 function getFileAndFunctionFromState(
   fileIssueMap: Map<string, FileWithIssues>,
   fileName: string,
@@ -41,10 +42,12 @@ function getFileAndFunctionFromState(
 
   return {
     file: locatedFile,
-    fn: locatedFn ? {
-      fnName: locatedFn?.fnName,
-      fnToRefactor: locatedFn.fnToRefactor
-    } : undefined,
+    fn: locatedFn
+      ? {
+          fnName: locatedFn?.fnName,
+          fnToRefactor: locatedFn.fnToRefactor,
+        }
+      : undefined,
   };
 }
 
@@ -137,7 +140,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    if(this.view){
+    if (this.view) {
       const filesWithIssueCount = this.fileIssueMap.size;
       const resultsText =
         filesWithIssueCount > 0
@@ -304,9 +307,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
           jobs: this.ideContextData.jobs,
           autoRefactor: this.ideContextData.autoRefactor,
           showOnboarding: false,
-          commitBaseline: this.ideContextData.commitBaseline
-        }
-        ),
+          commitBaseline: this.ideContextData.commitBaseline,
+        }),
       });
     } else {
       webView.html = this.baseContent;

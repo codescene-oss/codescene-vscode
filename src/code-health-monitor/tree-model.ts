@@ -142,10 +142,12 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly fnName: string;
   readonly range?: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
+  readonly fnToRefactor?: FnToRefactor;
 
-  constructor(readonly parent: FileWithIssues, fnMeta: Function, public fnToRefactor?: FnToRefactor) {
+  constructor(readonly parent: FileWithIssues, fnMeta: Function, public fnToRefactorParam?: FnToRefactor) {
     this.fnName = fnMeta.name;
     this.range = vscodeRange(fnMeta.range);
+    this.fnToRefactor = fnToRefactorParam;
   }
 
   toTreeItem(): vscode.TreeItem {
