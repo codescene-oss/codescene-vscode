@@ -15,5 +15,9 @@ export function getUri(webView: Webview, ...pathSegments: string[]) {
 }
 
 export function commonResourceRoots() {
-  return [Uri.joinPath(CsExtensionState.extensionUri, 'out'), Uri.joinPath(CsExtensionState.extensionUri, 'assets')];
+  return [
+    Uri.joinPath(CsExtensionState.extensionUri, 'out'),
+    Uri.joinPath(CsExtensionState.extensionUri, 'assets'),
+    //Uri.joinPath(CsExtensionState.extensionUri, 'cs-cwf'), //TODO: Add for new monitor CWF
+  ];
 }
