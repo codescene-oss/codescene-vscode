@@ -113,7 +113,7 @@ export const initialDataContext = /*html*/ `
   <script>
     function setContext() {
       window.ideContext = {
-        ideType: ${ideType},
+        ideType: "${ideType}",
         view: 'home',
         devmode:true,
         pro: true,

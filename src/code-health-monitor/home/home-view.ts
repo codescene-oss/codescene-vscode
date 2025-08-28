@@ -1,4 +1,4 @@
-import vscode, { Disposable, ExtensionContext, Position, Webview, WebviewViewProvider } from 'vscode';
+import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, WebviewViewProvider } from 'vscode';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
@@ -7,7 +7,7 @@ import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-a
 import { Baseline, CsExtensionState } from '../../cs-extension-state';
 import { Delta } from '../../devtools-api/delta-model';
 import { FileWithIssues } from '../tree-model';
-import { isDefined, pluralize, showDocAtPosition } from '../../utils';
+import { showDocAtPosition } from '../../utils';
 import {
   convertCWFCommitBaselineToVSCode,
   convertCWFDocTypeToVSCode,
@@ -16,11 +16,12 @@ import {
 } from './cwf-parsers';
 import { toDocsParams } from '../../documentation/commands';
 import { CwfCommitBaselineType } from './cwf-types';
+import { BackgroundServiceView } from '../background-view';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
-export function register(context: ExtensionContext) {
-  const viewProvider = new HomeView(context);
+export function register(context: ExtensionContext, backgroundSeriveView: BackgroundServiceView) {
+  const viewProvider = new HomeView(context, backgroundSeriveView);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
 }
 
@@ -57,6 +58,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private baseContent: string = '';
   private initialized: boolean = false; // keep track of webview init state
   private fileIssueMap: Map<string, FileWithIssues> = new Map(); // Raw VSCode specific delta result, source of truth
+  private backgroundServiceView: BackgroundServiceView;
   private ideContextData: {
     showOnboarding: boolean;
     fileDeltaData: any[];
@@ -75,14 +77,14 @@ export class HomeView implements WebviewViewProvider, Disposable {
     jobs: [],
   };
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, backgroundServiceView: BackgroundServiceView) {
+    this.backgroundServiceView = backgroundServiceView;
     this.disposables.push(
       this,
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()) // Detect change to commit baseline
     );
-
     // Limit number of re-renders
     this.update = throttle(this.updateRaw, 350, {
       leading: true,
@@ -136,16 +138,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    if (this.view) {
-      const filesWithIssueCount = this.fileIssueMap.size;
-      const resultsText =
-        filesWithIssueCount > 0
-          ? `Found ${filesWithIssueCount} ${pluralize('file', filesWithIssueCount)} with introduced code health issues`
-          : undefined;
-      this.view.badge = {
-        value: filesWithIssueCount,
-        tooltip: [resultsText].filter(isDefined).join(' • '),
-      };
+    if (this.backgroundServiceView) {
+      this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
     }
 
     this.ideContextData.fileDeltaData = [...this.fileIssueMap].map((d) => convertFileIssueToCWFDeltaItem(d[1]));
@@ -233,10 +227,16 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   private handleOpenDocs(payload: any) {
-    const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName, {
-      name: payload.fn.name,
-      startLine: payload.fn.range.startLine,
-    });
+    const foundFileFunction = getFileAndFunctionFromState(
+      this.fileIssueMap,
+      payload.fileName,
+      payload.fn
+        ? {
+            name: payload.fn.name,
+            startLine: payload.fn.range.startLine,
+          }
+        : undefined
+    );
 
     if (!foundFileFunction) return;
 
