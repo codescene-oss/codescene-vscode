@@ -1,12 +1,13 @@
 import { Baseline } from '../../cs-extension-state';
 import { Delta } from '../../devtools-api/delta-model';
 import { FileWithIssues } from '../tree-model';
+import { CwfCommitBaselineType } from './cwf-types';
 
 /**
  * Convert VSCode commit baseline enum to CWF baseline string
  */
 export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) {
-  const payloadConverter = ['HEAD', 'branchCreate', 'default'];
+  const payloadConverter: CwfCommitBaselineType[] = ['HEAD', 'branchCreate', 'default'];
   return payloadConverter[baseline - 1];
 }
 
@@ -15,7 +16,7 @@ export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) {
  * @param commitBaselineString
  * @returns
  */
-export function convertCWFCommitBaselineToVSCode(commitBaselineString: 'HEAD' | 'branchCreate' | 'default') {
+export function convertCWFCommitBaselineToVSCode(commitBaselineString: CwfCommitBaselineType) {
   const payloadConverter = {
     HEAD: 1,
     branchCreate: 2,

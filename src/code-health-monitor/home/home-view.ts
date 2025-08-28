@@ -15,6 +15,7 @@ import {
   convertVSCodeCommitBaselineToCWF,
 } from './cwf-parsers';
 import { toDocsParams } from '../../documentation/commands';
+import { CwfCommitBaselineType } from './cwf-types';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -198,7 +199,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   // ### CWF Message handlers ###
 
-  private async handleSelectCommitBaseLineMessage(commitBaseLineString: 'HEAD' | 'branchCreate' | 'default') {
+  private async handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommitBaselineType) {
     const currentBaseline = CsExtensionState.baseline;
     const newBaseline = convertCWFCommitBaselineToVSCode(commitBaseLineString);
     if (newBaseline !== currentBaseline) {

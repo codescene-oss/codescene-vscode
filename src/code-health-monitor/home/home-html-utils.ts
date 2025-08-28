@@ -1,6 +1,8 @@
 import { Webview } from 'vscode';
 import { getUri } from '../../webview-utils';
 
+const IDE_TYPE = 'VSCode';
+
 const opacityHexLookup = {
   '1': {
     hex: '03',
@@ -111,7 +113,7 @@ export const initialDataContext = /*html*/ `
   <script>
     function setContext() {
       window.ideContext = {
-        ideType: 'VSCode',
+        ideType: ${IDE_TYPE},
         view: 'home',
         devmode:true,
         pro: true,
@@ -131,7 +133,7 @@ export const getHomeData = ({fileDeltaData, jobs, autoRefactor, showOnboarding, 
   commitBaseline: string
 }) => {
   return {
-    ideType: 'VSCode',
+    ideType: IDE_TYPE,
     view: 'home',
     devmode: true,
     pro: true,
