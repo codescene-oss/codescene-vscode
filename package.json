@@ -192,7 +192,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "prepackage": "npm run updatedocs && npm run tsc && npm run lint && npm run clean",
+    "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
     "clean": "rm -rf ./out",
     "build": "node ./esbuild.js",
@@ -202,6 +202,7 @@
     "pretest": "npm run tsc && npm run lint && npm run build",
     "test": "node ./out/test/runTest.js",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
+    "updatecwf": "fetch-github-release -s 'cs-webview' empear-analytics cs-webview ./cs-cwf",
     "release:minor": "standard-version --release-as minor",
     "release:patch": "standard-version --release-as patch",
     "release:major": "standard-version --release-as major"
