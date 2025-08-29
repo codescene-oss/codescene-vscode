@@ -156,7 +156,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
               return;
-      } 
+      }
       clearTimeout(reviewTimer);
       // Run review after 1 second of no edits
       reviewTimer = setTimeout(() => {
@@ -196,6 +196,13 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       vscode.authentication
         .getSession(AUTH_TYPE, [], { createIfNone: true })
         .then(onGetSessionSuccess(context, csContext), onGetSessionError());
+    }),
+    vscode.commands.registerCommand('codescene.signOut', async () => {
+      vscode.authentication
+        .getSession(AUTH_TYPE, [], { createIfNone: true })
+        .then(async (session) => {
+          await authProvider.removeSession(session.id);
+        }, onGetSessionError());
     })
   );
 

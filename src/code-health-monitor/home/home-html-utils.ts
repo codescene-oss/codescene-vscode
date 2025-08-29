@@ -1,5 +1,6 @@
 import { Webview } from 'vscode';
 import { getUri } from '../../webview-utils';
+import { CwfLoginStates } from './cwf-types';
 
 const ideType = 'VSCode';
 
@@ -98,52 +99,70 @@ export const ideStylesVars = `
   </style>
 `;
 
-const deltaData = {
-  fileDeltaData: [],
-  jobs: [],
-  showOnboarding: false,
-  autoRefactor: {
-    activated: true, // indicate that the user has not approved the use of ACE yet
-    disabled: false, // disable the visible button if visible: true
-    visible: true, // Show any type of ACE functionality
-  },
-};
-
-export const initialDataContext = /*html*/ `
+export const initialDataContextScriptTag = (ideContext: any) => /*html*/ `
   <script>
     function setContext() {
-      window.ideContext = {
-        ideType: "${ideType}",
-        view: 'home',
-        devmode:true,
-        pro: true,
-        featureFlags: ["jobs", "commit-baseline", "open-settings"],
-        data: ${JSON.stringify(deltaData)}
-      }
+      window.ideContext = ${JSON.stringify(ideContext)}
     }
     setContext();
   </script>
 `;
 
-export const getHomeData = ({fileDeltaData, jobs, autoRefactor, showOnboarding, commitBaseline}:{
-  fileDeltaData: any[],
-  jobs: any[],
-  autoRefactor: any,
-  showOnboarding: boolean,
-  commitBaseline: string
+export const getHomeData = ({
+  fileDeltaData,
+  jobs,
+  autoRefactor,
+  showOnboarding,
+  commitBaseline,
+  signedIn,
+  user,
+}: {
+  fileDeltaData: any[];
+  jobs: any[];
+  autoRefactor: any;
+  showOnboarding: boolean;
+  commitBaseline: string;
+  signedIn: boolean;
+  user?: {name: string}
 }) => {
   return {
     ideType: ideType,
     view: 'home',
     devmode: true,
-    pro: true,
-    featureFlags: ['jobs', 'commit-baseline', 'open-settings'],
+    pro: signedIn,
+    featureFlags: ['jobs', 'commit-baseline', 'open-settings', 'sign-in'],
     data: {
       fileDeltaData,
       jobs,
       autoRefactor,
       showOnboarding,
       commitBaseline,
+      user,
+    },
+  };
+};
+export const getLoginData = ({
+  baseUrl,
+  state,
+  availableProjects,
+  user,
+}: {
+  baseUrl: string;
+  state: CwfLoginStates;
+  availableProjects: any[];
+  user: { name: string };
+}) => {
+  return {
+    ideType: ideType,
+    view: 'login',
+    devmode: true,
+    pro: false,
+    featureFlags: ['sign-in'],
+    data: {
+      baseUrl,
+      state,
+      availableProjects,
+      user,
     },
   };
 };
@@ -167,9 +186,9 @@ export const getCsp = (webview: Webview) => [
   `connect-src https://*`,
 ];
 
-export function initBaseContent(webView: Webview) {
-  const scriptUri = getUri(webView, 'cs-cwf', 'index.js');
-  const stylesUri = getUri(webView, 'cs-cwf', 'index.css');
+export function initBaseContent(webView: Webview, initialIdeContext: any) {
+  const scriptUri = getUri(webView, 'cs-cwf','assets', 'index.js');
+  const stylesUri = getUri(webView, 'cs-cwf', 'assets', 'index.css');
   const csp = getCsp(webView);
 
   // The full html with all previous varaibles included
@@ -182,7 +201,7 @@ export function initBaseContent(webView: Webview) {
       <link rel="stylesheet" type="text/css" href="${stylesUri}">
       <title>VSCode React Webview</title>
       ${ideStylesVars}
-      ${initialDataContext}
+      ${initialDataContextScriptTag(initialIdeContext)}
     </head>
     <body>
       <div id="root"></div>

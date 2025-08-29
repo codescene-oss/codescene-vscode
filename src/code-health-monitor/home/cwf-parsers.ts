@@ -1,3 +1,4 @@
+import { Position } from 'vscode';
 import { Baseline } from '../../cs-extension-state';
 import { Delta } from '../../devtools-api/delta-model';
 import { FileWithIssues } from '../tree-model';
@@ -44,4 +45,30 @@ function capitalize(text: string) {
 
 export function convertCWFDocTypeToVSCode(docType: string) {
   return capitalize(docType.replace('docs_', '').replace('issues_', '').replace(/_/g, ' '));
+}
+
+export function getFileAndFunctionFromState(
+  fileIssueMap: Map<string, FileWithIssues>,
+  fileName: string,
+  fn?: { name: string; startLine: number }
+) {
+  const locatedFile = fileIssueMap.get(fileName);
+  if (!locatedFile) return;
+
+  const locatedFn = fn
+    ? locatedFile.functionLevelIssues.find((functionLevelIssues) => fn.name === functionLevelIssues.fnName)
+    : undefined;
+
+  return {
+    file: locatedFile,
+    fn: locatedFn
+      ? {
+          fnName: locatedFn?.fnName,
+        }
+      : undefined,
+  };
+}
+
+export function getFunctionPosition(fn: any | undefined): Position | undefined {
+  return fn ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
 }
