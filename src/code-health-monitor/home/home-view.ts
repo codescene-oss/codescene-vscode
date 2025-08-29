@@ -181,6 +181,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.session = CsExtensionState.session;
     if (this.session) {
       this.loginFlowState.loginOpen = false;
+    } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
+      // If the user has a pending login that fails we update the login flow state.
+      this.loginFlowState.loginState = 'init'; //TODO: use error state when we have retry and back buttons implemented
     }
     this.update();
   }
