@@ -39,14 +39,28 @@ export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): { file: {
     delta: event.deltaForFile,
   };
 }
+
 function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/**
+ * Convert docsType format to something the old docsPanel can understand
+ * "docs_issues_complex_method" => "Complex Method"
+ * @param docType
+ * @returns
+ */
 export function convertCWFDocTypeToVSCode(docType: string) {
   return capitalize(docType.replace('docs_', '').replace('issues_', '').replace(/_/g, ' '));
 }
 
+/**
+ * Searches the native fileIssueMap for file and function to be able to get native objects needed (document + Position)
+ * @param fileIssueMap
+ * @param fileName
+ * @param fn
+ * @returns
+ */
 export function getFileAndFunctionFromState(
   fileIssueMap: Map<string, FileWithIssues>,
   fileName: string,
@@ -69,6 +83,11 @@ export function getFileAndFunctionFromState(
   };
 }
 
+/**
+ * Convert webview fn range to a VSCode Position
+ * @param fn
+ * @returns
+ */
 export function getFunctionPosition(fn: any | undefined): Position | undefined {
   return fn ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
 }

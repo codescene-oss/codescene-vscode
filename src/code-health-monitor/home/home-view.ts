@@ -31,7 +31,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private baseContent: string = '';
   private initialized: boolean = false; // keep track of webview init state
   private fileIssueMap: Map<string, FileWithIssues> = new Map(); // Raw VSCode specific delta result, source of truth
-  private backgroundServiceView: BackgroundServiceView;
+  private backgroundServiceView: BackgroundServiceView; //handles badge updates
 
   private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
   private loginFlowState: {
@@ -52,7 +52,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     autoRefactor: {
       activated: false, // indicate that the user has not approved the use of ACE yet
       disabled: false, // disable the visible button if visible: true
-      visible: true, // Show any type of ACE functionality
+      visible: false, // Show any type of ACE functionality
     },
     jobs: [],
   };
@@ -104,12 +104,18 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   public update!: CancelableVoid;
+
+  //Setter of login state used by message handler
   setLoginFlowState(updatedLoginFlowState: any) {
     this.loginFlowState = updatedLoginFlowState;
   }
+
+  //Setter of init state used by message handler
   setInitiated(updatedInitiated: boolean) {
     this.initialized = updatedInitiated;
   }
+
+  //Getter of native file list used by message handler
   getFileIssueMap() {
     return this.fileIssueMap;
   }

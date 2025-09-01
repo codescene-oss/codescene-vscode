@@ -56,6 +56,8 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
       }),
       window.registerUriHandler(this.uriHandler)
     );
+
+    // Expose the signInCancel event to be used from homeView message handler
     context.subscriptions.push(
       commands.registerCommand('codescene.signInCancel', async () => {
         this.cancelLogin();

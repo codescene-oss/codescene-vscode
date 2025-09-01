@@ -1,4 +1,4 @@
-import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, WebviewViewProvider } from 'vscode';
+import vscode from 'vscode';
 import { CsExtensionState } from '../../cs-extension-state';
 import {
   convertCWFCommitBaselineToVSCode,
@@ -11,7 +11,12 @@ import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
 import { toDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
+import { getMessageCategory } from './cwf-message-categories';
 
+/**
+ * Changes the commit baseline
+ * @param commitBaseLineString
+ */
 async function handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommitBaselineType) {
   const currentBaseline = CsExtensionState.baseline;
   const newBaseline = convertCWFCommitBaselineToVSCode(commitBaseLineString);
@@ -20,6 +25,11 @@ async function handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommit
   }
 }
 
+/**
+ * Finds position data fora. function and opens the function in editor
+ * @param homeView
+ * @param payload
+ */
 async function handleGoToFunction(
   homeView: HomeView,
   payload: {
@@ -32,6 +42,10 @@ async function handleGoToFunction(
     (await showDocAtPosition(foundFileFunction.file.document, getFunctionPosition(payload.fn)));
 }
 
+/**
+ * NYI: Find function in VSCode state and trigger autorefactor panel
+ * @param payload
+ */
 function handleAutoRefactor(payload: any) {
   console.log('Autorefactor NYI');
   // const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName, {
@@ -48,6 +62,12 @@ function handleAutoRefactor(payload: any) {
   // );
 }
 
+/**
+ * Opens docs panel for a codesmell
+ * @param homeView
+ * @param payload
+ * @returns
+ */
 function handleOpenDocs(homeView: HomeView, payload: any) {
   const foundFileFunction = getFileAndFunctionFromState(
     homeView.getFileIssueMap(),
@@ -71,6 +91,9 @@ function handleOpenDocs(homeView: HomeView, payload: any) {
   }
 }
 
+/**
+ * Open settings in editor
+ */
 function handleOpenSettings() {
   Telemetry.logUsage('control-center/open-settings');
   vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode').then(
@@ -81,6 +104,10 @@ function handleOpenSettings() {
   );
 }
 
+/**
+ * Change homeview state to display loginflow
+ * @param homeView
+ */
 async function handleOpenLogin(homeView: HomeView) {
   await vscode.commands.executeCommand('codescene.signInCancel');
   homeView.setLoginFlowState({
@@ -88,6 +115,11 @@ async function handleOpenLogin(homeView: HomeView) {
     loginState: 'init',
   });
 }
+
+/**
+ * Change homeview state to hide loginflow
+ * @param homeView
+ */
 function handleCloseLogin(homeView: HomeView) {
   homeView.setLoginFlowState({
     loginOpen: false,
@@ -96,7 +128,11 @@ function handleCloseLogin(homeView: HomeView) {
 }
 
 
-
+/**
+ * Initiate the login flow first checking if the baseUrl has been changed by the user (Enterprise)
+ * @param homeView
+ * @param payload
+ */
 async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, type: 'cloud' | 'enterprise'}) {
   const cfg = vscode.workspace.getConfiguration('codescene');
   const currentServerUrl = cfg.get('serverUrl');
@@ -110,37 +146,12 @@ async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, ty
   });
 }
 
-const lifecycleMessages = ['init'] as const;
-const loginMessages = ['open-login', 'open-home', 'init-login'] as const;
-const panelMessages = ['request-and-present-refactoring', 'open-docs-for-function'] as const;
-const editorMessages = ['goto-function-location', 'open-settings'] as const;
-const stateChangeMessages = ['commitBaseline'] as const;
-
-const categorySets = {
-  lifecycle: new Set<string>(lifecycleMessages),
-  login: new Set<string>(loginMessages),
-  panel: new Set<string>(panelMessages),
-  editor: new Set<string>(editorMessages),
-  stateChange: new Set<string>(stateChangeMessages),
-} as const;
-
-type MessageCategory = keyof typeof categorySets; // 'lifecycle' | 'login' | 'panel' | 'editor' | 'stateChange'
-
-// Build a lookup table once (and detect accidental duplicates)
-const messageToCategoryLokup = (() => {
-  const map = new Map<string, MessageCategory>();
-  for (const [category, set] of Object.entries(categorySets) as Array<[MessageCategory, Set<string>]>) {
-    for (const msg of set) {
-      map.set(msg, category);
-    }
-  }
-  return map;
-})();
-
-function getMessageCategory(message: string): MessageCategory | 'unknown' {
-  return messageToCategoryLokup.get(message) ?? 'unknown';
-}
-
+/**
+ * Handles messages related to webview meta state
+ * @param homeView
+ * @param message
+ * @returns
+ */
 function handleLifecyleMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'init':
@@ -148,6 +159,13 @@ function handleLifecyleMessage(homeView: HomeView, message: { messageType: strin
       return;
   }
 }
+
+/**
+ * Handles messages related to loginflow or from the login view
+ * @param homeView
+ * @param message
+ * @returns
+ */
 async function handleLoginMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'open-login':
@@ -161,6 +179,13 @@ async function handleLoginMessage(homeView: HomeView, message: { messageType: st
       return;
   }
 }
+
+/**
+ * Handling messages related to opening new panels
+ * @param homeView
+ * @param message
+ * @returns
+ */
 function handlePanelMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'request-and-present-refactoring':
@@ -171,6 +196,13 @@ function handlePanelMessage(homeView: HomeView, message: { messageType: string; 
       return;
   }
 }
+
+/**
+ * Handling messages related to native UI interactions
+ * @param homeView
+ * @param message
+ * @returns
+ */
 async function handleEditorMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'goto-function-location':
@@ -181,6 +213,13 @@ async function handleEditorMessage(homeView: HomeView, message: { messageType: s
       return;
   }
 }
+
+/**
+ * Handling messages related to CodeScene global state
+ * @param homeView
+ * @param message
+ * @returns
+ */
 async function handleStateChangeMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'commitBaseline':

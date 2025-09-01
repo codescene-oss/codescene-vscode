@@ -108,6 +108,11 @@ export const initialDataContextScriptTag = (ideContext: any) => /*html*/ `
   </script>
 `;
 
+/**
+ * Generate all needed props for CWF HomeView
+ * @param param0
+ * @returns
+ */
 export const getHomeData = ({
   fileDeltaData,
   jobs,
@@ -141,6 +146,12 @@ export const getHomeData = ({
     },
   };
 };
+
+/**
+ * Generate all needed props for LoginView
+ * @param param0
+ * @returns
+ */
 export const getLoginData = ({
   baseUrl,
   state,
