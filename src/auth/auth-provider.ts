@@ -13,6 +13,7 @@ import {
   authentication,
   env,
   window,
+  commands,
 } from 'vscode';
 import { getServerUrl } from '../configuration';
 import { logOutputChannel } from '../log';
@@ -54,6 +55,11 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         supportsMultipleAccounts: false,
       }),
       window.registerUriHandler(this.uriHandler)
+    );
+    context.subscriptions.push(
+      commands.registerCommand('codescene.signInCancel', async () => {
+        this.cancelLogin();
+      })
     );
   }
 
