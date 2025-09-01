@@ -93,7 +93,14 @@ function handleCloseLogin(homeView: HomeView) {
     loginState: 'init',
   });
 }
-function handleInitLogin(homeView: HomeView) {
+
+
+
+async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, type: 'cloud' | 'enterprise'}) {
+  if(payload.type === 'enterprise' && payload.baseUrl) {
+    const cfg = vscode.workspace.getConfiguration('codescene');
+    await cfg.update('serverUrl', payload.baseUrl, vscode.ConfigurationTarget.Workspace);
+  }
   void vscode.commands.executeCommand('codescene.signIn');
   homeView.setLoginFlowState({
     loginOpen: true,
@@ -139,7 +146,7 @@ function handleLifecyleMessage(homeView: HomeView, message: { messageType: strin
       return;
   }
 }
-function handleLoginMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+async function handleLoginMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
   switch (message.messageType) {
     case 'open-login':
       handleOpenLogin(homeView);
@@ -148,7 +155,7 @@ function handleLoginMessage(homeView: HomeView, message: { messageType: string; 
       handleCloseLogin(homeView);
       return;
     case 'init-login':
-      handleInitLogin(homeView);
+      await handleInitLogin(homeView, message.payload);
       return;
   }
 }
@@ -192,7 +199,7 @@ export async function handleCWFMessage(homeView: HomeView, message: { messageTyp
       handleLifecyleMessage(homeView, message);
       return;
     case 'login':
-      handleLoginMessage(homeView, message);
+      await handleLoginMessage(homeView, message);
       return;
     case 'panel':
       handlePanelMessage(homeView, message);

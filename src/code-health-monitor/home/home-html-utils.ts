@@ -130,7 +130,7 @@ export const getHomeData = ({
     view: 'home',
     devmode: true,
     pro: signedIn,
-    featureFlags: ['jobs', 'commit-baseline', 'open-settings', 'sign-in'],
+    featureFlags: ['jobs', 'commit-baseline', 'open-settings', 'sign-in', 'sign-in-enterprise'],
     data: {
       fileDeltaData,
       jobs,
@@ -157,7 +157,7 @@ export const getLoginData = ({
     view: 'login',
     devmode: true,
     pro: false,
-    featureFlags: ['sign-in'],
+    featureFlags: ['sign-in', 'sign-in-enterprise', 'open-settings'],
     data: {
       baseUrl,
       state,
