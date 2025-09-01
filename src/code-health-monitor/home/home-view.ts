@@ -183,7 +183,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       this.loginFlowState.loginOpen = false;
     } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
       // If the user has a pending login that fails we update the login flow state.
-      this.loginFlowState.loginState = 'init'; //TODO: use error state when we have retry and back buttons implemented
+      this.loginFlowState.loginState = 'error';
     }
     this.update();
   }
@@ -240,7 +240,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     await webView.postMessage({
       messageType: 'update-renderer',
       payload: getLoginData({
-        baseUrl: '',
+        baseUrl: 'https://codescene.io',
         availableProjects: [],
         state: this.loginFlowState.loginState,
         user: { name: this.session?.account.label || 'Unknown' },

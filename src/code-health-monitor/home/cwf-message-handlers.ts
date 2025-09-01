@@ -97,10 +97,8 @@ function handleCloseLogin(homeView: HomeView) {
 
 
 async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, type: 'cloud' | 'enterprise'}) {
-  if(payload.type === 'enterprise' && payload.baseUrl) {
-    const cfg = vscode.workspace.getConfiguration('codescene');
-    await cfg.update('serverUrl', payload.baseUrl, vscode.ConfigurationTarget.Workspace);
-  }
+  const cfg = vscode.workspace.getConfiguration('codescene');
+  await cfg.update('serverUrl', payload.baseUrl, vscode.ConfigurationTarget.Workspace);
   void vscode.commands.executeCommand('codescene.signIn');
   homeView.setLoginFlowState({
     loginOpen: true,
