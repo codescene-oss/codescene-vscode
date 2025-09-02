@@ -7,14 +7,11 @@ import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-a
 import { Baseline, CsExtensionState } from '../../cs-extension-state';
 import { Delta } from '../../devtools-api/delta-model';
 import { FileWithIssues } from '../tree-model';
-import {
-
-  convertFileIssueToCWFDeltaItem,
-  convertVSCodeCommitBaselineToCWF,
-} from './cwf-parsers';
-import { CwfLoginStates } from './cwf-types';
+import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from './cwf-parsers';
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
+import { CommitBaselineType, MessageToIDEType } from './types/messages';
+import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from './types';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -34,17 +31,14 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private backgroundServiceView: BackgroundServiceView; //handles badge updates
 
   private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
-  private loginFlowState: {
-    loginOpen: boolean;
-    loginState: CwfLoginStates;
-  };
+  private loginFlowState: LoginFlowStateType;
 
   private ideContextData: {
     showOnboarding: boolean;
-    fileDeltaData: any[];
-    commitBaseline: string;
-    autoRefactor: any;
-    jobs: any[];
+    fileDeltaData: FileDeltaData[];
+    commitBaseline: CommitBaselineType;
+    autoRefactor: AutoRefactorConfig;
+    jobs: Job[];
   } = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
@@ -106,7 +100,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   public update!: CancelableVoid;
 
   //Setter of login state used by message handler
-  setLoginFlowState(updatedLoginFlowState: any) {
+  setLoginFlowState(updatedLoginFlowState: LoginFlowStateType) {
     this.loginFlowState = updatedLoginFlowState;
   }
 
@@ -162,9 +156,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
   // Convert VSCode jobs to CWF Jobs for rendering
   private updateJobsData(event: AnalysisEvent) {
     const eventArray = event.jobs ? Array.from(event.jobs) : [];
-    this.ideContextData.jobs = eventArray.map((fileName) => ({
-      file: { fileName: fileName, type: 'deltaAnalysis', state: 'running' },
-    }));
+    this.ideContextData.jobs = eventArray.map(
+      (fileName): Job => ({
+        file: { fileName: fileName },
+        type: 'deltaAnalysis',
+        state: 'running',
+      })
+    );
   }
 
   // ### VSCode state handlers ###
@@ -210,7 +208,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   // Handles messages from the homeView webview
-  private async messageHandler(message: { messageType: string; payload: any }) {
+  private async messageHandler(message: MessageToIDEType) {
     await handleCWFMessage(this, message);
     this.update();
   }

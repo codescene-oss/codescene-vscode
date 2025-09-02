@@ -6,18 +6,19 @@ import {
   getFileAndFunctionFromState,
   getFunctionPosition,
 } from './cwf-parsers';
-import { CwfCommitBaselineType } from './cwf-types';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
 import { toDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { getMessageCategory } from './cwf-message-categories';
+import { CommitBaselineType, MessageToIDEType, OpenDocsMessage } from './types/messages';
+import { FileMetaType } from './types';
 
 /**
  * Changes the commit baseline
  * @param commitBaseLineString
  */
-async function handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommitBaselineType) {
+async function handleSelectCommitBaseLineMessage(commitBaseLineString: CommitBaselineType) {
   const currentBaseline = CsExtensionState.baseline;
   const newBaseline = convertCWFCommitBaselineToVSCode(commitBaseLineString);
   if (newBaseline !== currentBaseline) {
@@ -32,10 +33,7 @@ async function handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommit
  */
 async function handleGoToFunction(
   homeView: HomeView,
-  payload: {
-    fileName: string;
-    fn?: { name: string; range?: { startLine: number; endLine: number; startColumn: number; endColumn: number } };
-  }
+  payload: FileMetaType
 ) {
   const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName);
   foundFileFunction?.file &&
@@ -68,14 +66,14 @@ function handleAutoRefactor(payload: any) {
  * @param payload
  * @returns
  */
-function handleOpenDocs(homeView: HomeView, payload: any) {
+function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload']) {
   const foundFileFunction = getFileAndFunctionFromState(
     homeView.getFileIssueMap(),
     payload.fileName,
     payload.fn
       ? {
           name: payload.fn.name,
-          startLine: payload.fn.range.startLine,
+          startLine: payload.fn.range?.startLine || 0,
         }
       : undefined
   );
@@ -152,7 +150,7 @@ async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, ty
  * @param message
  * @returns
  */
-function handleLifecyleMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+function handleLifecyleMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'init':
       homeView.setInitiated(true);
@@ -166,7 +164,7 @@ function handleLifecyleMessage(homeView: HomeView, message: { messageType: strin
  * @param message
  * @returns
  */
-async function handleLoginMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'open-login':
       await handleOpenLogin(homeView);
@@ -186,7 +184,7 @@ async function handleLoginMessage(homeView: HomeView, message: { messageType: st
  * @param message
  * @returns
  */
-function handlePanelMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+function handlePanelMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'request-and-present-refactoring':
       handleAutoRefactor(message.payload);
@@ -203,7 +201,7 @@ function handlePanelMessage(homeView: HomeView, message: { messageType: string; 
  * @param message
  * @returns
  */
-async function handleEditorMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+async function handleEditorMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'goto-function-location':
       await handleGoToFunction(homeView, message.payload);
@@ -220,7 +218,7 @@ async function handleEditorMessage(homeView: HomeView, message: { messageType: s
  * @param message
  * @returns
  */
-async function handleStateChangeMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+async function handleStateChangeMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'commitBaseline':
       await handleSelectCommitBaseLineMessage(message.payload);
@@ -234,7 +232,7 @@ async function handleStateChangeMessage(homeView: HomeView, message: { messageTy
  * @param message
  * @returns
  */
-export async function handleCWFMessage(homeView: HomeView, message: { messageType: string; payload: any }) {
+export async function handleCWFMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (getMessageCategory(message.messageType)) {
     case 'lifecycle':
       handleLifecyleMessage(homeView, message);

@@ -2,13 +2,14 @@ import { Position } from 'vscode';
 import { Baseline } from '../../cs-extension-state';
 import { Delta } from '../../devtools-api/delta-model';
 import { FileWithIssues } from '../tree-model';
-import { CwfCommitBaselineType } from './cwf-types';
+import { FileDeltaData, FileMetaType } from './types';
+import { CommitBaselineType } from './types/messages';
 
 /**
  * Convert VSCode commit baseline enum to CWF baseline string
  */
-export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) {
-  const payloadConverter: CwfCommitBaselineType[] = ['HEAD', 'branchCreate', 'default'];
+export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) : CommitBaselineType {
+  const payloadConverter: CommitBaselineType[] = ['HEAD', 'branchCreate', 'default'];
   return payloadConverter[baseline - 1];
 }
 
@@ -17,7 +18,7 @@ export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) {
  * @param commitBaselineString
  * @returns
  */
-export function convertCWFCommitBaselineToVSCode(commitBaselineString: CwfCommitBaselineType) {
+export function convertCWFCommitBaselineToVSCode(commitBaselineString: CommitBaselineType) {
   const payloadConverter = {
     HEAD: 1,
     branchCreate: 2,
@@ -31,7 +32,7 @@ export function convertCWFCommitBaselineToVSCode(commitBaselineString: CwfCommit
  * @param event
  * @returns
  */
-export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): { file: { fileName: string }; delta?: Delta } {
+export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDeltaData  {
   return {
     file: {
       fileName: event.document.fileName,
@@ -88,6 +89,6 @@ export function getFileAndFunctionFromState(
  * @param fn
  * @returns
  */
-export function getFunctionPosition(fn: any | undefined): Position | undefined {
-  return fn ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
+export function getFunctionPosition(fn: FileMetaType['fn'] | undefined): Position | undefined {
+  return fn?.range ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
 }

@@ -1,6 +1,6 @@
 import { Webview } from 'vscode';
 import { getUri } from '../../webview-utils';
-import { CwfLoginStates } from './cwf-types';
+import { HomeContextViewProps, IdeContextType, LoginViewProps } from './types';
 
 const ideType = 'VSCode';
 
@@ -99,7 +99,7 @@ export const ideStylesVars = `
   </style>
 `;
 
-export const initialDataContextScriptTag = (ideContext: any) => /*html*/ `
+export const initialDataContextScriptTag = (ideContext: IdeContextType) => /*html*/ `
   <script>
     function setContext() {
       window.ideContext = ${JSON.stringify(ideContext)}
@@ -121,15 +121,7 @@ export const getHomeData = ({
   commitBaseline,
   signedIn,
   user,
-}: {
-  fileDeltaData: any[];
-  jobs: any[];
-  autoRefactor: any;
-  showOnboarding: boolean;
-  commitBaseline: string;
-  signedIn: boolean;
-  user?: {name: string}
-}) => {
+}: HomeContextViewProps['data'] & { signedIn: boolean }): IdeContextType => {
   return {
     ideType: ideType,
     view: 'home',
@@ -157,12 +149,7 @@ export const getLoginData = ({
   state,
   availableProjects,
   user,
-}: {
-  baseUrl: string;
-  state: CwfLoginStates;
-  availableProjects: any[];
-  user: { name: string };
-}) => {
+}: LoginViewProps['data']) => {
   return {
     ideType: ideType,
     view: 'login',
@@ -178,7 +165,7 @@ export const getLoginData = ({
   };
 };
 
-export const generateContextScriptTag = (ideContext: any) => {
+export const generateContextScriptTag = (ideContext: IdeContextType) => {
   return `
   <script>
     function setContext() {
@@ -197,7 +184,7 @@ export const getCsp = (webview: Webview) => [
   `connect-src https://*`,
 ];
 
-export function initBaseContent(webView: Webview, initialIdeContext: any) {
+export function initBaseContent(webView: Webview, initialIdeContext: IdeContextType) {
   const scriptUri = getUri(webView, 'cs-cwf','assets', 'index.js');
   const stylesUri = getUri(webView, 'cs-cwf', 'assets', 'index.css');
   const csp = getCsp(webView);
