@@ -17,6 +17,11 @@ type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
 const ignoreSessionStateFeatureFlag = false;
 
+function getUserName(accountLabel: string | undefined) {
+  if(!accountLabel || accountLabel === 'null') return 'Signed in';
+  return accountLabel;
+}
+
 export function register(context: ExtensionContext, backgroundSeriveView: BackgroundServiceView) {
   const viewProvider = new HomeView(context, backgroundSeriveView);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
@@ -250,7 +255,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
         baseUrl: 'https://codescene.io',
         availableProjects: [],
         state: this.loginFlowState.loginState,
-        user: { name: this.session?.account.label || 'Unknown' },
+        user: { name: getUserName(this.session?.account.label) },
       }),
     });
   }
