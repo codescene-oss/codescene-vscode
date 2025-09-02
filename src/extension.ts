@@ -198,11 +198,12 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
         .then(onGetSessionSuccess(context, csContext), onGetSessionError());
     }),
     vscode.commands.registerCommand('codescene.signOut', async () => {
-      vscode.authentication
-        .getSession(AUTH_TYPE, [], { createIfNone: true })
-        .then(async (session) => {
-          await authProvider.removeSession(session.id);
-        }, onGetSessionError());
+      vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: true }).then(async (session) => {
+        await authProvider.removeSession(session.id);
+      }, onGetSessionError());
+    }),
+    vscode.commands.registerCommand('codescene.signInCancel', async () => {
+      authProvider.cancelLogin();
     })
   );
 

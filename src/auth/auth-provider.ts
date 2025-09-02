@@ -13,7 +13,6 @@ import {
   authentication,
   env,
   window,
-  commands,
 } from 'vscode';
 import { getServerUrl } from '../configuration';
 import { logOutputChannel } from '../log';
@@ -55,13 +54,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         supportsMultipleAccounts: false,
       }),
       window.registerUriHandler(this.uriHandler)
-    );
-
-    // Expose the signInCancel event to be used from homeView message handler
-    context.subscriptions.push(
-      commands.registerCommand('codescene.signInCancel', async () => {
-        this.cancelLogin();
-      })
     );
   }
 
@@ -212,7 +204,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   }
 
   // Cancel currently running login (if any)
-  private cancelLogin() {
+  cancelLogin() {
     if (CsAuthenticationProvider.runningLogin) CsAuthenticationProvider.runningLogin.cancel();
     CsAuthenticationProvider.runningLogin = new CancellationTokenSource();
   }

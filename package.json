@@ -74,10 +74,6 @@
         "title": "CodeScene: Sign out of CodeScene"
       },
       {
-        "command": "codescene.signInCancel",
-        "title": "CodeScene: Cancel ongoing sign in"
-      },
-      {
         "command": "codescene.revokeTerms",
         "title": "CodeScene: Revoke Terms and Policies agreement"
       },
