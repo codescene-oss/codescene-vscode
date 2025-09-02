@@ -1,14 +1,14 @@
 import { MessageToIDEType } from "./types/messages";
 
 // Build a lookuptable to separate all the messages from webview into smaller categories
-const lifecycleMessages: MessageToIDEType['messageType'][] = ['init'] as const;
-const loginMessages: MessageToIDEType['messageType'][] = ['open-login', 'open-home', 'init-login'] as const;
-const panelMessages: MessageToIDEType['messageType'][] = [
+const lifecycleMessages = ['init'] as const;
+const loginMessages = ['open-login', 'open-home', 'init-login'] as const;
+const panelMessages = [
   'request-and-present-refactoring',
   'open-docs-for-function',
 ] as const;
-const editorMessages: MessageToIDEType['messageType'][] = ['goto-function-location', 'open-settings'] as const;
-const stateChangeMessages: MessageToIDEType['messageType'][] = ['commitBaseline'] as const;
+const editorMessages = ['goto-function-location', 'open-settings'] as const;
+const stateChangeMessages = ['commitBaseline'] as const;
 
 const categorySets = {
   lifecycle: new Set<string>(lifecycleMessages),
