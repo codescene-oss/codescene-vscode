@@ -241,7 +241,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
         showOnboarding: false,
         commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),
-        user: { name: this.session?.account.label || 'Not set' },
+        user: { name: getUserName(this.session?.account.label)},
       }),
     });
   }
