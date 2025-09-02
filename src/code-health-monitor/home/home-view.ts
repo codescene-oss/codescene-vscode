@@ -140,7 +140,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    if (this.backgroundServiceView) {
+    if (this.backgroundServiceView && this.isSignedIn()) {
       this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
     }
 
@@ -185,6 +185,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.session = CsExtensionState.session;
     if (this.session) {
       this.loginFlowState.loginOpen = false;
+      if (this.backgroundServiceView && this.isSignedIn()) {
+        this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
+      }
     } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
       // If the user has a pending login that fails we update the login flow state.
       this.loginFlowState.loginState = 'error';
