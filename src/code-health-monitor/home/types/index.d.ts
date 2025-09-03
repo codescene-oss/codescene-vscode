@@ -7,8 +7,6 @@ import {
 
 import { CommitBaselineType } from "./messages";
 export type IdeTypes =  "VSCode"
-export type ViewType = "ace" | "code-smell" | "docs";
-
 
 //View Props
 export type AutoRefactorConfig = {

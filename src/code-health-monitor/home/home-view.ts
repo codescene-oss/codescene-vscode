@@ -2,10 +2,9 @@ import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, Web
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, getLoginData, initBaseContent } from './home-html-utils';
+import { getHomeData, getLoginData, ignoreSessionStateFeatureFlag, initBaseContent } from './home-html-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
-import { Baseline, CsExtensionState } from '../../cs-extension-state';
-import { Delta } from '../../devtools-api/delta-model';
+import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../tree-model';
 import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from './cwf-parsers';
 import { BackgroundServiceView } from '../background-view';
@@ -14,8 +13,6 @@ import { CommitBaselineType, MessageToIDEType } from './types/messages';
 import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from './types';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
-
-const ignoreSessionStateFeatureFlag = false;
 
 function getUserName(accountLabel: string | undefined) {
   if(!accountLabel || accountLabel === 'null') return 'Signed in';
@@ -222,6 +219,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   private isSignedIn() {
+    // if the ignoreSessionStateFeatureFlag is true we always consider the user signed in.
     return ignoreSessionStateFeatureFlag ? true : Boolean(this.session);
   }
 

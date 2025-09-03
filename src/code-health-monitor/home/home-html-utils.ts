@@ -1,8 +1,17 @@
 import { Webview } from 'vscode';
 import { getUri } from '../../webview-utils';
 import { HomeContextViewProps, IdeContextType, LoginViewProps } from './types';
+import { FeatureFlags } from './types/cwf-feature';
 
 const ideType = 'VSCode';
+
+// This flag is used to enable or disable the login flow
+// true: will ignore any session data and always show Code Health Monitor
+// false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
+export const ignoreSessionStateFeatureFlag = false;
+
+const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
+if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
 const opacityHexLookup = {
   '1': {
@@ -127,7 +136,7 @@ export const getHomeData = ({
     view: 'home',
     devmode: true,
     pro: signedIn,
-    featureFlags: ['jobs', 'commit-baseline', 'open-settings', 'sign-in', 'sign-in-enterprise'],
+    featureFlags: featureFlags,
     data: {
       fileDeltaData,
       jobs,
@@ -144,18 +153,13 @@ export const getHomeData = ({
  * @param param0
  * @returns
  */
-export const getLoginData = ({
-  baseUrl,
-  state,
-  availableProjects,
-  user,
-}: LoginViewProps['data']) => {
+export const getLoginData = ({ baseUrl, state, availableProjects, user }: LoginViewProps['data']) => {
   return {
     ideType: ideType,
     view: 'login',
     devmode: true,
     pro: false,
-    featureFlags: ['sign-in', 'sign-in-enterprise', 'open-settings'],
+    featureFlags: featureFlags,
     data: {
       baseUrl,
       state,
@@ -185,7 +189,7 @@ export const getCsp = (webview: Webview) => [
 ];
 
 export function initBaseContent(webView: Webview, initialIdeContext: IdeContextType) {
-  const scriptUri = getUri(webView, 'cs-cwf','assets', 'index.js');
+  const scriptUri = getUri(webView, 'cs-cwf', 'assets', 'index.js');
   const stylesUri = getUri(webView, 'cs-cwf', 'assets', 'index.css');
   const csp = getCsp(webView);
 
