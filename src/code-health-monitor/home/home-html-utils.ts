@@ -10,6 +10,9 @@ const ideType = 'VSCode';
 // false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
 export const ignoreSessionStateFeatureFlag = false;
 
+// Enable Webview devmode with alot of logging
+const devmode = false;
+
 const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
 if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
@@ -134,7 +137,7 @@ export const getHomeData = ({
   return {
     ideType: ideType,
     view: 'home',
-    devmode: true,
+    devmode: devmode,
     pro: signedIn,
     featureFlags: featureFlags,
     data: {
@@ -157,7 +160,7 @@ export const getLoginData = ({ baseUrl, state, availableProjects, user }: LoginV
   return {
     ideType: ideType,
     view: 'login',
-    devmode: true,
+    devmode: devmode,
     pro: false,
     featureFlags: featureFlags,
     data: {
