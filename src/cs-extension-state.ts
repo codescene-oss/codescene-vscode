@@ -62,7 +62,7 @@ export class CsExtensionState {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly controlCenterView: ControlCenterViewProvider
+    //private readonly controlCenterView: ControlCenterViewProvider
   ) {
     this.stateProperties = {
       features: {
@@ -93,8 +93,8 @@ export class CsExtensionState {
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
-    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
+  static init(context: vscode.ExtensionContext/*, controlCenterView: ControlCenterViewProvider*/) {
+    CsExtensionState._instance = new CsExtensionState(context/*, controlCenterView*/);
   }
 
   static get acceptedTermsAndPolicies() {
@@ -189,7 +189,7 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update();
+    //CsExtensionState._instance.controlCenterView.update();
     CsExtensionState._instance.statusBar.update();
   }
 
