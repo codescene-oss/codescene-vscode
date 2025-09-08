@@ -4,7 +4,7 @@ import Reviewer from '../review/reviewer';
 // CS-5069 Remove ACE from public version
 // import { register as registerCodeLens } from './codelens';
 import { register as registerCodeHealthDetailsView } from './details/view';
-//import { register as registerHomeView } from './home/home-view'; // TODO: Adding this later for new CWF monitor.
+import { register as registerHomeView } from './home/home-view';
 import { CodeHealthMonitorView } from './tree-view';
 import {
   acquireGitApi,
@@ -16,6 +16,7 @@ import {
   updateGitState,
 } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
+import { BackgroundServiceView } from './background-view';
 
 let gitApi: API | undefined;
 
@@ -26,11 +27,11 @@ export function activate(context: vscode.ExtensionContext) {
   gitApi = acquireGitApi();
   if (!gitApi) return;
 
-  const codeHealthMonitorView = new CodeHealthMonitorView(context);
+  const codeHealthMonitorView = new BackgroundServiceView(context);
+  registerHomeView(context, codeHealthMonitorView);
+
   // CS-5069 Remove ACE from public version
   // registerCodeLens(context);
-  registerCodeHealthDetailsView(context);
-  //registerHomeView(context); // TODO: Adding this later for new CWF monitor.
 
   const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
 

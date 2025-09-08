@@ -1,1 +1,0 @@
-export type CwfCommitBaselineType = 'HEAD' | 'branchCreate' | 'default';

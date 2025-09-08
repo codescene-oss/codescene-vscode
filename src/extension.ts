@@ -35,8 +35,8 @@ interface CsContext {
  */
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
-  const controlCenterViewProvider = registerControlCenterViewProvider(context);
-  CsExtensionState.init(context, controlCenterViewProvider);
+  //const controlCenterViewProvider = registerControlCenterViewProvider(context);
+  CsExtensionState.init(context/*, controlCenterViewProvider*/);
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
@@ -48,18 +48,18 @@ export async function activate(context: vscode.ExtensionContext) {
         Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
-        finalizeActivation(controlCenterViewProvider);
+        finalizeActivation(/*controlCenterViewProvider*/);
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
         reportError({ context: 'Unable to start extension', e });
-        void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+        void vscode.commands.executeCommand('codescene.homeView.focus');
       }
     },
     (e) => {
       const error = assertError(e);
       CsExtensionState.setAnalysisState({ state: 'error', error });
       reportError({ context: 'Unable to start extension', e });
-      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+      void vscode.commands.executeCommand('codescene.homeView.focus');
       Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
@@ -109,10 +109,10 @@ async function startExtension(context: vscode.ExtensionContext) {
  * The context variable is used in package.json to conditionally enable/disable views that could
  * point to commands that haven't been fully initialized.
  */
-function finalizeActivation(ccProvider: ControlCenterViewProvider) {
+function finalizeActivation(/*ccProvider: ControlCenterViewProvider*/) {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('on_activate_extension');
-  void ccProvider.activationFinalized();
+  //void ccProvider.activationFinalized();
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
@@ -156,7 +156,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
               return;
-      } 
+      }
       clearTimeout(reviewTimer);
       // Run review after 1 second of no edits
       reviewTimer = setTimeout(() => {
@@ -196,6 +196,14 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       vscode.authentication
         .getSession(AUTH_TYPE, [], { createIfNone: true })
         .then(onGetSessionSuccess(context, csContext), onGetSessionError());
+    }),
+    vscode.commands.registerCommand('codescene.signOut', async () => {
+      vscode.authentication.getSession(AUTH_TYPE, [], { createIfNone: true }).then(async (session) => {
+        await authProvider.removeSession(session.id);
+      }, onGetSessionError());
+    }),
+    vscode.commands.registerCommand('codescene.signInCancel', async () => {
+      authProvider.cancelLogin();
     })
   );
 

@@ -38,7 +38,7 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';  
+const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';
 // CS-5069 Remove ACE from public version
 // const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
@@ -57,9 +57,12 @@ export class CsExtensionState {
   private baselineChangedEmitter = new vscode.EventEmitter<void>();
   readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
+  private sessionChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onSessionChanged = this.sessionChangedEmitter.event;
+
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly controlCenterView: ControlCenterViewProvider
+    //private readonly controlCenterView: ControlCenterViewProvider
   ) {
     this.stateProperties = {
       features: {
@@ -90,8 +93,8 @@ export class CsExtensionState {
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
-    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
+  static init(context: vscode.ExtensionContext/*, controlCenterView: ControlCenterViewProvider*/) {
+    CsExtensionState._instance = new CsExtensionState(context/*, controlCenterView*/);
   }
 
   static get acceptedTermsAndPolicies() {
@@ -153,15 +156,15 @@ export class CsExtensionState {
     //   DevtoolsAPI.onDidRefactoringFail((error) => {
     //     CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
     //   }),
-      // DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
-      //   if (evt.type === 'end') {
-      //     try {
-      //       await evt.request.promise;
-      //       // Reset error state when a request succeeds again
-      //       CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
-      //     } catch (error) {}
-      //   }
-      // })
+    // DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
+    //   if (evt.type === 'end') {
+    //     try {
+    //       await evt.request.promise;
+    //       // Reset error state when a request succeeds again
+    //       CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
+    //     } catch (error) {}
+    //   }
+    // })
     // );
   }
 
@@ -186,7 +189,7 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update();
+    //CsExtensionState._instance.controlCenterView.update();
     CsExtensionState._instance.statusBar.update();
   }
 
@@ -198,16 +201,20 @@ export class CsExtensionState {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
+    this._instance.sessionChangedEmitter.fire();
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
     }
-
     CsExtensionState._instance.updateStatusViews();
   }
 
   static get session(): vscode.AuthenticationSession | undefined {
     return CsExtensionState.stateProperties.session;
+  }
+
+  static get onSessionChanged() {
+    return this._instance.onSessionChanged;
   }
 
   static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {

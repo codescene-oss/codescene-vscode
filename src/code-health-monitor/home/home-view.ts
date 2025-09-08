@@ -1,54 +1,27 @@
-import vscode, { Disposable, ExtensionContext, Position, Webview, WebviewViewProvider } from 'vscode';
+import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, WebviewViewProvider } from 'vscode';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, initBaseContent } from './home-html-utils';
+import { getHomeData, getLoginData, ignoreSessionStateFeatureFlag, initBaseContent } from './home-html-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
-import { Baseline, CsExtensionState } from '../../cs-extension-state';
-import { Delta } from '../../devtools-api/delta-model';
+import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../tree-model';
-import { isDefined, pluralize, showDocAtPosition } from '../../utils';
-import {
-  convertCWFCommitBaselineToVSCode,
-  convertCWFDocTypeToVSCode,
-  convertFileIssueToCWFDeltaItem,
-  convertVSCodeCommitBaselineToCWF,
-} from './cwf-parsers';
-import { toDocsParams } from '../../documentation/commands';
-import { CwfCommitBaselineType } from './cwf-types';
+import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from './cwf-parsers';
+import { BackgroundServiceView } from '../background-view';
+import { handleCWFMessage } from './cwf-message-handlers';
+import { CommitBaselineType, MessageToIDEType } from './types/messages';
+import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from './types';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
-export function register(context: ExtensionContext) {
-  const viewProvider = new HomeView(context);
+function getUserName(accountLabel: string | undefined) {
+  if(!accountLabel || accountLabel === 'null') return 'Signed in';
+  return accountLabel;
+}
+
+export function register(context: ExtensionContext, backgroundSeriveView: BackgroundServiceView) {
+  const viewProvider = new HomeView(context, backgroundSeriveView);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
-}
-
-// Find the VSCode equivalent file/function from webview payload
-function getFileAndFunctionFromState(
-  fileIssueMap: Map<string, FileWithIssues>,
-  fileName: string,
-  fn?: { name: string; startLine: number }
-) {
-  const locatedFile = fileIssueMap.get(fileName);
-  if (!locatedFile) return;
-
-  const locatedFn = fn
-    ? locatedFile.functionLevelIssues.find((functionLevelIssues) => fn.name === functionLevelIssues.fnName)
-    : undefined;
-
-  return {
-    file: locatedFile,
-    fn: locatedFn
-      ? {
-          fnName: locatedFn?.fnName,
-        }
-      : undefined,
-  };
-}
-
-function getFunctionPosition(fn: any | undefined): Position | undefined {
-  return fn ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
 }
 
 export class HomeView implements WebviewViewProvider, Disposable {
@@ -57,12 +30,17 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private baseContent: string = '';
   private initialized: boolean = false; // keep track of webview init state
   private fileIssueMap: Map<string, FileWithIssues> = new Map(); // Raw VSCode specific delta result, source of truth
+  private backgroundServiceView: BackgroundServiceView; //handles badge updates
+
+  private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
+  private loginFlowState: LoginFlowStateType;
+
   private ideContextData: {
     showOnboarding: boolean;
-    fileDeltaData: any[];
-    commitBaseline: string;
-    autoRefactor: any;
-    jobs: any[];
+    fileDeltaData: FileDeltaData[];
+    commitBaseline: CommitBaselineType;
+    autoRefactor: AutoRefactorConfig;
+    jobs: Job[];
   } = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
@@ -70,19 +48,21 @@ export class HomeView implements WebviewViewProvider, Disposable {
     autoRefactor: {
       activated: false, // indicate that the user has not approved the use of ACE yet
       disabled: false, // disable the visible button if visible: true
-      visible: true, // Show any type of ACE functionality
+      visible: false, // Show any type of ACE functionality
     },
     jobs: [],
   };
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, backgroundServiceView: BackgroundServiceView) {
+    this.loginFlowState = { loginOpen: false, loginState: 'init' };
+    this.backgroundServiceView = backgroundServiceView;
     this.disposables.push(
       this,
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
-      CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()) // Detect change to commit baseline
+      CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
+      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()) // Detect change to commit baseline
     );
-
     // Limit number of re-renders
     this.update = throttle(this.updateRaw, 350, {
       leading: true,
@@ -104,11 +84,37 @@ export class HomeView implements WebviewViewProvider, Disposable {
     webView.onDidReceiveMessage(this.messageHandler, this, this.disposables);
 
     this.handleVisibilityEvents(webviewView);
-    this.baseContent = initBaseContent(webView);
+    this.baseContent = initBaseContent(
+      webView,
+      getHomeData({
+        fileDeltaData: this.ideContextData.fileDeltaData,
+        jobs: this.ideContextData.jobs,
+        autoRefactor: this.ideContextData.autoRefactor,
+        showOnboarding: false,
+        commitBaseline: this.ideContextData.commitBaseline,
+        signedIn: this.isSignedIn(),
+        user: { name: this.session?.account.label || 'Not set' },
+      })
+    );
     this.update();
   }
 
-  private update!: CancelableVoid;
+  public update!: CancelableVoid;
+
+  //Setter of login state used by message handler
+  setLoginFlowState(updatedLoginFlowState: LoginFlowStateType) {
+    this.loginFlowState = updatedLoginFlowState;
+  }
+
+  //Setter of init state used by message handler
+  setInitiated(updatedInitiated: boolean) {
+    this.initialized = updatedInitiated;
+  }
+
+  //Getter of native file list used by message handler
+  getFileIssueMap() {
+    return this.fileIssueMap;
+  }
 
   // Detect changes to the delta result, updates the list and lastly converts the data to CWF webview format
   private updateFileDeltaData(event: DeltaAnalysisEvent) {
@@ -136,16 +142,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    if (this.view) {
-      const filesWithIssueCount = this.fileIssueMap.size;
-      const resultsText =
-        filesWithIssueCount > 0
-          ? `Found ${filesWithIssueCount} ${pluralize('file', filesWithIssueCount)} with introduced code health issues`
-          : undefined;
-      this.view.badge = {
-        value: filesWithIssueCount,
-        tooltip: [resultsText].filter(isDefined).join(' • '),
-      };
+    if (this.backgroundServiceView && this.isSignedIn()) {
+      this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
     }
 
     this.ideContextData.fileDeltaData = [...this.fileIssueMap].map((d) => convertFileIssueToCWFDeltaItem(d[1]));
@@ -160,9 +158,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
   // Convert VSCode jobs to CWF Jobs for rendering
   private updateJobsData(event: AnalysisEvent) {
     const eventArray = event.jobs ? Array.from(event.jobs) : [];
-    this.ideContextData.jobs = eventArray.map((fileName) => ({
-      file: { fileName: fileName, type: 'deltaAnalysis', state: 'running' },
-    }));
+    this.ideContextData.jobs = eventArray.map(
+      (fileName): Job => ({
+        file: { fileName: fileName },
+        type: 'deltaAnalysis',
+        state: 'running',
+      })
+    );
   }
 
   // ### VSCode state handlers ###
@@ -181,6 +183,19 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.ideContextData.commitBaseline = convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline);
     this.update();
   }
+  private handleSessionChanged() {
+    this.session = CsExtensionState.session;
+    if (this.session) {
+      this.loginFlowState.loginOpen = false;
+      if (this.backgroundServiceView && this.isSignedIn()) {
+        this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
+      }
+    } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
+      // If the user has a pending login that fails we update the login flow state.
+      this.loginFlowState.loginState = 'error';
+    }
+    this.update();
+  }
 
   private handleVisibilityEvents(view: vscode.WebviewView) {
     // On first resolve ("resolveWebviewView is called when a view first becomes visible")
@@ -197,96 +212,50 @@ export class HomeView implements WebviewViewProvider, Disposable {
     );
   }
 
-  // ### CWF Message handlers ###
-
-  private async handleSelectCommitBaseLineMessage(commitBaseLineString: CwfCommitBaselineType) {
-    const currentBaseline = CsExtensionState.baseline;
-    const newBaseline = convertCWFCommitBaselineToVSCode(commitBaseLineString);
-    if (newBaseline !== currentBaseline) {
-      await CsExtensionState.setBaseline(newBaseline);
-    }
-  }
-
-  private async handleGoToFunction(payload: {
-    fileName: string;
-    fn?: { name: string; range?: { startLine: number; endLine: number; startColumn: number; endColumn: number } };
-  }) {
-    const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName);
-    foundFileFunction?.file &&
-      (await showDocAtPosition(foundFileFunction.file.document, getFunctionPosition(payload.fn)));
-  }
-
-  private handleAutoRefactor(payload: any) {
-    console.log('Autorefactor NYI');
-    // const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName, {
-    //   name: payload.fn.name,
-    //   startLine: payload.fn.range.startLine,
-    // });
-
-    // if (!foundFileFunction) return;
-
-    // void vscode.commands.executeCommand(
-    //   'codescene.requestAndPresentRefactoring',
-    //   foundFileFunction.file.document,
-    //   'code-health-details',
-    // );
-  }
-
-  private handleOpenDocs(payload: any) {
-    const foundFileFunction = getFileAndFunctionFromState(this.fileIssueMap, payload.fileName, {
-      name: payload.fn.name,
-      startLine: payload.fn.range.startLine,
-    });
-
-    if (!foundFileFunction) return;
-
-    const docsParams = toDocsParams(
-      convertCWFDocTypeToVSCode(payload.docType),
-      foundFileFunction.file?.document,
-      getFunctionPosition(payload.fn)
-    );
-    if (docsParams) {
-      void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
-    }
-  }
-
-  private handleOpenSettings() {
-    Telemetry.logUsage('control-center/open-settings');
-    vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode').then(
-      () => {},
-      (err) => {
-        void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
-      }
-    );
-  }
-
   // Handles messages from the homeView webview
-  private async messageHandler(message: any) {
-    switch (message.messageType) {
-      case 'init':
-        this.initialized = true;
-        this.update();
-        return;
-      case 'commitBaseline':
-        await this.handleSelectCommitBaseLineMessage(message.payload);
-        return;
-      case 'goto-function-location':
-        await this.handleGoToFunction(message.payload);
-        return;
-      case 'request-and-present-refactoring':
-        this.handleAutoRefactor(message.payload);
-        return;
-      case 'open-docs-for-function':
-        this.handleOpenDocs(message.payload);
-        return;
-      case 'open-settings':
-        this.handleOpenSettings();
-        return;
-    }
+  private async messageHandler(message: MessageToIDEType) {
+    await handleCWFMessage(this, message);
+    this.update();
+  }
+
+  private isSignedIn() {
+    // if the ignoreSessionStateFeatureFlag is true we always consider the user signed in.
+    return ignoreSessionStateFeatureFlag ? true : Boolean(this.session);
   }
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+  }
+
+  private async updateHomeRenderer() {
+    const webView = this.view?.webview;
+    if (!webView) return;
+    await webView.postMessage({
+      messageType: 'update-renderer',
+      payload: getHomeData({
+        fileDeltaData: this.ideContextData.fileDeltaData,
+        jobs: this.ideContextData.jobs,
+        autoRefactor: this.ideContextData.autoRefactor,
+        showOnboarding: false,
+        commitBaseline: this.ideContextData.commitBaseline,
+        signedIn: this.isSignedIn(),
+        user: { name: getUserName(this.session?.account.label)},
+      }),
+    });
+  }
+
+  private async updateLoginRenderer() {
+    const webView = this.view?.webview;
+    if (!webView) return;
+    await webView.postMessage({
+      messageType: 'update-renderer',
+      payload: getLoginData({
+        baseUrl: 'https://codescene.io',
+        availableProjects: [],
+        state: this.loginFlowState.loginState,
+        user: { name: getUserName(this.session?.account.label) },
+      }),
+    });
   }
 
   // Update function for rendering webview. used by lodash throttle to limit number of rerenders
@@ -295,16 +264,11 @@ export class HomeView implements WebviewViewProvider, Disposable {
     if (!webView) return;
 
     if (this.initialized) {
-      await webView.postMessage({
-        messageType: 'update-renderer',
-        payload: getHomeData({
-          fileDeltaData: this.ideContextData.fileDeltaData,
-          jobs: this.ideContextData.jobs,
-          autoRefactor: this.ideContextData.autoRefactor,
-          showOnboarding: false,
-          commitBaseline: this.ideContextData.commitBaseline,
-        }),
-      });
+      if (this.loginFlowState.loginOpen) {
+        await this.updateLoginRenderer();
+      } else {
+        await this.updateHomeRenderer();
+      }
     } else {
       webView.html = this.baseContent;
     }
