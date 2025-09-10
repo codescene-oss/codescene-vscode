@@ -82,9 +82,27 @@ export interface LoginViewProps {
   };
 }
 
-export type WebViewPropsType =
-  | HomeContextViewProps
-  | LoginViewProps
+export interface DocsContextViewProps {
+  /**The IDE invoking th webview */
+  ideType: IdeTypes;
+  /**Enable premium UI elements */
+  pro?: boolean;
+  /**What view should be rendered */
+  view: 'docs';
+  /**devmode will display devtools and log state and messages in the browser console */
+  devmode?: boolean;
+  /** array of feature flags string */
+  featureFlags?: FeatureFlags[];
+  data: {
+    /**Information about the source file and function  */
+    fileData?: FileMetaType;
+    /**Which documentation should be rendered */
+    docType: string | string[]
+    autoRefactor?: AutoRefactorConfig;
+  };
+}
+
+export type WebViewPropsType = HomeContextViewProps | LoginViewProps | DocsContextViewProps;
 
 
 export type IdeContextType = WebViewPropsType;

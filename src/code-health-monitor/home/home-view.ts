@@ -2,15 +2,16 @@ import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, Web
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, getLoginData, ignoreSessionStateFeatureFlag, initBaseContent } from './home-html-utils';
+import { getHomeData, getLoginData} from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../tree-model';
-import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from './cwf-parsers';
+import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from '../../centralized-webview-framework/cwf-parsers';
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
-import { CommitBaselineType, MessageToIDEType } from './types/messages';
-import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from './types';
+import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-framework/types/messages';
+import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from '../../centralized-webview-framework/types';
+import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 

@@ -1,4 +1,4 @@
-import { MessageToIDEType } from "./types/messages";
+import { MessageToIDEType } from "../../centralized-webview-framework/types/messages";
 
 // Build a lookuptable to separate all the messages from webview into smaller categories
 const lifecycleMessages = ['init'] as const;
