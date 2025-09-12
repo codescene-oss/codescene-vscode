@@ -35,6 +35,8 @@ type CodeSceneTabPanelParams = InteractiveDocsParams & {
   isStale?: boolean;
 };
 
+// DEPRECATED CS-5271, using cwf-webview-docs-panel.ts for Docs, and ACE should be moved to their own panel view
+// But keeping this for now since there is a alot of logic related to ACE in this file.
 export class CodeSceneTabPanel implements Disposable {
   private static _instance: CodeSceneTabPanel | undefined;
   private static readonly viewType = 'codescene-tab';
@@ -252,10 +254,10 @@ export class CodeSceneTabPanel implements Disposable {
   //   const ackContent = /*html*/ `
   //     <div class="ace-acknowledgement-container">
   //       <h4>CodeScene ACE - AI-Powered Refactoring</h4>
-  //       <p><a href="https://codescene.com/product/ai-coding">CodeScene ACE</a> combines multiple LLMs with fact-based validation. 
-  //       ACE chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier 
+  //       <p><a href="https://codescene.com/product/ai-coding">CodeScene ACE</a> combines multiple LLMs with fact-based validation.
+  //       ACE chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier
   //       to maintain.</p>
-  //       <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a 
+  //       <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a
   //       <a href="https://codescene.com/hubfs/web_docs/Business-impact-of-code-quality.pdf?utm_campaign=AI Coding&utm_source=IDE&utm_medium=extension&utm_content=code-red">
   //       proven business impact</a>.</p>
 
@@ -323,7 +325,7 @@ export class CodeSceneTabPanel implements Disposable {
   //   } catch (e) {
   //     const title = 'Refactoring Failed';
   //     const actionHtml = `
-  //       There was an error when performing this refactoring. 
+  //       There was an error when performing this refactoring.
   //       Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
 
   //     const summaryContent = customRefactoringSummary(-1, 'Refactoring Failed', actionHtml);

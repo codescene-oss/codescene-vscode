@@ -1,5 +1,6 @@
+// CS-5271
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
-import { InteractiveDocsParams, isInteractiveDocsParams } from '../documentation/commands';
+import { InteractiveDocsParams } from '../documentation/commands';
 import { reportError, showDocAtPosition } from '../utils';
 import { commonResourceRoots } from '../webview-utils';
 import { MessageToIDEType } from '../centralized-webview-framework/types/messages';
@@ -23,6 +24,27 @@ function getDocsData(docType: string, fileData: FileMetaType): DocsContextViewPr
 function getCWFDocType(docType: string) {
   if (docType.includes('_')) return docType;
   return `docs_issues_${docType.toLowerCase().split(' ').join('_').replace(',', '')}`;
+}
+
+function getFileData(params: InteractiveDocsParams): FileMetaType {
+  const { issueInfo, document } = params;
+  const fileData: FileMetaType = {
+    fileName: document.fileName,
+    fn: issueInfo.fnName
+      ? {
+          name: issueInfo.fnName,
+          range: issueInfo.position
+            ? {
+                startLine: issueInfo.position.line,
+                startColumn: 0,
+                endLine: issueInfo.position.line,
+                endColumn: 1,
+              }
+            : undefined,
+        }
+      : undefined,
+  };
+  return fileData;
 }
 
 export class CodeSceneCWFDocsTabPanel implements Disposable {
@@ -63,13 +85,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     );
   }
 
-  private async handleMessages(message: any) {
+  // MESSAGES
+  private async handleMessages(message: MessageToIDEType) {
     try {
       if (!this.state) return;
-
-      if (isInteractiveDocsParams(this.state)) {
-        await this.handleDocumentationMessage(this.state, message);
-      }
+      await this.handleDocumentationMessage(this.state, message);
     } catch (e) {
       reportError({ context: 'CodeScene tab message handling', e });
     }
@@ -88,43 +108,25 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     }
   }
 
+  // RENDERING
+  // Webview is visible and initiated
+  private isActive() {
+    return CodeSceneCWFDocsTabPanel.instance.webViewPanel.visible && this.initialized;
+  }
+
+  // Render webview either by creatign html or sending update-renderer message
   private async updateWebView(params: CodeSceneTabPanelParams) {
     this.state = params;
-    if (isInteractiveDocsParams(params)) {
-      await this.presentDocumentation(params);
-    }
-  }
-
-  private async presentDocumentation(params: InteractiveDocsParams) {
     const { issueInfo, document } = params;
+    const fileData = getFileData(params);
 
-    const fileData: FileMetaType = {
-      fileName: document.fileName,
-      fn: issueInfo.fnName
-        ? {
-            name: issueInfo.fnName,
-            range: issueInfo.position
-              ? {
-                  startLine: issueInfo.position.line,
-                  startColumn: 0,
-                  endLine: issueInfo.position.line,
-                  endColumn: 1,
-                }
-              : undefined,
-          }
-        : undefined,
-    };
-    await this.updateContentWithDocScripts(issueInfo.category, fileData);
-  }
-
-  private async updateContentWithDocScripts(docType: string, fileData: FileMetaType) {
-    if (CodeSceneCWFDocsTabPanel.instance.webViewPanel.visible && this.initialized) {
+    if (this.isActive()) {
       await this.webViewPanel.webview.postMessage({
         messageType: 'update-renderer',
-        payload: getDocsData(docType, fileData),
+        payload: getDocsData(issueInfo.category, fileData),
       });
     } else {
-      const htmlContent = initBaseContent(this.webViewPanel.webview, getDocsData(docType, fileData));
+      const htmlContent = initBaseContent(this.webViewPanel.webview, getDocsData(issueInfo.category, fileData));
       this.webViewPanel.webview.html = htmlContent;
     }
   }

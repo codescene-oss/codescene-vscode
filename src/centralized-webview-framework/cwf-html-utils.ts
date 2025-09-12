@@ -65,6 +65,7 @@ export const ideStylesVars = `
       --cs-theme-editor-background: var(--vscode-editor-background);
       --cs-theme-editor-foreground: var(--vscode-editor-foreground);
       --cs-theme-textLink-foreground: var(--vscode-textLink-foreground);
+      --cs-theme-scroll-bar-thumb: var(--vscode-scrollbarSlider-background);
 
       --cs-theme-foreground: var(--vscode-foreground);
       ${Object.keys(opacityHexLookup)
