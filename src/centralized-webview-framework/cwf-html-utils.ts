@@ -7,7 +7,7 @@ export const ideType = 'VSCode';
 // This flag is used to enable or disable the login flow
 // true: will ignore any session data and always show Code Health Monitor
 // false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
-export const ignoreSessionStateFeatureFlag = false;
+export const ignoreSessionStateFeatureFlag = true;
 
 // Enable Webview devmode with alot of logging
 export const devmode = false;
