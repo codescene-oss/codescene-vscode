@@ -5,14 +5,14 @@ import {
   convertCWFDocTypeToVSCode,
   getFileAndFunctionFromState,
   getFunctionPosition,
-} from './cwf-parsers';
+} from '../../centralized-webview-framework/cwf-parsers';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
 import { toDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { getMessageCategory } from './cwf-message-categories';
-import { CommitBaselineType, MessageToIDEType, OpenDocsMessage } from './types/messages';
-import { FileMetaType } from './types';
+import { CommitBaselineType, MessageToIDEType, OpenDocsMessage } from '../../centralized-webview-framework/types/messages';
+import { FileMetaType } from '../../centralized-webview-framework/types';
 
 /**
  * Changes the commit baseline
@@ -80,7 +80,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
   if (!foundFileFunction) return;
 
   const docsParams = toDocsParams(
-    convertCWFDocTypeToVSCode(payload.docType),
+    payload.docType,
     foundFileFunction.file?.document,
     getFunctionPosition(payload.fn)
   );

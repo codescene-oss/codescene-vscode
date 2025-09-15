@@ -1,6 +1,6 @@
 import { Position } from 'vscode';
-import { Baseline } from '../../cs-extension-state';
-import { FileWithIssues } from '../tree-model';
+import { Baseline } from '../cs-extension-state';
+import { FileWithIssues } from '../code-health-monitor/tree-model';
 import { FileDeltaData, FileMetaType } from './types';
 import { CommitBaselineType } from './types/messages';
 

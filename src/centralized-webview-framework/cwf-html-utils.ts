@@ -1,9 +1,8 @@
 import { Webview } from 'vscode';
-import { getUri } from '../../webview-utils';
-import { HomeContextViewProps, IdeContextType, LoginViewProps } from './types';
 import { FeatureFlags } from './types/cwf-feature';
-
-const ideType = 'VSCode';
+import { IdeContextType } from './types';
+import { getUri } from '../webview-utils';
+export const ideType = 'VSCode';
 
 // This flag is used to enable or disable the login flow
 // true: will ignore any session data and always show Code Health Monitor
@@ -11,9 +10,8 @@ const ideType = 'VSCode';
 export const ignoreSessionStateFeatureFlag = false;
 
 // Enable Webview devmode with alot of logging
-const devmode = false;
-
-const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
+export const devmode = false;
+export const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
 if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
 const opacityHexLookup = {
@@ -67,6 +65,7 @@ export const ideStylesVars = `
       --cs-theme-editor-background: var(--vscode-editor-background);
       --cs-theme-editor-foreground: var(--vscode-editor-foreground);
       --cs-theme-textLink-foreground: var(--vscode-textLink-foreground);
+      --cs-theme-scroll-bar-thumb: var(--vscode-scrollbarSlider-background);
 
       --cs-theme-foreground: var(--vscode-foreground);
       ${Object.keys(opacityHexLookup)
@@ -120,57 +119,6 @@ export const initialDataContextScriptTag = (ideContext: IdeContextType) => /*htm
   </script>
 `;
 
-/**
- * Generate all needed props for CWF HomeView
- * @param param0
- * @returns
- */
-export const getHomeData = ({
-  fileDeltaData,
-  jobs,
-  autoRefactor,
-  showOnboarding,
-  commitBaseline,
-  signedIn,
-  user,
-}: HomeContextViewProps['data'] & { signedIn: boolean }): IdeContextType => {
-  return {
-    ideType: ideType,
-    view: 'home',
-    devmode: devmode,
-    pro: signedIn,
-    featureFlags: featureFlags,
-    data: {
-      fileDeltaData,
-      jobs,
-      autoRefactor,
-      showOnboarding,
-      commitBaseline,
-      user,
-    },
-  };
-};
-
-/**
- * Generate all needed props for LoginView
- * @param param0
- * @returns
- */
-export const getLoginData = ({ baseUrl, state, availableProjects, user }: LoginViewProps['data']) => {
-  return {
-    ideType: ideType,
-    view: 'login',
-    devmode: devmode,
-    pro: false,
-    featureFlags: featureFlags,
-    data: {
-      baseUrl,
-      state,
-      availableProjects,
-      user,
-    },
-  };
-};
 
 export const generateContextScriptTag = (ideContext: IdeContextType) => {
   return `
