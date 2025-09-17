@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.12.1...v0.14.1) (2025-09-17)
+
+
+### Features
+
+* **ace:** ACE was previously part of our freemium offering during its public beta. ACE is now live and available exclusively to paying customers. ([a9157f8](https://github.com/codescene-oss/codescene-vscode/commit/a9157f8eef583a1a58234c31dd9bebf87b8d3f33))
+* CS-5164 enabled enterprise login ([c5de9c2](https://github.com/codescene-oss/codescene-vscode/commit/c5de9c2dcb0e1b7aa880bd254eb723b04dd812c9))
+* CS-5164 Replace Montor UI ([ef94261](https://github.com/codescene-oss/codescene-vscode/commit/ef94261ce0de61e3284f0a9190f78fb8f104100b))
+* CS-5271 Replace Docs panel with CWF ([74cb125](https://github.com/codescene-oss/codescene-vscode/commit/74cb1253af6b067ac4e41c4fb37ceeb1479c80c2))
+* Login flow in new webview ([3ef2db4](https://github.com/codescene-oss/codescene-vscode/commit/3ef2db4426e327cd6fc08b91bf801314105367fb))
+* **telemetry:**  telemetry is now optional, enabled by deafult ([b811ff5](https://github.com/codescene-oss/codescene-vscode/commit/b811ff5b18725e33c826c582e6fc097fd860dfdb))
+* **telemetry:**  telemetry is now optional, enabled by deafult ([64fd743](https://github.com/codescene-oss/codescene-vscode/commit/64fd7434dfcef78ca967b886ec17ea3d4607e6e6))
+
+
+### Documentation
+
+* added comments to code ([a09887c](https://github.com/codescene-oss/codescene-vscode/commit/a09887c1b60cb9fc77e9baeaf7fb441878425d4b))
+* added extra comments to cwf panel ([2e06601](https://github.com/codescene-oss/codescene-vscode/commit/2e066018024a59a01317eeb1c82d984c807dca43))
+
+
+### Bug fixes
+
+* **code-health-review:** Improve  code health review time by 50% ([240628b](https://github.com/codescene-oss/codescene-vscode/commit/240628b7720c355baa33a1e8c99d677596bab9e4))
+* CS-5164 Handle if user name is null string ([a30903b](https://github.com/codescene-oss/codescene-vscode/commit/a30903be4c4c9a9e93344f56d845554f97bb1b22))
+
 ## [0.14.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.12.1...v0.14.0) (2025-08-22)
 
 
