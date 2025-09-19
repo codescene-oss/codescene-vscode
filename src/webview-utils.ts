@@ -18,6 +18,6 @@ export function commonResourceRoots() {
   return [
     Uri.joinPath(CsExtensionState.extensionUri, 'out'),
     Uri.joinPath(CsExtensionState.extensionUri, 'assets'),
-    Uri.joinPath(CsExtensionState.extensionUri, 'cs-cwf'),
+    //Uri.joinPath(CsExtensionState.extensionUri, 'cs-cwf'), //TODO: Add for new monitor CWF
   ];
 }

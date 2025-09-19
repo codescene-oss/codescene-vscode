@@ -27,14 +27,11 @@ export function onDidChangeConfiguration(
   });
 }
 
-// Allow user to input https://url.to.onprem/ with trailing "/", might do this on actual login initiation...
-const stripTrailingSlash = (u: string): string => u.replace(/\/+$/, '');
 /**
  * Get the configured URL of the CodeScene server.
  */
 export function getServerUrl() {
-  const serverUrl = getConfiguration<string>('serverUrl', 'https://codescene.io');
-  return stripTrailingSlash(serverUrl || 'https://codescene.io');
+  return getConfiguration<string>('serverUrl', 'https://codescene.io');
 }
 
 export function reviewCodeLensesEnabled() {

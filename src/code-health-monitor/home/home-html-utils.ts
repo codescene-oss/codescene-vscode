@@ -1,20 +1,7 @@
 import { Webview } from 'vscode';
 import { getUri } from '../../webview-utils';
-import { HomeContextViewProps, IdeContextType, LoginViewProps } from './types';
-import { FeatureFlags } from './types/cwf-feature';
 
 const ideType = 'VSCode';
-
-// This flag is used to enable or disable the login flow
-// true: will ignore any session data and always show Code Health Monitor
-// false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
-export const ignoreSessionStateFeatureFlag = true;
-
-// Enable Webview devmode with alot of logging
-const devmode = false;
-
-const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
-if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
 const opacityHexLookup = {
   '1': {
@@ -111,68 +98,57 @@ export const ideStylesVars = `
   </style>
 `;
 
-export const initialDataContextScriptTag = (ideContext: IdeContextType) => /*html*/ `
+const deltaData = {
+  fileDeltaData: [],
+  jobs: [],
+  showOnboarding: false,
+  autoRefactor: {
+    activated: true, // indicate that the user has not approved the use of ACE yet
+    disabled: false, // disable the visible button if visible: true
+    visible: true, // Show any type of ACE functionality
+  },
+};
+
+export const initialDataContext = /*html*/ `
   <script>
     function setContext() {
-      window.ideContext = ${JSON.stringify(ideContext)}
+      window.ideContext = {
+        ideType: ${ideType},
+        view: 'home',
+        devmode:true,
+        pro: true,
+        featureFlags: ["jobs", "commit-baseline", "open-settings"],
+        data: ${JSON.stringify(deltaData)}
+      }
     }
     setContext();
   </script>
 `;
 
-/**
- * Generate all needed props for CWF HomeView
- * @param param0
- * @returns
- */
-export const getHomeData = ({
-  fileDeltaData,
-  jobs,
-  autoRefactor,
-  showOnboarding,
-  commitBaseline,
-  signedIn,
-  user,
-}: HomeContextViewProps['data'] & { signedIn: boolean }): IdeContextType => {
+export const getHomeData = ({fileDeltaData, jobs, autoRefactor, showOnboarding, commitBaseline}:{
+  fileDeltaData: any[],
+  jobs: any[],
+  autoRefactor: any,
+  showOnboarding: boolean,
+  commitBaseline: string
+}) => {
   return {
     ideType: ideType,
     view: 'home',
-    devmode: devmode,
-    pro: signedIn,
-    featureFlags: featureFlags,
+    devmode: true,
+    pro: true,
+    featureFlags: ['jobs', 'commit-baseline', 'open-settings'],
     data: {
       fileDeltaData,
       jobs,
       autoRefactor,
       showOnboarding,
       commitBaseline,
-      user,
     },
   };
 };
 
-/**
- * Generate all needed props for LoginView
- * @param param0
- * @returns
- */
-export const getLoginData = ({ baseUrl, state, availableProjects, user }: LoginViewProps['data']) => {
-  return {
-    ideType: ideType,
-    view: 'login',
-    devmode: devmode,
-    pro: false,
-    featureFlags: featureFlags,
-    data: {
-      baseUrl,
-      state,
-      availableProjects,
-      user,
-    },
-  };
-};
-
-export const generateContextScriptTag = (ideContext: IdeContextType) => {
+export const generateContextScriptTag = (ideContext: any) => {
   return `
   <script>
     function setContext() {
@@ -191,9 +167,9 @@ export const getCsp = (webview: Webview) => [
   `connect-src https://*`,
 ];
 
-export function initBaseContent(webView: Webview, initialIdeContext: IdeContextType) {
-  const scriptUri = getUri(webView, 'cs-cwf', 'assets', 'index.js');
-  const stylesUri = getUri(webView, 'cs-cwf', 'assets', 'index.css');
+export function initBaseContent(webView: Webview) {
+  const scriptUri = getUri(webView, 'cs-cwf', 'index.js');
+  const stylesUri = getUri(webView, 'cs-cwf', 'index.css');
   const csp = getCsp(webView);
 
   // The full html with all previous varaibles included
@@ -206,7 +182,7 @@ export function initBaseContent(webView: Webview, initialIdeContext: IdeContextT
       <link rel="stylesheet" type="text/css" href="${stylesUri}">
       <title>VSCode React Webview</title>
       ${ideStylesVars}
-      ${initialDataContextScriptTag(initialIdeContext)}
+      ${initialDataContext}
     </head>
     <body>
       <div id="root"></div>
