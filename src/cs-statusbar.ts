@@ -25,7 +25,7 @@ export class CsStatusBar {
     this.statusBarItem.name = 'CodeScene status bar';
     this.statusBarItem.text = this.textContent(stateProperties);
     this.statusBarItem.tooltip = this.tooltipContent(stateProperties);
-    this.statusBarItem.command = 'codescene.homeView.focus';
+    this.statusBarItem.command = 'codescene.controlCenterView.focus';
     this.statusBarItem.backgroundColor = undefined;
   }
 

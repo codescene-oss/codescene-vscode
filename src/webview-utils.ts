@@ -15,9 +15,5 @@ export function getUri(webView: Webview, ...pathSegments: string[]) {
 }
 
 export function commonResourceRoots() {
-  return [
-    Uri.joinPath(CsExtensionState.extensionUri, 'out'),
-    Uri.joinPath(CsExtensionState.extensionUri, 'assets'),
-    Uri.joinPath(CsExtensionState.extensionUri, 'cs-cwf'),
-  ];
+  return [Uri.joinPath(CsExtensionState.extensionUri, 'out'), Uri.joinPath(CsExtensionState.extensionUri, 'assets')];
 }

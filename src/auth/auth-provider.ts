@@ -204,7 +204,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   }
 
   // Cancel currently running login (if any)
-  cancelLogin() {
+  private cancelLogin() {
     if (CsAuthenticationProvider.runningLogin) CsAuthenticationProvider.runningLogin.cancel();
     CsAuthenticationProvider.runningLogin = new CancellationTokenSource();
   }
