@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
+import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 // CS-5069 Remove ACE from public version
 // import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
-import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/cwf-webview-docs-panel';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -11,7 +11,7 @@ export function register(context: vscode.ExtensionContext) {
       'codescene.openInteractiveDocsPanel',
       (params: InteractiveDocsParams, source: string) => {
         Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params.issueInfo.category });
-        CodeSceneCWFDocsTabPanel.show(params);
+        CodeSceneTabPanel.show(params);
       }
     ),
     // A query param friendly version of openInteractiveDocsPanel
@@ -22,7 +22,7 @@ export function register(context: vscode.ExtensionContext) {
         issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
         document: await findOrOpenDocument(documentUri),
       };
-      CodeSceneCWFDocsTabPanel.show(params);
+      CodeSceneTabPanel.show(params);
     }),
     vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
       Telemetry.logUsage('openCodeHealthDocs');
@@ -63,7 +63,7 @@ export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsPar
 
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
-  params.issueInfo.fnName = fnInfo?.fnName;
+  params.issueInfo.fnName = fnInfo?.fnName; 
   // CS-5069 Remove ACE from public version
   // params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
