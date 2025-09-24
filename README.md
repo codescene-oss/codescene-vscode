@@ -31,11 +31,9 @@ Code smells often lead to issues such as increased technical debt, more bugs, an
 
 You can find detailed information for each code smell by either clicking the corresponding codelens in the editor, by examining the diagnostics (squigglies or in the Problems view), or by using the Quick Fix action menu (light bulb).
 
-## ACE AI-Powered Refactoring
-ACE (formerly available in beta)
-ACE, our AI-assisted code improvement tool, was previously included in the freemium version of this extension during its public beta phase.
-As of this version, ACE is no longer part of the public extension. It is now available exclusively to paying customers.
-Thank you to everyone who tested ACE during the beta and shared feedback.
 
+## Do you want to keep using CodeScene ACE?
 
+CodeScene ACE, our AI-powered refactoring agent, was free during beta but will now be offered as an add-on to the extension.
 
+If you’re interested in continuing to use CodeScene ACE or would like to share feedback, [reach out](https://codescene.com/contact-us-about-codescene-ace) to our Sales team.
