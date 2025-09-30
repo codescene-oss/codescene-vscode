@@ -242,11 +242,11 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
+      const baselineInfoItem = this.addBaselineInfo();
       // CS-5069 Remove ACE from public version
-      // const baselineInfoItem = this.addBaselineInfo();
       // const aceInfoItem = this.aceSummaryItem(filesWithIssues);
       // this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
-      this.tree = filesWithIssues;
+      this.tree = [baselineInfoItem, ...filesWithIssues];
     } else {
       this.tree = [];
     }
