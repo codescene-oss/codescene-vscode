@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.0...v0.14.2) (2025-10-02)
+
+### Bug fixes
+
+* **baseline:** Show baseline in monitor ([847447c](https://github.com/codescene-oss/codescene-vscode/commit/847447cbaf51abaec2284e0b68b596f509b14cee))
+
 ### [0.14.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.0...v0.14.1) (2025-09-19)
 
 ### Features
