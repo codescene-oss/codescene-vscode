@@ -12,8 +12,7 @@ import { register as registerCsDocProvider } from './documentation/csdoc-provide
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
-// CS-5069 Remove ACE from public version
-// import { initAce } from './refactoring';
+import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -36,7 +35,7 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
   //const controlCenterViewProvider = registerControlCenterViewProvider(context);
-  CsExtensionState.init(context/*, controlCenterViewProvider*/);
+  CsExtensionState.init(context /*, controlCenterViewProvider*/);
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
@@ -72,8 +71,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context);
-  // CS-5069 Remove ACE from public version
-  // initAce(context);
+  initAce(context);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
@@ -93,15 +91,14 @@ async function startExtension(context: vscode.ExtensionContext) {
   registerCodeActionProvider(context);
 
   // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  // CS-5069 Remove ACE from public version
-  // const debouncedSetEnabledAce = debounce((enabled: boolean) => {
-  //   void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
-  // }, 500);
-  // context.subscriptions.push(
-  //   onDidChangeConfiguration('enableAutoRefactor', (e) => {
-  //     debouncedSetEnabledAce(e.value);
-  //   })
-  // );
+  const debouncedSetEnabledAce = debounce((enabled: boolean) => {
+    void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
+  }, 500);
+  context.subscriptions.push(
+    onDidChangeConfiguration('enableAutoRefactor', (e) => {
+      debouncedSetEnabledAce(e.value);
+    })
+  );
 }
 
 /**
@@ -155,13 +152,14 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
-              return;
+        return;
       }
       clearTimeout(reviewTimer);
       // Run review after 1 second of no edits
       reviewTimer = setTimeout(() => {
         CsDiagnostics.review(e.document);
-      }, 1000);    })
+      }, 1000);
+    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
