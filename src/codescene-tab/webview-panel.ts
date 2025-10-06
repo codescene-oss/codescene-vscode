@@ -345,7 +345,8 @@ export class CodeSceneTabPanel implements Disposable {
       switch (true) {
         case isAuthError:
           title = 'Authentication Failed';
-          actionHtml = 'Authentication failed. Please check your CodeScene authentication token in settings, or Sign In with CodeScene.';
+          actionHtml =
+            'Authentication failed. Please check your CodeScene authentication token in settings, or Sign In with CodeScene.';
           level = -2;
           break;
         default:

@@ -82,7 +82,8 @@ export class DevtoolsAPI {
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const binaryOpts = {
       args: ['review', '--output-format', 'json', '--file-name', fp.fileName].concat(
-        cachePath ? ['--cache-path', cachePath] :[]),
+        cachePath ? ['--cache-path', cachePath] : []
+      ),
       taskId: taskId('review', document),
       execOptions: { cwd: fp.documentDirectory },
       input: document.getText(),
@@ -269,7 +270,9 @@ export class DevtoolsAPI {
       input: document.getText(),
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
-    logOutputChannel.info(`Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`);
+    logOutputChannel.info(
+      `Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`
+    );
     return ret;
   }
 
@@ -281,7 +284,8 @@ export class DevtoolsAPI {
   private static buildRefactoringArgs(fnToRefactor: FnToRefactor, skipCache: boolean, token: string): string[] {
     const args = ['refactor', 'post'];
 
-    if (fnToRefactor['nippy-b64']) { // If available, use the newer, more recommended API which isn't to encoding errors
+    if (fnToRefactor['nippy-b64']) {
+      // If available, use the newer, more recommended API which isn't to encoding errors
       args.push('--fn-to-refactor-nippy-b64', fnToRefactor['nippy-b64']);
     } else {
       args.push('--fn-to-refactor', JSON.stringify(fnToRefactor));
@@ -565,6 +569,7 @@ export class AbortError extends Error {}
 
 export type AnalysisEvent = {
   state: 'running' | 'idle';
+  jobs?: Set<string>;
 };
 
 export type ReviewEvent = {

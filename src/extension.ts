@@ -35,8 +35,7 @@ interface CsContext {
  */
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
-  const controlCenterViewProvider = registerControlCenterViewProvider(context);
-  CsExtensionState.init(context, controlCenterViewProvider);
+  CsExtensionState.init(context);
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
@@ -46,8 +45,8 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
-        await startExtension(context, controlCenterViewProvider);
-        finalizeActivation(controlCenterViewProvider);
+        await startExtension(context);
+        finalizeActivation();
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
         reportError({ context: 'Unable to start extension', e });
@@ -64,7 +63,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 }
 
-async function startExtension(context: vscode.ExtensionContext, controlCenterViewProvider: ControlCenterViewProvider) {
+async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
   };
@@ -75,7 +74,7 @@ async function startExtension(context: vscode.ExtensionContext, controlCenterVie
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
-  createAuthProvider(context, csContext, controlCenterViewProvider);
+  createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
@@ -106,10 +105,9 @@ async function startExtension(context: vscode.ExtensionContext, controlCenterVie
  * The context variable is used in package.json to conditionally enable/disable views that could
  * point to commands that haven't been fully initialized.
  */
-function finalizeActivation(ccProvider: ControlCenterViewProvider) {
+function finalizeActivation() {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('on_activate_extension');
-  void ccProvider.activationFinalized();
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
@@ -151,13 +149,14 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
-              return;
-      } 
+        return;
+      }
       clearTimeout(reviewTimer);
       // Run review after 1 second of no edits
       reviewTimer = setTimeout(() => {
         CsDiagnostics.review(e.document);
-      }, 1000);    })
+      }, 1000);
+    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
@@ -192,7 +191,7 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
-function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext, controlCenterViewProvider: ControlCenterViewProvider) {
+function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
@@ -206,9 +205,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   );
 
   // Register manual sign out command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider))
-  );
+  context.subscriptions.push(vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider)));
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
   // sign in in the accounts menu - see AuthenticationGetSessionOptions
@@ -230,7 +227,6 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     }
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
-    controlCenterViewProvider.update();
   });
 
   const serverUrlChangedDisposable = onDidChangeConfiguration('serverUrl', async (e) => {
@@ -246,7 +242,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
-    controlCenterViewProvider.update();
+    // TODO: refresh CWF view(s)
   });
 
   context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);

@@ -10,7 +10,9 @@ function sendMessage(command: string, data?: object) {
 }
 
 function main() {
-  document.getElementById('refactoring-button')?.addEventListener('click', () => sendMessage('request-and-present-refactoring'));
+  document
+    .getElementById('refactoring-button')
+    ?.addEventListener('click', () => sendMessage('request-and-present-refactoring'));
 
   for (const link of Array.from(document.getElementsByClassName('issue-link'))) {
     link.addEventListener('click', (e) => issueClickHandler(e));

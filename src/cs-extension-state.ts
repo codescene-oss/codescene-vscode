@@ -54,10 +54,7 @@ export class CsExtensionState {
   private baselineChangedEmitter = new vscode.EventEmitter<void>();
   readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly controlCenterView: ControlCenterViewProvider
-  ) {
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -76,17 +73,13 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([
-      acknowledgedAceUsageKey,
-      baselineKey,
-      telemetryNoticeShownKey,
-    ]);
+    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
-    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
+  static init(context: vscode.ExtensionContext) {
+    CsExtensionState._instance = new CsExtensionState(context);
   }
 
   static get acknowledgedAceUsage() {
@@ -170,7 +163,6 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update();
     CsExtensionState._instance.statusBar.update();
   }
 

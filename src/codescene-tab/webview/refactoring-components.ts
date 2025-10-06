@@ -13,7 +13,7 @@ export function refactoringSummary(confidence: Confidence) {
   return customRefactoringSummary(level, action, actionDetails);
 }
 
-// The texts here should be from the service, but updating there would make it change for customers - so for now hardcode in these fns 
+// The texts here should be from the service, but updating there would make it change for customers - so for now hardcode in these fns
 export function summaryHeader(level: number, levelClass: string, action: string) {
   if (level >= 3) {
     return `<div class="refactoring-summary-header ${levelClass}">Refactoring improves Code Health</div>`;
@@ -34,7 +34,7 @@ export function summaryDetails(level: number, actionDetails: string) {
 
 export function customRefactoringSummary(level: number, action: string, actionDetails: string) {
   const levelClass = `level-${level > 0 ? level : 'error'}`;
-  return  /*html*/ `
+  return /*html*/ `
   <div class="refactoring-summary ${levelClass}">
     ${summaryHeader(level, levelClass, action)}
     ${summaryDetails(level, actionDetails)}
@@ -87,15 +87,26 @@ async function codeSmellsGuide(codeSmell: string) {
 }
 
 async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId, isStale: boolean) {
-  const declarationsSection = response.declarations && response.declarations.trim()
-    ? collapsibleContent('Declarations for Refactored Code', await codeContainerContent({ content: response.declarations, languageId: code.languageId }, false, 'copy-declarations-to-clipboard-button'))
-    : '';
+  const declarationsSection =
+    response.declarations && response.declarations.trim()
+      ? collapsibleContent(
+          'Declarations for Refactored Code',
+          await codeContainerContent(
+            { content: response.declarations, languageId: code.languageId },
+            false,
+            'copy-declarations-to-clipboard-button'
+          )
+        )
+      : '';
 
   const content = /*html*/ `
         ${isStale ? '' : acceptAndRejectButtons()}
         ${reasonsContent(response)}
         ${declarationsSection}
-        ${collapsibleContent('Refactored code', await codeContainerContent(code, true, 'copy-code-to-clipboard-button'))}
+        ${collapsibleContent(
+          'Refactored code',
+          await codeContainerContent(code, true, 'copy-code-to-clipboard-button')
+        )}
     `;
   return content;
 }
@@ -162,7 +173,10 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true, copyB
 async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithLangId) {
   return /*html*/ `
     ${reasonsContent(response)}
-    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code, false, 'copy-code-to-clipboard-button'))}
+    ${collapsibleContent(
+      'Refactored code (unverified)',
+      await codeContainerContent(code, false, 'copy-code-to-clipboard-button')
+    )}
   `;
 }
 

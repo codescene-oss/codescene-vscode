@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
-import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 
@@ -48,6 +47,7 @@ export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
+  fnToRefactor?: FnToRefactor;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
@@ -63,6 +63,7 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
   params.issueInfo.fnName = fnInfo?.fnName;
   params.fnToRefactor = fnInfo?.fnToRefactor;
+  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 
@@ -71,7 +72,9 @@ export function toDocsParams(
   document: vscode.TextDocument,
   position?: vscode.Position,
   fnToRefactor?: FnToRefactor
+  fnToRefactor?: FnToRefactor
 ): InteractiveDocsParams {
+  return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
   return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
 }
 

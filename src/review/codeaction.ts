@@ -39,9 +39,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .map((diagnostic) => diagnostic.codeSmell)
       .filter(isDefined);
 
-    const fnToRefactor = (
-      await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells)
-    )?.[0];
+    const fnToRefactor = (await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells))?.[0];
 
     if (fnToRefactor) {
       const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');

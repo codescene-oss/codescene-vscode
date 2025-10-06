@@ -49,7 +49,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
     return refactoring.promise.then(async (response) => {
       const editor = targetEditor(document);
-      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn, });
+      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn });
       const workSpaceEdit = new WorkspaceEdit();
       workSpaceEdit.replace(document.uri, vscodeRange, response.code);
       await vscode.workspace.applyEdit(workSpaceEdit);

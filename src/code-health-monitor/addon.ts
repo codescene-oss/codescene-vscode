@@ -2,8 +2,7 @@ import vscode, { Uri } from 'vscode';
 import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
-import { register as registerCodeHealthDetailsView } from './details/view';
-import { CodeHealthMonitorView } from './tree-view';
+import { register as registerHomeView } from './home/home-view';
 import {
   acquireGitApi,
   getBranchCreationCommit,
@@ -14,6 +13,7 @@ import {
   updateGitState,
 } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
+import { BackgroundServiceView } from './background-view';
 
 let gitApi: API | undefined;
 
@@ -24,9 +24,10 @@ export function activate(context: vscode.ExtensionContext) {
   gitApi = acquireGitApi();
   if (!gitApi) return;
 
-  const codeHealthMonitorView = new CodeHealthMonitorView(context);
+  const codeHealthMonitorView = new BackgroundServiceView(context);
+  registerHomeView(context, codeHealthMonitorView);
+
   registerCodeLens(context);
-  registerCodeHealthDetailsView(context);
 
   const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
 
