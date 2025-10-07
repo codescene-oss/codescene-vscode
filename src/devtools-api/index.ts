@@ -283,7 +283,14 @@ export class DevtoolsAPI {
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
-      const args = ['refactor', 'post', '--fn-to-refactor', JSON.stringify(fnToRefactor)];
+      const args = ['refactor', 'post'];
+
+      if (fnToRefactor['nippy-b64']) { // If available, use the newer, more recommended API which isn't to encoding errors
+        args.push('--fn-to-refactor-nippy-b64', fnToRefactor['nippy-b64']);
+      } else {
+        args.push('--fn-to-refactor', JSON.stringify(fnToRefactor));
+      }
+
       if (skipCache) args.push('--skip-cache');
 
       const session = CsExtensionState.stateProperties.session;
