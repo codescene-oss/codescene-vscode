@@ -76,7 +76,7 @@ export class DevtoolsAPI {
   static async reviewContent(document: vscode.TextDocument) {
     const fp = fileParts(document);
     const binaryOpts = {
-      args: ['review', '--file-name', fp.fileName],
+      args: ['review', '--output-format', 'json', '--file-name', fp.fileName],
       taskId: taskId('review', document),
       execOptions: { cwd: fp.documentDirectory },
       input: document.getText(),
@@ -110,7 +110,7 @@ export class DevtoolsAPI {
     const path = `${commitHash}:./${fp.fileName}`;
 
     const binaryOpts = {
-      args: ['review', path],
+      args: ['review', '--output-format', 'json', path],
       taskId: taskId('review-base', document),
       execOptions: { cwd: fp.documentDirectory },
     };
@@ -162,7 +162,7 @@ export class DevtoolsAPI {
     try {
       const fp = fileParts(document);
       const result = await DevtoolsAPI.instance.runBinary({
-        args: ['delta'],
+        args: ['delta', '--output-format', 'json'],
         input: inputJsonString,
         taskId: taskId('delta', document),
         execOptions: { cwd: fp.documentDirectory },
