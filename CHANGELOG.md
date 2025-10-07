@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.14.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.3...v0.14.4) (2025-10-07)
+
+
+### Features
+
+* add Sign Out command ([43a0657](https://github.com/codescene-oss/codescene-vscode/commit/43a06571b54b6c51f71d9b2fd293236660bc7a77))
+* Bump CLI version to 1.0.10 ([8beb94f](https://github.com/codescene-oss/codescene-vscode/commit/8beb94f5b03fdcd052609a7208d5ac29839634b2))
+
+
+### Bug fixes
+
+* access reviewResults safely ([3472686](https://github.com/codescene-oss/codescene-vscode/commit/3472686f3aeda11c164a5ffa20b6aad109af7d08))
+* add --output-format json in missing places ([2424bd9](https://github.com/codescene-oss/codescene-vscode/commit/2424bd9158b11961d81faf4b6852a340a4053c60))
+* **delta:** run command from the right cwd ([fad67cb](https://github.com/codescene-oss/codescene-vscode/commit/fad67cb3fb6200150525d44954226864cb94c518))
+* **telemetry:** don't call getDeviceId when telemetry is disabled ([ae7224b](https://github.com/codescene-oss/codescene-vscode/commit/ae7224b84db10a2badbef7fa524ec6e8216bb40f))
+
 ### [0.14.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.2...v0.14.3) (2025-10-02)
 
 
