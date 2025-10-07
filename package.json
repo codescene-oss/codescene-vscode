@@ -76,6 +76,10 @@
         "title": "CodeScene: Sign in to CodeScene (see Server Url setting)"
       },
       {
+        "command": "codescene.signOut",
+        "title": "CodeScene: Sign out from CodeScene"
+      },
+      {
         "command": "codescene.revokeTerms",
         "title": "CodeScene: Revoke Terms and Policies agreement"
       },

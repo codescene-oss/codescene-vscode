@@ -184,16 +184,31 @@ function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsCon
 
 function disableRemoteFeatures() {}
 
+async function handleSignOut(authProvider: CsAuthenticationProvider) {
+  if (CsExtensionState.session?.id) {
+    await authProvider.removeSession(CsExtensionState.session.id);
+    vscode.window.showInformationMessage('Signed out from CodeScene.');
+  } else {
+    vscode.window.showInformationMessage('Not signed in to CodeScene.');
+  }
+}
+
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
   context.subscriptions.push(
     vscode.commands.registerCommand('codescene.signIn', async () => {
+      const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
       vscode.authentication
         .getSession(AUTH_TYPE, [], { createIfNone: true })
-        .then(onGetSessionSuccess(context, csContext), onGetSessionError());
+        .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
     })
+  );
+
+  // Register manual sign out command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider))
   );
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
@@ -232,10 +247,13 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 // This method is called when your extension is deactivated
 export function deactivate() {}
 
-function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext) {
+function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {
   return (session: vscode.AuthenticationSession | undefined) => {
     CsExtensionState.setSession(session);
     if (session) {
+      if (showAlreadySignedIn) {
+        void vscode.window.showInformationMessage('Already signed in to CodeScene.');
+      }
       enableRemoteFeatures(context, csContext);
     } else {
       disableRemoteFeatures();
