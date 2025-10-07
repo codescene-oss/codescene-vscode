@@ -465,7 +465,14 @@ class DevtoolsAPIImpl {
 
   async executeAsJson<T>(opts: BinaryOpts) {
     const output = await this.runBinary(opts);
-    return JSON.parse(output.stdout) as T;
+    try {
+      return JSON.parse(output.stdout) as T;
+    } catch (error) {
+      logOutputChannel.error(['JSON parsing failed:', error,
+                              '\nBinary opts:', opts,
+                              '\nJSON input:', output.stdout].join('\n'));
+      throw error;
+    }
   }
 }
 
