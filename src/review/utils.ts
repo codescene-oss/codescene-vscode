@@ -55,11 +55,11 @@ export function removeDetails(diagnosticMessage: string) {
 
 export function reviewResultToDiagnostics(reviewResult: Review, document: vscode.TextDocument) {
   let diagnostics: CsDiagnostic[] = [];
-  for (const fun of reviewResult['function-level-code-smells']) {
+  for (const fun of reviewResult['function-level-code-smells'] || []) {
     diagnostics.push(...reviewFunctionToDiagnostics(fun, document));
   }
 
-  const fileLevelDiagnostics = reviewResult['file-level-code-smells']
+  const fileLevelDiagnostics = (reviewResult['file-level-code-smells'] || [])
     .map((cs) => reviewCodeSmellToDiagnostics(cs, document))
     .filter(isDefined);
   diagnostics.push(...fileLevelDiagnostics);
