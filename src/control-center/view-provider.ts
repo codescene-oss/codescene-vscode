@@ -7,6 +7,7 @@ import vscode, {
   WebviewViewResolveContext,
   window,
 } from 'vscode';
+import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { CreditsInfoError, DevtoolsAPI } from '../devtools-api';
 import { CreditsInfo } from '../devtools-api/refactor-models';
@@ -61,7 +62,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
    */
   public async activationFinalized() {
     Telemetry.logUsage('control-center/visibility', { visible: this.view?.visible ? true : false });
-    this.deviceId = await DevtoolsAPI.getDeviceId();
+    if (getConfiguration('enableTelemetry')) {
+      this.deviceId = await DevtoolsAPI.getDeviceId();
+    }
   }
 
   private handleMessages(message: any) {
