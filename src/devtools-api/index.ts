@@ -161,10 +161,12 @@ export class DevtoolsAPI {
 
     DevtoolsAPI.startAnalysisEvent();
     try {
+      const fp = fileParts(document);
       const result = await DevtoolsAPI.instance.runBinary({
         args: ['delta', '--output-format', 'json'],
         input: inputJsonString,
         taskId: taskId('delta', document),
+        execOptions: { cwd: fp.documentDirectory },
       });
       let deltaResult;
       if (result.stdout !== '') {
