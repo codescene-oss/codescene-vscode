@@ -68,7 +68,7 @@ async function codeImprovementContent(response: RefactorResponse, code: Code) {
 
   return /*html*/ `
       ${solutionContent}
-      ${collapsibleContent('Example code', await codeContainerContent(code, false))}
+      ${collapsibleContent('Example code', await codeContainerContent(code, false, 'copy-code-to-clipboard-button'))}
     `;
 }
 async function codeSmellsGuide(codeSmell: string) {
@@ -83,14 +83,14 @@ async function codeSmellsGuide(codeSmell: string) {
 
 async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId, isStale: boolean) {
   const declarationsSection = response.declarations && response.declarations.trim()
-    ? collapsibleContent('Declarations for Refactored Code', await codeContainerContent({ content: response.declarations, languageId: code.languageId }, false))
+    ? collapsibleContent('Declarations for Refactored Code', await codeContainerContent({ content: response.declarations, languageId: code.languageId }, false, 'copy-declarations-to-clipboard-button'))
     : '';
 
   const content = /*html*/ `
         ${isStale ? '' : acceptAndRejectButtons()}
         ${reasonsContent(response)}
         ${declarationsSection}
-        ${collapsibleContent('Refactored code', await codeContainerContent(code))}
+        ${collapsibleContent('Refactored code', await codeContainerContent(code, true, 'copy-code-to-clipboard-button'))}
     `;
   return content;
 }
@@ -123,7 +123,7 @@ function acceptAndRejectButtons() {
   `;
 }
 
-async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
+async function codeContainerContent(code: CodeWithLangId, showDiff = true, copyButtonId: string) {
   // Use built in  markdown extension for rendering code
   const mdRenderedCode = await commands.executeCommand(
     'markdown.api.render',
@@ -143,11 +143,13 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
         <div class="code-container-buttons">
           ${diffButton}
         <!-- slot="start" ? -->
-          <vscode-button id="copy-to-clipboard-button" icon="clippy" secondary aria-label="Copy code" title="Copy code">
+          <vscode-button id="${copyButtonId}" icon="clippy" secondary aria-label="Copy code" title="Copy code">
             Copy
           </vscode-button>
-        </div>      
-        ${mdRenderedCode}
+        </div>
+        <div class="code-content">
+          ${mdRenderedCode}
+        </div>
       </div>
     `;
 }
@@ -155,7 +157,7 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true) {
 async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithLangId) {
   return /*html*/ `
     ${reasonsContent(response)}
-    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code, false))}
+    ${collapsibleContent('Refactored code (unverified)', await codeContainerContent(code, false, 'copy-code-to-clipboard-button'))}
   `;
 }
 
