@@ -84,6 +84,10 @@ export interface RefactorResponse {
    * ACE Credit info
    */
   'credits-info'?: CreditsInfo;
+  /**
+   * Optional declarations to be added above the refactored code
+   */
+  declarations?: string;
   metadata: Metadata;
   /**
    * List of reasons for refactoring failure
