@@ -170,6 +170,10 @@ export class CodeSceneTabPanel implements Disposable {
         Telemetry.logUsage('refactor/copy-code', refactoring.eventData);
         await this.copyCode(refactoring);
       },
+      copyDeclarations: async () => {
+        Telemetry.logUsage('refactor/copy-declarations', refactoring.eventData);
+        await this.copyDeclarations(refactoring);
+      },
       showDiff: () => {
         void vscode.commands.executeCommand('codescene.showDiffForRefactoring', refactoring);
       },
@@ -192,9 +196,21 @@ export class CodeSceneTabPanel implements Disposable {
   }
 
   private async copyCode(refactoring: RefactoringRequest) {
-    const decoratedCode = decorateCode(await refactoring.promise, refactoring.document.languageId);
-    await vscode.env.clipboard.writeText(decoratedCode);
-    void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
+    const response = await refactoring.promise;
+    const decoratedCode = decorateCode(response, refactoring.document.languageId);
+    if (decoratedCode.trim()) {
+      await vscode.env.clipboard.writeText(decoratedCode);
+      void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
+    }
+  }
+
+  private async copyDeclarations(refactoring: RefactoringRequest) {
+    const response = await refactoring.promise;
+    const declarations = response.declarations;
+    if (declarations?.trim()) {
+      await vscode.env.clipboard.writeText(declarations);
+      void vscode.window.showInformationMessage('Copied declarations to clipboard');
+    }
   }
 
   private async handleDocumentationMessage(params: InteractiveDocsParams, command: string) {

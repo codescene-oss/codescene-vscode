@@ -16,7 +16,8 @@ function main() {
   addClickEventListener('reject-button', 'reject');
   addClickEventListener('apply-button', 'apply');
   addClickEventListener('retry-button', 'retry');
-  addClickEventListener('copy-to-clipboard-button', 'copyCode');
+  addClickEventListener('copy-code-to-clipboard-button', 'copyCode');
+  addClickEventListener('copy-declarations-to-clipboard-button', 'copyDeclarations');
   addClickEventListener('show-logoutput-link', 'showLogoutput');
 }
 
