@@ -10,12 +10,10 @@ import vscode, {
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { CreditsInfoError, DevtoolsAPI } from '../devtools-api';
-// CS-5069 Remove ACE from public version
-// import { CreditsInfo } from '../devtools-api/refactor-models';
+import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
-// CS-5069 Remove ACE from public version
-// import { pluralize } from '../utils';
+import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
@@ -73,12 +71,11 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     const commands: { [key: string]: () => void } = {
       openAiPricing: () => this.openLink('https://codescene.com/product/ai-coding#pricing'),
       showLogOutput: () => logOutputChannel.show(),
-      // CS-5069 Remove ACE from public version
-      // retryAce: () => {
-      //   logOutputChannel.show();
-      //   logOutputChannel.info('Retrying ACE activation...');
-      //   void vscode.commands.executeCommand('codescene.ace.setEnabled');
-      // },
+      retryAce: () => {
+        logOutputChannel.show();
+        logOutputChannel.info('Retrying ACE activation...');
+        void vscode.commands.executeCommand('codescene.ace.setEnabled');
+      },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
@@ -183,10 +180,9 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     return /*html*/ `
     <div class="group">
         <div class="header">STATUS</div>
-        ${this.codeHealthAnalysisRow()}` +
-        // CS-5069 Remove ACE from public version
-        // ${this.aceStatusRow()}
-        `</div>  
+        ${this.codeHealthAnalysisRow()}
+        ${this.aceStatusRow()}
+    </div>  
     `;
   }
 
@@ -235,86 +231,85 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     `;
   }
 
-  // CS-5069 Remove ACE from public version
-  // private aceStatusRow() {
-  //   const aceFeature = CsExtensionState.stateProperties.features.ace;
+  private aceStatusRow() {
+    const aceFeature = CsExtensionState.stateProperties.features.ace;
 
-  //   let iconClass = 'codicon-sparkle',
-  //     text = '',
-  //     tooltip,
-  //     outOfCreditsBanner;
+    let iconClass = 'codicon-sparkle',
+      text = '',
+      tooltip,
+      outOfCreditsBanner;
 
-    // switch (aceFeature.state) {
-    //   case 'loading':
-    //     iconClass = 'codicon-loading codicon-modifier-spin';
-    //     text = 'initializing';
-    //     break;
-    //   case 'enabled':
-    //     iconClass = 'codicon-sparkle';
-    //     text = 'activated';
-    //     break;
-    //   case 'disabled':
-    //     iconClass = 'codicon-circle-slash';
-    //     text = 'deactivated';
-    //     tooltip = 'Disabled in configuration';
-    //     break;
-    //   case 'error':
-    //     iconClass = 'codicon-error';
-    //     tooltip = 'Click to retry connecting to CodeScene ACE';
-    //     text = 'error';
-    //     break;
-    //   case 'offline':
-    //     iconClass = 'codicon-error';
-    //     text = 'offline';
-    //     tooltip = 'Internet connection unavailable';
-    //     break;
-    // }
+    switch (aceFeature.state) {
+      case 'loading':
+        iconClass = 'codicon-loading codicon-modifier-spin';
+        text = 'initializing';
+        break;
+      case 'enabled':
+        iconClass = 'codicon-sparkle';
+        text = 'activated';
+        break;
+      case 'disabled':
+        iconClass = 'codicon-circle-slash';
+        text = 'deactivated';
+        tooltip = 'Disabled in configuration';
+        break;
+      case 'error':
+        iconClass = 'codicon-error';
+        tooltip = 'Click to retry connecting to CodeScene ACE';
+        text = 'error';
+        break;
+      case 'offline':
+        iconClass = 'codicon-error';
+        text = 'offline';
+        tooltip = 'Internet connection unavailable';
+        break;
+    }
 
-  //   // Custom presentation if we're out of credits
-  //   if (aceFeature.error instanceof CreditsInfoError) {
-  //     text = 'out of credits';
-  //     outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
-  //   }
+    // Custom presentation if we're out of credits
+    if (aceFeature.error instanceof CreditsInfoError) {
+      text = 'out of credits';
+      outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
+    }
 
-  //   // Always in error if analysis error (fail to init or other error)
-  //   if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
-  //     iconClass = 'codicon-error';
-  //     text = 'error';
-  //   }
+    // Always in error if analysis error (fail to init or other error)
+    if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
+      iconClass = 'codicon-error';
+      text = 'error';
+    }
 
-  //   return /*html*/ `
-  //       <div class="row">
-  //           <div class="icon-and-text"><span class="codicon ${iconClass}"></span><span>CodeScene ACE</span></div>
-  //           <div class="badge badge-${text} ${text === 'error' ? 'clickable' : ''}" 
-  //             id="ace-badge"
-  //             title="${tooltip ? tooltip : ''}">${text}
-  //           </div>
-  //       </div>
-  //       ${outOfCreditsBanner ? outOfCreditsBanner : ''}
-  //   `;
-  // }
+    return /*html*/ `
+        <div class="row">
+            <div class="icon-and-text"><span class="codicon ${iconClass}"></span><span>CodeScene ACE</span></div>
+            <div class="badge badge-${text} ${text === 'error' ? 'clickable' : ''}" 
+              id="ace-badge"
+              title="${tooltip ? tooltip : ''}">${text}
+            </div>
+        </div>
+        ${outOfCreditsBanner ? outOfCreditsBanner : ''}
+    `;
+  }
 
-  // private creditBannerContent(creditInfo: CreditsInfo) {
-  //   if (!creditInfo.reset) return;
-  //   const resetTime = new Date(creditInfo.reset);
-  //   const differenceInDays = Math.floor((resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  private creditBannerContent(creditInfo: CreditsInfo) {
+    if (!creditInfo.reset) return;
+    const resetTime = new Date(creditInfo.reset);
+    const differenceInDays = Math.floor((resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
-  //   const content = /* html*/ `
-  //   <div class="out-of-credits-banner">
-  //     <div class="icon-and-text">
-  //       <span class="codicon codicon-warning warning"></span>
-  //       <span class="bold">You're out of ACE credits</span>
-  //     </div>
-  //     <p>
-  //       You'll get new credits in ${differenceInDays} ${pluralize(
-  //     'day',
-  //     differenceInDays
-  //   )}. (${resetTime.toLocaleString()})
-  //     </p>
-  //   </div>
-  //   `;
-  //   return content;
-  // }
+    const content = /* html*/ `
+    <div class="out-of-credits-banner">
+      <div class="icon-and-text">
+        <span class="codicon codicon-warning warning"></span>
+        <span class="bold">You're out of ACE credits</span>
+      </div>
+      <p>
+        You'll get new credits in ${differenceInDays} ${pluralize(
+      'day',
+      differenceInDays
+    )}. (${resetTime.toLocaleString()})
+      </p>
+    </div>
+    `;
+    return content;
+  }
 
   private moreGroup() {
     return /*html*/ `

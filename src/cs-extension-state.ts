@@ -29,8 +29,7 @@ type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
   analysis: AnalysisFeature;
-  // CS-5069 Remove ACE from public version
-  // ace: CsFeature;
+  ace: CsFeature;
 }
 
 export interface CsStateProperties {
@@ -38,8 +37,7 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-// CS-5069 Remove ACE from public version
-// const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
+const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
@@ -63,8 +61,7 @@ export class CsExtensionState {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
-        // CS-5069 Remove ACE from public version
-        // ace: { state: 'loading' },
+        ace: { state: 'loading' },
       },
     };
     this.extensionUri = context.extensionUri;
@@ -80,7 +77,7 @@ export class CsExtensionState {
 
   private setupGlobalStateSync() {
     this.context.globalState.setKeysForSync([
-      /*acknowledgedAceUsageKey, // CS-5069 Remove ACE */
+      acknowledgedAceUsageKey,
       baselineKey,
       telemetryNoticeShownKey,
     ]);
@@ -92,14 +89,13 @@ export class CsExtensionState {
     CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
   }
 
-  // CS-5069 Remove ACE from public version
-  // static get acknowledgedAceUsage() {
-  //   return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
-  // }
+  static get acknowledgedAceUsage() {
+    return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
+  }
 
-  // static async setAcknowledgedAceUsage(value?: boolean) {
-  //   await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
-  // }
+  static async setAcknowledgedAceUsage(value?: boolean) {
+    await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
+  }
 
   static get baseline(): Baseline {
     return this._instance.context.globalState.get<Baseline>(baselineKey) || Baseline.default;
@@ -138,29 +134,27 @@ export class CsExtensionState {
       DevtoolsAPI.onDidAnalysisStateChange(CsExtensionState._instance.handleAnalysisEvent),
       DevtoolsAPI.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
-    // CS-5069 Remove ACE from public version
-    // context.subscriptions.push(
-    //   DevtoolsAPI.onDidRefactoringFail((error) => {
-    //     CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
-    //   }),
-      // DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
-      //   if (evt.type === 'end') {
-      //     try {
-      //       await evt.request.promise;
-      //       // Reset error state when a request succeeds again
-      //       CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
-      //     } catch (error) {}
-      //   }
-      // })
-    // );
+    context.subscriptions.push(
+      DevtoolsAPI.onDidRefactoringFail((error) => {
+        CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
+      }),
+      DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
+        if (evt.type === 'end') {
+          try {
+            await evt.request.promise;
+            // Reset error state when a request succeeds again
+            CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
+          } catch (error) {}
+        }
+      })
+    );
   }
 
   static clearErrors() {
     CsExtensionState.stateProperties.features.analysis.error = undefined;
     CsExtensionState.stateProperties.features.analysis.state = 'enabled';
-    // CS-5069 Remove ACE from public version
-    // CsExtensionState.stateProperties.features.ace.error = undefined;
-    // CsExtensionState.stateProperties.features.ace.state = 'enabled';
+    CsExtensionState.stateProperties.features.ace.error = undefined;
+    CsExtensionState.stateProperties.features.ace.state = 'enabled';
     CsExtensionState._instance.updateStatusViews();
   }
 
@@ -208,14 +202,13 @@ export class CsExtensionState {
     CsExtensionState._instance.updateStatusViews();
   }
 
-  // CS-5069 Remove ACE from public version
-  // static setACEState({ state, error }: CsFeature) {
-  //   CsExtensionState.stateProperties.features = {
-  //     ...CsExtensionState.stateProperties.features,
-  //     ace: { state: featureState({ state, error }), error },
-  //   };
-  //   CsExtensionState._instance.updateStatusViews();
-  // }
+  static setACEState({ state, error }: CsFeature) {
+    CsExtensionState.stateProperties.features = {
+      ...CsExtensionState.stateProperties.features,
+      ace: { state: featureState({ state, error }), error },
+    };
+    CsExtensionState._instance.updateStatusViews();
+  }
 }
 
 function featureState(feature: CsFeature) {

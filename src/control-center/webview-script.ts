@@ -12,9 +12,8 @@ function main() {
 
   // Status
   addClickEventForClass('code-health-analysis-badge', 'badge-error', () => sendMessage('showLogOutput'));
-  // CS-5069 Remove ACE from public version
-  // addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('retryAce'));
-  // addClickEventForClass('ace-badge', 'badge-offline', () => sendMessage('retryAce'));
+  addClickEventForClass('ace-badge', 'badge-error', () => sendMessage('retryAce'));
+  addClickEventForClass('ace-badge', 'badge-offline', () => sendMessage('retryAce'));
 
   // More
   addClickListenerToElementById('codescene-settings', () => sendMessage('openSettings'));

@@ -93,14 +93,13 @@ export class CsReviewCodeLensProvider
 
   private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
     const { codeSmell, range } = codeLens;
-    // CS-5069 Remove ACE from public version
-    // const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+    const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
 
     const title = `$(warning) ${codeSmell.category}`;
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [toDocsParams(codeSmell.category, document, range.start /*, fnToRefactor // CS-5069 Remove ACE */), 'codelens (review)'],
+      arguments: [toDocsParams(codeSmell.category, document, range.start, fnToRefactor), 'codelens (review)'],
     };
   }
 
