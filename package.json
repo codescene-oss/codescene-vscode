@@ -26,7 +26,13 @@
     "code metrics",
     "cyclomatic complexity",
     "refactoring",
-    "technical debt"
+    "technical debt",
+    "ai",
+    "anthropic",
+    "openai",
+    "gemini",
+    "gpt",
+    "ai code review"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -166,6 +172,12 @@
           "default": true,
           "description": "Exclude files in .gitignore from analysis",
           "order": 8
+        },
+        "codescene.enableAutoRefactor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeScene ACE",
+          "order": 15
         },
         "codescene.serverUrl": {
           "type": "string",

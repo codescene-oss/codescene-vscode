@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
 import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
-// CS-5069 Remove ACE from public version
-// import { FnToRefactor } from '../devtools-api/refactor-models';
+import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 
 export function register(context: vscode.ExtensionContext) {
@@ -48,8 +47,7 @@ export interface IssueInfo {
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document: vscode.TextDocument;
-  // CS-5069 Remove ACE from public version
-  // fnToRefactor?: FnToRefactor;
+  fnToRefactor?: FnToRefactor;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
@@ -63,9 +61,8 @@ export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsPar
 
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
-  params.issueInfo.fnName = fnInfo?.fnName; 
-  // CS-5069 Remove ACE from public version
-  // params.fnToRefactor = fnInfo?.fnToRefactor;
+  params.issueInfo.fnName = fnInfo?.fnName;
+  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 
@@ -73,9 +70,9 @@ export function toDocsParams(
   category: string,
   document: vscode.TextDocument,
   position?: vscode.Position,
-  // fnToRefactor?: FnToRefactor
+  fnToRefactor?: FnToRefactor
 ): InteractiveDocsParams {
-  return { issueInfo: { category, position /*, fnName: fnToRefactor?.name*/ }, document, /* fnToRefactor // CS-5069 Remove ACE */ };
+  return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
 }
 
 export function categoryToDocsCode(issueCategory: string) {
