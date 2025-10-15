@@ -82,9 +82,14 @@ async function codeSmellsGuide(codeSmell: string) {
 }
 
 async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId, isStale: boolean) {
+  const declarationsSection = response.declarations && response.declarations.trim()
+    ? collapsibleContent('Declarations for Refactored Code', await codeContainerContent({ content: response.declarations, languageId: code.languageId }, false))
+    : '';
+
   const content = /*html*/ `
         ${isStale ? '' : acceptAndRejectButtons()}
         ${reasonsContent(response)}
+        ${declarationsSection}
         ${collapsibleContent('Refactored code', await codeContainerContent(code))}
     `;
   return content;
