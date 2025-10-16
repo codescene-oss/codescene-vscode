@@ -38,6 +38,11 @@ export interface FnToRefactor {
    */
   name: string;
   /**
+   * Nippy-encoded base64 representation of the function to refactor.
+   * When present, should be used instead of JSON encoding for the post call.
+   */
+  'nippy-b64'?: string;
+  /**
    * Range of the function. Use to keep track of what code to replace in the original file.
    */
   range: Range;
@@ -79,6 +84,10 @@ export interface RefactorResponse {
    * ACE Credit info
    */
   'credits-info'?: CreditsInfo;
+  /**
+   * Optional declarations to be added above the refactored code
+   */
+  declarations?: string;
   metadata: Metadata;
   /**
    * List of reasons for refactoring failure

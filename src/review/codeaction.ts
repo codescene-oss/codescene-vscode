@@ -39,22 +39,21 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .map((diagnostic) => diagnostic.codeSmell)
       .filter(isDefined);
 
-    // CS-5069 Remove ACE from public version
-    // const fnToRefactor = (
-    //   await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells)
-    // )?.[0];
+    const fnToRefactor = (
+      await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells)
+    )?.[0];
 
-    // if (fnToRefactor) {
-    //   const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
-    //   const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
-    //   refactorAction.diagnostics = [refactorHighligting];
-    //   refactorAction.command = {
-    //     command: 'codescene.requestAndPresentRefactoring',
-    //     title: 'Refactor using CodeScene ACE',
-    //     arguments: [document, 'codeaction', fnToRefactor],
-    //   };
-    //   actions.push(refactorAction);
-    // }
+    if (fnToRefactor) {
+      const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
+      const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
+      refactorAction.diagnostics = [refactorHighligting];
+      refactorAction.command = {
+        command: 'codescene.requestAndPresentRefactoring',
+        title: 'Refactor using CodeScene ACE',
+        arguments: [document, 'codeaction', fnToRefactor],
+      };
+      actions.push(refactorAction);
+    }
 
     codeSmells.forEach((codeSmell) => {
       const { category, 'highlight-range': range } = codeSmell;
@@ -67,7 +66,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParams(category, document, highLightRange.start /*, fnToRefactor// CS-5069 Remove ACE */), 'codeaction'],
+        arguments: [toDocsParams(category, document, highLightRange.start, fnToRefactor), 'codeaction'],
       };
       actions.push(action);
     });
