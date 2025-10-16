@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SimpleExecutor } from './executor';
 import { logOutputChannel } from './log';
+import { window } from 'vscode';
 
 export class DownloadError extends Error {
   constructor(message: string, readonly url: URL, readonly expectedCliPath: string) {
@@ -19,7 +20,7 @@ export class DownloadError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '4bbfed1b2a68783f54bc4da4e05c60ea2e4fe7c7';
+const REQUIRED_DEVTOOLS_VERSION = '2b500b540e0b17e20ff317aeae9486d83cddb6b4';
 
 const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
@@ -78,7 +79,9 @@ async function ensureExecutable(filePath: string) {
 
 function download({ artifactName: artifactDownloadName, absoluteDownloadPath, absoluteBinaryPath }: ArtifactInfo) {
   const url = new URL(`https://downloads.codescene.io/enterprise/cli/${artifactDownloadName}`);
+
   logOutputChannel.info(`Downloading ${url}`);
+  void window.showInformationMessage('Found new version of the CodeScene CLI. Downloading...');
 
   return new Promise<void>((resolve, reject) => {
     https

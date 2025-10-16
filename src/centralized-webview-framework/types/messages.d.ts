@@ -1,25 +1,21 @@
-import { FunctionInfoExternal } from "./delta";
-import {
-
-  IdeContextType,
-  WebViewPropsType,
-} from "./index";
+import { FunctionInfoExternal } from './delta';
+import { IdeContextType, WebViewPropsType } from './index';
 
 export type MessageType = {
-  messageType: "update-renderer";
+  messageType: 'update-renderer';
   payload: IdeContextType;
 };
 
-export type CommitBaselineType = "default" | "HEAD" | "branchCreate";
+export type CommitBaselineType = 'default' | 'HEAD' | 'branchCreate';
 
 export type OpenDocsMessage = {
-      messageType: "open-docs-for-function";
-      payload: {
-        docType: string;
-        fileName: string;
-        fn?: FunctionInfoExternal;
-      };
-    }
+  messageType: 'open-docs-for-function';
+  payload: {
+    docType: string;
+    fileName: string;
+    fn?: FunctionInfoExternal;
+  };
+};
 
 export type MessageToIDEType =
   | { messageType: 'init'; payload: WebViewPropsType['view'] }
@@ -63,4 +59,34 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'show-onboarding';
+    }
+  | {
+      messageType: 'apply';
+    }
+  | {
+      messageType: 'close';
+    }
+  | {
+      messageType: 'retry';
+    }
+  | {
+      messageType: 'reject';
+    }
+  | {
+      messageType: 'copyCode';
+    }
+  | {
+      messageType: 'acknowledged';
+    }
+  | {
+      messageType: 'retry';
+    }
+  | {
+      messageType: 'showDiff';
+    }
+  | {
+      messageType: 'showLogoutput';
+    }
+  | {
+      messageType: 'goto-function-location';
     };

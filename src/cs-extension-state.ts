@@ -1,5 +1,4 @@
 import vscode, { Uri } from 'vscode';
-import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -58,10 +57,10 @@ export class CsExtensionState {
   private sessionChangedEmitter = new vscode.EventEmitter<void>();
   readonly onSessionChanged = this.sessionChangedEmitter.event;
 
-  constructor(
-    private readonly context: vscode.ExtensionContext
-  ) //private readonly controlCenterView: ControlCenterViewProvider
-  {
+  private aceStateChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAceStateChanged = this.aceStateChangedEmitter.event;
+
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -211,6 +210,10 @@ export class CsExtensionState {
     return this._instance.onSessionChanged;
   }
 
+  static get onAceStateChanged() {
+    return this._instance.onAceStateChanged;
+  }
+
   static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
@@ -224,7 +227,9 @@ export class CsExtensionState {
       ...CsExtensionState.stateProperties.features,
       ace: { state: featureState({ state, error }), error },
     };
+
     CsExtensionState._instance.updateStatusViews();
+    CsExtensionState._instance.aceStateChangedEmitter.fire();
   }
 }
 

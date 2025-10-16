@@ -7,7 +7,7 @@ import { CommitBaselineType } from './types/messages';
 /**
  * Convert VSCode commit baseline enum to CWF baseline string
  */
-export function convertVSCodeCommitBaselineToCWF(baseline: Baseline) : CommitBaselineType {
+export function convertVSCodeCommitBaselineToCWF(baseline: Baseline): CommitBaselineType {
   const payloadConverter: CommitBaselineType[] = ['HEAD', 'branchCreate', 'default'];
   return payloadConverter[baseline - 1];
 }
@@ -31,7 +31,7 @@ export function convertCWFCommitBaselineToVSCode(commitBaselineString: CommitBas
  * @param event
  * @returns
  */
-export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDeltaData  {
+export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDeltaData {
   return {
     file: {
       fileName: event.document.fileName,
@@ -80,6 +80,7 @@ export function getFileAndFunctionFromState(
           fnName: locatedFn?.fnName,
         }
       : undefined,
+    fnToRefactor: locatedFn?.fnToRefactor,
   };
 }
 

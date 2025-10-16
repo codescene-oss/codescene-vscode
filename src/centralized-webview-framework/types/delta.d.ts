@@ -1,34 +1,34 @@
 export interface ReviewResult {
-  "file-level-code-smells": FileSmell[];
-  "function-level-code-smells": FunctionSmell[];
-  "raw-score": string;
+  'file-level-code-smells': FileSmell[];
+  'function-level-code-smells': FunctionSmell[];
+  'raw-score': string;
   score: number;
 }
 
 export interface FileSmell {
   category: string;
-  "highlight-range": HighlightRange;
+  'highlight-range': HighlightRange;
   details: string;
 }
 
 export interface HighlightRange {
-  "start-line": number;
-  "start-column": number;
-  "end-line": number;
-  "end-column": number;
+  'start-line': number;
+  'start-column': number;
+  'end-line': number;
+  'end-column': number;
 }
 
 export interface FunctionSmell {
   function: string;
   range: Range;
-  "code-smells": CodeSmell[];
+  'code-smells': CodeSmell[];
 }
 
 export interface Range {
-  "start-line": number;
-  "start-column": number;
-  "end-line": number;
-  "end-column": number;
+  'start-line': number;
+  'start-column': number;
+  'end-line': number;
+  'end-column': number;
 }
 
 export interface RangeCamel {
@@ -40,17 +40,17 @@ export interface RangeCamel {
 
 export interface CodeSmell {
   category: string;
-  "highlight-range": HighlightRange;
+  'highlight-range': HighlightRange;
   details: string;
 }
 
 export interface FunctionToRefactor {
   name: string;
   body: string;
-  "function-type": string;
-  "file-type": string;
+  'function-type': string;
+  'file-type': string;
   range: Range;
-  "refactoring-targets": RefactoringTarget[];
+  'refactoring-targets': RefactoringTarget[];
 }
 
 export interface RefactoringTarget {
@@ -59,28 +59,23 @@ export interface RefactoringTarget {
 }
 
 export interface DeltaForFile {
-  "old-score"?: number;
-  "new-score"?: number;
-  "score-change": number;
-  "file-level-findings": ChangeDetail[];
-  "function-level-findings": FunctionFinding[];
+  'old-score'?: number;
+  'new-score'?: number;
+  'score-change': number;
+  'file-level-findings': ChangeDetail[];
+  'function-level-findings': FunctionFinding[];
 }
 
 export interface FunctionFinding {
   function: FunctionInfo;
-  "change-details": ChangeDetail[];
-  "refactorable-fn"?: FunctionToRefactor | undefined;
+  'change-details': ChangeDetail[];
+  'refactorable-fn'?: FunctionToRefactor | undefined;
 }
 
-export type ChangeType =
-  | "introduced"
-  | "fixed"
-  | "improved"
-  | "degraded"
-  | "unchanged";
+export type ChangeType = 'introduced' | 'fixed' | 'improved' | 'degraded' | 'unchanged';
 
 export interface ChangeDetail {
-  "change-type": ChangeType;
+  'change-type': ChangeType;
   category: string;
   description: string;
   line?: number;
