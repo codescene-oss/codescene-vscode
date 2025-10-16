@@ -24,12 +24,15 @@ import { Delta } from './delta-model';
 import { jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { getBaselineCommit } from '../code-health-monitor/addon';
+import { ReviewCache } from './review-cache';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
+  private static reviewCache: ReviewCache;
 
   static init(binaryPath: string, context: ExtensionContext) {
     DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
+    DevtoolsAPI.reviewCache = new ReviewCache(context);
   }
 
   /**
@@ -76,8 +79,10 @@ export class DevtoolsAPI {
 
   static async reviewContent(document: vscode.TextDocument) {
     const fp = fileParts(document);
+    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', '--file-name', fp.fileName],
+      args: ['review', '--output-format', 'json', '--file-name', fp.fileName].concat(
+        cachePath ? ['--cache-path', cachePath] :[]),
       taskId: taskId('review', document),
       execOptions: { cwd: fp.documentDirectory },
       input: document.getText(),
