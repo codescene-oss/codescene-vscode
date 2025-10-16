@@ -145,7 +145,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
                                       currentCached.document,
                                       currentCached.position,
                                       currentCached.fnToRefactor);
-          vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
+          void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
         }
       });
 
