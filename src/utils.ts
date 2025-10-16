@@ -52,7 +52,6 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
     ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
     : `${context}. ${error.message}`;
 
-  delete error.stack;
   logOutputChannel.error(`${message} ${!isNetworkError ? JSON.stringify(error) : ''}`);
   if (consoleOnly) {
     logOutputChannel.show();
