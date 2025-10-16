@@ -118,7 +118,29 @@ export interface AceContextViewProps {
   };
 }
 
-export type WebViewPropsType = HomeContextViewProps | LoginViewProps | DocsContextViewProps | AceContextViewProps;
+export interface AceAcknowledgeContextViewProps {
+  /**The IDE invoking th webview */
+  ideType: IdeTypes;
+  /**Enable premium UI elements */
+  pro?: boolean;
+  /**What view should be rendered */
+  view: 'aceAcknowledge';
+  /**devmode will display devtools and log state and messages in the browser console */
+  devmode?: boolean;
+  /** array of feature flags string */
+  featureFlags?: FeatureFlags[];
+  data: {
+    fileData?: FileMetaType;
+    autoRefactor: AutoRefactorConfig;
+  };
+}
+
+export type WebViewPropsType =
+  | HomeContextViewProps
+  | LoginViewProps
+  | DocsContextViewProps
+  | AceContextViewProps
+  | AceAcknowledgeContextViewProps;
 
 export type IdeContextType = WebViewPropsType;
 

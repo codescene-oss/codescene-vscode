@@ -359,7 +359,7 @@ export class DevtoolsAPI {
   private static shouldHandleOfflineBehavior(e: unknown): boolean {
     const message = (e as Error).message;
 
-    if (message === networkErrors.javaConnectException) {
+    if (message === networkErrors.javaConnectException || message.startsWith(networkErrors.javaHttpTimeoutException)) {
       return true;
     }
 

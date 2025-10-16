@@ -53,7 +53,18 @@ export class CsStatusBar {
   private indicateErrors(stateProperties: CsStateProperties) {
     const { analysis, ace } = stateProperties.features;
 
-    if (analysis.state === 'error' || ace.state === 'error') {
+    if (ace.state === 'offline' || ace.state === 'error') {
+      this.statusBarItem.text = '$(cs-logo) ' + `${ace.state.charAt(0).toUpperCase() + ace.state.slice(1)}`;
+      this.statusBarItem.backgroundColor =
+        ace.state === 'offline'
+          ? new vscode.ThemeColor('statusBarItem.warningBackground')
+          : new vscode.ThemeColor('statusBarItem.errorBackground');
+      this.statusBarItem.tooltip = 'Retry ACE activation';
+      this.statusBarItem.command = 'codescene.ace.setEnabled';
+      return;
+    }
+
+    if (analysis.state === 'error') {
       this.statusBarItem.text = `$(cs-logo) Error`;
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
       this.statusBarItem.tooltip = 'Show in control center';

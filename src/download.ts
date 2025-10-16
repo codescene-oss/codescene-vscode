@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { SimpleExecutor } from './executor';
 import { logOutputChannel } from './log';
+import { window } from 'vscode';
 
 export class DownloadError extends Error {
   constructor(message: string, readonly url: URL, readonly expectedCliPath: string) {
@@ -78,7 +79,9 @@ async function ensureExecutable(filePath: string) {
 
 function download({ artifactName: artifactDownloadName, absoluteDownloadPath, absoluteBinaryPath }: ArtifactInfo) {
   const url = new URL(`https://downloads.codescene.io/enterprise/cli/${artifactDownloadName}`);
+
   logOutputChannel.info(`Downloading ${url}`);
+  void window.showInformationMessage('Found new version of the CodeScene CLI. Downloading...');
 
   return new Promise<void>((resolve, reject) => {
     https

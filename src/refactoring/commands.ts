@@ -6,6 +6,8 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
+import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webview-ace-panel';
+import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -31,13 +33,13 @@ export class CsRefactoringCommands implements vscode.Disposable {
     if (!fnToRefactor) return;
     if (!CsExtensionState.acknowledgedAceUsage) {
       Telemetry.logUsage('ace-info/presented', { source });
-      CodeSceneTabPanel.show({ document, fnToRefactor });
+      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(fnToRefactor, document, skipCache));
       return;
     }
 
     const request = new RefactoringRequest(fnToRefactor, document, skipCache);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
-    CodeSceneTabPanel.show(request);
+    CodeSceneCWFAceTabPanel.show(request);
   }
 
   private async applyRefactoringCmd(refactoring: RefactoringRequest) {

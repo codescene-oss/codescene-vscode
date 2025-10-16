@@ -1,5 +1,4 @@
 import vscode, { Uri } from 'vscode';
-import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -53,6 +52,12 @@ export class CsExtensionState {
 
   private baselineChangedEmitter = new vscode.EventEmitter<void>();
   readonly onBaselineChanged = this.baselineChangedEmitter.event;
+
+  private sessionChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onSessionChanged = this.sessionChangedEmitter.event;
+
+  private aceStateChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAceStateChanged = this.aceStateChangedEmitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
@@ -174,6 +179,7 @@ export class CsExtensionState {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
+    this._instance.sessionChangedEmitter.fire();
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
@@ -184,6 +190,14 @@ export class CsExtensionState {
 
   static get session(): vscode.AuthenticationSession | undefined {
     return CsExtensionState.stateProperties.session;
+  }
+
+  static get onSessionChanged() {
+    return this._instance.onSessionChanged;
+  }
+
+  static get onAceStateChanged() {
+    return this._instance.onAceStateChanged;
   }
 
   static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
@@ -199,7 +213,9 @@ export class CsExtensionState {
       ...CsExtensionState.stateProperties.features,
       ace: { state: featureState({ state, error }), error },
     };
+
     CsExtensionState._instance.updateStatusViews();
+    CsExtensionState._instance.aceStateChangedEmitter.fire();
   }
 }
 
