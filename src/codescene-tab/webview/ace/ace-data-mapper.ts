@@ -3,6 +3,7 @@ import { AceContextViewProps, FileMetaType } from '../../../centralized-webview-
 import { Confidence, Reason, RefactorResponse } from '../../../devtools-api/refactor-models';
 import { RefactoringRequest } from '../../../refactoring/request';
 import { Reason as CwfReason } from '../../../centralized-webview-framework/types/ace';
+import { devmode } from '../../../centralized-webview-framework/cwf-html-utils';
 
 interface CwfAceData {
   request: RefactoringRequest;
@@ -18,7 +19,7 @@ export function getAceData(data: CwfAceData): AceContextViewProps {
   return {
     view: 'ace',
     ideType: 'VSCode',
-    devmode: true,
+    devmode: devmode,
     data: {
       fileData: getFileData(request, request.document),
       aceResultData: result
