@@ -165,6 +165,12 @@
           "description": "Exclude files in .gitignore from analysis",
           "order": 8
         },
+        "codescene.enableAutoRefactor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeScene ACE",
+          "order": 15
+        },
         "codescene.serverUrl": {
           "type": "string",
           "default": "https://codescene.io",

@@ -62,12 +62,12 @@ export class CsReviewCodeLensProvider
     if (isDefined(delta)) {
       codeLens.command = {
         title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
-        command: 'codescene.codeHealthMonitorView.focus',
+        command: 'codescene.homeView.focus',
       };
       return codeLens;
     } else {
       const scorePresentation = await cacheItem.review.scorePresentation;
-      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`);
+      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`, cacheItem.document);
       return codeLens;
     }
   }
@@ -93,22 +93,21 @@ export class CsReviewCodeLensProvider
 
   private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
     const { codeSmell, range } = codeLens;
-    // CS-5069 Remove ACE from public version
-    // const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+    const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
 
     const title = `$(warning) ${codeSmell.category}`;
     return {
       title,
       command: 'codescene.openInteractiveDocsPanel',
-      arguments: [toDocsParams(codeSmell.category, document, range.start /*, fnToRefactor // CS-5069 Remove ACE */), 'codelens (review)'],
+      arguments: [toDocsParams(codeSmell.category, document, range.start, fnToRefactor), 'codelens (review)'],
     };
   }
 
-  private showCodeHealthDocsCommand(message: string) {
+  private showCodeHealthDocsCommand(message: string, document: vscode.TextDocument) {
     return {
       title: `$(pulse) ${message}`,
-      command: 'markdown.showPreviewToSide',
-      arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
+      command: 'codescene.openCodeHealthDocs',
+      arguments: [document],
     };
   }
 }

@@ -8,10 +8,14 @@ import {
 } from '../../centralized-webview-framework/cwf-parsers';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
-import { toDocsParams } from '../../documentation/commands';
+import { findOrOpenDocument, toDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { getMessageCategory } from './cwf-message-categories';
-import { CommitBaselineType, MessageToIDEType, OpenDocsMessage } from '../../centralized-webview-framework/types/messages';
+import {
+  CommitBaselineType,
+  MessageToIDEType,
+  OpenDocsMessage,
+} from '../../centralized-webview-framework/types/messages';
 import { FileMetaType } from '../../centralized-webview-framework/types';
 
 /**
@@ -31,10 +35,7 @@ async function handleSelectCommitBaseLineMessage(commitBaseLineString: CommitBas
  * @param homeView
  * @param payload
  */
-async function handleGoToFunction(
-  homeView: HomeView,
-  payload: FileMetaType
-) {
+async function handleGoToFunction(homeView: HomeView, payload: FileMetaType) {
   const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName);
   foundFileFunction?.file &&
     (await showDocAtPosition(foundFileFunction.file.document, getFunctionPosition(payload.fn)));
@@ -44,20 +45,21 @@ async function handleGoToFunction(
  * NYI: Find function in VSCode state and trigger autorefactor panel
  * @param payload
  */
-function handleAutoRefactor(payload: any) {
-  console.log('Autorefactor NYI');
-  // const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName, {
-  //   name: payload.fn.name,
-  //   startLine: payload.fn.range.startLine,
-  // });
+async function handleAutoRefactor(homeView: HomeView, payload: any) {
+  const document = await findOrOpenDocument(payload.fileName);
+  const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName, {
+    name: payload.fn.name,
+    startLine: payload.fn.range.startLine,
+  });
 
-  // if (!foundFileFunction) return;
+  if (!foundFileFunction?.fnToRefactor) return;
 
-  // void vscode.commands.executeCommand(
-  //   'codescene.requestAndPresentRefactoring',
-  //   foundFileFunction.file.document,
-  //   'code-health-details',
-  // );
+  void vscode.commands.executeCommand(
+    'codescene.requestAndPresentRefactoring',
+    document,
+    'code-health-details',
+    foundFileFunction?.fnToRefactor
+  );
 }
 
 /**
@@ -79,11 +81,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
   );
   if (!foundFileFunction) return;
 
-  const docsParams = toDocsParams(
-    payload.docType,
-    foundFileFunction.file?.document,
-    getFunctionPosition(payload.fn)
-  );
+  const docsParams = toDocsParams(payload.docType, foundFileFunction.file?.document, getFunctionPosition(payload.fn));
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
   }
@@ -125,13 +123,12 @@ function handleCloseLogin(homeView: HomeView) {
   });
 }
 
-
 /**
  * Initiate the login flow first checking if the baseUrl has been changed by the user (Enterprise)
  * @param homeView
  * @param payload
  */
-async function handleInitLogin(homeView: HomeView, payload: {baseUrl: string, type: 'cloud' | 'enterprise'}) {
+async function handleInitLogin(homeView: HomeView, payload: { baseUrl: string; type: 'cloud' | 'enterprise' }) {
   const cfg = vscode.workspace.getConfiguration('codescene');
   const currentServerUrl = cfg.get('serverUrl');
   if (payload.baseUrl !== currentServerUrl) {
@@ -186,9 +183,11 @@ async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType)
  */
 function handlePanelMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     case 'request-and-present-refactoring':
-      handleAutoRefactor(message.payload);
+      void handleAutoRefactor(homeView, message.payload);
       return;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     case 'open-docs-for-function':
       handleOpenDocs(homeView, message.payload);
       return;

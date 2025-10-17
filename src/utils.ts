@@ -31,6 +31,7 @@ interface ReportErrorProps {
 
 export const networkErrors = {
   javaConnectException: 'java.net.ConnectException',
+  javaHttpTimeoutException: 'java.net.http.HttpTimeoutException',
   getAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
   eConnRefused: 'ECONNREFUSED',
   // add more later if needed
@@ -85,18 +86,22 @@ export function rangeStr(range: Range) {
 }
 
 /**
- * Navigate to the position in the file specified by uri. If we have no position, just make sure
- * the document is shown.
+ * Attempt to show the given document in VS Code, focusing an existing editor if open,
+ * or opening it if not. Optionally move the cursor to a given position and reveal it.
  *
  * @param uri
  * @param position
  * @returns
  */
 export async function showDocAtPosition(document: vscode.TextDocument, position?: vscode.Position) {
-  if (!isDefined(position)) {
-    await vscode.window.showTextDocument(document);
-    return;
+  const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === document.uri.toString());
+
+  const activeEditor = editor
+    ? await vscode.window.showTextDocument(editor.document, editor.viewColumn)
+    : await vscode.window.showTextDocument(document, { preview: false });
+
+  if (position) {
+    activeEditor.selection = new vscode.Selection(position, position);
+    activeEditor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
-  const location = new vscode.Location(document.uri, position);
-  return vscode.commands.executeCommand('editor.action.goToLocations', document.uri, position, [location]);
 }

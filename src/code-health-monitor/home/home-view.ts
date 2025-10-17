@@ -2,27 +2,39 @@ import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, Web
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, getLoginData} from './home-props-utils';
+import { getHomeData, getLoginData } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../tree-model';
-import { convertFileIssueToCWFDeltaItem, convertVSCodeCommitBaselineToCWF } from '../../centralized-webview-framework/cwf-parsers';
+import {
+  convertFileIssueToCWFDeltaItem,
+  convertVSCodeCommitBaselineToCWF,
+} from '../../centralized-webview-framework/cwf-parsers';
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-framework/types/messages';
-import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType, LoginViewProps } from '../../centralized-webview-framework/types';
+import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
+import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
 function getUserName(accountLabel: string | undefined) {
-  if(!accountLabel || accountLabel === 'null') return 'Signed in';
+  if (!accountLabel || accountLabel === 'null') return 'Signed in';
   return accountLabel;
 }
 
 export function register(context: ExtensionContext, backgroundSeriveView: BackgroundServiceView) {
   const viewProvider = new HomeView(context, backgroundSeriveView);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
+}
+
+interface IdeContextData {
+  showOnboarding: boolean;
+  fileDeltaData: FileDeltaData[];
+  commitBaseline: CommitBaselineType;
+  autoRefactor: AutoRefactorConfig;
+  jobs: Job[];
 }
 
 export class HomeView implements WebviewViewProvider, Disposable {
@@ -36,34 +48,27 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
   private loginFlowState: LoginFlowStateType;
 
-  private ideContextData: {
-    showOnboarding: boolean;
-    fileDeltaData: FileDeltaData[];
-    commitBaseline: CommitBaselineType;
-    autoRefactor: AutoRefactorConfig;
-    jobs: Job[];
-  } = {
+  private ideContextData: IdeContextData = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
     commitBaseline: convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline),
-    autoRefactor: {
-      activated: false, // indicate that the user has not approved the use of ACE yet
-      disabled: false, // disable the visible button if visible: true
-      visible: false, // Show any type of ACE functionality
-    },
+    autoRefactor: getAutoRefactorConfig(),
     jobs: [],
   };
 
   constructor(context: vscode.ExtensionContext, backgroundServiceView: BackgroundServiceView) {
     this.loginFlowState = { loginOpen: false, loginState: 'init' };
     this.backgroundServiceView = backgroundServiceView;
+
     this.disposables.push(
       this,
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
-      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()) // Detect change to commit baseline
+      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
+      CsExtensionState.onAceStateChanged(() => this.refreshAceState()) // Detect change to ACE status
     );
+
     // Limit number of re-renders
     this.update = throttle(this.updateRaw, 350, {
       leading: true,
@@ -184,6 +189,12 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.ideContextData.commitBaseline = convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline);
     this.update();
   }
+
+  private refreshAceState() {
+    this.ideContextData.autoRefactor = getAutoRefactorConfig();
+    this.update();
+  }
+
   private handleSessionChanged() {
     this.session = CsExtensionState.session;
     if (this.session) {
@@ -240,7 +251,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
         showOnboarding: false,
         commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),
-        user: { name: getUserName(this.session?.account.label)},
+        user: { name: getUserName(this.session?.account.label) },
       }),
     });
   }

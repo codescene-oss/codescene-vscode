@@ -14,14 +14,19 @@ export let repoState: {
 };
 
 export function acquireGitApi() {
-  const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
-  if (!gitExtension) {
-    void vscode.window.showErrorMessage(
-      'Unable to load vscode.git extension. Code Health Monitor will be unavailable.'
-    );
+  try {
+    const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
+    if (!gitExtension) throw Error('Git extension not available.');
+
+    return gitExtension.getAPI(1);
+  } catch (error) {
+    const message = 'Unable to load vscode.git extension. Code Health Monitor will be unavailable.';
+
+    logOutputChannel.warn(message);
+    void vscode.window.showErrorMessage(message);
+
     return;
   }
-  return gitExtension.getAPI(1);
 }
 
 /**

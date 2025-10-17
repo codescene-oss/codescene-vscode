@@ -1,12 +1,7 @@
-import { MessageToIDEType } from "../../centralized-webview-framework/types/messages";
-
 // Build a lookuptable to separate all the messages from webview into smaller categories
 const lifecycleMessages = ['init'] as const;
 const loginMessages = ['open-login', 'open-home', 'init-login'] as const;
-const panelMessages = [
-  'request-and-present-refactoring',
-  'open-docs-for-function',
-] as const;
+const panelMessages = ['request-and-present-refactoring', 'open-docs-for-function'] as const;
 const editorMessages = ['goto-function-location', 'open-settings'] as const;
 const stateChangeMessages = ['commitBaseline'] as const;
 
