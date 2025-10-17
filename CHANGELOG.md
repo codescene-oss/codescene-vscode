@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.15.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.4...v0.15.0) (2025-10-17)
+
+### Bug fixes
+
+* CS-5495: Minimize the number of simultaneus reviews ([fef3798](https://github.com/codescene-oss/codescene-vscode/commit/fef379866812c50e5ac89bb05071cd7e222742bb))
+* CS-5521: Remove terms and policies ([d3efec9](https://github.com/codescene-oss/codescene-vscode/commits/d3efec9088187248a45627b013189accaac0a311))
+
 ### [0.14.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.3...v0.14.4) (2025-10-07)
 
 
