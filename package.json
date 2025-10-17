@@ -74,10 +74,6 @@
         "title": "CodeScene: Sign out from CodeScene"
       },
       {
-        "command": "codescene.revokeTerms",
-        "title": "CodeScene: Revoke Terms and Policies agreement"
-      },
-      {
         "command": "codescene.revokeAceAcknowledgement",
         "title": "CodeScene: Revoke acknowledging ACE usage"
       },
