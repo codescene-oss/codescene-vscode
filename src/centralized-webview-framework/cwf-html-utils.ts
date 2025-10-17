@@ -119,7 +119,6 @@ export const initialDataContextScriptTag = (ideContext: IdeContextType) => /*htm
   </script>
 `;
 
-
 export const generateContextScriptTag = (ideContext: IdeContextType) => {
   return `
   <script>

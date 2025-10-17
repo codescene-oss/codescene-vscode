@@ -3,12 +3,13 @@ import { AceAcknowledgeContextViewProps, AutoRefactorConfig } from '../../../../
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { RefactoringRequest } from '../../../../refactoring/request';
 import { getFileData } from '../ace-data-mapper';
+import { devmode } from '../../../../centralized-webview-framework/cwf-html-utils';
 
 export function getAceAcknowledgeData(request: RefactoringRequest): AceAcknowledgeContextViewProps {
   return {
     view: 'aceAcknowledge',
     ideType: 'VSCode',
-    devmode: true,
+    devmode: devmode,
     data: {
       fileData: getFileData(request, request.document),
       autoRefactor: getAutoRefactorConfig(),

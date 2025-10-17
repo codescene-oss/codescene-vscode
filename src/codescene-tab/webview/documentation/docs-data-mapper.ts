@@ -1,3 +1,4 @@
+import { devmode } from '../../../centralized-webview-framework/cwf-html-utils';
 import { FileMetaType, DocsContextViewProps } from '../../../centralized-webview-framework/types';
 import { InteractiveDocsParams } from '../../../documentation/commands';
 import { getCWFDocType } from './utils';
@@ -7,7 +8,7 @@ export function getDocsData(docType: string, fileData: FileMetaType): DocsContex
   return {
     ideType: 'VSCode',
     view: 'docs',
-    devmode: true,
+    devmode: devmode,
     data: {
       docType: docTypeCwf,
       fileData,
