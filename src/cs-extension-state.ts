@@ -38,7 +38,6 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-const acceptedTermsAndPoliciesKey = 'termsAndPoliciesAccepted';  
 // CS-5069 Remove ACE from public version
 // const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
@@ -81,7 +80,6 @@ export class CsExtensionState {
 
   private setupGlobalStateSync() {
     this.context.globalState.setKeysForSync([
-      acceptedTermsAndPoliciesKey,
       /*acknowledgedAceUsageKey, // CS-5069 Remove ACE */
       baselineKey,
       telemetryNoticeShownKey,
@@ -92,14 +90,6 @@ export class CsExtensionState {
 
   static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
     CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
-  }
-
-  static get acceptedTermsAndPolicies() {
-    return this._instance.context.globalState.get<boolean>(acceptedTermsAndPoliciesKey);
-  }
-
-  static async setAcceptedTermsAndPolicies(value?: boolean) {
-    await this._instance.context.globalState.update(acceptedTermsAndPoliciesKey, value);
   }
 
   // CS-5069 Remove ACE from public version

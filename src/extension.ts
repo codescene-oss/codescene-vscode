@@ -20,7 +20,6 @@ import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
-import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-conditions';
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
@@ -44,7 +43,6 @@ export async function activate(context: vscode.ExtensionContext) {
       await Telemetry.init(context);
 
       try {
-        await acceptTermsAndPolicies(context); // throws Error if terms are not accepted
         Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
@@ -118,7 +116,6 @@ function finalizeActivation(ccProvider: ControlCenterViewProvider) {
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   registerShowLogCommand(context);
-  registerTermsAndPoliciesCmds(context);
   registerDocumentationCommands(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
