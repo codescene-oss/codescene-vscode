@@ -52,7 +52,6 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
     ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
     : `${context}. ${error.message}`;
 
-  delete error.stack;
   logOutputChannel.error(`${message} ${!isNetworkError ? JSON.stringify(error) : ''}`);
   if (consoleOnly) {
     logOutputChannel.show();
@@ -99,4 +98,14 @@ export async function showDocAtPosition(document: vscode.TextDocument, position?
   }
   const location = new vscode.Location(document.uri, position);
   return vscode.commands.executeCommand('editor.action.goToLocations', document.uri, position, [location]);
+}
+
+export function safeJsonParse(input: string, context?: any) {
+  try {
+    return JSON.parse(input);
+  } catch (error) {
+    const contextStr = context ? `\nContext: ${JSON.stringify(context)}` : '';
+    logOutputChannel.error(`JSON parsing failed: ${error}\nInput: ${input}${contextStr}`);
+    throw error;
+  }
 }

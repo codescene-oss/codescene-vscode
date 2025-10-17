@@ -187,9 +187,9 @@ function disableRemoteFeatures() {}
 async function handleSignOut(authProvider: CsAuthenticationProvider) {
   if (CsExtensionState.session?.id) {
     await authProvider.removeSession(CsExtensionState.session.id);
-    vscode.window.showInformationMessage('Signed out from CodeScene.');
+    void vscode.window.showInformationMessage('Signed out from CodeScene.');
   } else {
-    vscode.window.showInformationMessage('Not signed in to CodeScene.');
+    void vscode.window.showInformationMessage('Not signed in to CodeScene.');
   }
 }
 

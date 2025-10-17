@@ -18,6 +18,7 @@ import { getServerUrl } from '../configuration';
 import { logOutputChannel } from '../log';
 import { CsServerVersion, ServerVersion } from '../server-version';
 import Telemetry from '../telemetry';
+import { safeJsonParse } from '../utils';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -70,7 +71,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
     const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
 
     if (allSessions) {
-      return JSON.parse(allSessions) as CodeSceneAuthenticationSession[];
+      return safeJsonParse(allSessions) as CodeSceneAuthenticationSession[];
     }
 
     return [];
@@ -120,7 +121,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   public async removeSession(sessionId: string): Promise<void> {
     const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
     if (allSessions) {
-      let sessions = JSON.parse(allSessions) as AuthenticationSession[];
+      let sessions = safeJsonParse(allSessions) as AuthenticationSession[];
       const session = sessions.find((s) => s.id === sessionId);
       if (session) {
         await this.context.secrets.store(SESSIONS_STORAGE_KEY, '[]');

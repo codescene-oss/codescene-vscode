@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
 import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { assertError, getFileExtension, networkErrors, rangeStr, reportError } from '../utils';
+import { assertError, getFileExtension, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfo,
@@ -24,12 +24,15 @@ import { Delta } from './delta-model';
 import { jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { getBaselineCommit } from '../code-health-monitor/addon';
+import { ReviewCache } from './review-cache';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
+  private static reviewCache: ReviewCache;
 
   static init(binaryPath: string, context: ExtensionContext) {
     DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
+    DevtoolsAPI.reviewCache = new ReviewCache(context);
   }
 
   /**
@@ -76,8 +79,10 @@ export class DevtoolsAPI {
 
   static async reviewContent(document: vscode.TextDocument) {
     const fp = fileParts(document);
+    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', '--file-name', fp.fileName],
+      args: ['review', '--output-format', 'json', '--file-name', fp.fileName].concat(
+        cachePath ? ['--cache-path', cachePath] :[]),
       taskId: taskId('review', document),
       execOptions: { cwd: fp.documentDirectory },
       input: document.getText(),
@@ -136,7 +141,7 @@ export class DevtoolsAPI {
   private static async review(document: TextDocument, opts: BinaryOpts) {
     const { stdout, duration } = await DevtoolsAPI.instance.runBinary(opts);
     StatsCollector.instance.recordAnalysis(document.fileName, duration);
-    return JSON.parse(stdout) as Review;
+    return safeJsonParse(stdout) as Review;
   }
 
   static abortReviews(document: TextDocument) {
@@ -171,7 +176,7 @@ export class DevtoolsAPI {
       let deltaResult;
       if (result.stdout !== '') {
         // stdout === '' means there were no changes detected - return undefined to indicate this
-        deltaResult = JSON.parse(result.stdout) as Delta;
+        deltaResult = safeJsonParse(result.stdout) as Delta;
         // CS-5069 Remove ACE from public version
         // await addRefactorableFunctionsToDeltaResult(document, deltaResult);
       }
@@ -448,11 +453,11 @@ class DevtoolsAPIImpl {
   private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
-        const devtoolsError = JSON.parse(stderr) as DevtoolsErrorModel;
+        const devtoolsError = safeJsonParse(stderr) as DevtoolsErrorModel;
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
-        const creditsInfoError = JSON.parse(stderr) as CreditsInfoErrorModel;
+        const creditsInfoError = safeJsonParse(stderr) as CreditsInfoErrorModel;
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
         throw new CreditsInfoError(
           creditsInfoError.message,
@@ -471,14 +476,7 @@ class DevtoolsAPIImpl {
 
   async executeAsJson<T>(opts: BinaryOpts) {
     const output = await this.runBinary(opts);
-    try {
-      return JSON.parse(output.stdout) as T;
-    } catch (error) {
-      logOutputChannel.error(['JSON parsing failed:', error,
-                              '\nBinary opts:', opts,
-                              '\nJSON input:', output.stdout].join('\n'));
-      throw error;
-    }
+    return safeJsonParse(output.stdout, { opts }) as T;
   }
 }
 
