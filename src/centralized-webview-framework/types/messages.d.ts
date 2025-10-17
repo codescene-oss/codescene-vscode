@@ -86,7 +86,4 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'showLogoutput';
-    }
-  | {
-      messageType: 'goto-function-location';
     };
