@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import {
   AuthenticationProvider,
   AuthenticationProviderAuthenticationSessionsChangeEvent,
+  AuthenticationProviderSessionOptions,
   AuthenticationSession,
   CancellationTokenSource,
   Disposable,
@@ -65,13 +66,24 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   /**
    * Get the existing sessions.
    * @param scopes
+   * @param options
    * @returns
    */
-  public async getSessions(scopes?: string[]): Promise<readonly AuthenticationSession[]> {
+  public async getSessions(
+    scopes: readonly string[] | undefined,
+    options: AuthenticationProviderSessionOptions
+  ): Promise<AuthenticationSession[]> {
     const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
 
     if (allSessions) {
-      return safeJsonParse(allSessions) as CodeSceneAuthenticationSession[];
+      const sessions = safeJsonParse(allSessions) as CodeSceneAuthenticationSession[];
+
+      // Filter by account if specified in options
+      if (options.account) {
+        return sessions.filter(session => session.account.id === options.account!.id);
+      }
+
+      return sessions;
     }
 
     return [];
