@@ -210,6 +210,8 @@
     "vscode.git"
   ],
   "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
     "@terascope/fetch-github-release": "^1.0.0",
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
