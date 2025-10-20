@@ -278,6 +278,22 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
+  private static buildRefactoringArgs(fnToRefactor: FnToRefactor, skipCache: boolean, token: string): string[] {
+    const args = ['refactor', 'post'];
+
+    if (fnToRefactor['nippy-b64']) { // If available, use the newer, more recommended API which isn't to encoding errors
+      args.push('--fn-to-refactor-nippy-b64', fnToRefactor['nippy-b64']);
+    } else {
+      args.push('--fn-to-refactor', JSON.stringify(fnToRefactor));
+    }
+
+    if (skipCache) args.push('--skip-cache');
+
+    args.push('--token', token);
+
+    return args;
+  }
+
   /**
    * Posts a refactoring using devtools binary
    *
@@ -296,17 +312,7 @@ export class DevtoolsAPI {
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
-      const args = ['refactor', 'post'];
-
-      if (fnToRefactor['nippy-b64']) { // If available, use the newer, more recommended API which isn't to encoding errors
-        args.push('--fn-to-refactor-nippy-b64', fnToRefactor['nippy-b64']);
-      } else {
-        args.push('--fn-to-refactor', JSON.stringify(fnToRefactor));
-      }
-
-      if (skipCache) args.push('--skip-cache');
-
-      args.push('--token', token);
+      const args = DevtoolsAPI.buildRefactoringArgs(fnToRefactor, skipCache, token);
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
