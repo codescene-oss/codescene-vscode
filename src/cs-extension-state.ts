@@ -23,7 +23,7 @@ export enum Baseline {
   default = 3,
 }
 
-type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
+export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
@@ -74,7 +74,7 @@ export class CsExtensionState {
         logOutputChannel.show();
       })
     );
-    this.statusBar = new CsStatusBar(this.stateProperties);
+    this.statusBar = new CsStatusBar();
     this.setupGlobalStateSync();
   }
 
