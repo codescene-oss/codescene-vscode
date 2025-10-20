@@ -1,6 +1,5 @@
 import { commands } from 'vscode';
-import { CsExtensionState } from '../../cs-extension-state';
-import { isCodeSceneSession } from '../../devtools-api';
+import { getEffectiveToken } from '../../devtools-api';
 import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
@@ -23,10 +22,14 @@ export function summaryHeader(level: number, levelClass: string, action: string)
 }
 
 export function summaryDetails(level: number, actionDetails: string) {
-  if (level < 1) {
-    return '<span>The LLM failed to improve Code Health. The refactoring might still offer a structural step in the right direction - inspect and decide!</span>';
-  } 
-  return level < 3 ?`<span>${actionDetails}</span>` : '';
+  switch (true) {
+    case level === -2:
+      return `<span>${actionDetails}</span>`;
+    case level < 1:
+      return '<span>The LLM failed to improve Code Health. The refactoring might still offer a structural step in the right direction - inspect and decide!</span>';
+    default:
+      return level < 3 ? `<span>${actionDetails}</span>` : '';
+  }
 }
 
 export function customRefactoringSummary(level: number, action: string, actionDetails: string) {
@@ -163,22 +166,26 @@ async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithL
   `;
 }
 
-export function refactoringError() {
-  return /*html*/ `
-    <div class="refactoring-error-content">
-      <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement 
-      guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
-      <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a> 
-      for best practices and guidance on improving your code.</p>
-    </div>
-    `;
+export function refactoringError(isAuthError = false) {
+  switch (true) {
+    case isAuthError:
+      return '';
+    default:
+      return /*html*/ `
+        <div class="refactoring-error-content">
+          <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement
+          guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
+          <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a>
+          for best practices and guidance on improving your code.</p>
+        </div>
+        `;
+  }
 }
 
 export function refactoringButton(refactoring?: FnToRefactor) {
-  const session = CsExtensionState.stateProperties.session;
-  const hasValidSession = session && isCodeSceneSession(session);
+  const hasValidToken = !!getEffectiveToken();
 
-  if (!refactoring || !hasValidSession) {
+  if (!refactoring || !hasValidToken) {
     return /* html */ `
       <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
         Auto-Refactor

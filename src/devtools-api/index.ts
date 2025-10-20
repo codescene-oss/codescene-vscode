@@ -14,6 +14,7 @@ import {
 import { basename, dirname } from 'path';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
+import { getAuthToken } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
@@ -288,8 +289,8 @@ export class DevtoolsAPI {
   static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
     const { document, fnToRefactor, skipCache, signal } = request;
 
-    const session = CsExtensionState.stateProperties.session;
-    if (!session || !isCodeSceneSession(session)) {
+    const token = getEffectiveToken();
+    if (!token) {
       throw new Error('Token not available for fn-to-refactor operation');
     }
 
@@ -305,7 +306,7 @@ export class DevtoolsAPI {
 
       if (skipCache) args.push('--skip-cache');
 
-      args.push('--token', session.accessToken);
+      args.push('--token', token);
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
@@ -523,6 +524,15 @@ function fileParts(document: vscode.TextDocument): FileParts {
 
 export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
   return (<CodeSceneAuthenticationSession>x).url !== undefined;
+}
+
+export function getEffectiveToken(): string | undefined {
+  const configToken = getAuthToken();
+  const session = CsExtensionState.stateProperties.session;
+  const sessionToken = session && isCodeSceneSession(session) ? session.accessToken : undefined;
+
+  const token = configToken || sessionToken;
+  return token && token.trim() !== '' ? token : undefined;
 }
 
 function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
