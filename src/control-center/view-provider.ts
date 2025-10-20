@@ -9,7 +9,7 @@ import vscode, {
 } from 'vscode';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
-import { CreditsInfoError, DevtoolsAPI } from '../devtools-api';
+import { CreditsInfoError, DevtoolsAPI, getEffectiveToken } from '../devtools-api';
 import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
@@ -231,61 +231,76 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     `;
   }
 
-  private aceStatusRow() {
+  private static readonly aceStatusMap: Record<string, { iconClass: string; text: string; tooltip: string }> = {
+    loading: {
+      iconClass: 'codicon-loading codicon-modifier-spin',
+      text: 'initializing',
+      tooltip: '',
+    },
+    disabled: {
+      iconClass: 'codicon-circle-slash',
+      text: 'deactivated',
+      tooltip: 'Disabled in configuration',
+    },
+    error: {
+      iconClass: 'codicon-error',
+      text: 'error',
+      tooltip: 'Click to retry connecting to CodeScene ACE',
+    },
+    offline: {
+      iconClass: 'codicon-error',
+      text: 'offline',
+      tooltip: 'Internet connection unavailable',
+    },
+  };
+
+  private getAceStatus() {
     const aceFeature = CsExtensionState.stateProperties.features.ace;
 
-    let iconClass = 'codicon-sparkle',
-      text = '',
-      tooltip,
-      outOfCreditsBanner;
-
-    switch (aceFeature.state) {
-      case 'loading':
-        iconClass = 'codicon-loading codicon-modifier-spin';
-        text = 'initializing';
-        break;
-      case 'enabled':
-        iconClass = 'codicon-sparkle';
-        text = 'activated';
-        break;
-      case 'disabled':
-        iconClass = 'codicon-circle-slash';
-        text = 'deactivated';
-        tooltip = 'Disabled in configuration';
-        break;
-      case 'error':
-        iconClass = 'codicon-error';
-        tooltip = 'Click to retry connecting to CodeScene ACE';
-        text = 'error';
-        break;
-      case 'offline':
-        iconClass = 'codicon-error';
-        text = 'offline';
-        tooltip = 'Internet connection unavailable';
-        break;
+    if (aceFeature.state === 'enabled') {
+      const hasToken = !!getEffectiveToken();
+      return {
+        iconClass: hasToken ? 'codicon-account' : 'codicon-warning',
+        text: hasToken ? 'signed in' : 'signed out',
+        tooltip: hasToken ? '' : 'Sign in or configure auth token in settings',
+      };
     }
 
-    // Custom presentation if we're out of credits
+    return ControlCenterViewProvider.aceStatusMap[aceFeature.state] || { iconClass: 'codicon-sparkle', text: '', tooltip: '' };
+  }
+
+  private applyAceStatusOverrides(status: { iconClass: string; text: string; tooltip: string }) {
+    const aceFeature = CsExtensionState.stateProperties.features.ace;
+
     if (aceFeature.error instanceof CreditsInfoError) {
-      text = 'out of credits';
-      outOfCreditsBanner = this.creditBannerContent(aceFeature.error.creditsInfo);
+      status.text = 'out of credits';
     }
 
     // Always in error if analysis error (fail to init or other error)
     if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
-      iconClass = 'codicon-error';
-      text = 'error';
+      status.iconClass = 'codicon-error';
+      status.text = 'error';
     }
+
+    return status;
+  }
+
+  private aceStatusRow() {
+    const aceFeature = CsExtensionState.stateProperties.features.ace;
+    const status = this.applyAceStatusOverrides(this.getAceStatus());
+    const outOfCreditsBanner = aceFeature.error instanceof CreditsInfoError
+      ? this.creditBannerContent(aceFeature.error.creditsInfo)
+      : '';
 
     return /*html*/ `
         <div class="row">
-            <div class="icon-and-text"><span class="codicon ${iconClass}"></span><span>CodeScene ACE</span></div>
-            <div class="badge badge-${text} ${text === 'error' ? 'clickable' : ''}" 
+            <div class="icon-and-text"><span class="codicon ${status.iconClass}"></span><span>CodeScene ACE</span></div>
+            <div class="badge badge-${status.text.replace(/ /g, '-')} ${status.text === 'error' ? 'clickable' : ''}"
               id="ace-badge"
-              title="${tooltip ? tooltip : ''}">${text}
+              title="${status.tooltip}">${status.text}
             </div>
         </div>
-        ${outOfCreditsBanner ? outOfCreditsBanner : ''}
+        ${outOfCreditsBanner}
     `;
   }
 

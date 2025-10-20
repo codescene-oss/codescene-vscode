@@ -73,7 +73,7 @@
       },
       {
         "command": "codescene.signIn",
-        "title": "CodeScene: Sign in to CodeScene (see Server Url setting)"
+        "title": "CodeScene: Sign in to CodeScene"
       },
       {
         "command": "codescene.signOut",
