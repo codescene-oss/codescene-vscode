@@ -10,7 +10,7 @@ import Telemetry from '../../../telemetry';
 
 type CodeSceneTabPanelState = InteractiveDocsParams & {
   isStale?: boolean;
-  fileData: FileMetaType;
+  fileData: FileMetaType | undefined;
 };
 
 export class CodeSceneCWFDocsTabPanel implements Disposable {
@@ -31,7 +31,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
   constructor() {
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFDocsTabPanel.viewType,
-      'Code smell documentation',
+      'CodeScene documentation',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,

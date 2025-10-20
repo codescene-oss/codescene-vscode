@@ -3,7 +3,7 @@ import { FileMetaType, DocsContextViewProps } from '../../../centralized-webview
 import { InteractiveDocsParams } from '../../../documentation/commands';
 import { getCWFDocType } from './utils';
 
-export function getDocsData(docType: string, fileData: FileMetaType): DocsContextViewProps {
+export function getDocsData(docType: string, fileData: FileMetaType | undefined): DocsContextViewProps {
   const docTypeCwf = getCWFDocType(docType);
   return {
     ideType: 'VSCode',
@@ -16,23 +16,26 @@ export function getDocsData(docType: string, fileData: FileMetaType): DocsContex
   };
 }
 
-export function getFileData(params: InteractiveDocsParams): FileMetaType {
+export function getFileData(params: InteractiveDocsParams): FileMetaType | undefined {
   const { issueInfo, document } = params;
-  const fileData: FileMetaType = {
-    fileName: document.fileName,
-    fn: issueInfo.fnName
+  const fileData =
+    document && issueInfo
       ? {
-          name: issueInfo.fnName,
-          range: issueInfo.position
+          fileName: document?.fileName || '',
+          fn: issueInfo.fnName
             ? {
-                startLine: issueInfo.position.line,
-                startColumn: 0,
-                endLine: issueInfo.position.line,
-                endColumn: 1,
+                name: issueInfo.fnName,
+                range: issueInfo.position
+                  ? {
+                      startLine: issueInfo.position.line,
+                      startColumn: 0,
+                      endLine: issueInfo.position.line,
+                      endColumn: 1,
+                    }
+                  : undefined,
               }
             : undefined,
         }
-      : undefined,
-  };
+      : undefined;
   return fileData;
 }

@@ -51,7 +51,7 @@ export interface IssueInfo {
 
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
-  document: vscode.TextDocument;
+  document?: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
 }
 
