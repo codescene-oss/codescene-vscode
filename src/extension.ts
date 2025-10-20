@@ -23,6 +23,7 @@ import { acceptTermsAndPolicies, registerTermsAndPoliciesCmds } from './terms-co
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerCopyDeviceIdCommand } from './device-id';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -47,7 +48,7 @@ export async function activate(context: vscode.ExtensionContext) {
         Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
-        finalizeActivation(/*controlCenterViewProvider*/);
+        finalizeActivation(context);
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
         reportError({ context: 'Unable to start extension', e });
@@ -106,10 +107,10 @@ async function startExtension(context: vscode.ExtensionContext) {
  * The context variable is used in package.json to conditionally enable/disable views that could
  * point to commands that haven't been fully initialized.
  */
-function finalizeActivation(/*ccProvider: ControlCenterViewProvider*/) {
+function finalizeActivation(context: vscode.ExtensionContext) {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('on_activate_extension');
-  //void ccProvider.activationFinalized();
+  registerCopyDeviceIdCommand(context);
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
