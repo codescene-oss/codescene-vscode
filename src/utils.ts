@@ -93,7 +93,12 @@ export function rangeStr(range: Range) {
  * @param position
  * @returns
  */
-export async function showDocAtPosition(document: vscode.TextDocument, position?: vscode.Position) {
+export async function showDocAtPosition(document: vscode.TextDocument | undefined, position?: vscode.Position) {
+  if (!document) {
+    logOutputChannel.warn('Could not focus on line in editor as it is undefined.');
+    return;
+  }
+
   const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === document.uri.toString());
 
   const activeEditor = editor

@@ -16,6 +16,8 @@ import {
 } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { BackgroundServiceView } from './background-view';
+import { InteractiveDocsParams } from '../documentation/commands';
+import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 
 let gitApi: API | undefined;
 
@@ -41,10 +43,11 @@ export function activate(context: vscode.ExtensionContext) {
     codeHealthMonitorView,
     ...repoStateListeners,
     vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
-      void vscode.commands.executeCommand(
-        'markdown.showPreviewToSide',
-        vscode.Uri.parse(`csdoc:code-health-monitor.md`)
-      );
+      const params: InteractiveDocsParams = {
+        issueInfo: { category: 'docs_code_health_monitor', position: new vscode.Position(0, 0) },
+        document: undefined,
+      };
+      CodeSceneCWFDocsTabPanel.show(params);
     })
   );
 }
