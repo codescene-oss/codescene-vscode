@@ -184,6 +184,12 @@
           "default": "https://codescene.io",
           "order": 19
         },
+        "codescene.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Authentication token for CodeScene ACE. Has priority over the Sign In with CodeScene command.",
+          "order": 19.5
+        },
         "codescene.enableTelemetry": {
           "type": "boolean",
           "default": true,

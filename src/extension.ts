@@ -242,7 +242,12 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     }
   });
 
-  context.subscriptions.push(authProvider, serverUrlChangedDisposable);
+  const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
+    refreshCodeHealthDetailsView();
+    CodeSceneTabPanel.refreshIfExists();
+  });
+
+  context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
 }
 
 // This method is called when your extension is deactivated

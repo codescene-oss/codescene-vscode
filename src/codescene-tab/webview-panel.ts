@@ -335,15 +335,32 @@ export class CodeSceneTabPanel implements Disposable {
         await refactoringContent(response, document.languageId, isStale),
       ]);
     } catch (e) {
-      const title = 'Refactoring Failed';
-      const actionHtml = `
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      const isAuthError = errorMessage.includes('Token not available') || errorMessage.includes('token is not valid');
+
+      let title: string;
+      let actionHtml: string;
+      let level: number;
+
+      switch (true) {
+        case isAuthError:
+          title = 'Authentication Failed';
+          actionHtml = 'Authentication failed. Please check your CodeScene authentication token in settings, or Sign In with CodeScene.';
+          level = -2;
+          break;
+        default:
+          title = 'Refactoring Failed';
+          actionHtml = `
         There was an error when performing this refactoring.
         Please see the <a href="" id="show-logoutput-link">CodeScene Log</a> output for error details.`;
+          level = -1;
+          break;
+      }
 
-      const summaryContent = customRefactoringSummary(-1, 'Refactoring Failed', actionHtml);
+      const summaryContent = customRefactoringSummary(level, title, actionHtml);
 
       Telemetry.logUsage('refactor/presented', { confidence: 'error', ...refactoring.eventData });
-      this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError()]);
+      this.updateRefactoringContent(title, [fnLocContent, summaryContent, refactoringError(isAuthError)]);
     }
   }
 

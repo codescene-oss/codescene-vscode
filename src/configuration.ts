@@ -42,3 +42,7 @@ export function toggleReviewCodeLenses() {
   const state = reviewCodeLensesEnabled();
   setConfiguration('enableReviewCodeLenses', !state);
 }
+
+export function getAuthToken() {
+  return getConfiguration<string>('authToken', '');
+}
