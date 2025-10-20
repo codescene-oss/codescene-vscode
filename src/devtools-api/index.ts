@@ -254,6 +254,7 @@ export class DevtoolsAPI {
    */
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
+    logOutputChannel.info(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const baseArgs = [
       'refactor',
       'fns-to-refactor',
@@ -267,6 +268,7 @@ export class DevtoolsAPI {
       input: document.getText(),
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
+    logOutputChannel.info(`Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`);
     return ret;
   }
 
@@ -303,11 +305,11 @@ export class DevtoolsAPI {
         args.push('--token', session.accessToken);
       }
 
-      logOutputChannel.debug(
+      logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
       );
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({ args, execOptions: { signal } });
-      logOutputChannel.debug(
+      logOutputChannel.info(
         `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
           skipCache === true ? ' (retry)' : ''
         }`
