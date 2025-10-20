@@ -55,11 +55,6 @@
         "icon": "$(question)"
       },
       {
-        "command": "codescene.codeHealthMonitorSort",
-        "title": "Sort files by...",
-        "icon": "$(sort-precedence)"
-      },
-      {
         "command": "codescene.openCodeHealthDocs",
         "title": "CodeScene: Open Code Health Documentation"
       },
@@ -91,6 +86,10 @@
         "command": "codescene.codeHealthMonitorSelectBaseline",
         "title": "Select monitor baseline...",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "codescene.copyDeviceId",
+        "title": "CodeScene: Copy Device ID"
       }
     ],
     "viewsContainers": {
@@ -144,11 +143,6 @@
           "command": "codescene.codeHealthMonitorHelp",
           "when": "view === codescene.codeHealthMonitorView",
           "group": "navigation@2"
-        },
-        {
-          "command": "codescene.codeHealthMonitorSort",
-          "when": "view === codescene.codeHealthMonitorView",
-          "group": "navigation@§"
         },
         {
           "command": "codescene.codeHealthMonitorSelectBaseline",

@@ -35,9 +35,6 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
         void this.treeDataProvider.selectBaseline();
       }),
-      vscode.commands.registerCommand('codescene.codeHealthMonitorSort', async () => {
-        void this.treeDataProvider.selectSortFn();
-      }),
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.treeDataProvider.syncTree(e)),
       onFileDeletedFromGit((e) => {
         this.treeDataProvider.removeTreeEntry(e);
