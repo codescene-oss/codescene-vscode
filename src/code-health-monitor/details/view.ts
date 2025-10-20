@@ -8,14 +8,21 @@ import {  isDegradation } from '../presentation';
 import { DeltaFunctionInfo, sortIssues } from '../tree-model';
 import { ChangeType } from '../../devtools-api/delta-model';
 
+let codeHealthDetailsView: CodeHealthDetailsView | undefined;
+
 export function register(context: ExtensionContext) {
   const viewProvider = new CodeHealthDetailsView();
+  codeHealthDetailsView = viewProvider;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codescene.codeHealthDetailsView', viewProvider),
     vscode.commands.registerCommand('codescene.codeHealthDetailsView.showDetails', (functionInfo?: DeltaFunctionInfo) =>
       viewProvider.update(functionInfo)
     )
   );
+}
+
+export function refreshCodeHealthDetailsView() {
+  codeHealthDetailsView?.refresh();
 }
 
 class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
@@ -109,6 +116,9 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+    if (codeHealthDetailsView === this) {
+      codeHealthDetailsView = undefined;
+    }
   }
 
   update(functionInfo?: DeltaFunctionInfo) {
@@ -131,6 +141,10 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     }
 
     webView.html = this.baseContent.replace(CodeHealthDetailsView.placeholder, content);
+  }
+
+  refresh() {
+    this.update(this.functionInfo);
   }
 
   private defaultContent() {
