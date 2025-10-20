@@ -285,8 +285,13 @@ export class DevtoolsAPI {
    * @param request refactoring request
    * @returns refactoring response
    */
-  static async postRefactoring(request: RefactoringRequest) {
+  static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
     const { document, fnToRefactor, skipCache, signal } = request;
+
+    const session = CsExtensionState.stateProperties.session;
+    if (!session || !isCodeSceneSession(session)) {
+      throw new Error('Token not available for fn-to-refactor operation');
+    }
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
@@ -300,10 +305,7 @@ export class DevtoolsAPI {
 
       if (skipCache) args.push('--skip-cache');
 
-      const session = CsExtensionState.stateProperties.session;
-      if (session && isCodeSceneSession(session)) {
-        args.push('--token', session.accessToken);
-      }
+      args.push('--token', session.accessToken);
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
@@ -493,9 +495,9 @@ interface BinaryOpts {
   // optional string to send on stdin
   input?: string;
 
-  /* 
-  optional taskid for the invocation, ensuring only one task with the same id is running.
-  see LimitingExecutor for details
+  /*
+    optional taskid for the invocation, ensuring only one task with the same id is running.
+    see LimitingExecutor for details
   */
   taskId?: string;
 }
@@ -519,7 +521,7 @@ function fileParts(document: vscode.TextDocument): FileParts {
   return { fileName, documentDirectory };
 }
 
-function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
+export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
   return (<CodeSceneAuthenticationSession>x).url !== undefined;
 }
 

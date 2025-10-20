@@ -44,6 +44,12 @@ export class CodeSceneTabPanel implements Disposable {
     return CodeSceneTabPanel._instance;
   }
 
+  public static refreshIfExists() {
+    if (CodeSceneTabPanel._instance) {
+      CodeSceneTabPanel._instance.refresh();
+    }
+  }
+
   constructor() {
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneTabPanel.viewType,
@@ -228,6 +234,12 @@ export class CodeSceneTabPanel implements Disposable {
         return;
       default:
         throw new Error(`Command not implemented: "${command}"!`);
+    }
+  }
+
+  public refresh() {
+    if (this.state) {
+      void this.updateWebView(this.state);
     }
   }
 

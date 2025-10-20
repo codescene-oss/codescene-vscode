@@ -1,4 +1,6 @@
 import { commands } from 'vscode';
+import { CsExtensionState } from '../../cs-extension-state';
+import { isCodeSceneSession } from '../../devtools-api';
 import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
@@ -173,7 +175,10 @@ export function refactoringError() {
 }
 
 export function refactoringButton(refactoring?: FnToRefactor) {
-  if (!refactoring) {
+  const session = CsExtensionState.stateProperties.session;
+  const hasValidSession = session && isCodeSceneSession(session);
+
+  if (!refactoring || !hasValidSession) {
     return /* html */ `
       <vscode-button id="refactoring-button" icon="circle-slash" secondary disabled>
         Auto-Refactor
