@@ -46,7 +46,7 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         Reviewer.init(context);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
-        await startExtension(context);
+        await startExtension(context, controlCenterViewProvider);
         finalizeActivation(controlCenterViewProvider);
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
@@ -64,7 +64,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 }
 
-async function startExtension(context: vscode.ExtensionContext) {
+async function startExtension(context: vscode.ExtensionContext, controlCenterViewProvider: ControlCenterViewProvider) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
   };
@@ -75,7 +75,7 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
-  createAuthProvider(context, csContext);
+  createAuthProvider(context, csContext, controlCenterViewProvider);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
@@ -192,7 +192,7 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
-function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
+function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext, controlCenterViewProvider: ControlCenterViewProvider) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
@@ -230,6 +230,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     }
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
+    controlCenterViewProvider.update();
   });
 
   const serverUrlChangedDisposable = onDidChangeConfiguration('serverUrl', async (e) => {
@@ -245,6 +246,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
+    controlCenterViewProvider.update();
   });
 
   context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
