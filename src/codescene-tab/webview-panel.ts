@@ -403,7 +403,7 @@ export class CodeSceneTabPanel implements Disposable {
           'end-column': -1,
         },
       };
-      return await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+      if (document) return await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
     }
   }
 
@@ -414,7 +414,7 @@ export class CodeSceneTabPanel implements Disposable {
     let fnToRefactor = await this.getOrFindFnToRefactor(params);
 
     const fnLocContent = functionLocationContent({
-      filePath: document.fileName,
+      filePath: document?.fileName || '',
       position: issueInfo.position,
       fnName: issueInfo.fnName || fnToRefactor?.name,
       isStale,
