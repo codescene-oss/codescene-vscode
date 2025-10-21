@@ -36,7 +36,6 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
@@ -85,8 +84,8 @@ export class CsExtensionState {
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext /*, controlCenterView: ControlCenterViewProvider*/) {
-    CsExtensionState._instance = new CsExtensionState(context/*, controlCenterView*/);
+  static init(context: vscode.ExtensionContext) {
+    CsExtensionState._instance = new CsExtensionState(context);
   }
 
   static get acknowledgedAceUsage() {
