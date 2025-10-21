@@ -1,7 +1,12 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
+import os from 'os';
 
 const cwfPath = './cs-cwf';
+
+function isMac() {
+  return os.platform() === 'darwin';
+}
 
 function hasCwfFolder(): boolean {
   if (!fs.existsSync(cwfPath)) return false;
@@ -12,12 +17,16 @@ function hasCwfFolder(): boolean {
 }
 
 if (!hasCwfFolder()) {
-  console.log('[setup] cs-cwf folder missing. Running `npm run updatecwf`...');
-  try {
-    execSync('npm run updatecwf', { stdio: 'inherit' });
-  } catch (err) {
-    console.error('[setup] Failed to fetch cs-cwf:', err);
-    process.exit(1);
+  if (!isMac()) {
+    console.log('[setup] Skipping cs-cwf fetch on non-macOS platforms.');
+  } else {
+    console.log('[setup] cs-cwf folder missing. Running `npm run updatecwf`...');
+    try {
+      execSync('npm run updatecwf', { stdio: 'inherit' });
+    } catch (err) {
+      console.error('[setup] Failed to fetch cs-cwf:', err);
+      process.exit(1);
+    }
   }
 } else {
   console.log('[setup] cs-cwf already present. Skipping update.');
