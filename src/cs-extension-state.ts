@@ -36,7 +36,6 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
