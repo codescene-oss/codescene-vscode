@@ -111,23 +111,17 @@
           "when": "false"
         },
         {
-          "id": "codescene.codeHealthMonitorView",
-          "name": "Code Health Monitoring",
+          "id": "codescene.backgroundService",
+          "name": "",
           "icon": "$(cs-logo)",
-          "when": "codescene.asyncActivationFinished"
+          "when": "false"
         },
         {
-          "id": "codescene.codeHealthDetailsView",
-          "name": "Code Health Details",
+          "id": "codescene.homeView",
+          "name": "",
           "icon": "$(cs-logo)",
           "type": "webview",
           "when": "codescene.asyncActivationFinished"
-        },
-        {
-          "id": "codescene.controlCenterView",
-          "name": "Control Center",
-          "icon": "$(cs-logo)",
-          "type": "webview"
         }
       ]
     },
@@ -204,7 +198,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
-    "prepackage": "npm run updatedocs && npm run tsc && npm run lint && npm run clean",
+    "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
     "clean": "rm -rf ./out",
     "build": "node ./esbuild.js",
@@ -214,6 +208,7 @@
     "pretest": "npm run tsc && npm run lint && npm run build",
     "test": "node ./out/test/runTest.js",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
+    "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
     "release:minor": "standard-version --release-as minor",
     "release:patch": "standard-version --release-as patch",
     "release:major": "standard-version --release-as major"
@@ -244,6 +239,7 @@
   "dependencies": {
     "@types/follow-redirects": "^1.14.1",
     "@types/lodash.debounce": "^4.0.7",
+    "@types/lodash.throttle": "^4.1.9",
     "@types/vscode-webview": "^1.57.4",
     "@vscode-elements/elements": "^1.8.0",
     "@vscode/codicons": "^0.0.35",
@@ -251,6 +247,7 @@
     "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.6",
     "lodash.debounce": "^4.0.8",
+    "lodash.throttle": "^4.1.1",
     "uuid": "^9.0.0"
   }
 }

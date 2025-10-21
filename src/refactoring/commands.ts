@@ -1,5 +1,4 @@
 import vscode, { WorkspaceEdit } from 'vscode';
-import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';

@@ -68,7 +68,6 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
   params.issueInfo.fnName = fnInfo?.fnName;
   params.fnToRefactor = fnInfo?.fnToRefactor;
-  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 

@@ -1,7 +1,7 @@
 import { Webview } from 'vscode';
-import { FeatureFlags } from './types/cwf-feature';
 import { IdeContextType } from './types';
 import { getUri } from '../webview-utils';
+import { FeatureFlags } from './types/cwf-feature';
 export const ideType = 'VSCode';
 
 // This flag is used to enable or disable the login flow
@@ -11,7 +11,7 @@ export const ignoreSessionStateFeatureFlag = true;
 
 // Enable Webview devmode with alot of logging
 export const devmode = false;
-export const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings', 'sign-in-enterprise'];
+export const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings'];
 if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
 const opacityHexLookup = {

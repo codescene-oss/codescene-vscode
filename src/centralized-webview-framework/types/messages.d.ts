@@ -86,4 +86,7 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'showLogoutput';
+    }
+  | {
+      messageType: 'cancel';
     };

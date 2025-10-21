@@ -58,16 +58,19 @@ export class DevtoolsAPI {
   /** Emits events when review or delta analysis state changes (running/idle?) */
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
-
+  public static jobs = new Set<string>(); // Keep track of the filename of current jobs
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
 
-  private static startAnalysisEvent() {
+  // Adding to the jobs set if it's a delta analysis
+  private static startAnalysisEvent(fileName: string, delta?: boolean) {
+    delta && DevtoolsAPI.jobs.add(fileName);
     DevtoolsAPI.analysesRunning++;
-    DevtoolsAPI.analysisStateEmitter.fire({ state: 'running' });
+    DevtoolsAPI.analysisStateEmitter.fire({ state: 'running', jobs: DevtoolsAPI.jobs });
   }
 
-  private static endAnalysisEvent() {
+  private static endAnalysisEvent(fileName: string, delta?: boolean) {
+    delta && DevtoolsAPI.jobs.delete(fileName); // Remove filename from jobs list on completed delta analysis
     DevtoolsAPI.analysesRunning--;
     if (DevtoolsAPI.analysesRunning === 0) {
       DevtoolsAPI.analysisStateEmitter.fire({ state: 'idle' });
@@ -89,7 +92,7 @@ export class DevtoolsAPI {
       input: document.getText(),
     };
 
-    DevtoolsAPI.startAnalysisEvent();
+    DevtoolsAPI.startAnalysisEvent(document.fileName);
     try {
       const reviewResult = await DevtoolsAPI.review(document, binaryOpts);
       if (reviewResult['code-health-rules-error']) {
@@ -105,7 +108,7 @@ export class DevtoolsAPI {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
       }
     } finally {
-      DevtoolsAPI.endAnalysisEvent();
+      DevtoolsAPI.endAnalysisEvent(document.fileName);
     }
   }
 
@@ -122,7 +125,7 @@ export class DevtoolsAPI {
       execOptions: { cwd: fp.documentDirectory },
     };
 
-    DevtoolsAPI.startAnalysisEvent();
+    DevtoolsAPI.startAnalysisEvent(document.fileName);
     try {
       return await DevtoolsAPI.review(document, binaryOpts);
     } catch (e) {
@@ -135,7 +138,7 @@ export class DevtoolsAPI {
       }
       throw e;
     } finally {
-      DevtoolsAPI.endAnalysisEvent();
+      DevtoolsAPI.endAnalysisEvent(document.fileName);
     }
   }
 
@@ -165,7 +168,7 @@ export class DevtoolsAPI {
     const inputJsonString = jsonForScores(oldScore, newScore);
     if (!inputJsonString) return;
 
-    DevtoolsAPI.startAnalysisEvent();
+    DevtoolsAPI.startAnalysisEvent(document.fileName, true);
     try {
       const fp = fileParts(document);
       const result = await DevtoolsAPI.instance.runBinary({
@@ -193,7 +196,7 @@ export class DevtoolsAPI {
         reportError({ context: 'Unable to enable refactoring capabilities', e });
       }
     } finally {
-      DevtoolsAPI.endAnalysisEvent();
+      DevtoolsAPI.endAnalysisEvent(document.fileName, true);
     }
   }
 
@@ -256,7 +259,7 @@ export class DevtoolsAPI {
    */
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
-    logOutputChannel.info(`Calling fns-to-refactor for ${basename(document.fileName)}`);
+    logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const baseArgs = [
       'refactor',
       'fns-to-refactor',
@@ -270,7 +273,7 @@ export class DevtoolsAPI {
       input: document.getText(),
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
-    logOutputChannel.info(
+    logOutputChannel.debug(
       `Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`
     );
     return ret;
@@ -545,7 +548,7 @@ export function getEffectiveToken(): string | undefined {
   return token && token.trim() !== '' ? token : undefined;
 }
 
-function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
+export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
   return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 

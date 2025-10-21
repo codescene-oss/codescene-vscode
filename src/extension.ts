@@ -5,7 +5,6 @@ import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
 import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
-import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';

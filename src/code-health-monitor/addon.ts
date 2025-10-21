@@ -13,9 +13,9 @@ import {
   updateGitState,
 } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
-import { BackgroundServiceView } from './background-view';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
+import { BackgroundServiceView } from './background-view';
 
 let gitApi: API | undefined;
 

@@ -15,6 +15,7 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
 import debounce from 'lodash.debounce';
+import { logIdString } from '../../../devtools-api';
 
 export interface CwfAceTabParams {
   request: RefactoringRequest;
@@ -135,6 +136,17 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       'goto-function-location': async () => {
         await showDocAtPosition(request.document, request.fnToRefactor.vscodeRange.start);
         void highlightCode(request, false);
+      },
+      cancel: () => {
+        request.abort();
+        this.dispose();
+
+        logOutputChannel.info(
+          `Refactor request aborted ${logIdString(request.fnToRefactor, request.traceId)}${
+            request.skipCache === true ? ' (retry)' : ''
+          }`
+        );
+        return;
       },
     };
 
