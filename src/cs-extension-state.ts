@@ -1,5 +1,4 @@
 import vscode, { Uri } from 'vscode';
-import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -24,7 +23,7 @@ export enum Baseline {
   default = 3,
 }
 
-type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
+export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
@@ -36,6 +35,7 @@ export interface CsStateProperties {
   session?: vscode.AuthenticationSession;
   features: CsFeatures;
 }
+
 
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
@@ -54,10 +54,10 @@ export class CsExtensionState {
   private baselineChangedEmitter = new vscode.EventEmitter<void>();
   readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly controlCenterView: ControlCenterViewProvider
-  ) {
+  private aceStateChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAceStateChanged = this.aceStateChangedEmitter.event;
+
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -71,7 +71,7 @@ export class CsExtensionState {
         logOutputChannel.show();
       })
     );
-    this.statusBar = new CsStatusBar(this.stateProperties);
+    this.statusBar = new CsStatusBar();
     this.setupGlobalStateSync();
   }
 
@@ -85,8 +85,8 @@ export class CsExtensionState {
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
-    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
+  static init(context: vscode.ExtensionContext /*, controlCenterView: ControlCenterViewProvider*/) {
+    CsExtensionState._instance = new CsExtensionState(context/*, controlCenterView*/);
   }
 
   static get acknowledgedAceUsage() {
@@ -170,7 +170,7 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update();
+    //CsExtensionState._instance.controlCenterView.update();
     CsExtensionState._instance.statusBar.update();
   }
 
@@ -207,7 +207,13 @@ export class CsExtensionState {
       ...CsExtensionState.stateProperties.features,
       ace: { state: featureState({ state, error }), error },
     };
+
     CsExtensionState._instance.updateStatusViews();
+    CsExtensionState._instance.aceStateChangedEmitter.fire();
+  }
+
+  static get onAceStateChanged() {
+    return this._instance.onAceStateChanged;
   }
 }
 
