@@ -123,9 +123,8 @@ export function deselectRefactoring(refactoring: RefactoringRequest) {
   }
 }
 
-export async function copyCode(refactoring: RefactoringRequest) {
-  const decoratedCode = decorateCode(await refactoring.promise, refactoring.document.languageId);
-  await vscode.env.clipboard.writeText(decoratedCode);
+export async function copyCode(code: string) {
+  await vscode.env.clipboard.writeText(code);
   void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
 }
 

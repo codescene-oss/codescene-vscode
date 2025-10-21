@@ -9,7 +9,7 @@ interface CwfAceData {
   request: RefactoringRequest;
   result?: RefactorResponse;
   isStale: boolean;
-  error: boolean;
+  error?: string;
   loading: boolean;
 }
 
@@ -25,6 +25,7 @@ export function getAceData(data: CwfAceData): AceContextViewProps {
       aceResultData: result
         ? {
             code: result?.code,
+            declarations: result?.declarations,
             metadata: { 'cached?': result?.metadata['cached?'] },
             'trace-id': result?.['trace-id'],
             confidence: getConfidence(result.confidence),

@@ -16,6 +16,7 @@ import { AceContextViewProps } from '../../../centralized-webview-framework/type
 import { getAceData } from './ace-data-mapper';
 import debounce from 'lodash.debounce';
 import { logIdString } from '../../../devtools-api';
+import { MissingAuthTokenError } from '../../../missing-auth-token-error';
 
 export interface CwfAceTabParams {
   request: RefactoringRequest;
@@ -126,8 +127,16 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
         void vscode.commands.executeCommand('codescene.showDiffForRefactoring', request);
       },
       copyCode: async () => {
+        const copyCodeMessage = message as Extract<MessageToIDEType, { messageType: 'copyCode' }>;
+        const code = copyCodeMessage.payload?.code;
+
         Telemetry.logUsage('refactor/copy-code', request.eventData);
-        await copyCode(request);
+
+        if (code) {
+          await copyCode(code);
+        } else {
+          logOutputChannel.warn('Could not copy refactored code as it is undefined.');
+        }
       },
       showLogoutput: () => {
         logOutputChannel.show();
@@ -218,14 +227,21 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   private async updateWebView(request: RefactoringRequest) {
     const isStale = this.state?.isStale ?? false;
 
-    await this.renderAce(request, getAceData({ request, isStale, error: false, loading: true }));
+    await this.renderAce(request, getAceData({ request, isStale, loading: true }));
 
     try {
       const result = await request.promise;
 
-      await this.renderAce(request, getAceData({ request, result, isStale, loading: false, error: false }));
+      await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
     } catch (error) {
-      await this.renderAce(request, getAceData({ request, isStale, error: true, loading: false }));
+      let errorType = 'generic';
+
+      if (error instanceof MissingAuthTokenError) {
+        logOutputChannel.error('Missing auth token, cannot perform ACE refactoring.');
+        errorType = 'auth';
+      }
+
+      await this.renderAce(request, getAceData({ request, isStale, error: errorType, loading: false }));
     }
   }
 

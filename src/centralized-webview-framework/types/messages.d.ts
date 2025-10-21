@@ -74,6 +74,7 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'copyCode';
+      payload?: { code: string };
     }
   | {
       messageType: 'acknowledged';

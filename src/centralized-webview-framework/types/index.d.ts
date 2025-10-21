@@ -112,7 +112,7 @@ export interface AceContextViewProps {
   data: {
     fileData: FileMetaType;
     aceResultData?: RefactorResponse;
-    error: boolean;
+    error?: string;
     isStale: boolean;
     loading: boolean;
   };

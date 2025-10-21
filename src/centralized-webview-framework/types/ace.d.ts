@@ -1,5 +1,6 @@
 export interface RefactorResponse {
   code: string;
+  declarations?: string; // C++ specific
   metadata: Metadata;
   reasons: Reason[];
   confidence: Confidence;
