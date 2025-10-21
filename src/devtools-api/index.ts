@@ -25,6 +25,7 @@ import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-ut
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { getBaselineCommit } from '../code-health-monitor/addon';
 import { ReviewCache } from './review-cache';
+import { MissingAuthTokenError } from '../missing-auth-token-error';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -314,7 +315,7 @@ export class DevtoolsAPI {
 
     const token = getEffectiveToken();
     if (!token) {
-      throw new Error('Token not available for fn-to-refactor operation');
+      throw new MissingAuthTokenError();
     }
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
