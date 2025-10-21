@@ -385,9 +385,10 @@ export class DevtoolsAPI {
 
     // Only show when transitioning to offline mode
     if (currentState !== 'offline') {
-      void vscode.window.showInformationMessage(
-        'CodeScene extension is running in offline mode. Some features may be unavailable.'
-      );
+      // TODO: Enable toast when more sophisticated offline handling is introduced.
+      // void vscode.window.showInformationMessage(
+      //   'CodeScene extension is running in offline mode. Some features may be unavailable.'
+      // );
     }
 
     logOutputChannel.warn(
