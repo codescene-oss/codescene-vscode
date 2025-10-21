@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { AnalysisFeature, CsExtensionState, CsFeature, CsStateProperties } from './cs-extension-state';
-import { CreditsInfoError } from './devtools-api';
+import { CreditsInfoError, getEffectiveToken } from './devtools-api';
 import { isDefined, toUppercase } from './utils';
 
 interface StatusBarOptions {
@@ -32,42 +32,8 @@ export class CsStatusBar {
 
   private updateAceStatus(ace: CsFeature) {
     const item = this.aceStatus;
-
-    switch (ace.state) {
-      case 'error':
-        if (this.reportableAceError(ace.error)) {
-          this.setStatus(item, {
-            text: `$(error) ACE ${toUppercase(ace.state)}`,
-            tooltip: 'Retry ACE activation',
-            command: 'codescene.ace.setEnabled',
-            background: 'statusBarItem.errorBackground',
-          });
-
-          break;
-        }
-      case 'offline':
-      case 'disabled':
-        this.setStatus(item, {
-          text: `$(error) ACE ${toUppercase(ace.state)}`,
-          tooltip: ace.state === 'disabled' ? 'Enable ACE in the extension settings' : 'Retry ACE activation',
-          command: 'codescene.ace.setEnabled',
-          background: 'statusBarItem.warningBackground',
-        });
-
-        break;
-      case 'loading':
-        this.setStatus(item, {
-          text: '$(loading~spin) ACE',
-          tooltip: 'Retrying ACE activation...',
-        });
-        break;
-      default:
-        this.setStatus(item, {
-          text: '$(cs-logo) ACE',
-          tooltip: 'CodeScene ACE is active',
-        });
-        break;
-    }
+    const handler = this.aceStateHandlers[ace.state] || (() => {});
+    handler(ace, item);
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
@@ -133,4 +99,48 @@ export class CsStatusBar {
   private reportableAceError(error?: Error) {
     return isDefined(error) && !(error instanceof CreditsInfoError);
   }
+
+  private aceStateHandlers: Record<string, (ace: CsFeature, item: vscode.StatusBarItem) => void> = {
+    error: (ace, item) => {
+      if (this.reportableAceError(ace.error)) {
+        this.setStatus(item, {
+          text: `$(error) ACE ${toUppercase(ace.state)}`,
+          tooltip: 'Retry ACE activation',
+          command: 'codescene.ace.setEnabled',
+          background: 'statusBarItem.errorBackground',
+        });
+      }
+    },
+    offline: (ace, item) => {
+      this.setStatus(item, {
+        text: `$(error) ACE ${toUppercase(ace.state)}`,
+        tooltip: 'Retry ACE activation',
+        command: 'codescene.ace.setEnabled',
+        background: 'statusBarItem.warningBackground',
+      });
+    },
+    disabled: (ace, item) => {
+      this.setStatus(item, {
+        text: `$(error) ACE ${toUppercase(ace.state)}`,
+        tooltip: 'Enable ACE in the extension settings',
+        command: 'codescene.ace.setEnabled',
+        background: 'statusBarItem.warningBackground',
+      });
+    },
+    loading: (_ace, item) => {
+      this.setStatus(item, {
+        text: '$(loading~spin) ACE',
+        tooltip: 'Retrying ACE activation...',
+      });
+    },
+    enabled: (_ace, item) => {
+      const hasToken = !!getEffectiveToken();
+      this.setStatus(item, {
+        text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
+        command: hasToken ? undefined : 'codescene.signIn',
+        background: hasToken ? undefined : 'statusBarItem.warningBackground',
+        tooltip: hasToken ? 'CodeScene ACE is active' : 'Sign in or configure auth token in settings',
+      });
+    },
+  };
 }
