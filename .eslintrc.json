@@ -28,6 +28,7 @@
         "@typescript-eslint/semi": "warn",
         "curly": ["warn", "multi-line"],
         "eqeqeq": "warn",
+        "no-eval": "error",
         "no-throw-literal": "warn",
         "semi": "off"
     },

@@ -32,8 +32,12 @@
   background-color: var(--vscode-button-secondaryBackground);
 }
 
-.badge-activated {
+.badge-signed-in {
   color: var(--vscode-terminal-ansiBrightGreen);
+}
+
+.badge-signed-out {
+  color: var(--vscode-editorWarning-foreground);
 }
 
 .badge-error {
