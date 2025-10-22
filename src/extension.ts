@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor } from './code-health-monitor/addon';
+import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -43,7 +43,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await Telemetry.init(context);
 
       try {
-        Reviewer.init(context);
+        Reviewer.init(context, getBaselineCommit);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
         finalizeActivation(context);
@@ -144,19 +144,20 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   );
 
   const docSelector = reviewDocumentSelector();
-  let reviewTimer: NodeJS.Timeout | undefined;
+  let reviewTimers = new Map<string, NodeJS.Timeout>();
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
-        return;
+              return;
       }
-      clearTimeout(reviewTimer);
-      // Run review after 1 second of no edits
-      reviewTimer = setTimeout(() => {
+      const filePath = e.document.fileName;
+      clearTimeout(reviewTimers.get(filePath));
+      // Run review after 1 second of no edits to this file
+      reviewTimers.set(filePath, setTimeout(() => {
         CsDiagnostics.review(e.document);
-      }, 1000);
+      }, 1000));  
     })
   );
 
@@ -170,7 +171,8 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document, { skipCache: true });
+      // TODO: knorrest - looks really weird to have true as string here... 
+      CsDiagnostics.review(document, { skipCache: "true" });
     });
   });
   context.subscriptions.push(fileSystemWatcher);

@@ -6,10 +6,7 @@ import { register as registerHomeView } from './home/home-view';
 import {
   acquireGitApi,
   getBranchCreationCommit,
-  getLatestCommits,
   isMainBranch,
-  resetBaselineForFilesChanged,
-  repoState,
   updateGitState,
 } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
@@ -31,10 +28,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   registerCodeLens(context);
 
-  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
+  // Ensure an initial baseline is set
+  for (const repo of gitApi.repositories) {
+    onRepoStateChange(repo);
+  }
+  
+  const repoStateListeners = gitApi.repositories.map((repo) => 
+    repo.state.onDidChange(() => onRepoStateChange(repo)));
 
-  CsExtensionState.onBaselineChanged(() => {
-    Reviewer.instance.refreshAllDeltasAndBaselines();
+  CsExtensionState.onBaselineChanged(async () => {
+    for (const repo of gitApi!.repositories) {
+      await setBaseline(repo);
+    }
   });
 
   context.subscriptions.push(
@@ -56,6 +61,12 @@ const baselineHandlers: Record<Baseline, (repo: Repository) => Promise<string>> 
   [Baseline.branchCreation]: getBranchCreationCommit,
 };
 
+export function getRepo(fileUri: Uri): Repository | null {
+  if (!gitApi || !CsExtensionState.baseline) return null;
+
+  return gitApi!.getRepository(fileUri);
+}
+
 /**
  * Determines the appropriate baseline commit for a given file according to the active baseline strategy.
  *
@@ -68,10 +79,8 @@ const baselineHandlers: Record<Baseline, (repo: Repository) => Promise<string>> 
  * - BranchCreation: compares with the commit where the current branch was created.
  */
 export async function getBaselineCommit(fileUri: Uri): Promise<string | undefined> {
-  if (!gitApi || !CsExtensionState.baseline) return;
-
-  const repo = gitApi!.getRepository(fileUri);
-  if (!repo) return '';
+  const repo = getRepo(fileUri);
+  if (!repo) return;
 
   const handler = baselineHandlers[CsExtensionState.baseline];
   return await handler(repo);
@@ -105,80 +114,21 @@ async function getDefaultCommit(repo: Repository) {
   }
 }
 
-const commitHandlers: Record<Baseline, (repo: Repository) => Promise<void>> = {
-  [Baseline.head]: handleHeadRepoStateChange,
-  [Baseline.default]: handleDefaultRepoStateChange,
-  [Baseline.branchCreation]: handleBranchCreationRepoStateChange,
-};
-
 /**
- * Reacts to changes in the repository's HEAD commit by:
- * - skipping logic if the commit hasn't changed,
- * - deleting review cache & monitor tree entries if branch was changed, otherwise
- * - triggering baseline-specific handling logic.
+ * Reacts to changes in the repository's HEAD commit or branch by
+ * setting the baseline if either of them changed
  */
 async function onRepoStateChange(repo: Repository) {
-  updateGitState(repo);
-  const hasCheckedOut = repoState?.branch && repoState?.branch !== repo.state.HEAD!.name;
+  const gitStateChange = updateGitState(repo);
 
-  if (hasCheckedOut) {
-    Reviewer.instance.clearCache();
-    clearTreeEmitter.fire();
-  } else {
-    const handler = commitHandlers[CsExtensionState.baseline];
-    await handler(repo);
+  if (gitStateChange.branchChanged || gitStateChange.commitChanged) {
+    setBaseline(repo);
   }
 }
 
-/**
- * Handles baseline changes when the baseline is set to branch creation.
- */
-async function handleBranchCreationRepoStateChange(repo: Repository) {
-  const first = await getBranchCreationCommit(repo);
-  const second = repo.state.HEAD?.commit;
-
-  const isMain = isMainBranch(repo.state.HEAD?.name);
-
-  if (isMain) {
-    Reviewer.instance.refreshAllDeltasAndBaselines();
-    return;
-  }
-
-  const shouldDiff = first && second && first !== second;
-  if (!shouldDiff) return;
-
-  const changes = await repo.diffBetween(first, second);
-  changes.forEach((change) => {
-    Reviewer.instance.reviewCache.resetBaseline(change.uri.fsPath);
-  });
-}
-
-/**
- * Handles baseline changes when the baseline is set to default.
- */
-async function handleDefaultRepoStateChange(repo: Repository) {
-  const isMain = isMainBranch(repo.state.HEAD?.name);
-  if (isMain) {
-    void handleHeadRepoStateChange(repo);
-  } else {
-    void handleBranchCreationRepoStateChange(repo);
-  }
-}
-
-/**
- * Handles baseline changes when the baseline is set to HEAD.
- */
-async function handleHeadRepoStateChange(repo: Repository) {
-  const head = { ...repo.state.HEAD };
-  if (!head) return;
-
-  const commits = await getLatestCommits(repo);
-  const [headRef, prevRef] = commits;
-
-  if (commits.length !== 2 || head.commit !== headRef) {
-    void Reviewer.instance.refreshAllDeltasAndBaselines();
-    return;
-  }
-
-  void resetBaselineForFilesChanged({ prevRef, headRef, repo });
+async function setBaseline(repo: Repository) {
+    Reviewer.instance.setBaseline((fileUri: Uri) => {
+      const r = getRepo(fileUri)
+      return r?.rootUri.path == repo.rootUri.path;
+    });
 }
