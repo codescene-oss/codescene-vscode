@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import {
   AuthenticationProvider,
   AuthenticationProviderAuthenticationSessionsChangeEvent,
+  AuthenticationProviderSessionOptions,
   AuthenticationSession,
   CancellationTokenSource,
   Disposable,
@@ -48,6 +49,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
   private sessionChangeEmitter = new EventEmitter<AuthenticationProviderAuthenticationSessionsChangeEvent>();
   private disposable: Disposable;
   private uriHandler = new UriEventHandler();
+  private _sessions: AuthenticationSession[] = [];
 
   constructor(private context: ExtensionContext) {
     this.disposable = Disposable.from(
@@ -67,14 +69,17 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
    * @param scopes
    * @returns
    */
-  public async getSessions(scopes?: string[]): Promise<readonly AuthenticationSession[]> {
-    const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
+   async getSessions(
+    scopes: readonly string[] | undefined,
+    _options: AuthenticationProviderSessionOptions
+  ): Promise<AuthenticationSession[]> {
+    const need = new Set(scopes ?? []);
+    const sessions = this._sessions.filter(s => {
+      if (!need.size) return true;
+      return (s.scopes ?? []).some(sc => need.has(sc));
+    });
 
-    if (allSessions) {
-      return safeJsonParse(allSessions) as CodeSceneAuthenticationSession[];
-    }
-
-    return [];
+    return [...sessions];
   }
 
   /**

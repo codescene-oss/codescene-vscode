@@ -4,6 +4,10 @@ import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
 import { AbortError } from './devtools-api';
 
+export function toUppercase(word: String) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }
