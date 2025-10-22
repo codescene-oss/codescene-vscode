@@ -36,7 +36,7 @@ interface CsContext {
 export async function activate(context: vscode.ExtensionContext) {
   logOutputChannel.info('⚙️ Activating extension...');
   const controlCenterViewProvider = registerControlCenterViewProvider(context);
-  CsExtensionState.init(context, controlCenterViewProvider);
+  CsExtensionState.init(context);
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
