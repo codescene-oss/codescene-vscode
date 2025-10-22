@@ -120,7 +120,10 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
           request.document,
           'retry',
           request.fnToRefactor,
-          true
+          // Having true here means skipping cache, meaning retry to get another refactoring 
+          // if the first one is not what you want...
+          // But this seem to be used to retry when failed and we definitely don't want to skip cache then
+          false //true
         );
       },
       showDiff: () => {
