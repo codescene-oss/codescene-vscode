@@ -91,7 +91,6 @@ export class CsStatusBar {
         });
         return;
     }
-
     if (analysis.state === 'loading') {
       this.setStatus(item, {
         text: '$(loading~spin) Initializing...',
