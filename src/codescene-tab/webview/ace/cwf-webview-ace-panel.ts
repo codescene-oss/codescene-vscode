@@ -5,6 +5,7 @@ import { commonResourceRoots } from '../../../webview-utils';
 import Telemetry from '../../../telemetry';
 import {
   copyCode,
+  decorateCode,
   deselectRefactoring,
   highlightCode,
   isFunctionUnchangedInDocument,
@@ -234,6 +235,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
     try {
       const result = await request.promise;
+      result.code = decorateCode(result, request.document.languageId)
 
       await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
     } catch (error) {
