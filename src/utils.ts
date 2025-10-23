@@ -35,7 +35,6 @@ interface ReportErrorProps {
 
 export const networkErrors = {
   javaConnectException: 'java.net.ConnectException',
-  javaHttpTimeoutException: 'java.net.http.HttpTimeoutException',
   getAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
   eConnRefused: 'ECONNREFUSED',
   // add more later if needed
