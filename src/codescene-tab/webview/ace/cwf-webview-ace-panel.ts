@@ -16,7 +16,7 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
 import debounce from 'lodash.debounce';
-import { AbortError, logIdString } from '../../../devtools-api';
+import { AbortError, DevtoolsError, logIdString } from '../../../devtools-api';
 import { MissingAuthTokenError } from '../../../missing-auth-token-error';
 
 export interface CwfAceTabParams {
@@ -121,7 +121,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
           request.document,
           'retry',
           request.fnToRefactor,
-          // Having true here means skipping cache, meaning retry to get another refactoring 
+          // Having true here means skipping cache, meaning retry to get another refactoring
           // if the first one is not what you want...
           // But this seem to be used to retry when failed and we definitely don't want to skip cache then
           false //true
@@ -237,17 +237,6 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     }
   }
 
-  private abortExistingRefactoring(request: RefactoringRequest) {
-    const shouldAbort =
-      this.state && this.state.request.traceId !== request.traceId && !!this.state.cwfProps?.data.loading;
-    if (shouldAbort) {
-      this.state!!.request.abort();
-      return true;
-    }
-
-    return false;
-  }
-
   private async handleErrorState(request: RefactoringRequest, isStale: boolean, error: unknown) {
     // Ignore abort errors
     if (error instanceof AbortError) {
@@ -261,8 +250,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
     let errorType = 'generic';
 
-    if (error instanceof MissingAuthTokenError) {
-      logOutputChannel.error('Missing auth token, cannot perform ACE refactoring.');
+    const isMissingToken = error instanceof MissingAuthTokenError;
+    const isAuthError = error instanceof DevtoolsError && error.status === 401;
+    if (isMissingToken || isAuthError) {
       errorType = 'auth';
     }
 

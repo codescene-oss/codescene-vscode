@@ -115,6 +115,7 @@ function finalizeActivation(context: vscode.ExtensionContext) {
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   registerShowLogCommand(context);
   registerDocumentationCommands(context);
+  registerOpenCsSettingsCommand(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
@@ -122,6 +123,14 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
+}
+
+function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
+    })
+  );
 }
 
 /**
@@ -150,14 +159,17 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
-              return;
+        return;
       }
       const filePath = e.document.fileName;
       clearTimeout(reviewTimers.get(filePath));
       // Run review after 1 second of no edits to this file
-      reviewTimers.set(filePath, setTimeout(() => {
-        CsDiagnostics.review(e.document);
-      }, 1000));  
+      reviewTimers.set(
+        filePath,
+        setTimeout(() => {
+          CsDiagnostics.review(e.document);
+        }, 1000)
+      );
     })
   );
 
@@ -171,8 +183,8 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      // TODO: knorrest - looks really weird to have true as string here... 
-      CsDiagnostics.review(document, { skipCache: "true" });
+      // TODO: knorrest - looks really weird to have true as string here...
+      CsDiagnostics.review(document, { skipCache: 'true' });
     });
   });
   context.subscriptions.push(fileSystemWatcher);

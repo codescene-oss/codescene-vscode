@@ -16,6 +16,7 @@ import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-
 import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
+import { onDidChangeConfiguration } from '../../configuration';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -66,7 +67,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
       CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
-      CsExtensionState.onAceStateChanged(() => this.refreshAceState()) // Detect change to ACE status
+      CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
+      onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
     );
 
     // Limit number of re-renders
