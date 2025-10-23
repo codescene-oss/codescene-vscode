@@ -16,7 +16,7 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
 import debounce from 'lodash.debounce';
-import { logIdString } from '../../../devtools-api';
+import { AbortError, logIdString } from '../../../devtools-api';
 import { MissingAuthTokenError } from '../../../missing-auth-token-error';
 
 export interface CwfAceTabParams {
@@ -153,12 +153,6 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       cancel: () => {
         request.abort();
         this.dispose();
-
-        logOutputChannel.info(
-          `Refactor request aborted ${logIdString(request.fnToRefactor, request.traceId)}${
-            request.skipCache === true ? ' (retry)' : ''
-          }`
-        );
         return;
       },
     };
@@ -239,15 +233,40 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
       await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
     } catch (error) {
-      let errorType = 'generic';
-
-      if (error instanceof MissingAuthTokenError) {
-        logOutputChannel.error('Missing auth token, cannot perform ACE refactoring.');
-        errorType = 'auth';
-      }
-
-      await this.renderAce(request, getAceData({ request, isStale, error: errorType, loading: false }));
+      void this.handleErrorState(request, isStale, error);
     }
+  }
+
+  private abortExistingRefactoring(request: RefactoringRequest) {
+    const shouldAbort =
+      this.state && this.state.request.traceId !== request.traceId && !!this.state.cwfProps?.data.loading;
+    if (shouldAbort) {
+      this.state!!.request.abort();
+      return true;
+    }
+
+    return false;
+  }
+
+  private async handleErrorState(request: RefactoringRequest, isStale: boolean, error: unknown) {
+    // Ignore abort errors
+    if (error instanceof AbortError) {
+      logOutputChannel.info(
+        `Refactor request aborted ${logIdString(request.fnToRefactor, request.traceId)}${
+          request.skipCache === true ? ' (retry)' : ''
+        }`
+      );
+      return;
+    }
+
+    let errorType = 'generic';
+
+    if (error instanceof MissingAuthTokenError) {
+      logOutputChannel.error('Missing auth token, cannot perform ACE refactoring.');
+      errorType = 'auth';
+    }
+
+    await this.renderAce(request, getAceData({ request, isStale, error: errorType, loading: false }));
   }
 
   private async renderAce(request: RefactoringRequest, aceData: AceContextViewProps) {

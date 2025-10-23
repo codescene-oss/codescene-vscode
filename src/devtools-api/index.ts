@@ -25,7 +25,6 @@ import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-ut
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
 import { MissingAuthTokenError } from '../missing-auth-token-error';
-import crypto from 'crypto';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -523,11 +522,6 @@ interface BinaryOpts {
 type CmdId = 'review' | 'review-base' | 'delta';
 function taskId(cmdId: CmdId, document: TextDocument) {
   return `${cmdId} ${document.fileName} v${document.version}`;
-}
-
-function refactoringTaskId(fnToRefactor: FnToRefactor) {
-  const { 'start-line': startLine, 'end-line': endLine } = fnToRefactor.range;
-  return `refactor '${fnToRefactor.name}' [${startLine}-${endLine}]`;
 }
 
 interface FileParts {
