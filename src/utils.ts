@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
-import { AbortError } from './devtools-api';
+import { AbortError, DevtoolsError } from './devtools-api';
 
 export function toUppercase(word: String) {
   return word.charAt(0).toUpperCase() + word.slice(1);
@@ -65,6 +65,11 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
  */
 function resolveErrorMessage(context: string, error: Error): string {
   const msg = error.message.toLowerCase();
+
+  const isAuthError = error instanceof DevtoolsError && error.status === 401;
+  if (isAuthError) {
+    return `${context}. Authentication failed.`;
+  }
 
   if (msg.includes(networkErrors.getAddrInfoNotFound.toLowerCase())) {
     return `${context}. Server is unreachable. Ensure you have a stable internet connection.`;

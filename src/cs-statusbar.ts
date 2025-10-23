@@ -1,7 +1,8 @@
-import vscode from 'vscode';
+import vscode, { Disposable } from 'vscode';
 import { AnalysisFeature, CsExtensionState, CsFeature, CsStateProperties } from './cs-extension-state';
 import { CreditsInfoError, getEffectiveToken } from './devtools-api';
 import { isDefined, toUppercase } from './utils';
+import { onDidChangeConfiguration } from './configuration';
 
 interface StatusBarOptions {
   text: string;
@@ -10,11 +11,14 @@ interface StatusBarOptions {
   background?: string;
 }
 
-export class CsStatusBar {
+export class CsStatusBar implements Disposable {
+  private disposables: Disposable[] = [];
+
   private readonly aceStatus: vscode.StatusBarItem;
   private readonly analysisStatus: vscode.StatusBarItem;
 
   constructor() {
+    this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
     this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
@@ -127,20 +131,24 @@ export class CsStatusBar {
         background: 'statusBarItem.warningBackground',
       });
     },
-    loading: (_ace, item) => {
+    loading: (ace, item) => {
       this.setStatus(item, {
         text: '$(loading~spin) ACE',
         tooltip: 'Retrying ACE activation...',
       });
     },
-    enabled: (_ace, item) => {
+    enabled: (ace, item) => {
       const hasToken = !!getEffectiveToken();
       this.setStatus(item, {
         text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
-        command: hasToken ? undefined : 'codescene.signIn',
+        command: 'codescene.openSettingsAndFocusToken',
         background: hasToken ? undefined : 'statusBarItem.warningBackground',
-        tooltip: hasToken ? 'CodeScene ACE is active' : 'Sign in or configure auth token in settings',
+        tooltip: hasToken ? 'CodeScene ACE is active' : 'Configure ACE auth token in extension Workspace settings',
       });
     },
   };
+
+  dispose() {
+    this.disposables.forEach((d) => d.dispose());
+  }
 }
