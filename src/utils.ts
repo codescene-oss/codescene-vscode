@@ -51,17 +51,30 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
 
   const error = assertError(e);
 
-  const isNetworkError = error.message.toLowerCase().includes(networkErrors.getAddrInfoNotFound.toLowerCase());
-  let message = isNetworkError
-    ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
-    : `${context}. ${error.message}`;
-
-  logOutputChannel.error(`${message} ${!isNetworkError ? JSON.stringify(error) : ''}`);
+  const message = resolveErrorMessage(context, error);
+  logOutputChannel.error(message);
   if (consoleOnly) {
     logOutputChannel.show();
   } else {
     void vscode.window.showErrorMessage(message);
   }
+}
+
+/**
+ * Derives a user-friendly message for known error types.
+ */
+function resolveErrorMessage(context: string, error: Error): string {
+  const msg = error.message.toLowerCase();
+
+  if (msg.includes(networkErrors.getAddrInfoNotFound.toLowerCase())) {
+    return `${context}. Server is unreachable. Ensure you have a stable internet connection.`;
+  }
+
+  if (msg.includes('java.net.http.httptimeoutexception')) {
+    return `${context}. The latest refactoring has timed out.`;
+  }
+
+  return `${context}. ${JSON.stringify(error)}`;
 }
 
 export function pluralize(noun: string, count: number) {

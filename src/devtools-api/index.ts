@@ -25,6 +25,7 @@ import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-ut
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
 import { MissingAuthTokenError } from '../missing-auth-token-error';
+import crypto from 'crypto';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -323,7 +324,11 @@ export class DevtoolsAPI {
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
       );
-      const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({ args, execOptions: { signal } });
+      const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
+        args,
+        execOptions: { signal },
+        taskId: 'refactor', // Limit to only 1 refactoring at a time
+      });
       logOutputChannel.info(
         `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
           skipCache === true ? ' (retry)' : ''
@@ -518,6 +523,11 @@ interface BinaryOpts {
 type CmdId = 'review' | 'review-base' | 'delta';
 function taskId(cmdId: CmdId, document: TextDocument) {
   return `${cmdId} ${document.fileName} v${document.version}`;
+}
+
+function refactoringTaskId(fnToRefactor: FnToRefactor) {
+  const { 'start-line': startLine, 'end-line': endLine } = fnToRefactor.range;
+  return `refactor '${fnToRefactor.name}' [${startLine}-${endLine}]`;
 }
 
 interface FileParts {
