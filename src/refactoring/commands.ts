@@ -4,9 +4,11 @@ import { FnToRefactor } from '../devtools-api/refactor-models';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
-import { createTempDocument, decorateCode, selectCode, targetEditor } from './utils';
+import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
 import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
+import { logOutputChannel } from '../log';
+import { CodeSmell } from '../devtools-api/review-model';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -23,20 +25,27 @@ export class CsRefactoringCommands implements vscode.Disposable {
     );
   }
 
+  // @codescene(disable:"Excess Number of Function Arguments")
   private async requestAndPresentRefactoringCmd(
     document: vscode.TextDocument,
     source: string,
     fnToRefactor?: FnToRefactor,
-    skipCache?: boolean
+    skipCache?: boolean,
+    codeSmell?: CodeSmell
   ) {
-    if (!fnToRefactor) return;
-    if (!CsExtensionState.acknowledgedAceUsage) {
-      Telemetry.logUsage('ace-info/presented', { source });
-      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(fnToRefactor, document, skipCache));
+    const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
+    if (!toRefactor) {
+      logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
       return;
     }
 
-    const request = new RefactoringRequest(fnToRefactor, document, skipCache);
+    if (!CsExtensionState.acknowledgedAceUsage) {
+      Telemetry.logUsage('ace-info/presented', { source });
+      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(toRefactor, document, skipCache));
+      return;
+    }
+
+    const request = new RefactoringRequest(toRefactor, document, skipCache);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneCWFAceTabPanel.show(request);
   }

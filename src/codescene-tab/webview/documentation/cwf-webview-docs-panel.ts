@@ -7,8 +7,10 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { getDocsData, getFileData } from './docs-data-mapper';
 import { FileMetaType } from '../../../centralized-webview-framework/types';
 import Telemetry from '../../../telemetry';
+import { CsExtensionState } from '../../../cs-extension-state';
+import { onDidChangeConfiguration } from '../../../configuration';
 
-type CodeSceneTabPanelState = InteractiveDocsParams & {
+export type CodeSceneTabPanelState = InteractiveDocsParams & {
   isStale?: boolean;
   fileData: FileMetaType | undefined;
 };
@@ -41,6 +43,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
+    this.disposables.push(
+      this,
+      CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
+      onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
+    );
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.document === e;
@@ -61,6 +68,14 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     }
   }
 
+  private async refreshAceState() {
+    if (this.state)
+      await this.webViewPanel.webview.postMessage({
+        messageType: 'update-renderer',
+        payload: await getDocsData(this.state),
+      });
+  }
+
   private async handleDocumentationMessage(params: InteractiveDocsParams, message: MessageToIDEType) {
     switch (message.messageType) {
       case 'init':
@@ -68,11 +83,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
           this.initialized = true;
 
           // Refresh to latest data when tab is visible again to render correct data
-          const { issueInfo, fileData } = this.state as CodeSceneTabPanelState;
-          await this.webViewPanel.webview.postMessage({
-            messageType: 'update-renderer',
-            payload: getDocsData(issueInfo.category, fileData),
-          });
+          if (this.state)
+            await this.webViewPanel.webview.postMessage({
+              messageType: 'update-renderer',
+              payload: await getDocsData(this.state),
+            });
         }
         return;
       case 'open-settings':
@@ -88,6 +103,16 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
       case 'goto-function-location':
         void showDocAtPosition(params.document, params.issueInfo.position);
         return;
+      case 'request-and-present-refactoring':
+        void vscode.commands.executeCommand(
+          'codescene.requestAndPresentRefactoring',
+          params.document,
+          'interactive-docs',
+          params.fnToRefactor,
+          false, // Never skip cache
+          params.codeSmell
+        );
+        return;
       default:
         throw new Error(`Command not implemented: "${message.messageType}"!`);
     }
@@ -101,7 +126,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
 
   // Render webview either by creating html or sending update-renderer message
   private async updateWebView(params: InteractiveDocsParams) {
-    const { issueInfo } = params;
     const fileData = getFileData(params);
 
     this.state = { ...params, fileData };
@@ -109,10 +133,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     if (this.isActive()) {
       await this.webViewPanel.webview.postMessage({
         messageType: 'update-renderer',
-        payload: getDocsData(issueInfo.category, fileData),
+        payload: await getDocsData(this.state),
       });
     } else {
-      const htmlContent = initBaseContent(this.webViewPanel.webview, getDocsData(issueInfo.category, fileData));
+      const docsData = await getDocsData(this.state);
+      const htmlContent = initBaseContent(this.webViewPanel.webview, docsData);
       this.webViewPanel.webview.html = htmlContent;
     }
   }

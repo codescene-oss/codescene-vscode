@@ -3,6 +3,7 @@ import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
+import { CodeSmell } from '../devtools-api/review-model';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -15,11 +16,12 @@ export function register(context: vscode.ExtensionContext) {
     ),
     // A query param friendly version of openInteractiveDocsPanel
     vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
-      const { category, lineNo, charNo, documentUri } = queryParams;
+      const { category, lineNo, charNo, documentUri, codeSmell } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
       const params: InteractiveDocsParams = {
         issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
         document: await findOrOpenDocument(documentUri),
+        codeSmell,
       };
       CodeSceneCWFDocsTabPanel.show(params);
     }),
@@ -53,6 +55,7 @@ export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document?: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
+  codeSmell?: CodeSmell;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
