@@ -119,8 +119,7 @@ export class DevtoolsAPI {
     const path = `${baselineCommit}:./${fp.fileName}`;
 
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', path].concat(
-        cachePath ? ['--cache-path', cachePath] :[]),
+      args: ['review', '--output-format', 'json', path].concat(cachePath ? ['--cache-path', cachePath] : []),
       taskId: taskId('review-base', document),
       execOptions: { cwd: fp.documentDirectory },
     };
@@ -362,7 +361,7 @@ export class DevtoolsAPI {
   private static shouldHandleOfflineBehavior(e: unknown): boolean {
     const message = (e as Error).message;
 
-    if (message === networkErrors.javaConnectException || message.startsWith(networkErrors.javaHttpTimeoutException)) {
+    if (message === networkErrors.javaConnectException) {
       return true;
     }
 
@@ -384,10 +383,9 @@ export class DevtoolsAPI {
 
     // Only show when transitioning to offline mode
     if (currentState !== 'offline') {
-      // TODO: Enable toast when more sophisticated offline handling is introduced.
-      // void vscode.window.showInformationMessage(
-      //   'CodeScene extension is running in offline mode. Some features may be unavailable.'
-      // );
+      void vscode.window.showInformationMessage(
+        'CodeScene extension is running in offline mode. Some features may be unavailable.'
+      );
     }
 
     logOutputChannel.warn(
