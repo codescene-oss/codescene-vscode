@@ -1,10 +1,20 @@
+import vscode from 'vscode';
 import { devmode } from '../../../centralized-webview-framework/cwf-html-utils';
 import { FileMetaType, DocsContextViewProps } from '../../../centralized-webview-framework/types';
+import { CodeSmell } from '../../../devtools-api/review-model';
 import { InteractiveDocsParams } from '../../../documentation/commands';
+import { findFnToRefactor } from '../../../refactoring/utils';
+import { getAutoRefactorConfig } from '../ace/acknowledgement/ace-acknowledgement-mapper';
 import { getCWFDocType } from './utils';
+import { CodeSceneTabPanelState } from './cwf-webview-docs-panel';
 
-export function getDocsData(docType: string, fileData: FileMetaType | undefined): DocsContextViewProps {
-  const docTypeCwf = getCWFDocType(docType);
+export async function getDocsData(state: CodeSceneTabPanelState): Promise<DocsContextViewProps> {
+  const { document, issueInfo, codeSmell, fnToRefactor, fileData } = state;
+  const docTypeCwf = getCWFDocType(issueInfo.category);
+
+  const config = getAutoRefactorConfig();
+  const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
+
   return {
     ideType: 'VSCode',
     view: 'docs',
@@ -12,6 +22,7 @@ export function getDocsData(docType: string, fileData: FileMetaType | undefined)
     data: {
       docType: docTypeCwf,
       fileData,
+      autoRefactor: { ...config, disabled: config.disabled || !toRefactor },
     },
   };
 }

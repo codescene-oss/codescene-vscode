@@ -321,7 +321,9 @@ export class DevtoolsAPI {
       const args = DevtoolsAPI.buildRefactoringArgs(fnToRefactor, skipCache, token);
 
       logOutputChannel.info(
-        `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}`
+        `Refactor requested for ${logIdString(fnToRefactor)}${
+          skipCache === true ? ' (retry)' : ''
+        }, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
       );
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,

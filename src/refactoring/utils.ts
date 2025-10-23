@@ -11,6 +11,8 @@ import vscode, {
 import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
 import { isDefined } from '../utils';
 import { RefactoringRequest } from './request';
+import { DevtoolsAPI } from '../devtools-api';
+import { CodeSmell } from '../devtools-api/review-model';
 
 function singleLineCommentSeparator(languageId: string) {
   switch (languageId) {
@@ -154,4 +156,11 @@ export function isFunctionUnchangedInDocument(
     return { shouldUpdateRange: true, isStale: false };
   }
   return { shouldUpdateRange: false, isStale: true };
+}
+
+export async function findFnToRefactor(document: vscode.TextDocument | undefined, codeSmell: CodeSmell | undefined) {
+  if (document && codeSmell) {
+    const fn = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+    return fn;
+  }
 }
