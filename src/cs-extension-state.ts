@@ -1,5 +1,4 @@
 import vscode, { Uri } from 'vscode';
-import { ControlCenterViewProvider } from './control-center/view-provider';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -24,7 +23,7 @@ export enum Baseline {
   default = 3,
 }
 
-type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
+export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
@@ -54,10 +53,13 @@ export class CsExtensionState {
   private baselineChangedEmitter = new vscode.EventEmitter<void>();
   readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly controlCenterView: ControlCenterViewProvider
-  ) {
+  private sessionChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onSessionChanged = this.sessionChangedEmitter.event;
+
+  private aceStateChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAceStateChanged = this.aceStateChangedEmitter.event;
+
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
@@ -71,22 +73,18 @@ export class CsExtensionState {
         logOutputChannel.show();
       })
     );
-    this.statusBar = new CsStatusBar(this.stateProperties);
+    this.statusBar = new CsStatusBar();
     this.setupGlobalStateSync();
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([
-      acknowledgedAceUsageKey,
-      baselineKey,
-      telemetryNoticeShownKey,
-    ]);
+    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
 
-  static init(context: vscode.ExtensionContext, controlCenterView: ControlCenterViewProvider) {
-    CsExtensionState._instance = new CsExtensionState(context, controlCenterView);
+  static init(context: vscode.ExtensionContext) {
+    CsExtensionState._instance = new CsExtensionState(context);
   }
 
   static get acknowledgedAceUsage() {
@@ -170,7 +168,6 @@ export class CsExtensionState {
   }
 
   private updateStatusViews() {
-    CsExtensionState._instance.controlCenterView.update();
     CsExtensionState._instance.statusBar.update();
   }
 
@@ -182,6 +179,7 @@ export class CsExtensionState {
     const signedIn = isDefined(session);
     void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
+    this._instance.sessionChangedEmitter.fire();
     if (!signedIn) {
       // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
@@ -192,6 +190,14 @@ export class CsExtensionState {
 
   static get session(): vscode.AuthenticationSession | undefined {
     return CsExtensionState.stateProperties.session;
+  }
+
+  static get onSessionChanged() {
+    return this._instance.onSessionChanged;
+  }
+
+  static get onAceStateChanged() {
+    return this._instance.onAceStateChanged;
   }
 
   static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
@@ -207,7 +213,9 @@ export class CsExtensionState {
       ...CsExtensionState.stateProperties.features,
       ace: { state: featureState({ state, error }), error },
     };
+
     CsExtensionState._instance.updateStatusViews();
+    CsExtensionState._instance.aceStateChangedEmitter.fire();
   }
 }
 

@@ -1,36 +1,47 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
-import { CodeSceneTabPanel } from '../codescene-tab/webview-panel';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
+import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
+import { CodeSmell } from '../devtools-api/review-model';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'codescene.openInteractiveDocsPanel',
       (params: InteractiveDocsParams, source: string) => {
-        Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params.issueInfo.category });
-        CodeSceneTabPanel.show(params);
+        Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params?.issueInfo?.category });
+        CodeSceneCWFDocsTabPanel.show(params);
       }
     ),
     // A query param friendly version of openInteractiveDocsPanel
     vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
-      const { category, lineNo, charNo, documentUri } = queryParams;
+      const { category, lineNo, charNo, documentUri, codeSmell } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
       const params: InteractiveDocsParams = {
-        issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
+        issueInfo: {
+          category,
+          position: new vscode.Position(lineNo, charNo),
+          range: getVsCodeRangeByCodeSmell(codeSmell),
+        },
         document: await findOrOpenDocument(documentUri),
+        codeSmell,
       };
-      CodeSceneTabPanel.show(params);
+      CodeSceneCWFDocsTabPanel.show(params);
     }),
-    vscode.commands.registerCommand('codescene.openCodeHealthDocs', () => {
+    vscode.commands.registerCommand('codescene.openCodeHealthDocs', (args) => {
       Telemetry.logUsage('openCodeHealthDocs');
-      void vscode.env.openExternal(vscode.Uri.parse('https://codescene.io/docs/guides/technical/code-health.html'));
+
+      const params: InteractiveDocsParams = {
+        issueInfo: { category: 'docs_general_code_health', position: new vscode.Position(0, 0) },
+        document: args,
+      };
+      CodeSceneCWFDocsTabPanel.show(params);
     })
   );
 }
 
-async function findOrOpenDocument(uri: vscode.Uri) {
+export async function findOrOpenDocument(uri: vscode.Uri) {
   let document = vscode.workspace.textDocuments.find((doc) => doc.uri.toString() === uri.toString());
   if (!document) {
     document = await vscode.workspace.openTextDocument(uri);
@@ -42,12 +53,14 @@ export interface IssueInfo {
   category: string;
   position?: vscode.Position;
   fnName?: string;
+  range?: vscode.Range;
 }
 
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
-  document: vscode.TextDocument;
+  document?: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
+  codeSmell?: CodeSmell;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
@@ -64,6 +77,34 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
   params.issueInfo.fnName = fnInfo?.fnName;
   params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
+}
+
+export function toDocsParamsRanged(
+  category: string,
+  document: vscode.TextDocument,
+  codeSmell: CodeSmell,
+  fnToRefactor?: FnToRefactor
+): InteractiveDocsParams {
+  return {
+    issueInfo: {
+      category,
+      position: new vscode.Position(
+        codeSmell['highlight-range']['start-line'] - 1, // vscode.Position is 0-based, while code smell range is 1-based.
+        codeSmell['highlight-range']['start-column'] - 1
+      ),
+      range: getVsCodeRangeByCodeSmell(codeSmell),
+      fnName: fnToRefactor?.name ?? '',
+    },
+    document,
+    fnToRefactor,
+  };
+}
+
+export function getVsCodeRangeByCodeSmell(codeSmell: CodeSmell) {
+  return new vscode.Range(
+    new vscode.Position(codeSmell['highlight-range']['start-line'], codeSmell['highlight-range']['start-column']),
+    new vscode.Position(codeSmell['highlight-range']['end-line'], codeSmell['highlight-range']['end-column'])
+  );
 }
 
 export function toDocsParams(

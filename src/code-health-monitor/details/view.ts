@@ -4,7 +4,7 @@ import { refactoringButton } from '../../codescene-tab/webview/refactoring-compo
 import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
-import {  isDegradation } from '../presentation';
+import { isDegradation } from '../presentation';
 import { DeltaFunctionInfo, sortIssues } from '../tree-model';
 import { ChangeType } from '../../devtools-api/delta-model';
 

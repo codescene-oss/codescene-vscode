@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
-import { DevtoolsAPI } from '../devtools-api';
+import { DevtoolsAPI, logIdString } from '../devtools-api';
 import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
+import { logOutputChannel } from '../log';
 
 export class RefactoringRequest {
   readonly traceId: string;
@@ -24,5 +25,11 @@ export class RefactoringRequest {
 
   abort() {
     this.abortController.abort();
+
+    logOutputChannel.info(
+      `Refactor request aborted ${logIdString(this.fnToRefactor, this.traceId)}${
+        this.skipCache === true ? ' (retry)' : ''
+      }`
+    );
   }
 }

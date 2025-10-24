@@ -32,7 +32,7 @@ export function reviewCodeSmellToDiagnostics(codeSmell: CodeSmell, document: vsc
   }
   const diagnostic = new CsDiagnostic(range, message, vscode.DiagnosticSeverity.Warning, codeSmell);
   diagnostic.source = csSource;
-  diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document);
+  diagnostic.code = createDiagnosticCodeWithTarget(category, range.start, document, codeSmell);
   return diagnostic;
 }
 
@@ -77,8 +77,13 @@ export function getCsDiagnosticCode(code?: string | number | { value: string | n
  * @param category
  * @returns
  */
-function createDiagnosticCodeWithTarget(category: string, position: vscode.Position, document: vscode.TextDocument) {
-  const args = [{ category, lineNo: position.line, charNo: position.character, documentUri: document.uri }];
+function createDiagnosticCodeWithTarget(
+  category: string,
+  position: vscode.Position,
+  document: vscode.TextDocument,
+  codeSmell: CodeSmell
+) {
+  const args = [{ category, lineNo: position.line, charNo: position.character, documentUri: document.uri, codeSmell }];
   const openDocCommandUri = vscode.Uri.parse(
     `command:codescene.openInteractiveDocsFromDiagnosticTarget?${encodeURIComponent(JSON.stringify(args))}`
   );

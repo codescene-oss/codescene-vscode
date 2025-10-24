@@ -8,8 +8,11 @@ import vscode, {
   ViewColumn,
   window,
 } from 'vscode';
-import { RefactorResponse } from '../devtools-api/refactor-models';
+import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
 import { isDefined } from '../utils';
+import { RefactoringRequest } from './request';
+import { DevtoolsAPI } from '../devtools-api';
+import { CodeSmell } from '../devtools-api/review-model';
 
 function singleLineCommentSeparator(languageId: string) {
   switch (languageId) {
@@ -104,4 +107,60 @@ export async function selectCode(document: vscode.TextDocument, code: string, po
     }));
   editor.selection = new Selection(newRange.start, newRange.end);
   editor.revealRange(newRange, TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
+export async function highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
+  const { fnToRefactor, document } = refactoring;
+  const highlightCode = !isStale;
+  const editor = targetEditor(document);
+  if (highlightCode && editor) {
+    editor.selection = new vscode.Selection(fnToRefactor.vscodeRange.start, fnToRefactor.vscodeRange.end);
+  }
+}
+
+export function deselectRefactoring(refactoring: RefactoringRequest) {
+  const editor = targetEditor(refactoring.document);
+  if (editor) {
+    editor.selection = new vscode.Selection(0, 0, 0, 0);
+  }
+}
+
+export async function copyCode(code: string) {
+  await vscode.env.clipboard.writeText(code);
+  void vscode.window.showInformationMessage('Copied refactoring suggestion to clipboard');
+}
+
+export function isFunctionUnchangedInDocument(
+  document: vscode.TextDocument,
+  fnToRefactor?: FnToRefactor
+): { shouldUpdateRange: boolean; isStale: boolean } {
+  if (!fnToRefactor) return { shouldUpdateRange: false, isStale: false };
+  const contentAtRange = document.getText(fnToRefactor.vscodeRange);
+
+  // If content matches what's already in the document range, function is not stale
+  if (contentAtRange === fnToRefactor.body) return { shouldUpdateRange: false, isStale: false };
+
+  const ixOfContent = document.getText().indexOf(fnToRefactor.body);
+  if (ixOfContent >= 0) {
+    // The function body exists somewhere else (was moved)
+    const newPos = document.positionAt(ixOfContent);
+    const r = fnToRefactor.vscodeRange;
+
+    // Update the range to point to the new position
+    const newRange = r.with(newPos, r.end.translate(newPos.line - r.start.line));
+
+    fnToRefactor.range['start-line'] = newRange.start.line;
+    fnToRefactor.range['end-line'] = newRange.end.line;
+    fnToRefactor.vscodeRange = newRange;
+
+    return { shouldUpdateRange: true, isStale: false };
+  }
+  return { shouldUpdateRange: false, isStale: true };
+}
+
+export async function findFnToRefactor(document: vscode.TextDocument | undefined, codeSmell: CodeSmell | undefined) {
+  if (document && codeSmell) {
+    const fn = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+    return fn;
+  }
 }

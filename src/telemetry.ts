@@ -27,32 +27,31 @@ export default class Telemetry {
     this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
   }
 
-static async init(context: vscode.ExtensionContext): Promise<void> {
-  try {
-    await this.checkFirstRun();
+  static async init(context: vscode.ExtensionContext): Promise<void> {
+    try {
+      await this.checkFirstRun();
 
-    const enableTelemetry = getConfiguration('enableTelemetry');
-    if (enableTelemetry) {
-      logOutputChannel.info('Initializing telemetry logger');
-      this._instance = new Telemetry(context.extension);
-    } else {
-      logOutputChannel.info('Telemetry is disabled by user preference');
-    }
-
-    // Listen for changes in telemetry setting
-    const disposable = vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('enableTelemetry')) {
-        Telemetry.refreshConfig(context.extension);
+      const enableTelemetry = getConfiguration('enableTelemetry');
+      if (enableTelemetry) {
+        logOutputChannel.info('Initializing telemetry logger');
+        this._instance = new Telemetry(context.extension);
+      } else {
+        logOutputChannel.debug('Telemetry is disabled by user preference');
       }
-    });
 
-    context.subscriptions.push(disposable);
+      // Listen for changes in telemetry setting
+      const disposable = vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('enableTelemetry')) {
+          Telemetry.refreshConfig(context.extension);
+        }
+      });
 
-  } catch (error) {
-    logOutputChannel.error('Error during telemetry initialization:', error);
-    this._instance = undefined; // Ensure instance is cleared on error
+      context.subscriptions.push(disposable);
+    } catch (error) {
+      logOutputChannel.error('Error during telemetry initialization:', error);
+      this._instance = undefined; // Ensure instance is cleared on error
+    }
   }
-}
 
   static logUsage(eventName: string, eventData?: any) {
     if (!Telemetry._instance || !getConfiguration('enableTelemetry')) {
@@ -87,7 +86,7 @@ static async init(context: vscode.ExtensionContext): Promise<void> {
         'Telemetry is enabled by default to help improve this extension. You can disable it in the settings.',
         openSettings
       );
-      
+
       if (selection === openSettings) {
         await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
       }
