@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CodeSmell, Function, Range, Review } from '../devtools-api/review-model';
 import { CsDiagnostic, csSource } from '../diagnostics/cs-diagnostics';
 import { isDefined } from '../utils';
+import { toDocsParamsRanged } from '../documentation/commands';
 
 const noApplicationCode = 'No application code detected for scoring';
 

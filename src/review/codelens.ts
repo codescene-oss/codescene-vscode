@@ -4,7 +4,7 @@ import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configurat
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CodeSmell } from '../devtools-api/review-model';
-import { toDocsParams } from '../documentation/commands';
+import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 
@@ -146,10 +146,10 @@ export class CsReviewCodeLensProvider
       const command = vscode.commands.registerCommand(commandId, () => {
         const currentCached = this.commandCache.get(cacheKey);
         if (currentCached) {
-          const params = toDocsParams(
+          const params = toDocsParamsRanged(
             currentCached.category,
             currentCached.document,
-            currentCached.position,
+            codeSmell,
             currentCached.fnToRefactor
           );
           void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
