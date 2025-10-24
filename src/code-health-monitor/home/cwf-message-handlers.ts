@@ -96,8 +96,6 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
         foundFileFunction.fnToRefactor
       )
     : undefined;
-
-  // const docsParams = toDocsParams(payload.docType, foundFileFunction.file?.document, getFunctionPosition(payload.fn));
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
   }
