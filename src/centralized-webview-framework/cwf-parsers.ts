@@ -90,5 +90,5 @@ export function getFileAndFunctionFromState(
  * @returns
  */
 export function getFunctionPosition(fn: FileMetaType['fn'] | undefined): Position | undefined {
-  return fn?.range ? new Position(fn.range?.startLine, fn.range?.startColumn) : undefined;
+  return fn?.range ? new Position(fn.range?.startLine - 1, fn.range?.startColumn - 1) : undefined;
 }
