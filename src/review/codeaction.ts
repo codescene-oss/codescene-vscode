@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
-import { toDocsParams } from '../documentation/commands';
+import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
@@ -64,7 +64,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParams(category, document, highLightRange.start, fnToRefactor), 'codeaction'],
+        arguments: [toDocsParamsRanged(category, document, codeSmell, fnToRefactor), 'codeaction'],
       };
       actions.push(action);
     });

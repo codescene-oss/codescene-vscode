@@ -19,7 +19,11 @@ export function register(context: vscode.ExtensionContext) {
       const { category, lineNo, charNo, documentUri, codeSmell } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
       const params: InteractiveDocsParams = {
-        issueInfo: { category, position: new vscode.Position(lineNo, charNo) },
+        issueInfo: {
+          category,
+          position: new vscode.Position(lineNo, charNo),
+          range: getVsCodeRangeByCodeSmell(codeSmell),
+        },
         document: await findOrOpenDocument(documentUri),
         codeSmell,
       };
@@ -49,6 +53,7 @@ export interface IssueInfo {
   category: string;
   position?: vscode.Position;
   fnName?: string;
+  range?: vscode.Range;
 }
 
 export interface InteractiveDocsParams {
@@ -72,6 +77,34 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
   params.issueInfo.fnName = fnInfo?.fnName;
   params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
+}
+
+export function toDocsParamsRanged(
+  category: string,
+  document: vscode.TextDocument,
+  codeSmell: CodeSmell,
+  fnToRefactor?: FnToRefactor
+): InteractiveDocsParams {
+  return {
+    issueInfo: {
+      category,
+      position: new vscode.Position(
+        codeSmell['highlight-range']['start-line'] - 1, // vscode.Position is 0-based, while code smell range is 1-based.
+        codeSmell['highlight-range']['start-column'] - 1
+      ),
+      range: getVsCodeRangeByCodeSmell(codeSmell),
+      fnName: fnToRefactor?.name,
+    },
+    document,
+    fnToRefactor,
+  };
+}
+
+export function getVsCodeRangeByCodeSmell(codeSmell: CodeSmell) {
+  return new vscode.Range(
+    new vscode.Position(codeSmell['highlight-range']['start-line'], codeSmell['highlight-range']['start-column']),
+    new vscode.Position(codeSmell['highlight-range']['end-line'], codeSmell['highlight-range']['end-column'])
+  );
 }
 
 export function toDocsParams(
