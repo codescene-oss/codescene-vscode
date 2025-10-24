@@ -67,7 +67,6 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     if (functionInfo.fnToRefactor) {
       codeLenses.push(requestAceLens, dismissAceLens);
     }
-
     let order = 1;
     if (!reviewCodeLensesEnabled()) {
       functionInfo.children.forEach((issue) => {
