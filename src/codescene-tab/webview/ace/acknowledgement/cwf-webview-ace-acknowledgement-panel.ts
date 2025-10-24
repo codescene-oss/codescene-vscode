@@ -49,7 +49,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.request.document === e;
-        if (closedThisDoc) this.dispose();
+        if (closedThisDoc) this.webViewPanel.dispose();
       },
       this,
       this.disposables
@@ -61,7 +61,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'CodeScene tab message handling', e });
+      reportError({ context: 'An error occurred in the CodeScene ACE Acknowledgement panel', e });
     }
   }
 
@@ -77,7 +77,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
         const document = this.state?.request.document;
         const fnToRefactor = this.state?.request.fnToRefactor;
 
-        this.dispose();
+        this.webViewPanel.dispose();
 
         await CsExtensionState.setAcknowledgedAceUsage(true);
         Telemetry.logUsage('ace-info/acknowledged');
@@ -144,7 +144,6 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
     this.state = undefined;
     this.initialized = false;
 
-    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
   }
 

@@ -65,7 +65,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.request.document === e;
-        if (closedThisDoc) this.dispose();
+        if (closedThisDoc) this.webViewPanel.dispose();
       },
       this,
       this.disposables
@@ -90,7 +90,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleAceMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'CodeScene tab message handling', e });
+      reportError({ context: 'An error occurred in the CodeScene ACE panel', e });
     }
   }
 
@@ -100,19 +100,19 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       apply: async () => {
         try {
           await vscode.commands.executeCommand('codescene.applyRefactoring', request);
-          this.dispose();
+          this.webViewPanel.dispose();
         } catch (e) {
           reportError({ context: 'Error applying refactoring', e });
-          this.dispose();
+          this.webViewPanel.dispose();
         }
       },
       reject: () => {
         deselectRefactoring(request);
         Telemetry.logUsage('refactor/rejected', request.eventData);
-        this.dispose();
+        this.webViewPanel.dispose();
       },
       close: () => {
-        this.dispose();
+        this.webViewPanel.dispose();
         return;
       },
       retry: async () => {
@@ -152,7 +152,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       },
       cancel: () => {
         request.abort();
-        this.dispose();
+        this.webViewPanel.dispose();
         return;
       },
     };
@@ -229,7 +229,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
     try {
       const result = await request.promise;
-      result.code = decorateCode(result, request.document.languageId)
+      result.code = decorateCode(result, request.document.languageId);
 
       await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
     } catch (error) {
@@ -288,7 +288,6 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     this.initialized = false;
     this.hasSetInitialScript = false;
 
-    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
   }
 
