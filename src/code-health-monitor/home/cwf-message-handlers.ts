@@ -2,13 +2,12 @@ import vscode from 'vscode';
 import { CsExtensionState } from '../../cs-extension-state';
 import {
   convertCWFCommitBaselineToVSCode,
-  convertCWFDocTypeToVSCode,
   getFileAndFunctionFromState,
   getFunctionPosition,
 } from '../../centralized-webview-framework/cwf-parsers';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
-import { findOrOpenDocument, toDocsParams } from '../../documentation/commands';
+import { findOrOpenDocument, toDocsParamsRanged } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { getMessageCategory } from './cwf-message-categories';
 import {
@@ -17,6 +16,7 @@ import {
   OpenDocsMessage,
 } from '../../centralized-webview-framework/types/messages';
 import { FileMetaType } from '../../centralized-webview-framework/types';
+import { CodeSmell } from '../../devtools-api/review-model';
 
 /**
  * Changes the commit baseline
@@ -81,7 +81,19 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
   );
   if (!foundFileFunction) return;
 
-  const docsParams = toDocsParams(payload.docType, foundFileFunction.file?.document, getFunctionPosition(payload.fn));
+  const docsParams = toDocsParamsRanged(
+    payload.docType,
+    foundFileFunction.file?.document,
+    {
+      'highlight-range': {
+        'start-line': payload.fn?.range?.startLine ?? 1,
+        'start-column': payload.fn?.range?.startColumn ?? 1,
+        'end-line': payload.fn?.range?.endLine ?? 1,
+        'end-column': payload.fn?.range?.endColumn ?? 1,
+      },
+    } as CodeSmell,
+    foundFileFunction.fnToRefactor
+  );
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
   }
