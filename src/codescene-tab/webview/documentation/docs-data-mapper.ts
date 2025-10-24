@@ -51,9 +51,9 @@ function getRange(issueInfo: IssueInfo) {
   }
 
   return {
-    startLine: (issueInfo.range.start.line ?? 0) + 1, // Adjusted only for display purposes (1-based)
+    startLine: issueInfo.range.start.line ?? 0, // Adjusted only for display purposes (1-based)
     startColumn: 0,
-    endLine: (issueInfo.range.end.line ?? 0) + 1,
+    endLine: issueInfo.range.end.line ?? 0,
     endColumn: 1,
   };
 }

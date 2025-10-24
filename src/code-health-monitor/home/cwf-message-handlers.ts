@@ -81,21 +81,19 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
   );
   if (!foundFileFunction) return;
 
-  const docsParams = payload.fn
-    ? toDocsParamsRanged(
-        payload.docType,
-        foundFileFunction.file?.document,
-        {
-          'highlight-range': {
-            'start-line': payload.fn.range?.startLine,
-            'start-column': payload.fn.range?.startColumn,
-            'end-line': payload.fn.range?.endLine,
-            'end-column': payload.fn.range?.endColumn,
-          },
-        } as CodeSmell,
-        foundFileFunction.fnToRefactor
-      )
-    : undefined;
+  const docsParams = toDocsParamsRanged(
+    payload.docType,
+    foundFileFunction.file?.document,
+    {
+      'highlight-range': {
+        'start-line': payload.fn?.range?.startLine ?? 1,
+        'start-column': payload.fn?.range?.startColumn ?? 1,
+        'end-line': payload.fn?.range?.endLine ?? 1,
+        'end-column': payload.fn?.range?.endColumn ?? 1,
+      },
+    } as CodeSmell,
+    foundFileFunction.fnToRefactor
+  );
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
   }

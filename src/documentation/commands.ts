@@ -93,7 +93,7 @@ export function toDocsParamsRanged(
         codeSmell['highlight-range']['start-column'] - 1
       ),
       range: getVsCodeRangeByCodeSmell(codeSmell),
-      fnName: fnToRefactor?.name,
+      fnName: fnToRefactor?.name ?? '',
     },
     document,
     fnToRefactor,
