@@ -29,11 +29,16 @@ interface CsContext {
   csWorkspace: CsWorkspace;
 }
 
+const EXT_ID = 'codescene.codescene-vscode';
+const MIGRATION_KEY = 'codescene.lastSeenVersion';
+const CUTOFF = '0.16.0';
 /**
  * Extension entry point
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
+  await reloadWindowForUpdate(context);
+
   logOutputChannel.info('⚙️ Activating extension...');
   CsExtensionState.init(context);
 
@@ -286,3 +291,70 @@ function onGetSessionError() {
     void vscode.window.showErrorMessage(`Error signing in with CodeScene: ${error}`);
   };
 }
+
+async function reloadWindowForUpdate(context: vscode.ExtensionContext) {
+  const current = vscode.extensions.getExtension(EXT_ID)?.packageJSON?.version ?? '0.0.0';
+  const prev = context.globalState.get<string>(MIGRATION_KEY);
+  if (!prev) {
+    await context.globalState.update(MIGRATION_KEY, current);
+    logOutputChannel.info(`Set initial extension version to ${current}`);
+  }
+  if (isSemverGreaterOrEqual(current, CUTOFF) && isSemverLessThan(prev ?? '0.0.0', CUTOFF)) {
+    logOutputChannel.info(`Extension updated from ${prev} to ${current}, triggering reload to finalize update.`);
+    await context.globalState.update(MIGRATION_KEY, current);
+    try {
+      const choice = await vscode.window.showInformationMessage(
+        'CodeScene updated its view. Reload is required to finish the upgrade.',
+        'Reload now'
+      );
+      if (choice === 'Reload now') {
+        logOutputChannel.info(`Reloading window to complete CodeScene update from ${prev} to ${current}`);
+        await vscode.commands.executeCommand('workbench.action.reloadWindow');
+        return;
+      }
+    } catch (e) {
+      logOutputChannel.error('Error showing reload message after update:', assertError(e));
+    }
+  }
+}
+
+/* --- semantic version helpers for x.y.z (optional -prerelease) --- */
+function parseSemver(v: string): [number, number, number, string?] {
+  const [core, pre] = v.split('-', 2);
+  const [major, minor, patch] = core.split('.').map((n) => parseInt(n || '0', 10));
+  return [major || 0, minor || 0, patch || 0, pre];
+}
+
+function compareSemver(a: string, b: string): number {
+  const [Amaj, Amin, Apat, Apre] = parseSemver(a);
+  const [Bmaj, Bmin, Bpat, Bpre] = parseSemver(b);
+
+  const majorDiff = compareNumbers(Amaj, Bmaj);
+  if (majorDiff !== 0) return majorDiff;
+
+  const minorDiff = compareNumbers(Amin, Bmin);
+  if (minorDiff !== 0) return minorDiff;
+
+  const patchDiff = compareNumbers(Apat, Bpat);
+  if (patchDiff !== 0) return patchDiff;
+
+  // prerelease is lower than stable
+  const prereleaseDiff = comparePrerelease(Apre, Bpre);
+  if (prereleaseDiff !== 0) return prereleaseDiff;
+
+  return 0;
+}
+
+function compareNumbers(a: number, b: number): number {
+  return a - b;
+}
+
+function comparePrerelease(Apre: string | undefined, Bpre: string | undefined): number {
+  if (Apre && !Bpre) return -1;
+  if (!Apre && Bpre) return 1;
+  if (Apre && Bpre) return Apre.localeCompare(Bpre);
+  return 0;
+}
+
+const isSemverLessThan = (a: string, b: string) => compareSemver(a, b) < 0;
+const isSemverGreaterOrEqual = (a: string, b: string) => compareSemver(a, b) >= 0;
