@@ -3,12 +3,7 @@ import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
-import {
-  acquireGitApi,
-  getBranchCreationCommit,
-  isMainBranch,
-  updateGitState,
-} from '../git-utils';
+import { acquireGitApi, getBranchCreationCommit, isMainBranch, updateGitState } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
@@ -32,9 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
   for (const repo of gitApi.repositories) {
     onRepoStateChange(repo);
   }
-  
-  const repoStateListeners = gitApi.repositories.map((repo) => 
-    repo.state.onDidChange(() => onRepoStateChange(repo)));
+
+  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
 
   CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
@@ -127,8 +121,8 @@ async function onRepoStateChange(repo: Repository) {
 }
 
 async function setBaseline(repo: Repository) {
-    Reviewer.instance.setBaseline((fileUri: Uri) => {
-      const r = getRepo(fileUri)
-      return r?.rootUri.path == repo.rootUri.path;
-    });
+  Reviewer.instance.setBaseline((fileUri: Uri) => {
+    const r = getRepo(fileUri);
+    return r?.rootUri.path === repo.rootUri.path;
+  });
 }

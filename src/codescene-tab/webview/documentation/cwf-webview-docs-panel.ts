@@ -4,15 +4,13 @@ import { reportError, showDocAtPosition } from '../../../utils';
 import { commonResourceRoots } from '../../../webview-utils';
 import { MessageToIDEType } from '../../../centralized-webview-framework/types/messages';
 import { initBaseContent } from '../../../centralized-webview-framework/cwf-html-utils';
-import { getDocsData, getFileData } from './docs-data-mapper';
-import { FileMetaType } from '../../../centralized-webview-framework/types';
+import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
 import { onDidChangeConfiguration } from '../../../configuration';
 
 export type CodeSceneTabPanelState = InteractiveDocsParams & {
   isStale?: boolean;
-  fileData: FileMetaType | undefined;
 };
 
 export class CodeSceneCWFDocsTabPanel implements Disposable {
@@ -51,7 +49,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.document === e;
-        if (closedThisDoc) this.dispose();
+        if (closedThisDoc) this.webViewPanel.dispose();
       },
       this,
       this.disposables
@@ -64,46 +62,53 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleDocumentationMessage(this.state, message);
     } catch (e) {
-      reportError({ context: 'CodeScene tab message handling', e });
+      reportError({ context: 'An error occurred in the CodeScene Docs panel', e });
     }
   }
 
   private async refreshAceState() {
-    if (this.state)
+    if (this.state) {
       await this.webViewPanel.webview.postMessage({
         messageType: 'update-renderer',
         payload: await getDocsData(this.state),
       });
+    }
   }
 
   private async handleDocumentationMessage(params: InteractiveDocsParams, message: MessageToIDEType) {
-    switch (message.messageType) {
-      case 'init':
-        if (message.payload === 'docs') {
+    const handlers: Record<string, () => Promise<void> | void> = {
+      init: async () => {
+        if (message.messageType === 'init' && message.payload === 'docs') {
           this.initialized = true;
 
           // Refresh to latest data when tab is visible again to render correct data
-          if (this.state)
+          if (this.state) {
             await this.webViewPanel.webview.postMessage({
               messageType: 'update-renderer',
               payload: await getDocsData(this.state),
             });
+          }
         }
-        return;
-      case 'open-settings':
+      },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      'open-settings': async () => {
         Telemetry.logUsage('control-center/open-settings');
-        vscode.commands
-          .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode')
-          .then(
-            () => {},
-            (err) => {
-              void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
-            }
+        try {
+          await vscode.commands.executeCommand(
+            'workbench.action.openWorkspaceSettings',
+            '@ext:codescene.codescene-vscode'
           );
-      case 'goto-function-location':
+        } catch {
+          await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+        }
+      },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      'goto-function-location': () => {
         void showDocAtPosition(params.document, params.issueInfo.position);
-        return;
-      case 'request-and-present-refactoring':
+      },
+
+      acknowledged: async () => {
+        await CsExtensionState.setAcknowledgedAceUsage(true);
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',
           params.document,
@@ -112,10 +117,28 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
           false, // Never skip cache
           params.codeSmell
         );
-        return;
-      default:
-        throw new Error(`Command not implemented: "${message.messageType}"!`);
+        this.webViewPanel.dispose();
+      },
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      'request-and-present-refactoring': () => {
+        void vscode.commands.executeCommand(
+          'codescene.requestAndPresentRefactoring',
+          params.document,
+          'interactive-docs',
+          params.fnToRefactor,
+          false, // Never skip cache
+          params.codeSmell
+        );
+        this.webViewPanel.dispose();
+      },
+    };
+
+    const handler = handlers[message.messageType];
+    if (!handler) {
+      throw new Error(`Command not implemented: "${message.messageType}"!`);
     }
+
+    await handler();
   }
 
   // RENDERING
@@ -126,9 +149,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
 
   // Render webview either by creating html or sending update-renderer message
   private async updateWebView(params: InteractiveDocsParams) {
-    const fileData = getFileData(params);
-
-    this.state = { ...params, fileData };
+    this.state = { ...params };
 
     if (this.isActive()) {
       await this.webViewPanel.webview.postMessage({
@@ -144,9 +165,9 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
 
   dispose() {
     CodeSceneCWFDocsTabPanel._instance = undefined;
+    this.state = undefined;
     this.initialized = false;
 
-    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
   }
 

@@ -75,10 +75,6 @@
         "title": "CodeScene: Sign out from CodeScene"
       },
       {
-        "command": "codescene.revokeAceAcknowledgement",
-        "title": "CodeScene: Revoke acknowledging ACE usage"
-      },
-      {
         "command": "codescene.printDevtoolsApiStats",
         "title": "CodeScene: Print Devtools API stats"
       },
