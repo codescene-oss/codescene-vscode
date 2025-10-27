@@ -81,7 +81,7 @@ function download({ artifactName: artifactDownloadName, absoluteDownloadPath, ab
   const url = new URL(`https://downloads.codescene.io/enterprise/cli/${artifactDownloadName}`);
 
   logOutputChannel.info(`Downloading ${url}`);
-  void window.showInformationMessage('Found new version of the CodeScene CLI. Downloading...');
+  const updatingDependenciesMessage = window.setStatusBarMessage('Updating CodeScene dependencies...');
 
   return new Promise<void>((resolve, reject) => {
     https
@@ -92,6 +92,10 @@ function download({ artifactName: artifactDownloadName, absoluteDownloadPath, ab
             .on('end', () => {
               writeStream.close();
               logOutputChannel.debug('CodeScene devtools artifact downloaded to', absoluteDownloadPath);
+
+              updatingDependenciesMessage.dispose();
+              void window.setStatusBarMessage('CodeScene dependencies updated.', 5000);
+
               resolve();
             })
             .pipe(writeStream);
@@ -131,8 +135,10 @@ async function verifyBinaryVersion({
   });
   if (result.exitCode !== 0) {
     if (throwOnError) throw new Error(`Error when verifying devtools binary version: ${result.stderr}`);
-    logOutputChannel.info(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
+    logOutputChannel.debug(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
     return false;
+  } else {
+    logOutputChannel.debug(`Using CodeScene CLI version '${result.stdout}'.`);
   }
 
   return result.stdout.trim() === REQUIRED_DEVTOOLS_VERSION;
