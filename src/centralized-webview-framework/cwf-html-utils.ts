@@ -11,7 +11,7 @@ export const ignoreSessionStateFeatureFlag = true;
 
 // Enable Webview devmode with alot of logging
 export const devmode = false;
-export const featureFlags: FeatureFlags[] = ['jobs', 'commit-baseline', 'open-settings'];
+export const featureFlags: FeatureFlags[] = ['jobs', 'open-settings']; // CS-5597: removed 'commit-baseline'
 if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
 const opacityHexLookup = {

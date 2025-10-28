@@ -76,7 +76,7 @@ export async function getBaselineCommit(fileUri: Uri): Promise<string | undefine
   const repo = getRepo(fileUri);
   if (!repo) return;
 
-  const handler = baselineHandlers[CsExtensionState.baseline];
+  const handler = baselineHandlers[Baseline.default]; //CS-5597: was baselineHandlers[CsExtensionState.baseline]
   return await handler(repo);
 }
 
