@@ -5,7 +5,7 @@ import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
-import { vscodeRange } from './utils';
+import { getAuthToken } from '../configuration';
 
 export function register(context: vscode.ExtensionContext) {
   const codeActionProvider = new ReviewCodeActionProvider();
@@ -39,6 +39,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .map((diagnostic) => diagnostic.codeSmell)
       .filter(isDefined);
 
+    const authToken = getAuthToken();
     const fnToRefactor = (await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells))?.[0];
 
     if (fnToRefactor) {
@@ -50,12 +51,16 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
         title: 'Refactor using CodeScene ACE',
         arguments: [document, 'codeaction', fnToRefactor],
       };
+      refactorAction.disabled = !authToken
+        ? {
+            reason: 'Refactoring is not available. Please verify your authentication token in Workspace settings.',
+          }
+        : undefined;
       actions.push(refactorAction);
     }
 
     codeSmells.forEach((codeSmell) => {
       const { category, 'highlight-range': range } = codeSmell;
-      const highLightRange = vscodeRange(range)!;
 
       if (!category) return;
       const title = `Explain ${category}`;
