@@ -216,7 +216,7 @@
     "build": "node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",
     "tsc": "tsc -p ./",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src --ext ts --max-warnings=0",
     "pretest": "npm run tsc && npm run lint && npm run build",
     "test": "node ./out/test/runTest.js",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",

@@ -1,5 +1,6 @@
 const { build, context } = require('esbuild');
 const { copy } = require('esbuild-plugin-copy');
+const { execSync } = require('child_process');
 
 const baseConfig = {
   bundle: true,
