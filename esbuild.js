@@ -84,7 +84,16 @@ function webviewConfig(watch = false) {
     await webviewContext.watch();
     console.log('[watch] active');
   } else {
+    console.log('[tsc] running type check...');
+    execSync('npx tsc --noEmit', { stdio: 'inherit' }); // execSync throws an error on non-zero exit code
+    console.log('[tsc] type check passed');
+
+    console.log('[lint] running linter...');
+    execSync('npm run lint', { stdio: 'inherit' }); // execSync throws an error on non-zero exit code
+    console.log('[lint] linter passed');
+
     // Build source code
+    console.log('[build] building...');
     await build(extensionConfig);
     await build(webviewConfig());
     console.log('[build] complete');
