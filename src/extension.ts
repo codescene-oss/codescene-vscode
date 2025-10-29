@@ -348,11 +348,12 @@ function guardWindowLifecycleDuringTests() {
   const original = vscode.commands.executeCommand;
   // @ts-expect-error test-only monkey patch
   vscode.commands.executeCommand = (command: string, ...args: any[]) => {
-    if (
-      command === 'workbench.action.reloadWindow' ||
-      command === 'workbench.action.quit' ||
-      command === 'workbench.action.closeWindow'
-    ) {
+    const windowLifecycleCommands = [
+      'workbench.action.reloadWindow',
+      'workbench.action.quit',
+      'workbench.action.closeWindow',
+    ];
+    if (windowLifecycleCommands.includes(command)) {
       console.log(`[TEST] Ignored command: ${command}`);
       return Promise.resolve(undefined);
     }
