@@ -36,11 +36,8 @@ jobs:
 
     - uses: './.github/actions/setup'
 
-    - name: Type check
-      run: npx tsc --noEmit
-
-    - name: Lint
-      run: npm run lint
+    - name: Pretest
+      run: npm run pretest
 
     - run: xvfb-run -a npm test
       if: runner.os == 'Linux'

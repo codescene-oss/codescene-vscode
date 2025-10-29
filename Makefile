@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test updatedocs
+.PHONY: build package tsc clean lint watch test pretest updatedocs
 
 .DEFAULT_GOAL := build
 
@@ -17,7 +17,10 @@ lint:
 watch:
 	npm run watch
 
-test:
+pretest:
+	npm run pretest
+
+test: pretest
 	npm run test
 
 updatedocs:
