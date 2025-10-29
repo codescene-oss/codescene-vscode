@@ -292,12 +292,19 @@ function onGetSessionError() {
   };
 }
 
+function isUnderVSCodeTests() {
+  return process.env.VSCODE_TEST === 'true' || /Code.*- Test/i.test(vscode.env.appName);
+}
+
 async function reloadWindowForUpdate(context: vscode.ExtensionContext) {
   const current = vscode.extensions.getExtension(extId)?.packageJSON?.version ?? '0.0.0';
   const prev = context.globalState.get<string>(migrationKey);
   await context.globalState.update(migrationKey, current);
+
   if (current !== prev) {
     try {
+      if (isUnderVSCodeTests()) return;
+
       logOutputChannel.info(`Extension updated from ${prev ?? 'none'} to ${current}, reloading window...`);
       await vscode.commands.executeCommand('workbench.action.reloadWindow');
       return;
