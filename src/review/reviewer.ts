@@ -14,7 +14,10 @@ import * as path from 'path';
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(context: vscode.ExtensionContext, getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>): void {
+  static init(
+    context: vscode.ExtensionContext,
+    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>
+  ): void {
     Reviewer._instance = new CachingReviewer(getBaselineCommit);
     context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
@@ -81,7 +84,9 @@ export class ReviewCacheItem {
   }
 
   setBaseline(baselineCommit: string) {
-    logOutputChannel.trace(`ReviewCacheItem.setBaseline for ${path.basename(this.document.fileName)} to ${baselineCommit}`);
+    logOutputChannel.trace(
+      `ReviewCacheItem.setBaseline for ${path.basename(this.document.fileName)} to ${baselineCommit}`
+    );
     this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document);
     void this.runDeltaAnalysis();
   }
@@ -93,8 +98,7 @@ export class ReviewCacheItem {
 class ReviewCache {
   private _cache = new Map<string, ReviewCacheItem>();
 
-  constructor(private getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>) {
-  }
+  constructor(private getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>) {}
 
   /**
    * Get the current review for this document given the document.version matches the review item version.
@@ -112,7 +116,7 @@ class ReviewCache {
       void item.runDeltaAnalysis();
     });
   }
-  
+
   /**
    * Get review cache item. (note that fileName is same as uri.fsPath)
    */
@@ -129,7 +133,7 @@ class ReviewCache {
       item.setBaseline(baselineCommit);
     }
   }
-  
+
   update(document: vscode.TextDocument, review: CsReview) {
     const reviewItem = this.get(document);
     if (!reviewItem) return false;
@@ -217,11 +221,11 @@ class CachingReviewer implements Disposable {
 
     return csReview;
   }
-  
+
   refreshDeltas() {
     this.reviewCache.refreshDeltas();
   }
-  
+
   setBaseline(fileFilter: (fileUri: Uri) => boolean) {
     this.reviewCache.setBaseline(fileFilter);
   }
@@ -247,7 +251,7 @@ class CachingReviewer implements Disposable {
    */
   updateOrAdd(document: vscode.TextDocument, review: CsReview) {
     if (!this.reviewCache.update(document, review)) {
-      this.reviewCache.add(document, review);
+      void this.reviewCache.add(document, review);
     }
   }
 

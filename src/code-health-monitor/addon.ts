@@ -112,7 +112,7 @@ async function getDefaultCommit(repo: Repository) {
  * Reacts to changes in the repository's HEAD commit or branch by
  * setting the baseline if either of them changed
  */
-async function onRepoStateChange(repo: Repository) {
+function onRepoStateChange(repo: Repository) {
   const gitStateChange = updateGitState(repo);
 
   if (gitStateChange.branchChanged || gitStateChange.commitChanged) {
@@ -120,7 +120,7 @@ async function onRepoStateChange(repo: Repository) {
   }
 }
 
-async function setBaseline(repo: Repository) {
+function setBaseline(repo: Repository) {
   Reviewer.instance.setBaseline((fileUri: Uri) => {
     const r = getRepo(fileUri);
     return r?.rootUri.path === repo.rootUri.path;
