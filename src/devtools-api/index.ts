@@ -23,7 +23,6 @@ import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
 import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
-import { getBaselineCommit } from '../code-health-monitor/addon';
 import { ReviewCache } from './review-cache';
 
 export class DevtoolsAPI {
@@ -108,15 +107,15 @@ export class DevtoolsAPI {
     }
   }
 
-  static async reviewBaseline(document: vscode.TextDocument) {
+  static async reviewBaseline(baselineCommit: string, document: vscode.TextDocument) {
     const fp = fileParts(document);
+    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
 
-    const commitHash = await getBaselineCommit(document.uri);
-    if (!commitHash) return;
-    const path = `${commitHash}:./${fp.fileName}`;
+    const path = `${baselineCommit}:./${fp.fileName}`;
 
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', path],
+      args: ['review', '--output-format', 'json', path].concat(
+        cachePath ? ['--cache-path', cachePath] :[]),
       taskId: taskId('review-base', document),
       execOptions: { cwd: fp.documentDirectory },
     };
