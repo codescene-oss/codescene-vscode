@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import * as path from 'path';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
@@ -11,7 +12,7 @@ import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
-import { reviewDocumentSelector } from './language-support';
+import { reviewDocumentSelector, supportedExtensions } from './language-support';
 import { logOutputChannel, registerShowLogCommand } from './log';
 import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
@@ -22,8 +23,10 @@ import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
+import { fireFileDeletedFromGit } from './git-utils';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
+import { GitChangeObserver } from './git/git-change-observer';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -144,56 +147,19 @@ function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
  *
  */
 function addReviewListeners(context: vscode.ExtensionContext) {
-  // This provides the initial diagnostics when a file is opened.
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document);
-    })
-  );
-
-  // Close document listener for cancelling reviews and refactoring requests
-  context.subscriptions.push(
-    vscode.workspace.onDidCloseTextDocument((document: vscode.TextDocument) => {
-      Reviewer.instance.abort(document);
-    })
-  );
-
-  const docSelector = reviewDocumentSelector();
-  let reviewTimers = new Map<string, NodeJS.Timeout>();
-
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-      // avoid reviewing non-matching documents
-      if (vscode.languages.match(docSelector, e.document) === 0) {
-        return;
-      }
-      const filePath = e.document.fileName;
-      clearTimeout(reviewTimers.get(filePath));
-      // Run review after 1 second of no edits to this file
-      reviewTimers.set(
-        filePath,
-        setTimeout(() => {
-          CsDiagnostics.review(e.document);
-        }, 1000)
-      );
-    })
-  );
-
-  // This provides the initial diagnostics when the extension is first activated.
-  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    CsDiagnostics.review(document);
-  });
-
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
-  const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
-  fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
+  const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
+  rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       // TODO: knorrest - looks really weird to have true as string here...
       CsDiagnostics.review(document, { skipCache: 'true' });
     });
   });
-  context.subscriptions.push(fileSystemWatcher);
+  context.subscriptions.push(rulesFileWatcher);
+
+  // Watch for discrete Git file changes (create, modify, delete)
+  context.subscriptions.push(new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor));
 }
 
 /**

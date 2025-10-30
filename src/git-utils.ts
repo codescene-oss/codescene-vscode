@@ -6,6 +6,7 @@ import { logOutputChannel } from './log';
 const gitExecutor = new SimpleExecutor();
 const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
+export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
 
 interface RepoState {
   branch: string | undefined;

@@ -275,6 +275,7 @@ class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeView
   removeTreeEntry(filePath: string) {
     this.fileIssueMap.delete(filePath);
     Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.parentView?.visible });
+    this.update();
   }
 
   clearTree() {
