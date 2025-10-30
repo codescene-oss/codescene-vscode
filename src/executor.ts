@@ -19,6 +19,7 @@ export interface Command {
 export interface Executor {
   logStats(): void;
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
+  executeTask<T>(task: () => Promise<T>): Promise<T>;
 }
 
 class AvgTime {
@@ -109,6 +110,10 @@ export class SimpleExecutor implements Executor {
       logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" started`);
     });
   }
+
+  async executeTask<T>(task: () => Promise<T>): Promise<T> {
+    return task();
+  }
 }
 
 export interface Task extends Command {
@@ -120,7 +125,7 @@ export interface Task extends Command {
  *
  * If a task is already running, it will be terminated and its promise will be rejected.
  */
-export class LimitingExecutor implements Executor {
+export class SingleTaskExecutor implements Executor {
   private readonly executor;
   private readonly runningCommands: Map<string, AbortController> = new Map();
 
@@ -134,7 +139,7 @@ export class LimitingExecutor implements Executor {
     // Check if running already
     const runningProcess = this.runningCommands.get(taskId);
     if (runningProcess) {
-      runningProcess.abort(`[LimitingExecutor] Abort current command ${taskId} and re-run`);
+      runningProcess.abort(`[SingleTaskExecutor] Abort current command ${taskId} and re-run`);
     }
 
     const abortController = new AbortController();
@@ -156,10 +161,17 @@ export class LimitingExecutor implements Executor {
     this.executor.logStats();
   }
 
+  async executeTask<T>(task: () => Promise<T>): Promise<T> {
+    return this.executor.executeTask(task);
+  }
+
   abort(taskId: string) {
     const abortController = this.runningCommands.get(taskId);
     if (abortController) {
-      abortController.abort(`[LimitingExecutor] Abort command ${taskId}`);
+      abortController.abort(`[SingleTaskExecutor] Abort command ${taskId}`);
     }
   }
 }
+
+export { ConcurrencyLimitingExecutor } from './concurrency-limiting-executor';
+

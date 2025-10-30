@@ -1,6 +1,6 @@
 import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
-import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
+import { Command, ExecResult, SingleTaskExecutor, SimpleExecutor, Task, ConcurrencyLimitingExecutor } from '../executor';
 import { assertError, getFileExtension, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
 import {
@@ -33,6 +33,10 @@ export class DevtoolsAPI {
   static init(binaryPath: string, context: ExtensionContext) {
     DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
     DevtoolsAPI.reviewCache = new ReviewCache(context);
+  }
+
+  static get concurrencyLimitingExecutor() {
+    return DevtoolsAPI.instance.concurrencyLimitingExecutor;
   }
 
   /**
@@ -148,8 +152,8 @@ export class DevtoolsAPI {
   }
 
   static abortReviews(document: TextDocument) {
-    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review', document));
-    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review-base', document));
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review', document));
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review-base', document));
   }
 
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
@@ -165,7 +169,10 @@ export class DevtoolsAPI {
    */
   static async delta(document: TextDocument, oldScore?: string | void, newScore?: string | void) {
     const inputJsonString = jsonForScores(oldScore, newScore);
-    if (!inputJsonString) return;
+    if (!inputJsonString) {
+      logOutputChannel.debug(`Delta analysis skipped for ${basename(document.fileName)}: no input scores`);
+      return;
+    }
 
     DevtoolsAPI.startAnalysisEvent(document.fileName, true);
     try {
@@ -181,10 +188,20 @@ export class DevtoolsAPI {
         // stdout === '' means there were no changes detected - return undefined to indicate this
         deltaResult = safeJsonParse(result.stdout) as Delta;
         await addRefactorableFunctionsToDeltaResult(document, deltaResult);
+        logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
+      } else {
+        logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
       }
       DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
       return deltaResult;
     } catch (e) {
+      const error = assertError(e);
+      if (!(e instanceof AbortError)) {
+        logOutputChannel.error(`Delta analysis failed for ${basename(document.fileName)}: ${error.message}`);
+        if (error.stack) {
+          logOutputChannel.error(`Stack trace: ${error.stack}`);
+        }
+      }
       if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
         DevtoolsAPI.handleOfflineBehavior();
         return;
@@ -322,8 +339,8 @@ export class DevtoolsAPI {
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${
-          skipCache === true ? ' (retry)' : ''
-        }, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
+skipCache === true ? ' (retry)' : ''
+}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
       );
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,
@@ -332,8 +349,8 @@ export class DevtoolsAPI {
       });
       logOutputChannel.info(
         `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
-          skipCache === true ? ' (retry)' : ''
-        }`
+skipCache === true ? ' (retry)' : ''
+}`
       );
 
       DevtoolsAPI.handleBackOnline();
@@ -417,7 +434,9 @@ export class DevtoolsAPI {
 
 class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
+  public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
+    this.simpleExecutor
+  );
   public preflightJson?: string;
 
   constructor(public binaryPath: string, context: ExtensionContext) {
@@ -447,7 +466,7 @@ class DevtoolsAPIImpl {
         taskId,
         ignoreError: true,
       };
-      result = await this.limitingExecutor.execute(task, execOptions, input);
+      result = await this.concurrencyLimitingExecutor.execute(task, execOptions, input);
     } else {
       const command: Command = {
         command: this.binaryPath,
@@ -488,7 +507,7 @@ class DevtoolsAPIImpl {
           creditsInfoError['credits-info'],
           creditsInfoError['trace-id']
         );
-      case 'ABORT_ERR':
+      case 'ABORT_ERR': // ABORT_ERR is triggered by AbortController usage
         throw new AbortError();
 
       default:
@@ -516,7 +535,7 @@ interface BinaryOpts {
 
   /*
     optional taskid for the invocation, ensuring only one task with the same id is running.
-    see LimitingExecutor for details
+    see SingleTaskExecutor for details
   */
   taskId?: string;
 }

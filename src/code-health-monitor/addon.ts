@@ -1,5 +1,6 @@
 import vscode, { Uri } from 'vscode';
-import { API, Repository } from '../../types/git';
+import * as path from 'path';
+import { API, Repository, Change } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
@@ -8,6 +9,11 @@ import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { supportedExtensions } from '../language-support';
+import { logOutputChannel } from '../log';
+import { GitChangeLister } from '../git/git-change-lister';
+import { DevtoolsAPI } from '../devtools-api';
 
 let gitApi: API | undefined;
 
@@ -25,16 +31,20 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Ensure an initial baseline is set
   for (const repo of gitApi.repositories) {
-    onRepoStateChange(repo);
+    void onRepoStateChange(repo);
   }
 
-  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
+  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
   CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
       await setBaseline(repo);
     }
   });
+
+  // Review all changed/added files once when repository state is ready
+  const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
+  gitChangeLister.setupInitialReview(context);
 
   context.subscriptions.push(
     codeHealthMonitorView,
