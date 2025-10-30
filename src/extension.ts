@@ -1,11 +1,10 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor } from './code-health-monitor/addon';
+import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
 import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
-import { ControlCenterViewProvider, registerControlCenterViewProvider } from './control-center/view-provider';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -24,19 +23,25 @@ import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
+import { registerCopyDeviceIdCommand } from './device-id';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
 }
+
+const extId = 'codescene.codescene-vscode';
+const migrationKey = 'codescene.lastSeenVersion';
 
 /**
  * Extension entry point
  * @param context
  */
 export async function activate(context: vscode.ExtensionContext) {
+  guardWindowLifecycleDuringTests();
+  await reloadWindowForUpdate(context);
+
   logOutputChannel.info('⚙️ Activating extension...');
-  const controlCenterViewProvider = registerControlCenterViewProvider(context);
-  CsExtensionState.init(context, controlCenterViewProvider);
+  CsExtensionState.init(context);
 
   ensureCompatibleBinary(context.extensionPath).then(
     async (binaryPath) => {
@@ -44,10 +49,10 @@ export async function activate(context: vscode.ExtensionContext) {
       await Telemetry.init(context);
 
       try {
-        Reviewer.init(context);
+        Reviewer.init(context, getBaselineCommit);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
-        await startExtension(context, controlCenterViewProvider);
-        finalizeActivation(controlCenterViewProvider);
+        await startExtension(context);
+        finalizeActivation(context);
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
         reportError({ context: 'Unable to start extension', e });
@@ -64,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 }
 
-async function startExtension(context: vscode.ExtensionContext, controlCenterViewProvider: ControlCenterViewProvider) {
+async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace: new CsWorkspace(context),
   };
@@ -75,7 +80,7 @@ async function startExtension(context: vscode.ExtensionContext, controlCenterVie
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
-  createAuthProvider(context, csContext, controlCenterViewProvider);
+  createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   addReviewListeners(context);
@@ -106,16 +111,17 @@ async function startExtension(context: vscode.ExtensionContext, controlCenterVie
  * The context variable is used in package.json to conditionally enable/disable views that could
  * point to commands that haven't been fully initialized.
  */
-function finalizeActivation(ccProvider: ControlCenterViewProvider) {
+function finalizeActivation(context: vscode.ExtensionContext) {
   // send telemetry on activation (gives us basic usage stats)
   Telemetry.logUsage('on_activate_extension');
-  void ccProvider.activationFinalized();
+  registerCopyDeviceIdCommand(context);
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   registerShowLogCommand(context);
   registerDocumentationCommands(context);
+  registerOpenCsSettingsCommand(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
@@ -123,6 +129,14 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
+}
+
+function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
+    })
+  );
 }
 
 /**
@@ -145,19 +159,24 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   );
 
   const docSelector = reviewDocumentSelector();
-  let reviewTimer: NodeJS.Timeout | undefined;
+  let reviewTimers = new Map<string, NodeJS.Timeout>();
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
       // avoid reviewing non-matching documents
       if (vscode.languages.match(docSelector, e.document) === 0) {
-              return;
-      } 
-      clearTimeout(reviewTimer);
-      // Run review after 1 second of no edits
-      reviewTimer = setTimeout(() => {
-        CsDiagnostics.review(e.document);
-      }, 1000);    })
+        return;
+      }
+      const filePath = e.document.fileName;
+      clearTimeout(reviewTimers.get(filePath));
+      // Run review after 1 second of no edits to this file
+      reviewTimers.set(
+        filePath,
+        setTimeout(() => {
+          CsDiagnostics.review(e.document);
+        }, 1000)
+      );
+    })
   );
 
   // This provides the initial diagnostics when the extension is first activated.
@@ -170,7 +189,8 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document, { skipCache: true });
+      // TODO: knorrest - looks really weird to have true as string here...
+      CsDiagnostics.review(document, { skipCache: 'true' });
     });
   });
   context.subscriptions.push(fileSystemWatcher);
@@ -192,7 +212,7 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
-function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext, controlCenterViewProvider: ControlCenterViewProvider) {
+function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
@@ -206,9 +226,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   );
 
   // Register manual sign out command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider))
-  );
+  context.subscriptions.push(vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider)));
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
   // sign in in the accounts menu - see AuthenticationGetSessionOptions
@@ -230,7 +248,6 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     }
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
-    controlCenterViewProvider.update();
   });
 
   const serverUrlChangedDisposable = onDidChangeConfiguration('serverUrl', async (e) => {
@@ -246,7 +263,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
-    controlCenterViewProvider.update();
+    // TODO: refresh CWF view(s)
   });
 
   context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
@@ -273,5 +290,73 @@ function onGetSessionError() {
   return (error: any) => {
     CsExtensionState.setSession();
     void vscode.window.showErrorMessage(`Error signing in with CodeScene: ${error}`);
+  };
+}
+
+function isUnderTestsOrCI(): boolean {
+  const appName = vscode.env.appName ?? '';
+  const argv = process.argv.join(' ');
+  return (
+    process.env.VSCODE_TEST === 'true' ||
+    process.env.CI === 'true' ||
+    /- Test/i.test(appName) ||
+    argv.includes('--extensionTestsPath') ||
+    !!process.env.CODE_TESTS_PATH
+  );
+}
+
+async function shouldReloadOnUpdate(): Promise<boolean> {
+  const cfg = vscode.workspace.getConfiguration('codescene');
+  // setting lets you force-disable reload without touching code
+  const enabled = cfg.get<boolean>('reloadOnUpdate', true);
+  return enabled;
+}
+
+export async function reloadWindowForUpdate(context: vscode.ExtensionContext) {
+  const current = vscode.extensions.getExtension(extId)?.packageJSON?.version ?? '0.0.0';
+  const prev = context.globalState.get<string>(migrationKey);
+  logOutputChannel.info('{current} extension version, previous version was {prev}', { current, prev });
+
+  await context.globalState.update(migrationKey, current);
+
+  if (isUnderTestsOrCI()) {
+    logOutputChannel.info(`[TEST/CI] Version changed ${prev} -> ${current}, reload skipped.`);
+    return;
+  }
+
+  if (!(await shouldReloadOnUpdate())) {
+    logOutputChannel.info(`[codescene] reloadOnUpdate disabled; skipping reload ${prev} -> ${current}.`);
+    return;
+  }
+
+  const versionChanged = current !== prev;
+  if (!versionChanged) {
+    logOutputChannel.info('Version unchanged, no reload needed.');
+    return;
+  }
+
+  try {
+    logOutputChannel.info(`[codescene] Reloading window due to update: ${prev} -> ${current}`);
+    void vscode.commands.executeCommand('workbench.action.reloadWindow');
+  } catch (e) {
+    logOutputChannel.error('Error triggering reload after update:', assertError(e));
+  }
+}
+
+function guardWindowLifecycleDuringTests() {
+  if (!isUnderTestsOrCI()) return;
+  const original = vscode.commands.executeCommand;
+  // @ts-expect-error test-only monkey patch
+  vscode.commands.executeCommand = (command: string, ...args: any[]) => {
+    const windowLifecycleCommands = [
+      'workbench.action.reloadWindow',
+      'workbench.action.quit',
+      'workbench.action.closeWindow',
+    ];
+    if (windowLifecycleCommands.includes(command)) {
+      console.log(`[TEST] Ignored command: ${command}`);
+      return Promise.resolve(undefined);
+    }
+    return original(command, ...args);
   };
 }

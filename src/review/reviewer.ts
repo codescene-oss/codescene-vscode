@@ -1,5 +1,6 @@
 import { dirname } from 'path';
-import vscode, { Disposable } from 'vscode';
+import vscode, { Disposable, Uri } from 'vscode';
+import { Repository } from '../../types/git';
 import { getConfiguration } from '../configuration';
 import { AbortError, DevtoolsAPI } from '../devtools-api';
 import { Delta } from '../devtools-api/delta-model';
@@ -9,11 +10,15 @@ import { SimpleExecutor } from '../executor';
 import { logOutputChannel } from '../log';
 import { formatScore, reviewResultToDiagnostics } from './utils';
 
+import * as path from 'path';
 export default class Reviewer {
   private static _instance: CachingReviewer;
 
-  static init(context: vscode.ExtensionContext): void {
-    Reviewer._instance = new CachingReviewer();
+  static init(
+    context: vscode.ExtensionContext,
+    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>
+  ): void {
+    Reviewer._instance = new CachingReviewer(getBaselineCommit);
     context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
   }
@@ -24,7 +29,7 @@ export default class Reviewer {
 }
 
 export interface ReviewOpts {
-  [key: string]: string | boolean;
+  [key: string]: string | string;
 }
 
 export class CsReview {
@@ -54,12 +59,12 @@ export class ReviewCacheItem {
 
   constructor(public document: vscode.TextDocument, public review: CsReview) {
     this.documentVersion = document.version;
-    this.resetBaseline();
   }
 
   setReview(document: vscode.TextDocument, review: CsReview) {
     this.review = review;
     this.documentVersion = document.version;
+    void this.runDeltaAnalysis();
   }
 
   /**
@@ -78,8 +83,11 @@ export class ReviewCacheItem {
     this.delta = await DevtoolsAPI.delta(this.document);
   }
 
-  resetBaseline() {
-    this.baselineScore = Reviewer.instance.baselineScore(this.document);
+  setBaseline(baselineCommit: string) {
+    logOutputChannel.trace(
+      `ReviewCacheItem.setBaseline for ${path.basename(this.document.fileName)} to ${baselineCommit}`
+    );
+    this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document);
     void this.runDeltaAnalysis();
   }
 }
@@ -89,6 +97,8 @@ export class ReviewCacheItem {
  */
 class ReviewCache {
   private _cache = new Map<string, ReviewCacheItem>();
+
+  constructor(private getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>) {}
 
   /**
    * Get the current review for this document given the document.version matches the review item version.
@@ -114,8 +124,24 @@ class ReviewCache {
     return this._cache.get(document.fileName);
   }
 
-  add(document: vscode.TextDocument, review: CsReview) {
-    this._cache.set(document.fileName, new ReviewCacheItem(document, review));
+  async add(document: vscode.TextDocument, review: CsReview) {
+    const item = new ReviewCacheItem(document, review);
+    this._cache.set(document.fileName, item);
+    logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
+    const baselineCommit = await this.getBaselineCommit(document.uri);
+    if (baselineCommit) {
+      item.setBaseline(baselineCommit);
+    }
+  }
+
+  update(document: vscode.TextDocument, review: CsReview) {
+    const reviewItem = this.get(document);
+    if (!reviewItem) return false;
+
+    logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
+    reviewItem.setReview(document, review);
+    void reviewItem.runDeltaAnalysis();
+    return true;
   }
 
   delete(fsPath: string) {
@@ -130,8 +156,15 @@ class ReviewCache {
     this._cache.clear();
   }
 
-  resetBaseline(fsPath: string) {
-    this._cache.get(fsPath)?.resetBaseline();
+  setBaseline(fileFilter: (fileUri: Uri) => boolean) {
+    this._cache.forEach(async (item) => {
+      if (fileFilter(item.document.uri)) {
+        const baselineCommit = await this.getBaselineCommit(item.document.uri);
+        if (baselineCommit) {
+          void item.setBaseline(baselineCommit);
+        }
+      }
+    });
   }
 }
 
@@ -139,9 +172,10 @@ class CachingReviewer implements Disposable {
   private reviewer = new FilteringReviewer();
 
   private disposables: vscode.Disposable[] = [];
-  readonly reviewCache = new ReviewCache();
+  readonly reviewCache: ReviewCache;
 
-  constructor() {
+  constructor(getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>) {
+    this.reviewCache = new ReviewCache(getBaselineCommit);
     const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     this.disposables.push(
       deleteFileWatcher,
@@ -165,21 +199,25 @@ class CachingReviewer implements Disposable {
     if (!reviewOpts.skipCache) {
       // If we have a cached CsReview for this document/version combination, return it.
       const reviewCacheItem = this.reviewCache.getExactVersion(document);
-      if (reviewCacheItem) return reviewCacheItem.review;
+      if (reviewCacheItem) {
+        return reviewCacheItem.review;
+      }
     }
 
     const reviewPromise = this.reviewer
       .review(document, reviewOpts)
       .then((reviewResult) => {
         // Clear cache of void reviews (ignored files probably)
-        if (!reviewResult) this.reviewCache.delete(document.uri.fsPath);
+        if (!reviewResult) {
+          this.reviewCache.delete(document.uri.fsPath);
+        }
         return reviewResult;
       })
       .catch((e) => this.handleReviewError(e, document));
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.setOrUpdate(document, csReview);
+    this.updateOrAdd(document, csReview);
 
     return csReview;
   }
@@ -188,10 +226,8 @@ class CachingReviewer implements Disposable {
     this.reviewCache.refreshDeltas();
   }
 
-  refreshAllDeltasAndBaselines() {
-    for (const [key, item] of this.reviewCache['_cache'].entries()) {
-      item.resetBaseline();
-    }
+  setBaseline(fileFilter: (fileUri: Uri) => boolean) {
+    this.reviewCache.setBaseline(fileFilter);
   }
 
   /**
@@ -199,9 +235,9 @@ class CachingReviewer implements Disposable {
    * @param document
    * @returns
    */
-  async baselineScore(document: vscode.TextDocument) {
+  async baselineScore(baselineCommit: string, document: vscode.TextDocument) {
     return this.reviewer
-      .review(document, { baseline: true })
+      .review(document, { baseline: baselineCommit })
       .then((reviewResult) => {
         return reviewResult && reviewResult['raw-score'];
       })
@@ -213,17 +249,14 @@ class CachingReviewer implements Disposable {
    * @param document
    * @param review
    */
-  setOrUpdate(document: vscode.TextDocument, review: CsReview) {
-    const reviewItem = this.reviewCache.get(document);
-    if (reviewItem) {
-      reviewItem.setReview(document, review);
-      void reviewItem.runDeltaAnalysis();
-    } else {
-      this.reviewCache.add(document, review);
+  updateOrAdd(document: vscode.TextDocument, review: CsReview) {
+    if (!this.reviewCache.update(document, review)) {
+      void this.reviewCache.add(document, review);
     }
   }
 
   abort(document: vscode.TextDocument): void {
+    this.reviewCache.delete(document.uri.fsPath);
     this.reviewer.abort(document);
   }
 
@@ -294,7 +327,7 @@ class FilteringReviewer {
     }
 
     if (reviewOpts.baseline) {
-      return DevtoolsAPI.reviewBaseline(document);
+      return DevtoolsAPI.reviewBaseline(reviewOpts.baseline, document);
     } else {
       return DevtoolsAPI.reviewContent(document);
     }

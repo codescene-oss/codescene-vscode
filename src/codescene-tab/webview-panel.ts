@@ -345,7 +345,8 @@ export class CodeSceneTabPanel implements Disposable {
       switch (true) {
         case isAuthError:
           title = 'Authentication Failed';
-          actionHtml = 'Authentication failed. Please check your CodeScene authentication token in settings, or Sign In with CodeScene.';
+          actionHtml =
+            'Authentication failed. Please check your CodeScene authentication token in settings, or Sign In with CodeScene.';
           level = -2;
           break;
         default:
@@ -402,7 +403,7 @@ export class CodeSceneTabPanel implements Disposable {
           'end-column': -1,
         },
       };
-      return await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+      if (document) return await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
     }
   }
 
@@ -413,7 +414,7 @@ export class CodeSceneTabPanel implements Disposable {
     let fnToRefactor = await this.getOrFindFnToRefactor(params);
 
     const fnLocContent = functionLocationContent({
-      filePath: document.fileName,
+      filePath: document?.fileName || '',
       position: issueInfo.position,
       fnName: issueInfo.fnName || fnToRefactor?.name,
       isStale,

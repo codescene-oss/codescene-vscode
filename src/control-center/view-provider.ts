@@ -266,7 +266,13 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       };
     }
 
-    return ControlCenterViewProvider.aceStatusMap[aceFeature.state] || { iconClass: 'codicon-sparkle', text: '', tooltip: '' };
+    return (
+      ControlCenterViewProvider.aceStatusMap[aceFeature.state] || {
+        iconClass: 'codicon-sparkle',
+        text: '',
+        tooltip: '',
+      }
+    );
   }
 
   private applyAceStatusOverrides(status: { iconClass: string; text: string; tooltip: string }) {
@@ -288,9 +294,8 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
   private aceStatusRow() {
     const aceFeature = CsExtensionState.stateProperties.features.ace;
     const status = this.applyAceStatusOverrides(this.getAceStatus());
-    const outOfCreditsBanner = aceFeature.error instanceof CreditsInfoError
-      ? this.creditBannerContent(aceFeature.error.creditsInfo)
-      : '';
+    const outOfCreditsBanner =
+      aceFeature.error instanceof CreditsInfoError ? this.creditBannerContent(aceFeature.error.creditsInfo) : '';
 
     return /*html*/ `
         <div class="row">

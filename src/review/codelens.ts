@@ -4,7 +4,7 @@ import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configurat
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CodeSmell } from '../devtools-api/review-model';
-import { toDocsParams } from '../documentation/commands';
+import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
 import Reviewer, { ReviewCacheItem } from './reviewer';
 
@@ -20,7 +20,7 @@ class CsCodeLens extends vscode.CodeLens {
 }
 
 export class CsReviewCodeLensProvider
-implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
+  implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
 {
   private changeCodeLensesEmitter = new vscode.EventEmitter<void>();
   onDidChangeCodeLenses = this.changeCodeLensesEmitter.event;
@@ -33,13 +33,16 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
   // We register unique commands WITHOUT arguments per CodeLens location, which bypasses this caching mechanism.
   // See in https://github.com/microsoft/vscode/blob/d22e62803f7850381179d5113347954f29965c54/src/vs/workbench/api/common/extHostCommands.ts#L394
   // how caching only happens if we pass `arguments` around.
-  private commandCache = new Map<string, {
-    category: string;
-    document: vscode.TextDocument;
-    position: vscode.Position;
-    fnToRefactor: FnToRefactor | undefined; // can be null
-    commandId: string;
-  }>();
+  private commandCache = new Map<
+    string,
+    {
+      category: string;
+      document: vscode.TextDocument;
+      position: vscode.Position;
+      fnToRefactor: FnToRefactor | undefined; // can be null
+      commandId: string;
+    }
+  >();
   private commandDisposables = new Map<string, vscode.Disposable>();
 
   constructor() {
@@ -98,12 +101,12 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
     if (isDefined(delta)) {
       codeLens.command = {
         title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
-        command: 'codescene.codeHealthMonitorView.focus',
+        command: 'codescene.homeView.focus',
       };
       return codeLens;
     } else {
       const scorePresentation = await cacheItem.review.scorePresentation;
-      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`);
+      codeLens.command = this.showCodeHealthDocsCommand(`Code Health: ${scorePresentation}`, cacheItem.document);
       return codeLens;
     }
   }
@@ -121,7 +124,9 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
     return diagnostics
       .map((diagnostic) => {
         if (diagnostic.codeSmell) {
-          const cacheKey = `${document.uri.toString()}:${diagnostic.range.start.line}:${diagnostic.range.start.character}:${diagnostic.codeSmell.category}`;
+          const cacheKey = `${document.uri.toString()}:${diagnostic.range.start.line}:${
+            diagnostic.range.start.character
+          }:${diagnostic.codeSmell.category}`;
           return new CsCodeLens(diagnostic.range, document, diagnostic.codeSmell, cacheKey);
         }
       })
@@ -141,10 +146,12 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       const command = vscode.commands.registerCommand(commandId, () => {
         const currentCached = this.commandCache.get(cacheKey);
         if (currentCached) {
-          const params = toDocsParams(currentCached.category,
-                                      currentCached.document,
-                                      currentCached.position,
-                                      currentCached.fnToRefactor);
+          const params = toDocsParamsRanged(
+            currentCached.category,
+            currentCached.document,
+            codeSmell,
+            currentCached.fnToRefactor
+          );
           void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
         }
       });
@@ -156,7 +163,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
         document,
         position: range.start,
         fnToRefactor,
-        commandId
+        commandId,
       };
       this.commandCache.set(cacheKey, cached);
     } else {
@@ -170,15 +177,15 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
     const title = `$(warning) ${codeSmell.category}`;
     return {
       title,
-      command: cached.commandId
+      command: cached.commandId,
     };
   }
 
-  private showCodeHealthDocsCommand(message: string) {
+  private showCodeHealthDocsCommand(message: string, document: vscode.TextDocument) {
     return {
       title: `$(pulse) ${message}`,
-      command: 'markdown.showPreviewToSide',
-      arguments: [vscode.Uri.parse('csdoc:general-code-health.md')],
+      command: 'codescene.openCodeHealthDocs',
+      arguments: [document],
     };
   }
 }

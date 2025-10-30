@@ -2,7 +2,11 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
-import { AbortError } from './devtools-api';
+import { AbortError, DevtoolsError } from './devtools-api';
+
+export function toUppercase(word: String) {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
 
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
@@ -47,17 +51,35 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
 
   const error = assertError(e);
 
-  const isNetworkError = error.message.toLowerCase().includes(networkErrors.getAddrInfoNotFound.toLowerCase());
-  let message = isNetworkError
-    ? `${context}. Server is unreachable. Ensure you have a stable internet connection.`
-    : `${context}. ${error.message}`;
-
-  logOutputChannel.error(`${message} ${!isNetworkError ? JSON.stringify(error) : ''}`);
+  const message = resolveErrorMessage(context, error);
+  logOutputChannel.error(message);
   if (consoleOnly) {
     logOutputChannel.show();
   } else {
     void vscode.window.showErrorMessage(message);
   }
+}
+
+/**
+ * Derives a user-friendly message for known error types.
+ */
+function resolveErrorMessage(context: string, error: Error): string {
+  const msg = error.message.toLowerCase();
+
+  const isAuthError = error instanceof DevtoolsError && error.status === 401;
+  if (isAuthError) {
+    return `${context}. Authentication failed.`;
+  }
+
+  if (msg.includes(networkErrors.getAddrInfoNotFound.toLowerCase())) {
+    return `${context}. Server is unreachable. Ensure you have a stable internet connection.`;
+  }
+
+  if (msg.includes('java.net.http.httptimeoutexception')) {
+    return `${context}. The latest refactoring has timed out.`;
+  }
+
+  return `${context}. ${JSON.stringify(error)}`;
 }
 
 export function pluralize(noun: string, count: number) {
@@ -84,20 +106,29 @@ export function rangeStr(range: Range) {
 }
 
 /**
- * Navigate to the position in the file specified by uri. If we have no position, just make sure
- * the document is shown.
+ * Attempt to show the given document in VS Code, focusing an existing editor if open,
+ * or opening it if not. Optionally move the cursor to a given position and reveal it.
  *
  * @param uri
  * @param position
  * @returns
  */
-export async function showDocAtPosition(document: vscode.TextDocument, position?: vscode.Position) {
-  if (!isDefined(position)) {
-    await vscode.window.showTextDocument(document);
+export async function showDocAtPosition(document: vscode.TextDocument | undefined, position?: vscode.Position) {
+  if (!document) {
+    logOutputChannel.warn('Could not focus on line in editor as it is undefined.');
     return;
   }
-  const location = new vscode.Location(document.uri, position);
-  return vscode.commands.executeCommand('editor.action.goToLocations', document.uri, position, [location]);
+
+  const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === document.uri.toString());
+
+  const activeEditor = editor
+    ? await vscode.window.showTextDocument(editor.document, editor.viewColumn)
+    : await vscode.window.showTextDocument(document, { preview: false });
+
+  if (position) {
+    activeEditor.selection = new vscode.Selection(position, position);
+    activeEditor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+  }
 }
 
 export function safeJsonParse(input: string, context?: any) {
