@@ -236,7 +236,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  DevtoolsAPI.dispose();
+}
 
 function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {
   return (session: vscode.AuthenticationSession | undefined) => {

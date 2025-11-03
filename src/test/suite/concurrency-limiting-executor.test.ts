@@ -31,6 +31,11 @@ class MockExecutor implements Executor {
   get totalCalls(): number {
     return this.executeCalls.length + this.executeTaskCalls.length;
   }
+
+  abortAllTasks(): void {
+    this.pending.forEach((p) => p.reject(new Error('Aborted')));
+    this.pending = [];
+  }
 }
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -140,5 +145,35 @@ suite('ConcurrencyLimitingExecutor Test Suite', () => {
     const result = await promise;
 
     assert.deepStrictEqual(result, expected);
+  });
+
+  test('abortAllTasks aborts running tasks', async () => {
+    const mock = new MockExecutor();
+    const exec = new ConcurrencyLimitingExecutor(mock, 2);
+
+    const p1 = exec.execute({ command: 'test1', args: [] });
+    const p2 = exec.execute({ command: 'test2', args: [] });
+
+    await tick();
+    assert.strictEqual(mock.executeCalls.length, 2);
+
+    exec.abortAllTasks();
+
+    await assert.rejects(p1, { message: 'Aborted' });
+    await assert.rejects(p2, { message: 'Aborted' });
+  });
+
+  test('dispose calls abortAllTasks', async () => {
+    const mock = new MockExecutor();
+    const exec = new ConcurrencyLimitingExecutor(mock, 2);
+
+    const p1 = exec.execute({ command: 'test1', args: [] });
+    const p2 = exec.execute({ command: 'test2', args: [] });
+
+    await tick();
+    exec.dispose();
+
+    await assert.rejects(p1, { message: 'Aborted' });
+    await assert.rejects(p2, { message: 'Aborted' });
   });
 });

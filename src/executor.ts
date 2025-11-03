@@ -20,6 +20,7 @@ export interface Executor {
   logStats(): void;
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
   executeTask<T>(task: () => Promise<T>): Promise<T>;
+  abortAllTasks(): void;
 }
 
 class AvgTime {
@@ -114,6 +115,8 @@ export class SimpleExecutor implements Executor {
   async executeTask<T>(task: () => Promise<T>): Promise<T> {
     return task();
   }
+
+  abortAllTasks(): void {}
 }
 
 export interface Task extends Command {
@@ -171,7 +174,18 @@ export class SingleTaskExecutor implements Executor {
       abortController.abort(`[SingleTaskExecutor] Abort command ${taskId}`);
     }
   }
+
+  abortAllTasks(): void {
+    const taskIds = Array.from(this.runningCommands.keys());
+    for (const taskId of taskIds) {
+      try {
+        logOutputChannel.error(`[SingleTaskExecutor] Aborting task ${taskId}`);
+        this.abort(taskId);
+      } catch (error) {
+        logOutputChannel.error(`[SingleTaskExecutor] Error aborting task ${taskId}: ${error}`);
+      }
+    }
+  }
 }
 
 export { ConcurrencyLimitingExecutor } from './concurrency-limiting-executor';
-
