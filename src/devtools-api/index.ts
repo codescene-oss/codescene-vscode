@@ -430,6 +430,10 @@ skipCache === true ? ' (retry)' : ''
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }
   }
+
+  static dispose() {
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.dispose();
+  }
 }
 
 class DevtoolsAPIImpl {

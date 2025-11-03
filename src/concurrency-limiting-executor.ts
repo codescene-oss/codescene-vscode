@@ -70,4 +70,12 @@ export class ConcurrencyLimitingExecutor implements Executor {
       (this.executor as any).abort(taskId);
     }
   }
+
+  abortAllTasks(): void {
+    this.executor.abortAllTasks();
+  }
+
+  dispose(): void {
+    this.abortAllTasks();
+  }
 }
