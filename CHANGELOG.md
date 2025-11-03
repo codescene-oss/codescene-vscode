@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.16.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.16.0...v0.16.1) (2025-11-03)
+
+
+### Documentation
+
+* minor rephrasing and spell corrections ([6633008](https://github.com/codescene-oss/codescene-vscode/commit/66330084ef1badcaa94f974d2166d66ce9256f8b))
+
 ## [0.16.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.15.0...v0.16.0) (2025-11-03)
 
 
