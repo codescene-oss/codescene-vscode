@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.16.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.15.0...v0.16.0) (2025-11-03)
+
+
+### Features
+
+* introduce codescene.authToken setting ([ed6dd32](https://github.com/codescene-oss/codescene-vscode/commit/ed6dd3251ab0b44da5dacbb57462e0c54bbd20ea))
+* make tokens mandatory for fn-to-refactor ([33cd4fd](https://github.com/codescene-oss/codescene-vscode/commit/33cd4fd13f56a1f7cda4134fdf04a931ce78bc7d))
+* reload window for new webview ([f13416a](https://github.com/codescene-oss/codescene-vscode/commit/f13416ab71d159af1096799b28050f3acebae81c))
+* remove baseline selector from monitor ui ([118531b](https://github.com/codescene-oss/codescene-vscode/commit/118531ba2b005775e8a379262d139098136439e2))
+* render `Declarations for Refactored Code` when available ([455df4c](https://github.com/codescene-oss/codescene-vscode/commit/455df4c789c7e686428783dbf5c8e0f5e7700beb))
+* restore ACE ([dda24a1](https://github.com/codescene-oss/codescene-vscode/commit/dda24a11a535eb9c38ba037a09d00ac86bf9ea29))
+* split 'Activate' status into 'Signed in' / 'Signed out' ([a6e71bc](https://github.com/codescene-oss/codescene-vscode/commit/a6e71bc9b80d9016787427b74b501dbaa30bc4d6))
+* **status:** split status bar into two distinct states for ACE and Analysis ([55ee550](https://github.com/codescene-oss/codescene-vscode/commit/55ee550eeff7bdf91cddedf24c87d8b85d05cd03))
+* **telemetry:** enable copying device ID from command palette ([7378680](https://github.com/codescene-oss/codescene-vscode/commit/737868091e86a18b40e6933241c73670270ed1ae))
+* use `--fn-to-refactor-nippy-b64` when available ([89e85b8](https://github.com/codescene-oss/codescene-vscode/commit/89e85b8fddf5711aff553757a8300602182a9b8f))
+
+
+### Bug fixes
+
+* code smell complex method ([b45875b](https://github.com/codescene-oss/codescene-vscode/commit/b45875b4f3ed7f5d71799691b56818f62259e0ef))
+* decorate refactored code with review issues ([ef7c01a](https://github.com/codescene-oss/codescene-vscode/commit/ef7c01a6309e7b20aa1c9c08ded2c5e04e5ba4f1))
+* don't skip cache when retrying a failed refactoring ([a470abc](https://github.com/codescene-oss/codescene-vscode/commit/a470abc9e317aedf6d9a9d5e521e948966fdba1e))
+* fix copy button for Declarations section ([175b8ec](https://github.com/codescene-oss/codescene-vscode/commit/175b8eca651c10ed752d0c623480e760f90902d1))
+* fix CS-5276 ([7c2eb8d](https://github.com/codescene-oss/codescene-vscode/commit/7c2eb8d4edcdf8e07247e7500f86446a1efc858f))
+* update code health monitor reliably ([2488768](https://github.com/codescene-oss/codescene-vscode/commit/24887682a91341667888653ede3e4b2737018508))
+
 ## [0.15.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.14.4...v0.15.0) (2025-10-17)
 
 ### Bug fixes
