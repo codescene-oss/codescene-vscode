@@ -9,7 +9,6 @@ import {
   ExtensionContext,
   ProgressLocation,
   Uri,
-  UriHandler,
   authentication,
   env,
   window,

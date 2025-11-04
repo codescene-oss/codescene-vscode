@@ -1,4 +1,3 @@
-import { TextDocument } from 'vscode';
 import { AceAcknowledgeContextViewProps, AutoRefactorConfig } from '../../../../centralized-webview-framework/types';
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { RefactoringRequest } from '../../../../refactoring/request';

@@ -1,19 +1,6 @@
-import { dirname } from 'path';
-import vscode, { Disposable, Uri } from 'vscode';
-import { Repository } from '../../types/git';
-import { getConfiguration } from '../configuration';
-import { AbortError, DevtoolsAPI } from '../devtools-api';
-import { Delta } from '../devtools-api/delta-model';
-import { Review } from '../devtools-api/review-model';
-import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
-import { SimpleExecutor } from '../executor';
+import vscode, { Uri } from 'vscode';
 import { logOutputChannel } from '../log';
-import { formatScore, reviewResultToDiagnostics } from './utils';
 
-import * as path from 'path';
-import { CsReview } from './cs-review';
-import { ReviewCacheItem } from './review-cache-item';
-import { ReviewCache } from './review-cache';
 import { CachingReviewer } from './caching-reviewer';
 export default class Reviewer {
   private static _instance: CachingReviewer;
