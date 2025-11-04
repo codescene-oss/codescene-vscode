@@ -18,7 +18,7 @@ export class GitChangeLister {
     this.executor = executor;
   }
 
-  setupInitialReview(context: vscode.ExtensionContext): void {
+  start(context: vscode.ExtensionContext): void {
     if (this.gitApi.repositories.length === 0) {
       logOutputChannel.error('Code Health Monitor: No repositories found for initial review');
       return;
@@ -74,7 +74,7 @@ export class GitChangeLister {
         void this.executor.executeTask(async () => {
           try {
             const document = await vscode.workspace.openTextDocument(filePath);
-            CsDiagnostics.review(document);
+            CsDiagnostics.review(document, { skipMonitorUpdate: false });
           } catch (error) {
             logOutputChannel.error(`Could not review ${filePath}: ${error}`);
           }

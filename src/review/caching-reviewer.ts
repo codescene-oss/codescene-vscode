@@ -33,7 +33,7 @@ export class CachingReviewer implements Disposable {
     }
   }
 
-  review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): CsReview {
+  review(document: vscode.TextDocument, reviewOpts: ReviewOpts): CsReview {
     if (!reviewOpts.skipCache) {
       // If we have a cached CsReview for this document/version combination, return it.
       const reviewCacheItem = this.reviewCache.getExactVersion(document);
@@ -55,7 +55,7 @@ export class CachingReviewer implements Disposable {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.updateOrAdd(document, csReview);
+    this.updateOrAdd(document, csReview, reviewOpts.skipMonitorUpdate);
 
     return csReview;
   }
@@ -73,9 +73,9 @@ export class CachingReviewer implements Disposable {
    * @param document
    * @returns
    */
-  async baselineScore(baselineCommit: string, document: vscode.TextDocument) {
+  async baselineScore(baselineCommit: string, document: vscode.TextDocument, skipMonitorUpdate: boolean) {
     return this.reviewer
-      .review(document, { baseline: baselineCommit })
+      .review(document, { baseline: baselineCommit, skipMonitorUpdate })
       .then((reviewResult) => {
         return reviewResult && reviewResult['raw-score'];
       })
@@ -86,10 +86,11 @@ export class CachingReviewer implements Disposable {
    * Store the diagnostics promise in the cache, or update it with the
    * @param document
    * @param review
+   * @param skipMonitorUpdate
    */
-  updateOrAdd(document: vscode.TextDocument, review: CsReview) {
-    if (!this.reviewCache.update(document, review)) {
-      void this.reviewCache.add(document, review);
+  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
+    if (!this.reviewCache.update(document, review, skipMonitorUpdate)) {
+      void this.reviewCache.add(document, review, skipMonitorUpdate);
     }
   }
 

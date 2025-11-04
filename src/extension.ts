@@ -25,6 +25,7 @@ import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
+import { OpenFilesObserver } from './review/open-files-observer';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -142,22 +143,28 @@ function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
 
 /**
  * Adds listeners for all events that should trigger a review.
- *
  */
 function addReviewListeners(context: vscode.ExtensionContext) {
+  // Observe open file events and trigger reviews
+  const openFilesObserver = new OpenFilesObserver(context);
+  openFilesObserver.start();
+  context.subscriptions.push(openFilesObserver);
+
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: 'true' });
+      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: false });
     });
   });
   context.subscriptions.push(rulesFileWatcher);
 
   // Watch for discrete Git file changes (create, modify, delete)
-  context.subscriptions.push(new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor));
+  const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
+  gitChangeObserver.start();
+  context.subscriptions.push(gitChangeObserver);
 }
 
 /**
@@ -264,10 +271,10 @@ function isUnderTestsOrCI(): boolean {
   const argv = process.argv.join(' ');
   return (
     process.env.VSCODE_TEST === 'true' ||
-    process.env.CI === 'true' ||
-    /- Test/i.test(appName) ||
-    argv.includes('--extensionTestsPath') ||
-    !!process.env.CODE_TESTS_PATH
+      process.env.CI === 'true' ||
+      /- Test/i.test(appName) ||
+      argv.includes('--extensionTestsPath') ||
+      !!process.env.CODE_TESTS_PATH
   );
 }
 

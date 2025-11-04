@@ -22,7 +22,7 @@ export class ReviewCache {
 
   refreshDeltas() {
     this._cache.forEach((item) => {
-      void item.runDeltaAnalysis();
+      void item.runDeltaAnalysis({ skipMonitorUpdate: false });
     });
   }
 
@@ -33,23 +33,23 @@ export class ReviewCache {
     return this._cache.get(document.fileName);
   }
 
-  async add(document: vscode.TextDocument, review: CsReview) {
+  async add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     const item = new ReviewCacheItem(document, review);
     this._cache.set(document.fileName, item);
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
     const baselineCommit = await this.getBaselineCommit(document.uri);
     if (baselineCommit) {
-      item.setBaseline(baselineCommit);
+      item.setBaseline(baselineCommit, skipMonitorUpdate);
     }
   }
 
-  update(document: vscode.TextDocument, review: CsReview) {
+  update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     const reviewItem = this.get(document);
     if (!reviewItem) return false;
 
     logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
-    reviewItem.setReview(document, review);
-    void reviewItem.runDeltaAnalysis();
+    reviewItem.setReview(document, review, skipMonitorUpdate);
+    void reviewItem.runDeltaAnalysis({ skipMonitorUpdate });
     return true;
   }
 
@@ -70,7 +70,7 @@ export class ReviewCache {
       if (fileFilter(item.document.uri)) {
         const baselineCommit = await this.getBaselineCommit(item.document.uri);
         if (baselineCommit) {
-          void item.setBaseline(baselineCommit);
+          void item.setBaseline(baselineCommit, false);
         }
       }
     });
