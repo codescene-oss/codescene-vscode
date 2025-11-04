@@ -18,6 +18,7 @@ watch:
 	npm run watch
 
 pretest:
+	rm -rf out/
 	npm run pretest
 
 test: pretest
