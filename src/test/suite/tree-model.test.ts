@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { sortFnInfo, sortIssues } from '../../code-health-monitor/tree-model';
+import { sortFnInfo, sortIssues } from '../../code-health-monitor/sort-fn-info';
 
 suite('Code Health Monitor tree-model Test Suite', () => {
   test('Test sorting of DeltaFunctionItems', async () => {

@@ -25,10 +25,6 @@ import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
 import { DevtoolsError } from './devtools-error';
 import { AbortError } from './abort-error';
 
-export { CreditsInfoError } from './credits-info-error';
-export { DevtoolsError } from './devtools-error';
-export { AbortError } from './abort-error';
-
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
   private static reviewCache: ReviewCache;

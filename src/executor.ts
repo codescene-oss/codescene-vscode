@@ -1,8 +1,5 @@
 import { ExecOptions } from 'child_process';
 
-export { SimpleExecutor } from './simple-executor';
-export { SingleTaskExecutor } from './single-task-executor';
-
 export interface ExecResult {
   stdout: string;
   stderr: string;
@@ -33,5 +30,3 @@ export interface Executor {
 export interface Task extends Command {
   taskId: string;
 }
-
-export { ConcurrencyLimitingExecutor } from './concurrency-limiting-executor';

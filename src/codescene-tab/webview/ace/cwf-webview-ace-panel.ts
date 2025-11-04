@@ -16,7 +16,9 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
 import debounce from 'lodash.debounce';
-import { AbortError, DevtoolsError, logIdString } from '../../../devtools-api';
+import { logIdString } from '../../../devtools-api';
+import { AbortError } from '../../../devtools-api/abort-error';
+import { DevtoolsError } from '../../../devtools-api/devtools-error';
 import { MissingAuthTokenError } from '../../../missing-auth-token-error';
 
 export interface CwfAceTabParams {
