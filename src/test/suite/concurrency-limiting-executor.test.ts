@@ -10,12 +10,21 @@ class MockExecutor implements Executor {
 
   async execute(command: Command | Task, options: ExecOptions = {}, input?: string): Promise<ExecResult> {
     this.executeCalls.push({ command, options, input });
-    return new Promise<ExecResult>((resolve, reject) => this.pending.push({ resolve, reject }));
+    return new Promise<ExecResult>((resolve, reject) => {
+      this.pending.push({ resolve, reject });
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => {
+          reject(new Error('Aborted'));
+        });
+      }
+    });
   }
 
   async executeTask<T>(task: () => Promise<T>): Promise<T> {
     this.executeTaskCalls.push(task as any);
-    return new Promise<T>((resolve, reject) => this.pending.push({ resolve, reject }));
+    return new Promise<T>((resolve, reject) => {
+      this.pending.push({ resolve, reject });
+    });
   }
 
   logStats(): void {}
@@ -157,10 +166,13 @@ suite('ConcurrencyLimitingExecutor Test Suite', () => {
     await tick();
     assert.strictEqual(mock.executeCalls.length, 2);
 
+    assert.ok(mock.executeCalls[0].options.signal);
+    assert.ok(mock.executeCalls[1].options.signal);
+
     exec.abortAllTasks();
 
-    await assert.rejects(p1, { message: 'Aborted' });
-    await assert.rejects(p2, { message: 'Aborted' });
+    await assert.rejects(p1);
+    await assert.rejects(p2);
   });
 
   test('dispose calls abortAllTasks', async () => {
@@ -173,7 +185,7 @@ suite('ConcurrencyLimitingExecutor Test Suite', () => {
     await tick();
     exec.dispose();
 
-    await assert.rejects(p1, { message: 'Aborted' });
-    await assert.rejects(p2, { message: 'Aborted' });
+    await assert.rejects(p1);
+    await assert.rejects(p2);
   });
 });

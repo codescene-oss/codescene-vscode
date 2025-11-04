@@ -1,6 +1,7 @@
 import { ExecOptions } from 'child_process';
 import * as os from 'os';
 import { Command, ExecResult, Executor, Task } from './executor';
+import { logOutputChannel } from './log';
 
 /**
  * An executor that limits the number of concurrent executions based on CPU cores.
@@ -11,6 +12,7 @@ export class ConcurrencyLimitingExecutor implements Executor {
   private readonly maxConcurrency: number;
   private runningCount = 0;
   private queue: Array<() => void> = [];
+  private readonly runningCommands: Map<Command | Task, AbortController> = new Map();
 
   constructor(executor: Executor, maxConcurrency?: number) {
     this.executor = executor;
@@ -20,9 +22,13 @@ export class ConcurrencyLimitingExecutor implements Executor {
   async execute(command: Command | Task, options: ExecOptions = {}, input?: string): Promise<ExecResult> {
     await this.acquireSlot();
 
+    const abortController = new AbortController();
+    this.runningCommands.set(command, abortController);
+
     try {
-      return await this.executor.execute(command, options, input);
+      return await this.executor.execute(command, { ...options, signal: abortController.signal }, input);
     } finally {
+      this.runningCommands.delete(command);
       this.releaseSlot();
     }
   }
@@ -72,7 +78,19 @@ export class ConcurrencyLimitingExecutor implements Executor {
   }
 
   abortAllTasks(): void {
-    this.executor.abortAllTasks();
+    const commands = Array.from(this.runningCommands.entries());
+    if (commands.length > 0) {
+      logOutputChannel.error(`[ConcurrencyLimitingExecutor] Aborting ${commands.length} running command(s)`);
+    }
+    for (const [command, abortController] of commands) {
+      try {
+        const commandStr = 'command' in command ? `${command.command} ${command.args.join(' ')}` : 'unknown';
+        logOutputChannel.error(`[ConcurrencyLimitingExecutor] Aborting command: ${commandStr}`);
+        abortController.abort('[ConcurrencyLimitingExecutor] Abort all tasks');
+      } catch (error) {
+        logOutputChannel.error(`[ConcurrencyLimitingExecutor] Error aborting command: ${error}`);
+      }
+    }
   }
 
   dispose(): void {
