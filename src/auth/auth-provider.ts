@@ -19,18 +19,13 @@ import { logOutputChannel } from '../log';
 import { CsServerVersion, ServerVersion } from '../server-version';
 import Telemetry from '../telemetry';
 import { safeJsonParse } from '../utils';
+import { UriEventHandler } from './uri-event-handler';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export const AUTH_TYPE = 'codescene';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const SESSIONS_STORAGE_KEY = `${AUTH_TYPE}.sessions`;
-
-class UriEventHandler extends EventEmitter<Uri> implements UriHandler {
-  public handleUri(uri: Uri) {
-    this.fire(uri);
-  }
-}
 
 interface LoginResponse {
   name: string;

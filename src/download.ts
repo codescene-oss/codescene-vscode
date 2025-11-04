@@ -12,54 +12,10 @@ import * as path from 'path';
 import { SimpleExecutor } from './executor';
 import { logOutputChannel } from './log';
 import { window } from 'vscode';
+import { DownloadError } from './download-error';
+import { ArtifactInfo, REQUIRED_DEVTOOLS_VERSION } from './artifact-info';
 
-export class DownloadError extends Error {
-  constructor(message: string, readonly url: URL, readonly expectedCliPath: string) {
-    super(message);
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/naming-convention
-const REQUIRED_DEVTOOLS_VERSION = '5e1b0e99b868bc94da2c39514fd7b8e731406bb1';
-
-const artifacts: { [platform: string]: { [arch: string]: string } } = {
-  darwin: {
-    x64: `cs-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  linux: {
-    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  win32: {
-    x64: `cs-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-};
-
-class ArtifactInfo {
-  constructor(readonly extensionPath: string) {}
-
-  get absoluteDownloadPath() {
-    return path.join(this.extensionPath, this.artifactName);
-  }
-
-  get absoluteBinaryPath() {
-    return path.join(this.extensionPath, this.binaryName);
-  }
-
-  get artifactName() {
-    const artifactName = artifacts[process.platform]?.[process.arch];
-    if (!artifactName) {
-      throw Error(`Unsupported platform: ${process.platform}-${process.arch}`);
-    }
-    return artifactName;
-  }
-
-  get binaryName(): string {
-    // E.g. cs-darwin-x64/arm64, cs-linux-x64, cs-win32-x64.exe
-    return `cs-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`;
-  }
-}
+export { DownloadError } from './download-error';
 
 async function unzipFile({ absoluteDownloadPath, extensionPath, absoluteBinaryPath }: ArtifactInfo): Promise<void> {
   await extractZip(absoluteDownloadPath, { dir: extensionPath });

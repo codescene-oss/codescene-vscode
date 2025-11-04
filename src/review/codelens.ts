@@ -4,20 +4,12 @@ import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configurat
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CodeSmell } from '../devtools-api/review-model';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
-import Reviewer, { ReviewCacheItem } from './reviewer';
-
-class CsCodeLens extends vscode.CodeLens {
-  constructor(
-    range: vscode.Range,
-    public readonly document: vscode.TextDocument,
-    public readonly codeSmell: CodeSmell,
-    public readonly cacheKey: string
-  ) {
-    super(range);
-  }
-}
+import Reviewer from './reviewer';
+import { ReviewCacheItem } from './review-cache-item';
+import { CsCodeLens } from './cs-code-lens';
 
 export class CsReviewCodeLensProvider
   implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
@@ -122,7 +114,7 @@ export class CsReviewCodeLensProvider
     }
 
     return diagnostics
-      .map((diagnostic) => {
+      .map((diagnostic: CsDiagnostic) => {
         if (diagnostic.codeSmell) {
           const cacheKey = `${document.uri.toString()}:${diagnostic.range.start.line}:${
             diagnostic.range.start.character
