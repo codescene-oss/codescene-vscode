@@ -1,7 +1,7 @@
 import { ExecOptions } from 'child_process';
 import { logOutputChannel } from './log';
 import { SimpleExecutor } from './simple-executor';
-import { Command, ExecResult, Executor, Task } from './executor';
+import { Executor, Task } from './executor';
 
 export class SingleTaskExecutor implements Executor {
   private readonly executor;

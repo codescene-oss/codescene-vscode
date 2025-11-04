@@ -1,11 +1,7 @@
-import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
-import { Command, ExecResult, SingleTaskExecutor, SimpleExecutor, Task, ConcurrencyLimitingExecutor } from '../executor';
 import { assertError, getFileExtension, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
-import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
+import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import {
-  CreditsInfo,
-  CreditsInfoError as CreditsInfoErrorModel,
   FnToRefactor,
   PreFlightResponse,
   RefactorResponse,

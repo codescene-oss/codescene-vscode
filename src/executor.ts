@@ -1,7 +1,4 @@
-import { ChildProcess, execFile, ExecOptions } from 'child_process';
-import { logOutputChannel } from './log';
-import { isDefined } from './utils';
-import { Stats } from './stats';
+import { ExecOptions } from 'child_process';
 
 export { SimpleExecutor } from './simple-executor';
 export { SingleTaskExecutor } from './single-task-executor';

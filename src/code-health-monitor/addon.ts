@@ -1,6 +1,5 @@
 import vscode, { Uri } from 'vscode';
-import * as path from 'path';
-import { API, Repository, Change } from '../../types/git';
+import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
@@ -9,9 +8,6 @@ import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
-import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { supportedExtensions } from '../language-support';
-import { logOutputChannel } from '../log';
 import { GitChangeLister } from '../git/git-change-lister';
 import { DevtoolsAPI } from '../devtools-api';
 

@@ -1,4 +1,4 @@
-import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, WebviewViewProvider } from 'vscode';
+import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscode';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
