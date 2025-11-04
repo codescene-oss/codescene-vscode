@@ -15,33 +15,33 @@ export class ReviewCacheItem {
     this.documentVersion = document.version;
   }
 
-  setReview(document: vscode.TextDocument, review: CsReview) {
+  setReview(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     this.review = review;
     this.documentVersion = document.version;
-    void this.runDeltaAnalysis();
+    void this.runDeltaAnalysis({ skipMonitorUpdate });
   }
 
   /**
    * Triggers a delta analysis using the raw scores. The analyser will trigger an event on completion
    */
-  async runDeltaAnalysis() {
+  async runDeltaAnalysis({ skipMonitorUpdate }: { skipMonitorUpdate: boolean }) {
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
-    this.delta = await DevtoolsAPI.delta(this.document, oldScore, newScore);
+    this.delta = await DevtoolsAPI.delta(this.document, !skipMonitorUpdate, oldScore, newScore);
   }
 
   /**
    * Deletes the delta for this item, and makes sure that (empty) DeltaAnalysisEvents are triggered properly
    */
   async deleteDelta() {
-    this.delta = await DevtoolsAPI.delta(this.document);
+    this.delta = await DevtoolsAPI.delta(this.document, true);
   }
 
-  setBaseline(baselineCommit: string) {
+  setBaseline(baselineCommit: string, skipMonitorUpdate: boolean) {
     logOutputChannel.trace(
       `ReviewCacheItem.setBaseline for ${path.basename(this.document.fileName)} to ${baselineCommit}`
     );
-    this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document);
-    void this.runDeltaAnalysis();
+    this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document, skipMonitorUpdate);
+    void this.runDeltaAnalysis({ skipMonitorUpdate });
   }
 }

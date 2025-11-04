@@ -162,11 +162,12 @@ export class DevtoolsAPI {
    * Runs delta analysis and returns the result. Also fires onDidDeltaAnalysisComplete when analysis is complete.
    *
    * @param document
+   * @param updateMonitor whether to update the Code Health Monitor tree view
    * @param oldScore raw base64 encoded score
    * @param newScore raw base64 encoded score
    * @returns Delta if any changes were detected or undefined when no improvements/degradations were found.
    */
-  static async delta(document: TextDocument, oldScore?: string | void, newScore?: string | void) {
+  static async delta(document: TextDocument, updateMonitor: boolean, oldScore?: string | void, newScore?: string | void) {
     const inputJsonString = jsonForScores(oldScore, newScore);
     if (!inputJsonString) {
       logOutputChannel.debug(`Delta analysis skipped for ${basename(document.fileName)}: no input scores`);
@@ -191,7 +192,7 @@ export class DevtoolsAPI {
       } else {
         logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
       }
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult, updateMonitor });
       return deltaResult;
     } catch (e) {
       const error = assertError(e);
@@ -485,4 +486,5 @@ export type ReviewEvent = {
 export type DeltaAnalysisEvent = {
   document: vscode.TextDocument;
   result?: Delta;
+  updateMonitor: boolean; // Please set this to false if triggering reviews due to opening files, and to true if triggering reviews due to Git changes.
 };

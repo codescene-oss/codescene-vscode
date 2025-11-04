@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { DevtoolsAPI } from '../devtools-api';
+import { DevtoolsAPI, DeltaAnalysisEvent } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize, showDocAtPosition } from '../utils';
@@ -37,7 +37,11 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
         void this.treeDataProvider.selectBaseline();
       }),
-      DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.treeDataProvider.syncTree(e)),
+      DevtoolsAPI.onDidDeltaAnalysisComplete((e: DeltaAnalysisEvent) => {
+        if (e.updateMonitor) {
+          this.treeDataProvider.syncTree(e);
+        }
+      }),
       onFileDeletedFromGit((e) => {
         this.treeDataProvider.removeTreeEntry(e);
       }),

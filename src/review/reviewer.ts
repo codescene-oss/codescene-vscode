@@ -20,5 +20,8 @@ export default class Reviewer {
 }
 
 export interface ReviewOpts {
-  [key: string]: string | string;
+  skipCache?: string;
+  baseline?: string;
+  skipMonitorUpdate: boolean; // Please set this to false if triggering reviews due to opening files, and to true if triggering reviews due to Git changes.
+  [key: string]: string | boolean | undefined;
 }

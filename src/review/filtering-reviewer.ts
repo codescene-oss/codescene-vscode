@@ -56,7 +56,7 @@ export class FilteringReviewer {
     return ignored;
   }
 
-  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts = {}): Promise<Review | void> {
+  async review(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<Review | void> {
     const ignored = await this.isIgnored(document);
 
     if (ignored) {

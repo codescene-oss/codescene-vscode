@@ -69,7 +69,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
       // Immediately trigger a re-review of the new file-content
       // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
-      CsDiagnostics.review(document);
+      CsDiagnostics.review(document, { skipMonitorUpdate: false });
       Telemetry.logUsage('refactor/applied', refactoring.eventData);
     });
   }

@@ -12,8 +12,10 @@ import { Executor } from '../executor';
 export class GitChangeObserver {
   private fileWatcher: vscode.FileSystemWatcher;
   private executor: Executor;
+  private context: vscode.ExtensionContext;
 
   constructor(context: vscode.ExtensionContext, executor: Executor) {
+    this.context = context;
     this.executor = executor;
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(
       '**/*',
@@ -21,12 +23,14 @@ export class GitChangeObserver {
       false, // Don't ignore change events
       false  // Don't ignore delete events
     );
+  }
 
+  start(): void {
     this.fileWatcher.onDidCreate(this.handleFileChange.bind(this));
     this.fileWatcher.onDidChange(this.handleFileChange.bind(this));
     this.fileWatcher.onDidDelete(this.handleFileDelete.bind(this));
 
-    context.subscriptions.push(this.fileWatcher);
+    this.context.subscriptions.push(this.fileWatcher);
   }
 
   private async handleFileChange(uri: vscode.Uri): Promise<void> {
@@ -41,7 +45,7 @@ export class GitChangeObserver {
       try {
         // Load the file as a TextDocument (doesn't open in editor UI)
         const document = await vscode.workspace.openTextDocument(filePath);
-        CsDiagnostics.review(document);
+        CsDiagnostics.review(document, { skipMonitorUpdate: false });
       } catch (error) {
         logOutputChannel.warn(`Could not load file for review ${filePath}: ${error}`);
       }

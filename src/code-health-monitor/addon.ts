@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Review all changed/added files once when repository state is ready
   const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
-  gitChangeLister.setupInitialReview(context);
+  gitChangeLister.start(context);
 
   context.subscriptions.push(
     codeHealthMonitorView,
