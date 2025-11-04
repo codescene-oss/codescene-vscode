@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { GitExtension, Repository } from '../types/git';
-import { SimpleExecutor } from './executor';
+import { SimpleExecutor } from './simple-executor';
 import { logOutputChannel } from './log';
 
 const gitExecutor = new SimpleExecutor();

@@ -3,7 +3,7 @@ import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
 import { FnToRefactor } from '../devtools-api/refactor-models';
-import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';

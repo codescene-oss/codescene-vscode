@@ -3,7 +3,7 @@ import vscode from 'vscode';
 import { getConfiguration } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
-import { SimpleExecutor } from '../executor';
+import { SimpleExecutor } from '../simple-executor';
 import { ReviewOpts } from './reviewer';
 
 /**

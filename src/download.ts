@@ -9,13 +9,11 @@ import extractZip from 'extract-zip';
 import { https } from 'follow-redirects';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SimpleExecutor } from './executor';
+import { SimpleExecutor } from './simple-executor';
 import { logOutputChannel } from './log';
 import { window } from 'vscode';
 import { DownloadError } from './download-error';
 import { ArtifactInfo, REQUIRED_DEVTOOLS_VERSION } from './artifact-info';
-
-export { DownloadError } from './download-error';
 
 async function unzipFile({ absoluteDownloadPath, extensionPath, absoluteBinaryPath }: ArtifactInfo): Promise<void> {
   await extractZip(absoluteDownloadPath, { dir: extensionPath });

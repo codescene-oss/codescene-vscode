@@ -2,7 +2,10 @@ import vscode from 'vscode';
 import { DeltaAnalysisEvent } from '../devtools-api';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
-import { DeltaFunctionInfo, DeltaInfoItem, DeltaTreeViewItem, FileWithIssues, refactoringsCount } from './tree-model';
+import { DeltaTreeViewItem, refactoringsCount } from './tree-model';
+import { DeltaFunctionInfo } from './delta-function-info';
+import { DeltaInfoItem } from './delta-info-item';
+import { FileWithIssues } from './file-with-issues';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 
 interface SortOption extends vscode.QuickPickItem {

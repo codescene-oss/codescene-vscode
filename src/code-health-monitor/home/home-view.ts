@@ -5,7 +5,7 @@ import { commonResourceRoots } from '../../webview-utils';
 import { getHomeData, getLoginData } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
-import { FileWithIssues } from '../tree-model';
+import { FileWithIssues } from '../file-with-issues';
 import {
   convertFileIssueToCWFDeltaItem,
   convertVSCodeCommitBaselineToCWF,

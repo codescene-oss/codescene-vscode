@@ -2,7 +2,9 @@ import vscode from 'vscode';
 import { ChangeDetail } from '../devtools-api/delta-model';
 import { issueToDocsParams } from '../documentation/commands';
 import { isDegradation, errorColor, okColor } from './presentation';
-import { DeltaTreeViewItem, DeltaFunctionInfo, FileWithIssues } from './tree-model';
+import { DeltaTreeViewItem } from './tree-model';
+import { DeltaFunctionInfo } from './delta-function-info';
+import { FileWithIssues } from './file-with-issues';
 
 const warningColor = new vscode.ThemeColor('editorWarning.foreground');
 

@@ -2,7 +2,7 @@ import vscode, { Uri } from 'vscode';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { issueToDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
-import { DeltaFunctionInfo } from './tree-model';
+import { DeltaFunctionInfo } from './delta-function-info';
 
 export function register(context: vscode.ExtensionContext) {
   const codeLensProvider = new CodeHealthMonitorCodeLens();

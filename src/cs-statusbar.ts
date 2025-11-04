@@ -1,6 +1,7 @@
 import vscode, { Disposable } from 'vscode';
 import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { CreditsInfoError, getEffectiveToken } from './devtools-api';
+import { getEffectiveToken } from './devtools-api';
+import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
 import { onDidChangeConfiguration } from './configuration';
 

@@ -2,7 +2,8 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
-import { AbortError, DevtoolsError } from './devtools-api';
+import { AbortError } from './devtools-api/abort-error';
+import { DevtoolsError } from './devtools-api/devtools-error';
 
 export function toUppercase(word: String) {
   return word.charAt(0).toUpperCase() + word.slice(1);

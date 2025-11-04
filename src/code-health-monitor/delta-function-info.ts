@@ -3,7 +3,8 @@ import { FnToRefactor } from '../devtools-api/refactor-models';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';
 import { isDegradation, okColor, errorColor } from './presentation';
-import { DeltaTreeViewItem, FileWithIssues, countInTree } from './tree-model';
+import { DeltaTreeViewItem, countInTree } from './tree-model';
+import { FileWithIssues } from './file-with-issues';
 import { DeltaIssue } from './delta-issue';
 import { Function, ChangeType } from '../devtools-api/delta-model';
 

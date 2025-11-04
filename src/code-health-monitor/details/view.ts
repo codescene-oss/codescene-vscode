@@ -5,7 +5,8 @@ import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
 import { isDegradation } from '../presentation';
-import { DeltaFunctionInfo, sortIssues } from '../tree-model';
+import { DeltaFunctionInfo } from '../delta-function-info';
+import { sortIssues } from '../sort-fn-info';
 import { ChangeType } from '../../devtools-api/delta-model';
 
 let codeHealthDetailsView: CodeHealthDetailsView | undefined;

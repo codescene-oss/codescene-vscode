@@ -6,7 +6,6 @@ import { CsDiagnostic } from './cs-diagnostic';
 import { ReviewRequestQueue } from './review-request-queue';
 
 export const csSource = 'CodeScene';
-export { CsDiagnostic } from './cs-diagnostic';
 
 export default class CsDiagnostics {
   // The collection of diagnostics presented in the Problems tab

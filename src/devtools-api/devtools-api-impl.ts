@@ -1,5 +1,7 @@
 import { ExecOptions } from 'child_process';
-import { Command, ExecResult, SimpleExecutor, Task, ConcurrencyLimitingExecutor } from '../executor';
+import { Command, ExecResult, Task } from '../executor';
+import { SimpleExecutor } from '../simple-executor';
+import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
 import { safeJsonParse, rangeStr } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
 import {

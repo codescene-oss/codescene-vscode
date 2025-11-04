@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { DeltaFunctionInfo, DeltaIssue } from '../code-health-monitor/tree-model';
+import { DeltaFunctionInfo } from '../code-health-monitor/delta-function-info';
+import { DeltaIssue } from '../code-health-monitor/delta-issue';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';

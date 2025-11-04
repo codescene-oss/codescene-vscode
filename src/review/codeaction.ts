@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
-import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';

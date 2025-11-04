@@ -1,5 +1,5 @@
 import vscode, { Disposable, Uri } from 'vscode';
-import { AbortError } from '../devtools-api';
+import { AbortError } from '../devtools-api/abort-error';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { FilteringReviewer } from './filtering-reviewer';

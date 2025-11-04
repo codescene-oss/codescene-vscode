@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import { Review } from '../devtools-api/review-model';
-import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { formatScore, reviewResultToDiagnostics } from './utils';
 
 export class CsReview {

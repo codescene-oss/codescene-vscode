@@ -9,7 +9,8 @@ import vscode, {
 } from 'vscode';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
-import { CreditsInfoError, DevtoolsAPI, getEffectiveToken } from '../devtools-api';
+import { DevtoolsAPI, getEffectiveToken } from '../devtools-api';
+import { CreditsInfoError } from '../devtools-api/credits-info-error';
 import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
