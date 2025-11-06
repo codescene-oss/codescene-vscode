@@ -1,5 +1,5 @@
 import { CodeSmell, Review } from '../devtools-api/review-model';
-import { assertError, getFileExtension, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
+import { assertError, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import {
   FnToRefactor,
@@ -276,16 +276,21 @@ export class DevtoolsAPI {
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
+    const fp = fileParts(document);    
+    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const baseArgs = [
       'refactor',
       'fns-to-refactor',
-      '--extension',
-      getFileExtension(document.fileName),
+      '--file-name',
+      fp.fileName,
       '--preflight',
       DevtoolsAPI.instance.preflightJson!, // aceEnabled() implies preflightJson is defined
     ];
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs.concat(args),
+      args: baseArgs.concat(
+        args,
+        cachePath ? ['--cache-path', cachePath] : []
+      ),
       input: document.getText(),
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
