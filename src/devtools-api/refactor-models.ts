@@ -2,6 +2,9 @@
 import { Range as VscodeRange } from 'vscode';
 import { Range } from '../devtools-api/review-model';
 
+export const REFACTOR_TASK_ID = 'refactor';
+export const SINGLE_EXECUTOR_TASK_IDS = [REFACTOR_TASK_ID];
+
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;
   /**
