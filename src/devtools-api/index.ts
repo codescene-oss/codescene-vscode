@@ -5,6 +5,7 @@ import {
   FnToRefactor,
   PreFlightResponse,
   RefactorResponse,
+  REFACTOR_TASK_ID,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -350,7 +351,7 @@ skipCache === true ? ' (retry)' : ''
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,
         execOptions: { signal },
-        taskId: 'refactor', // Limit to only 1 refactoring at a time
+        taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
       });
       logOutputChannel.info(
         `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
