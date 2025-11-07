@@ -81,6 +81,7 @@ export class DevtoolsAPIImpl {
     this.handleNonZeroExitCodes(args, result);
   }
 
+  // @CodeScene(disable:"Complex Method")
   /**
    * Handles the exit code of the devtools binary
    * Output on debug level, avoiding the default level of info. Error presentation should be done
@@ -94,7 +95,9 @@ export class DevtoolsAPIImpl {
   private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
-        const devtoolsError = safeJsonParse(stdout) as DevtoolsErrorModel;
+        const devtoolsError = stdout.trim() 
+          ? safeJsonParse(stdout) as DevtoolsErrorModel 
+          : {message: "<unknown error>"};
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
