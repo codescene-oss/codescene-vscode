@@ -256,16 +256,6 @@ export class DevtoolsAPI {
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
   }
 
-  static async fnsToRefactorFromCodeSmell(document: TextDocument, codeSmell: CodeSmell) {
-    const result = await this.fnsToRefactor(document, ['--code-smells', JSON.stringify([codeSmell])]);
-    return result?.[0];
-  }
-
-  static async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
-    if (codeSmells.length === 0) return [];
-    return this.fnsToRefactor(document, ['--code-smells', JSON.stringify(codeSmells)]);
-  }
-
   static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
     return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
