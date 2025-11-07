@@ -92,11 +92,11 @@ export class DevtoolsAPIImpl {
   private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
-        const devtoolsError = safeJsonParse(stderr) as DevtoolsErrorModel;
+        const devtoolsError = safeJsonParse(stdout) as DevtoolsErrorModel;
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
-        const creditsInfoError = safeJsonParse(stderr) as CreditsInfoErrorModel;
+        const creditsInfoError = safeJsonParse(stdout) as CreditsInfoErrorModel;
         logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
         throw new CreditsInfoError(
           creditsInfoError.message,
