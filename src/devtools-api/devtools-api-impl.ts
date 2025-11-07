@@ -56,6 +56,7 @@ export class DevtoolsAPIImpl {
         taskId,
         ignoreError: true,
       };
+      logOutputChannel.info("Running task: " + JSON.stringify(task));
       // singleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
       // `refactor` operation (or any other member of SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
       if (SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
@@ -69,6 +70,7 @@ export class DevtoolsAPIImpl {
         args,
         ignoreError: true,
       };
+      logOutputChannel.info("Running command: " + JSON.stringify(command));
       result = await this.simpleExecutor.execute(command, execOptions, input);
     }
 
