@@ -1,7 +1,7 @@
 import * as path from 'path';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export const REQUIRED_DEVTOOLS_VERSION = 'f36e0be8d3520c077b74ca562571b7958e01f527';
+export const REQUIRED_DEVTOOLS_VERSION = 'fafb2c42da8b9a314be29e626f653135e6d2c771';
 
 export const artifacts: { [platform: string]: { [arch: string]: string } } = {
   darwin: {
