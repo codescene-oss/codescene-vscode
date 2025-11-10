@@ -52,9 +52,9 @@ export class QueuedSingleTaskExecutor implements Executor {
       queuedTask.resolve(result);
     } catch (error) {
       queuedTask.reject(error);
+    } finally {
+      void this.processNextTask(taskId).catch(() => {});
     }
-
-    await this.processNextTask(taskId);
   }
 
   logStats(): void {
@@ -67,6 +67,14 @@ export class QueuedSingleTaskExecutor implements Executor {
 
   abortAllTasks(): void {
     this.executor.abortAllTasks();
+
+    // Reject all pending tasks to prevent callers from hanging
+    for (const queue of this.taskQueues.values()) {
+      for (const queuedTask of queue) {
+        queuedTask.reject(new Error('Task aborted'));
+      }
+    }
+
     this.taskQueues.clear();
     this.runningTasks.clear();
   }
