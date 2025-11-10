@@ -159,26 +159,34 @@ export class GitChangeObserver {
     }
   }
 
-  private async handleFileChange(uri: vscode.Uri): Promise<void> {
-    const filePath = uri.fsPath;
-
+  private async shouldProcessFile(filePath: string): Promise<boolean> {
     if (!this.isSupportedFile(filePath)) {
-      return;
+      return false;
     }
 
     const changedFiles = await this.getChangedFilesVsBaseline();
 
     if (!this.isFileInChangedList(filePath, changedFiles)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private async handleFileChange(uri: vscode.Uri): Promise<void> {
+    const filePath = uri.fsPath;
+
+    if (!await this.shouldProcessFile(filePath)) {
       return;
     }
 
     void this.executor.executeTask(() => this.reviewFile(filePath));
   }
 
-  private handleFileDelete(uri: vscode.Uri): void {
+  private async handleFileDelete(uri: vscode.Uri): Promise<void> {
     const filePath = uri.fsPath;
 
-    if (!this.isSupportedFile(filePath)) {
+    if (!await this.shouldProcessFile(filePath)) {
       return;
     }
 
