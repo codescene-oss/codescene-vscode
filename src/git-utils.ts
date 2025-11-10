@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import vscode from 'vscode';
 import { GitExtension, Repository } from '../types/git';
-import { SimpleExecutor } from './simple-executor';
+import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
 import { logOutputChannel } from './log';
 
-const gitExecutor = new SimpleExecutor();
+export const GIT_TASK_ID = 'git';
+export const gitExecutor = new QueuedSingleTaskExecutor();
 const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
 export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
@@ -46,7 +48,7 @@ export async function getBranchCreationCommit(repo: Repository) {
 
   try {
     const { stdout: reflog } = await gitExecutor.execute(
-      { command: 'git', args: ['reflog', currentBranch, '--no-abbrev'] },
+      { command: 'git', args: ['reflog', currentBranch, '--no-abbrev'], taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
 
@@ -64,20 +66,29 @@ export async function getBranchCreationCommit(repo: Repository) {
   }
 }
 
+const mainBranchCandidatesCache = new Map<string, string[]>();
+
 /**
  * Returns the branch names that look like the main branch AND do in fact exist.
  */
 export async function getMainBranchCandidates(repoPath: string): Promise<string[]> {
+  const cached = mainBranchCandidatesCache.get(repoPath);
+  if (cached) {
+    return cached;
+  }
+
   const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
 
   try {
     const { stdout } = await gitExecutor.execute(
-      { command: 'git', args: ['branch', '--list', '--format=%(refname:short)'] },
+      { command: 'git', args: ['branch', '--list', '--format=%(refname:short)'], taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
 
     const localBranches = stdout.split('\n').map(branch => branch.trim()).filter(Boolean);
-    return possibleMainBranches.filter(branch => localBranches.includes(branch));
+    const result = possibleMainBranches.filter(branch => localBranches.includes(branch));
+    mainBranchCandidatesCache.set(repoPath, result);
+    return result;
   } catch (err) {
     logOutputChannel.error(`Could not get local branches for ${repoPath}: ${err}`);
     return [];
@@ -145,7 +156,7 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   for (const mainBranch of localMainBranches) {
     try {
       const { stdout: mergeBase } = await gitExecutor.execute(
-        { command: 'git', args: ['merge-base', currentBranch, mainBranch] },
+        { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
         { cwd: repoPath }
       );
 

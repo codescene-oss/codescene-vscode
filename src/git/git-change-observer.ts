@@ -3,7 +3,7 @@ import * as path from 'path';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { fireFileDeletedFromGit, getMergeBaseCommit } from '../git-utils';
+import { fireFileDeletedFromGit, getMergeBaseCommit, gitExecutor } from '../git-utils';
 import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 
@@ -58,8 +58,8 @@ export class GitChangeObserver {
       return changedFiles;
     }
 
-    const result = await this.executor.execute(
-      { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true },
+    const result = await gitExecutor.execute(
+      { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
       { cwd: workspacePath }
     );
 
@@ -81,8 +81,8 @@ export class GitChangeObserver {
   private async getStatusChanges(workspacePath: string): Promise<Set<string>> {
     const changedFiles = new Set<string>();
 
-    const result = await this.executor.execute(
-      { command: 'git', args: ['status', '--porcelain'], ignoreError: true },
+    const result = await gitExecutor.execute(
+      { command: 'git', args: ['status', '--porcelain'], ignoreError: true, taskId: 'git' },
       { cwd: workspacePath }
     );
 
