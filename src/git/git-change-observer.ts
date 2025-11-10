@@ -3,12 +3,13 @@ import * as path from 'path';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { fireFileDeletedFromGit, getMergeBaseCommit, gitExecutor } from '../git-utils';
+import { fireFileDeletedFromGit, getMergeBaseCommit } from '../git-utils';
 import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
+import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 
 /**
- * Observes discrete Git file changes in real-time.
+ * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
  */
 export class GitChangeObserver {
   private fileWatcher: vscode.FileSystemWatcher;
@@ -34,76 +35,6 @@ export class GitChangeObserver {
     this.context.subscriptions.push(this.fileWatcher);
   }
 
-  private parseGitStatusFilename(line: string): string | null {
-
-    // e.g. "MM src/foo.clj"
-    const match = line.match(/^\S+\s+(.+)$/);
-
-    if (!match?.[1]) {
-      return null;
-    }
-
-    // Handle renames: "R  old -> new" becomes "new"
-    const filename = match[1].includes(' -> ')
-      ? match[1].split(' -> ')[1].trim()
-      : match[1];
-
-    return filename;
-  }
-
-  private async getCommittedChanges(baseCommit: string, workspacePath: string): Promise<Set<string>> {
-    const changedFiles = new Set<string>();
-
-    if (!baseCommit) {
-      return changedFiles;
-    }
-
-    const result = await gitExecutor.execute(
-      { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
-      { cwd: workspacePath }
-    );
-
-    if (result.exitCode === 0) {
-      result.stdout
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .forEach(file => {
-          changedFiles.add(file);
-        });
-    } else {
-      logOutputChannel.warn(`Failed to get committed changes vs ${baseCommit}: ${result.stderr}`);
-    }
-
-    return changedFiles;
-  }
-
-  private async getStatusChanges(workspacePath: string): Promise<Set<string>> {
-    const changedFiles = new Set<string>();
-
-    const result = await gitExecutor.execute(
-      { command: 'git', args: ['status', '--porcelain'], ignoreError: true, taskId: 'git' },
-      { cwd: workspacePath }
-    );
-
-    if (result.exitCode === 0) {
-      result.stdout
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .forEach(line => {
-          const filename = this.parseGitStatusFilename(line);
-          if (filename) {
-            changedFiles.add(filename);
-          }
-        });
-    } else {
-      logOutputChannel.info(`Failed to get status changes: ${result.stderr}`);
-    }
-
-    return changedFiles;
-  }
-
   async getChangedFilesVsBaseline(): Promise<string[]> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -115,8 +46,8 @@ export class GitChangeObserver {
 
     try {
       const workspacePath = workspaceFolder.uri.fsPath;
-      const committedChanges = await this.getCommittedChanges(baseCommit, workspacePath);
-      const statusChanges = await this.getStatusChanges(workspacePath);
+      const committedChanges = await getCommittedChanges(baseCommit, workspacePath);
+      const statusChanges = await getStatusChanges(workspacePath);
 
       const allChangedFiles = new Set([...committedChanges, ...statusChanges]);
 
