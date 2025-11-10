@@ -16,6 +16,13 @@ export class GitChangeObserver {
   private executor: Executor;
   private context: vscode.ExtensionContext;
 
+  // Tracks the files that have been added though this Observer.
+  // We need this because deletion events are tricky:
+  // - we need to ignore deletions for gitignored files
+  // - but we cannot ignore deletions of untracked files
+  //   (which may have been added to the Monitor treeview, so they need to be removed on deletion events)
+  private tracker: Set<string> = new Set();
+
   constructor(context: vscode.ExtensionContext, executor: Executor) {
     this.context = context;
     this.executor = executor;
@@ -111,17 +118,22 @@ export class GitChangeObserver {
       return;
     }
 
+    this.tracker.add(filePath);
     void this.executor.executeTask(() => this.reviewFile(filePath));
   }
 
   private async handleFileDelete(uri: vscode.Uri): Promise<void> {
     const filePath = uri.fsPath;
 
-    if (!await this.shouldProcessFile(filePath)) {
+    if (this.tracker.has(filePath)) {
+      this.tracker.delete(filePath);
+      fireFileDeletedFromGit(filePath);
       return;
     }
 
-    fireFileDeletedFromGit(filePath);
+    if (await this.shouldProcessFile(filePath)) {
+      fireFileDeletedFromGit(filePath);
+    }
   }
 
   dispose(): void {
