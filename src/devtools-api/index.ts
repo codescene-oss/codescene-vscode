@@ -6,6 +6,8 @@ import {
   PreFlightResponse,
   RefactorResponse,
   REFACTOR_TASK_ID,
+  TELEMETRY_POST_TASK_ID,
+  TELEMETRY_DEVICE_ID_TASK_ID,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -370,11 +372,17 @@ skipCache === true ? ' (retry)' : ''
 
   static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({ args: ['telemetry', '--event', jsonEvent] });
+    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({
+      args: ['telemetry', '--event', jsonEvent],
+      taskId: TELEMETRY_POST_TASK_ID
+    });
   }
 
   static async getDeviceId() {
-    return (await DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--device-id'] })).stdout;
+    return (await DevtoolsAPI.instance.runBinary({
+      args: ['telemetry', '--device-id'],
+      taskId: TELEMETRY_DEVICE_ID_TASK_ID
+    })).stdout;
   }
 
   private static shouldHandleOfflineBehavior(e: unknown): boolean {

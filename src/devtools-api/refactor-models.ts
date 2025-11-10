@@ -3,7 +3,9 @@ import { Range as VscodeRange } from 'vscode';
 import { Range } from '../devtools-api/review-model';
 
 export const REFACTOR_TASK_ID = 'refactor';
-export const SINGLE_EXECUTOR_TASK_IDS = [REFACTOR_TASK_ID];
+export const TELEMETRY_POST_TASK_ID = 'telemetry-post';
+export const TELEMETRY_DEVICE_ID_TASK_ID = 'telemetry-device-id';
+export const SINGLE_EXECUTOR_TASK_IDS = [REFACTOR_TASK_ID, TELEMETRY_POST_TASK_ID, TELEMETRY_DEVICE_ID_TASK_ID];
 
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;
