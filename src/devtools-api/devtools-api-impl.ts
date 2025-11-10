@@ -3,12 +3,14 @@ import { Command, ExecResult, Task } from '../executor';
 import { SimpleExecutor } from '../simple-executor';
 import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
 import { SingleTaskExecutor } from '../single-task-executor';
+import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
 import { safeJsonParse, rangeStr } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfoError as CreditsInfoErrorModel,
   FnToRefactor,
   SINGLE_EXECUTOR_TASK_IDS,
+  QUEUED_SINGLE_EXECUTOR_TASK_IDS,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -24,6 +26,7 @@ import { AbortError } from './abort-error';
 export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
   public singleTaskExecutor: SingleTaskExecutor = new SingleTaskExecutor(this.simpleExecutor);
+  public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
   public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
     this.simpleExecutor
   );
@@ -59,8 +62,11 @@ export class DevtoolsAPIImpl {
       logOutputChannel.info("Running task: " + JSON.stringify(task));
       // singleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
       // `refactor` operation (or any other member of SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
+      // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
       if (SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.singleTaskExecutor.execute(task, execOptions, input);
+      } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
+        result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
       } else {
         result = await this.concurrencyLimitingExecutor.execute(task, execOptions, input);
       }
