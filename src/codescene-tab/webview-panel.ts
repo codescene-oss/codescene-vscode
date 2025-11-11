@@ -298,6 +298,9 @@ export class CodeSceneTabPanel implements Disposable {
   }
 
   private async presentRefactoring(refactoring: RefactoringRequest, isStale = false) {
+
+    isStale = false; // Temporarily disable staleness detection, which doesn't work well for large files.
+
     const { fnToRefactor, promise, document } = refactoring;
 
     const fnLocContent = functionLocationContent({
