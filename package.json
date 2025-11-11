@@ -196,6 +196,8 @@
     "vscode:prepublish": "npm run package",
     "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
+    "bundle-cli": "node ./scripts/bundle-cli.js",
+    "package-platform": "node ./scripts/package-platform.js",
     "clean": "rm -rf ./out",
     "build": "node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",

@@ -6,8 +6,21 @@ on:
       - 'v*'
 
 jobs:
-  tagged-release:
-    name: 'Tagged Release'
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: darwin
+            arch: x64
+          - platform: darwin
+            arch: arm64
+          - platform: linux
+            arch: x64
+          - platform: linux
+            arch: arm64
+          - platform: win32
+            arch: x64
+    name: 'Build ${{ matrix.platform }}-${{ matrix.arch }}'
     runs-on: 'ubuntu-latest'
 
     steps:
@@ -16,15 +29,36 @@ jobs:
 
       - uses: './.github/actions/setup'
 
-      - name: Build extension vsix file
-        run: |
-          npm install --global @vscode/vsce
-          vsce package
+      - name: Install vsce
+        run: npm install --global @vscode/vsce
+
+      - name: Package platform-specific VSIX
+        run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: 'codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
+          name: 'codescene-vscode-${{ matrix.platform }}-${{ matrix.arch }}'
+
+  release:
+    name: 'Create Release'
+    runs-on: 'ubuntu-latest'
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all VSIX artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
 
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create ${{ github.ref_name }} *.vsix --generate-notes --verify-tag
+          gh release create ${{ github.ref_name }} ./artifacts/**/*.vsix --generate-notes --verify-tag

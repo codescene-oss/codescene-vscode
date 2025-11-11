@@ -8,6 +8,19 @@ on:
 
 jobs:
   build-and-upload:
+    strategy:
+      matrix:
+        include:
+          - platform: darwin
+            arch: x64
+          - platform: darwin
+            arch: arm64
+          - platform: linux
+            arch: x64
+          - platform: linux
+            arch: arm64
+          - platform: win32
+            arch: x64
     runs-on: 'ubuntu-latest'
 
     steps:
@@ -23,15 +36,16 @@ jobs:
           jq --arg new_version "${current_version}-PRERELEASE-${short_sha}" '.version = $new_version' package.json > tmp.json
           mv tmp.json package.json
 
-      - name: Build extension vsix file
-        run: |
-          npm install --global @vscode/vsce
-          vsce package
+      - name: Install vsce
+        run: npm install --global @vscode/vsce
+
+      - name: Package platform-specific VSIX
+        run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
       - name: Upload vsix artifact
         uses: actions/upload-artifact@v4
         with:
-          path: '*.vsix'
-          name: 'codescene-vscode-prerelease'
+          path: 'codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
+          name: 'codescene-vscode-prerelease-${{ matrix.platform }}-${{ matrix.arch }}'

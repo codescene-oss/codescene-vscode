@@ -27,9 +27,20 @@ jobs:
           target: './'
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Output file-name for use in publishing steps
-        id: latest-release
-        run: echo "file-name=$(find . -name codescene-vscode*.vsix)" >> "$GITHUB_OUTPUT"
+      - name: Verify platform-specific VSIX files
+        run: |
+          set -euo pipefail
+          rm -f vsix-map.txt
+          targets=("win32-x64" "darwin-x64" "darwin-arm64" "linux-x64" "linux-arm64")
+          for target in "${targets[@]}"; do
+            file=$(find . -name "codescene-vscode-*-${target}.vsix" | head -1)
+            if [ -z "$file" ]; then
+              echo "❌ Missing VSIX for ${target}"
+              exit 1
+            fi
+            echo "${target}=${file}" >> vsix-map.txt
+            echo "✅ Found ${file}"
+          done
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -40,10 +51,20 @@ jobs:
         if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' }}
         run: |
           npm install -g vsce
-          vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath ${{ steps.latest-release.outputs.file-name }}
+          declare -A vsix_map
+          while IFS='=' read -r target file; do
+            vsix_map["$target"]="$file"
+          done < vsix-map.txt
+          for target in "${!vsix_map[@]}"; do
+            echo "🚀 Publishing ${vsix_map[$target]} to Marketplace (target=${target})"
+            vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath "${vsix_map[$target]}"
+          done
 
       - name: Publish to open-vsx
         if: ${{ github.event.inputs.publish_open_vsx == 'true' }}
         run: |
           npm install -g ovsx
-          ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath ${{ steps.latest-release.outputs.file-name }}
+          while IFS='=' read -r target file; do
+            echo "🚀 Publishing ${file} to Open VSX (target=${target})"
+            ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath "${file}"
+          done <<< "$(cat vsix-map.txt)"
