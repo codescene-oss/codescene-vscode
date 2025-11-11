@@ -16,7 +16,10 @@ export class ConcurrencyLimitingExecutor implements Executor {
 
   constructor(executor: Executor, maxConcurrency?: number) {
     this.executor = executor;
-    this.maxConcurrency = maxConcurrency ?? Math.max(1, os.cpus().length - 1); // Use <cores - 1> in order to not saturate the user's resources
+
+    // Temporarily disabled - might contribute to ERR_CHILD_PROCESS_STDIO_MAXBUFFER errors
+    // this.maxConcurrency = maxConcurrency ?? Math.max(1, os.cpus().length - 1); // Use <cores - 1> in order to not saturate the user's resources
+    this.maxConcurrency = 1;
   }
 
   async execute(command: Command | Task, options: ExecOptions = {}, input?: string): Promise<ExecResult> {
