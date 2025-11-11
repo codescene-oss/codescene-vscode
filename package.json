@@ -18,6 +18,12 @@
     "Programming Languages",
     "Linters"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "CodeScene cannot work in untrusted environments because it depends on the Git extension, which cannot work in untrusted environments"
+    }
+  },
   "keywords": [
     "code analysis",
     "code health",
