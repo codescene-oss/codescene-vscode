@@ -8,7 +8,10 @@ export const GIT_TASK_ID = 'git';
 export const gitExecutor = new QueuedSingleTaskExecutor();
 const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
-export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
+export const fireFileDeletedFromGit = (filePath: string) => {
+  logOutputChannel.info(`Firing file deleted from git event: ${filePath}`);
+  gitFileDeleteEvent.fire(filePath);
+};
 
 interface RepoState {
   branch: string | undefined;
