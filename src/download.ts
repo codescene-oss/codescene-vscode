@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { SimpleExecutor } from './executor';
+import { SimpleExecutor } from './simple-executor';
 import { logOutputChannel } from './log';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention

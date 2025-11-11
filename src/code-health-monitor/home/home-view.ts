@@ -1,11 +1,11 @@
-import vscode, { Disposable, ExtensionContext, Position, ViewBadge, Webview, WebviewViewProvider } from 'vscode';
+import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscode';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
 import { getHomeData, getLoginData } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
-import { FileWithIssues } from '../tree-model';
+import { FileWithIssues } from '../file-with-issues';
 import {
   convertFileIssueToCWFDeltaItem,
   convertVSCodeCommitBaselineToCWF,
@@ -17,6 +17,7 @@ import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../.
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 import { onDidChangeConfiguration } from '../../configuration';
+import { onFileDeletedFromGit } from '../../git-utils';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -65,6 +66,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       this,
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
+      onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
       CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
       CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
@@ -150,10 +152,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    if (this.backgroundServiceView && this.isSignedIn()) {
-      this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
-    }
+    this.updateBadgeIfSignedIn();
 
+    this.rebuildFileDeltaData();
+  }
+
+  // Rebuild fileDeltaData from the current fileIssueMap
+  private rebuildFileDeltaData() {
     this.ideContextData.fileDeltaData = [...this.fileIssueMap].map((d) => convertFileIssueToCWFDeltaItem(d[1]));
   }
 
@@ -187,6 +192,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.update();
   }
 
+  private handleFileDelete(filePath: string) {
+    this.removeTreeEntry(filePath);
+    this.updateBadgeIfSignedIn();
+    this.rebuildFileDeltaData();
+    this.update();
+  }
+
   private handleBaseLineChange() {
     this.ideContextData.commitBaseline = convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline);
     this.update();
@@ -201,9 +213,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.session = CsExtensionState.session;
     if (this.session) {
       this.loginFlowState.loginOpen = false;
-      if (this.backgroundServiceView && this.isSignedIn()) {
-        this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
-      }
+      this.updateBadgeIfSignedIn();
     } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
       // If the user has a pending login that fails we update the login flow state.
       this.loginFlowState.loginState = 'error';
@@ -235,6 +245,12 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private isSignedIn() {
     // if the ignoreSessionStateFeatureFlag is true we always consider the user signed in.
     return ignoreSessionStateFeatureFlag ? true : Boolean(this.session);
+  }
+
+  private updateBadgeIfSignedIn() {
+    if (this.backgroundServiceView && this.isSignedIn()) {
+      this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
+    }
   }
 
   dispose() {

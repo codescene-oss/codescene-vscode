@@ -3,11 +3,13 @@ import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
-import { acquireGitApi, getBranchCreationCommit, isMainBranch, updateGitState } from '../git-utils';
+import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, updateGitState } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
+import { GitChangeLister } from '../git/git-change-lister';
+import { DevtoolsAPI } from '../devtools-api';
 
 let gitApi: API | undefined;
 
@@ -25,16 +27,20 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Ensure an initial baseline is set
   for (const repo of gitApi.repositories) {
-    onRepoStateChange(repo);
+    void onRepoStateChange(repo);
   }
 
-  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => onRepoStateChange(repo)));
+  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
   CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
       await setBaseline(repo);
     }
   });
+
+  // Review all changed/added files once when repository state is ready
+  const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
+  gitChangeLister.start(context);
 
   context.subscriptions.push(
     codeHealthMonitorView,
@@ -88,24 +94,6 @@ export async function getBaselineCommit(fileUri: Uri): Promise<string | undefine
 async function getHeadCommit(repo: Repository) {
   const head = repo.state.HEAD?.commit;
   return head || '';
-}
-
-/**
- * Determines the default comparison point for a file based on the current Git branch context.
- *
- * Default behavior:
- * - If on the main branch, the comparison point is the HEAD commit.
- * - If on a non-main branch, the comparison point is the branch creation commit.
- * - If the branch cannot be determined, fallback logic compares to a perfect score.
- */
-async function getDefaultCommit(repo: Repository) {
-  const isMain = isMainBranch(repo.state.HEAD?.name);
-
-  if (isMain) {
-    return await getHeadCommit(repo);
-  } else {
-    return await getBranchCreationCommit(repo);
-  }
 }
 
 /**

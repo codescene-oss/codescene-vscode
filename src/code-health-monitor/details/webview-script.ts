@@ -1,5 +1,4 @@
 import '@vscode-elements/elements/dist/vscode-button';
-import { VscodeButton } from '@vscode-elements/elements/dist/vscode-button';
 
 window.addEventListener('load', main);
 

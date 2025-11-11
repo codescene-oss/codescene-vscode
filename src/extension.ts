@@ -24,6 +24,8 @@ import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
+import { GitChangeObserver } from './git/git-change-observer';
+import { OpenFilesObserver } from './review/open-files-observer';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -141,59 +143,28 @@ function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
 
 /**
  * Adds listeners for all events that should trigger a review.
- *
  */
 function addReviewListeners(context: vscode.ExtensionContext) {
-  // This provides the initial diagnostics when a file is opened.
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((document: vscode.TextDocument) => {
-      CsDiagnostics.review(document);
-    })
-  );
-
-  // Close document listener for cancelling reviews and refactoring requests
-  context.subscriptions.push(
-    vscode.workspace.onDidCloseTextDocument((document: vscode.TextDocument) => {
-      Reviewer.instance.abort(document);
-    })
-  );
-
-  const docSelector = reviewDocumentSelector();
-  let reviewTimers = new Map<string, NodeJS.Timeout>();
-
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-      // avoid reviewing non-matching documents
-      if (vscode.languages.match(docSelector, e.document) === 0) {
-        return;
-      }
-      const filePath = e.document.fileName;
-      clearTimeout(reviewTimers.get(filePath));
-      // Run review after 1 second of no edits to this file
-      reviewTimers.set(
-        filePath,
-        setTimeout(() => {
-          CsDiagnostics.review(e.document);
-        }, 1000)
-      );
-    })
-  );
-
-  // This provides the initial diagnostics when the extension is first activated.
-  vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
-    CsDiagnostics.review(document);
-  });
+  // Observe open file events and trigger reviews
+  const openFilesObserver = new OpenFilesObserver(context);
+  openFilesObserver.start();
+  context.subscriptions.push(openFilesObserver);
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
-  const fileSystemWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
-  fileSystemWatcher.onDidChange((uri: vscode.Uri) => {
+  const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
+  rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
     vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
       // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: 'true' });
+      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: false });
     });
   });
-  context.subscriptions.push(fileSystemWatcher);
+  context.subscriptions.push(rulesFileWatcher);
+
+  // Watch for discrete Git file changes (create, modify, delete)
+  const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
+  gitChangeObserver.start();
+  context.subscriptions.push(gitChangeObserver);
 }
 
 /**
@@ -270,7 +241,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+  DevtoolsAPI.dispose();
+}
 
 function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {
   return (session: vscode.AuthenticationSession | undefined) => {
@@ -298,10 +271,10 @@ function isUnderTestsOrCI(): boolean {
   const argv = process.argv.join(' ');
   return (
     process.env.VSCODE_TEST === 'true' ||
-    process.env.CI === 'true' ||
-    /- Test/i.test(appName) ||
-    argv.includes('--extensionTestsPath') ||
-    !!process.env.CODE_TESTS_PATH
+      process.env.CI === 'true' ||
+      /- Test/i.test(appName) ||
+      argv.includes('--extensionTestsPath') ||
+      !!process.env.CODE_TESTS_PATH
   );
 }
 

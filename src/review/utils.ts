@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CodeSmell, Function, Range, Review } from '../devtools-api/review-model';
-import { CsDiagnostic, csSource } from '../diagnostics/cs-diagnostics';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
+import { csSource } from '../diagnostics/cs-diagnostics';
 import { isDefined } from '../utils';
 
 const noApplicationCode = 'No application code detected for scoring';

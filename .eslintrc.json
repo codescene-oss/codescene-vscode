@@ -30,7 +30,9 @@
         "eqeqeq": "warn",
         "no-eval": "error",
         "no-throw-literal": "warn",
-        "semi": "off"
+        "semi": "off",
+        "max-classes-per-file": ["warn", 1],
+        "no-duplicate-imports": "error"
     },
     "ignorePatterns": [
         "out",

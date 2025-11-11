@@ -4,6 +4,9 @@ import { formatScore } from '../review/utils';
 import { pluralize } from '../utils';
 import { DeltaTreeViewItem, countInTree } from './tree-model';
 
+export const okColor = new vscode.ThemeColor('terminal.ansiGreen');
+export const errorColor = new vscode.ThemeColor('errorForeground');
+
 export function registerDeltaAnalysisDecorations(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerFileDecorationProvider(new FileWithIssuesDecorationProvider()));
 }

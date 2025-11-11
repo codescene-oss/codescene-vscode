@@ -53,7 +53,6 @@ export class CsRefactoringCommands implements vscode.Disposable {
   private async applyRefactoringCmd(refactoring: RefactoringRequest) {
     const {
       document,
-      fnToRefactor,
       fnToRefactor: { vscodeRange },
     } = refactoring;
 
@@ -67,9 +66,6 @@ export class CsRefactoringCommands implements vscode.Disposable {
       await selectCode(document, response.code, vscodeRange.start);
       await vscode.commands.executeCommand('editor.action.formatSelection');
 
-      // Immediately trigger a re-review of the new file-content
-      // This is important, since otherwise the review is controlled by the debounced review done in the onDidChangeTextDocument (extension.ts)
-      CsDiagnostics.review(document);
       Telemetry.logUsage('refactor/applied', refactoring.eventData);
     });
   }

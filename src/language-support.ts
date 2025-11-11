@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 
-const supportedExtensions = [
+export const supportedExtensions = [
   '.brs',
   '.bs',
   '.c',

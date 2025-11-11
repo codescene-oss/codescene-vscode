@@ -2,25 +2,18 @@ import * as vscode from 'vscode';
 import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
+import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { FnToRefactor } from '../devtools-api/refactor-models';
-import { CodeSmell } from '../devtools-api/review-model';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
-import Reviewer, { ReviewCacheItem } from './reviewer';
-
-class CsCodeLens extends vscode.CodeLens {
-  constructor(
-    range: vscode.Range,
-    public readonly document: vscode.TextDocument,
-    public readonly codeSmell: CodeSmell,
-    public readonly cacheKey: string
-  ) {
-    super(range);
-  }
-}
+import Reviewer from './reviewer';
+import { ReviewCacheItem } from './review-cache-item';
+import { CsCodeLens } from './cs-code-lens';
+import { logOutputChannel } from '../log';
 
 export class CsReviewCodeLensProvider
-  implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
+implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
 {
   private changeCodeLensesEmitter = new vscode.EventEmitter<void>();
   onDidChangeCodeLenses = this.changeCodeLensesEmitter.event;
@@ -50,23 +43,32 @@ export class CsReviewCodeLensProvider
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidReviewComplete(() => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidDeltaAnalysisComplete(() => this.changeCodeLensesEmitter.fire()),
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        fnsToRefactorCache.invalidateForDocument(event.document);
+      }),
       vscode.workspace.onDidCloseTextDocument((document) => {
-        const docUri = document.uri.toString();
-        const keysToDelete: string[] = [];
-
-        for (const [key, cached] of this.commandCache.entries()) {
-          if (cached.document.uri.toString() === docUri) {
-            keysToDelete.push(key);
-          }
-        }
-
-        keysToDelete.forEach((key) => {
-          this.commandDisposables.get(key)?.dispose();
-          this.commandDisposables.delete(key);
-          this.commandCache.delete(key);
-        });
+        this.cleanupCachesForDocument(document);
       })
     );
+  }
+
+  private cleanupCachesForDocument(document: vscode.TextDocument) {
+    const docUri = document.uri.toString();
+    const commandKeysToDelete: string[] = [];
+
+    for (const [key, cached] of this.commandCache.entries()) {
+      if (cached.document.uri.toString() === docUri) {
+        commandKeysToDelete.push(key);
+      }
+    }
+
+    commandKeysToDelete.forEach((key) => {
+      this.commandDisposables.get(key)?.dispose();
+      this.commandDisposables.delete(key);
+      this.commandCache.delete(key);
+    });
+
+    fnsToRefactorCache.cleanupForDocument(document);
   }
 
   dispose() {
@@ -122,7 +124,7 @@ export class CsReviewCodeLensProvider
     }
 
     return diagnostics
-      .map((diagnostic) => {
+      .map((diagnostic: CsDiagnostic) => {
         if (diagnostic.codeSmell) {
           const cacheKey = `${document.uri.toString()}:${diagnostic.range.start.line}:${
             diagnostic.range.start.character
@@ -135,12 +137,13 @@ export class CsReviewCodeLensProvider
 
   private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
     const { codeSmell, range, cacheKey } = codeLens;
-    const fnToRefactor = await DevtoolsAPI.fnsToRefactorFromCodeSmell(document, codeSmell);
+
+    const fnToRefactor = await fnsToRefactorCache.fnsToRefactor(document, codeSmell);
 
     let cached = this.commandCache.get(cacheKey);
 
     if (!cached) {
-      // Register a unique command withhout arguments to avoid VS Code's CommandsConverter cache, as mentioned above.
+      // Register a unique command without arguments to avoid VS Code's CommandsConverter cache, as mentioned above.
       const commandId = `codescene.openInteractiveDocs.${cacheKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
       const command = vscode.commands.registerCommand(commandId, () => {
@@ -167,7 +170,7 @@ export class CsReviewCodeLensProvider
       };
       this.commandCache.set(cacheKey, cached);
     } else {
-      // Update the cached data with current values - especially for fnToRefactor which can change:
+      // Update the cached command data with current values
       cached.category = codeSmell.category;
       cached.document = document;
       cached.position = range.start;

@@ -1,14 +1,13 @@
-import { ExecOptions } from 'child_process';
 import { CodeSmell, Review } from '../devtools-api/review-model';
-import { Command, ExecResult, LimitingExecutor, SimpleExecutor, Task } from '../executor';
-import { assertError, getFileExtension, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
-import { AceRequestEvent, CodeHealthRulesResult, DevtoolsError as DevtoolsErrorModel } from './model';
+import { assertError, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
+import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import {
-  CreditsInfo,
-  CreditsInfoError as CreditsInfoErrorModel,
   FnToRefactor,
   PreFlightResponse,
   RefactorResponse,
+  REFACTOR_TASK_ID,
+  TELEMETRY_POST_TASK_ID,
+  TELEMETRY_DEVICE_ID_TASK_ID,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -25,6 +24,9 @@ import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-ut
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
 import { MissingAuthTokenError } from '../missing-auth-token-error';
+import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
+import { DevtoolsError } from './devtools-error';
+import { AbortError } from './abort-error';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -33,6 +35,10 @@ export class DevtoolsAPI {
   static init(binaryPath: string, context: ExtensionContext) {
     DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
     DevtoolsAPI.reviewCache = new ReviewCache(context);
+  }
+
+  static get concurrencyLimitingExecutor() {
+    return DevtoolsAPI.instance.concurrencyLimitingExecutor;
   }
 
   /**
@@ -148,8 +154,8 @@ export class DevtoolsAPI {
   }
 
   static abortReviews(document: TextDocument) {
-    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review', document));
-    DevtoolsAPI.instance.limitingExecutor.abort(taskId('review-base', document));
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review', document));
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review-base', document));
   }
 
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
@@ -159,13 +165,17 @@ export class DevtoolsAPI {
    * Runs delta analysis and returns the result. Also fires onDidDeltaAnalysisComplete when analysis is complete.
    *
    * @param document
+   * @param updateMonitor whether to update the Code Health Monitor tree view
    * @param oldScore raw base64 encoded score
    * @param newScore raw base64 encoded score
    * @returns Delta if any changes were detected or undefined when no improvements/degradations were found.
    */
-  static async delta(document: TextDocument, oldScore?: string | void, newScore?: string | void) {
+  static async delta(document: TextDocument, updateMonitor: boolean, oldScore?: string | void, newScore?: string | void) {
     const inputJsonString = jsonForScores(oldScore, newScore);
-    if (!inputJsonString) return;
+    if (!inputJsonString) {
+      logOutputChannel.debug(`Delta analysis skipped for ${basename(document.fileName)}: no input scores`);
+      return;
+    }
 
     DevtoolsAPI.startAnalysisEvent(document.fileName, true);
     try {
@@ -181,10 +191,20 @@ export class DevtoolsAPI {
         // stdout === '' means there were no changes detected - return undefined to indicate this
         deltaResult = safeJsonParse(result.stdout) as Delta;
         await addRefactorableFunctionsToDeltaResult(document, deltaResult);
+        logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
+      } else {
+        logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
       }
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult });
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult, updateMonitor });
       return deltaResult;
     } catch (e) {
+      const error = assertError(e);
+      if (!(e instanceof AbortError)) {
+        logOutputChannel.error(`Delta analysis failed for ${basename(document.fileName)}: ${error.message}`);
+        if (error.stack) {
+          logOutputChannel.error(`Stack trace: ${error.stack}`);
+        }
+      }
       if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
         DevtoolsAPI.handleOfflineBehavior();
         return;
@@ -238,16 +258,6 @@ export class DevtoolsAPI {
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
   }
 
-  static async fnsToRefactorFromCodeSmell(document: TextDocument, codeSmell: CodeSmell) {
-    const result = await this.fnsToRefactor(document, ['--code-smells', JSON.stringify([codeSmell])]);
-    return result?.[0];
-  }
-
-  static async fnsToRefactorFromCodeSmells(document: TextDocument, codeSmells: CodeSmell[]) {
-    if (codeSmells.length === 0) return [];
-    return this.fnsToRefactor(document, ['--code-smells', JSON.stringify(codeSmells)]);
-  }
-
   static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
     return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
   }
@@ -259,16 +269,21 @@ export class DevtoolsAPI {
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
+    const fp = fileParts(document);    
+    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const baseArgs = [
       'refactor',
       'fns-to-refactor',
-      '--extension',
-      getFileExtension(document.fileName),
+      '--file-name',
+      fp.fileName,
       '--preflight',
       DevtoolsAPI.instance.preflightJson!, // aceEnabled() implies preflightJson is defined
     ];
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs.concat(args),
+      args: baseArgs.concat(
+        args,
+        cachePath ? ['--cache-path', cachePath] : []
+      ),
       input: document.getText(),
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
@@ -322,18 +337,18 @@ export class DevtoolsAPI {
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${
-          skipCache === true ? ' (retry)' : ''
-        }, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
+skipCache === true ? ' (retry)' : ''
+}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
       );
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,
         execOptions: { signal },
-        taskId: 'refactor', // Limit to only 1 refactoring at a time
+        taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
       });
       logOutputChannel.info(
         `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
-          skipCache === true ? ' (retry)' : ''
-        }`
+skipCache === true ? ' (retry)' : ''
+}`
       );
 
       DevtoolsAPI.handleBackOnline();
@@ -357,11 +372,17 @@ export class DevtoolsAPI {
 
   static postTelemetry(event: TelemetryEvent) {
     const jsonEvent = JSON.stringify(event);
-    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({ args: ['telemetry', '--event', jsonEvent] });
+    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({
+      args: ['telemetry', '--event', jsonEvent],
+      taskId: TELEMETRY_POST_TASK_ID
+    });
   }
 
   static async getDeviceId() {
-    return (await DevtoolsAPI.instance.runBinary({ args: ['telemetry', '--device-id'] })).stdout;
+    return (await DevtoolsAPI.instance.runBinary({
+      args: ['telemetry', '--device-id'],
+      taskId: TELEMETRY_DEVICE_ID_TASK_ID
+    })).stdout;
   }
 
   private static shouldHandleOfflineBehavior(e: unknown): boolean {
@@ -413,112 +434,10 @@ export class DevtoolsAPI {
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }
   }
-}
 
-class DevtoolsAPIImpl {
-  public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public limitingExecutor: LimitingExecutor = new LimitingExecutor(this.simpleExecutor);
-  public preflightJson?: string;
-
-  constructor(public binaryPath: string, context: ExtensionContext) {
-    context.subscriptions.push(
-      vscode.commands.registerCommand('codescene.printDevtoolsApiStats', () => {
-        this.simpleExecutor.logStats();
-        logOutputChannel.show();
-      })
-    );
+  static dispose() {
+    DevtoolsAPI.instance.concurrencyLimitingExecutor.dispose();
   }
-
-  /**
-   * Runs the devtools binary
-   *
-   * @param opts Options for running the devtools binary
-   * @returns stdout of the command
-   * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
-   */
-  async runBinary(opts: BinaryOpts) {
-    const { args, execOptions, input, taskId } = opts;
-
-    let result: ExecResult;
-    if (taskId) {
-      const task: Task = {
-        command: this.binaryPath,
-        args,
-        taskId,
-        ignoreError: true,
-      };
-      result = await this.limitingExecutor.execute(task, execOptions, input);
-    } else {
-      const command: Command = {
-        command: this.binaryPath,
-        args,
-        ignoreError: true,
-      };
-      result = await this.simpleExecutor.execute(command, execOptions, input);
-    }
-
-    if (result.exitCode === 0) {
-      return result;
-    }
-
-    this.handleNonZeroExitCodes(args, result);
-  }
-
-  /**
-   * Handles the exit code of the devtools binary
-   * Output on debug level, avoiding the default level of info. Error presentation should be done
-   * higher in the call stack.
-   *
-   * @param exitCode exit code from the devtools binary
-   * @param stderr stderr from the devtools binary
-   * @param args args for logging purposes
-   * @throws appropriate Errors
-   */
-  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
-    switch (exitCode) {
-      case 10: // exit code for DevtoolsErrorModel
-        const devtoolsError = safeJsonParse(stderr) as DevtoolsErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
-        throw new DevtoolsError(devtoolsError);
-      case 11: // exit code for CreditInfoError
-        const creditsInfoError = safeJsonParse(stderr) as CreditsInfoErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
-        throw new CreditsInfoError(
-          creditsInfoError.message,
-          creditsInfoError['credits-info'],
-          creditsInfoError['trace-id']
-        );
-      case 'ABORT_ERR':
-        throw new AbortError();
-
-      default:
-        const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
-        logOutputChannel.error(msg);
-        throw new Error(msg);
-    }
-  }
-
-  async executeAsJson<T>(opts: BinaryOpts) {
-    const output = await this.runBinary(opts);
-    return safeJsonParse(output.stdout, { opts }) as T;
-  }
-}
-
-interface BinaryOpts {
-  // args to pass to the binary
-  args: string[];
-
-  // ExecOptions (signal, cwd etc...)
-  execOptions?: ExecOptions;
-
-  // optional string to send on stdin
-  input?: string;
-
-  /*
-    optional taskid for the invocation, ensuring only one task with the same id is running.
-    see LimitingExecutor for details
-  */
-  taskId?: string;
 }
 
 type CmdId = 'review' | 'review-base' | 'delta';
@@ -557,23 +476,6 @@ export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
   return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 
-export class CreditsInfoError extends Error {
-  constructor(message: string, readonly creditsInfo: CreditsInfo, readonly traceId: string) {
-    super(message);
-  }
-}
-
-export class DevtoolsError extends Error {
-  [property: string]: any;
-  constructor(devtoolsErrorObj: DevtoolsErrorModel) {
-    super(devtoolsErrorObj.message);
-    Object.getOwnPropertyNames(devtoolsErrorObj).forEach((propName) => {
-      this[propName] = devtoolsErrorObj[propName];
-    });
-  }
-}
-
-export class AbortError extends Error {}
 
 export type AnalysisEvent = {
   state: 'running' | 'idle';
@@ -588,4 +490,5 @@ export type ReviewEvent = {
 export type DeltaAnalysisEvent = {
   document: vscode.TextDocument;
   result?: Delta;
+  updateMonitor: boolean; // Please set this to false if triggering reviews due to opening files, and to true if triggering reviews due to Git changes.
 };

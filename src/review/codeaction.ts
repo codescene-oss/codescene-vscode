@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
-import { CsDiagnostic } from '../diagnostics/cs-diagnostics';
+import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { getAuthToken } from '../configuration';
+import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 
 export function register(context: vscode.ExtensionContext) {
   const codeActionProvider = new ReviewCodeActionProvider();
@@ -40,7 +41,11 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       .filter(isDefined);
 
     const authToken = getAuthToken();
-    const fnToRefactor = (await DevtoolsAPI.fnsToRefactorFromCodeSmells(document, codeSmells))?.[0];
+
+    const fnsToRefactor = await Promise.all(
+      codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
+    );
+    const fnToRefactor = fnsToRefactor.find(isDefined);
 
     if (fnToRefactor) {
       const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
