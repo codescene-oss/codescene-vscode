@@ -71,13 +71,13 @@ export class CsServerVersion {
       // that's cloud dev that hasn't had a version template generated
       logOutputChannel.debug('Cloud dev version detected');
     } else if (err.code === networkErrors.eConnRefused) {
-      void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Connection refused`);
+      logOutputChannel.warn(`Cannot fetch version from CodeScene server. Connection refused`);
     } else if (errorMessage.startsWith(networkErrors.getAddrInfoNotFound)) {
       logOutputChannel.warn(
         `Cannot reach CodeScene server (${url}). Please check your internet connection or verify the server address is correct.`
       );
     } else {
-      void vscode.window.showErrorMessage(`Cannot fetch version from CodeScene server. Error message: ${errorMessage}`);
+      logOutputChannel.warn(`Cannot fetch version from CodeScene server. Error message: ${errorMessage}`);
     }
   }
 
