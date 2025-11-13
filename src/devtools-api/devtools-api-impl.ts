@@ -112,12 +112,16 @@ export class DevtoolsAPIImpl {
           creditsInfoError['trace-id']
         );
       case 'ABORT_ERR': // ABORT_ERR is triggered by AbortController usage
-        throw new AbortError();
+        const abortError = new AbortError();
+        (abortError as any).code = exitCode;
+        throw abortError;
 
       default:
         const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
         logOutputChannel.error(msg);
-        throw new Error(msg);
+        const error = new Error(msg);
+        (error as any).code = exitCode;
+        throw error;
     }
   }
 

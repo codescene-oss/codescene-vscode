@@ -212,7 +212,7 @@ export class DevtoolsAPI {
 
       if (!(e instanceof AbortError)) {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        reportError({ context: 'Unable to enable refactoring capabilities', e });
+        reportError({ context: 'Refactoring (delta operation) failed', e });
       }
     } finally {
       DevtoolsAPI.endAnalysisEvent(document.fileName, true);
@@ -269,7 +269,7 @@ export class DevtoolsAPI {
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
-    const fp = fileParts(document);    
+    const fp = fileParts(document);
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const baseArgs = [
       'refactor',
