@@ -8,6 +8,7 @@ import {
   REFACTOR_TASK_ID,
   TELEMETRY_POST_TASK_ID,
   TELEMETRY_DEVICE_ID_TASK_ID,
+  DELTA_TASK_ID_PREFIX,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -183,7 +184,7 @@ export class DevtoolsAPI {
       const result = await DevtoolsAPI.instance.runBinary({
         args: ['delta', '--output-format', 'json'],
         input: inputJsonString,
-        taskId: taskId('delta', document),
+        taskId: taskId(DELTA_TASK_ID_PREFIX, document),
         execOptions: { cwd: fp.documentDirectory },
       });
       let deltaResult;

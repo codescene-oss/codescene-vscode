@@ -10,6 +10,7 @@ interface QueuedTask {
   reject: (error: any) => void;
 }
 
+// An executor with 1 item max per taskId, else the new item is queued for later execution.
 export class QueuedSingleTaskExecutor implements Executor {
   private readonly executor;
   private readonly taskQueues: Map<string, QueuedTask[]> = new Map();

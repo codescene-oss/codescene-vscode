@@ -3,6 +3,7 @@ import { logOutputChannel } from './log';
 import { SimpleExecutor } from './simple-executor';
 import { Executor, Task } from './executor';
 
+// An executor with 1 item max per taskId, else aborts the previous item with the same taskId.
 export class AbortingSingleTaskExecutor implements Executor {
   private readonly executor;
   private readonly runningCommands: Map<string, AbortController> = new Map();
@@ -14,7 +15,7 @@ export class AbortingSingleTaskExecutor implements Executor {
   async execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
 
-    // Check if running already
+    // Check if there's an item with the same taskId running already
     const runningProcess = this.runningCommands.get(taskId);
     if (runningProcess) {
       runningProcess.abort(`[AbortingSingleTaskExecutor] Abort current command ${taskId} and re-run`);
@@ -62,4 +63,3 @@ export class AbortingSingleTaskExecutor implements Executor {
     }
   }
 }
-

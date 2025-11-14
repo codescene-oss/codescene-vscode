@@ -11,6 +11,7 @@ import {
   FnToRefactor,
   ABORTING_SINGLE_EXECUTOR_TASK_IDS,
   QUEUED_SINGLE_EXECUTOR_TASK_IDS,
+  DELTA_TASK_ID_PREFIX,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -71,7 +72,7 @@ export class DevtoolsAPIImpl {
       // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
       // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
       // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
-      if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
+      if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId) || taskId.startsWith(DELTA_TASK_ID_PREFIX)) {
         result = await this.abortingSingleTaskExecutor.execute(task, execOptions, input);
       } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
