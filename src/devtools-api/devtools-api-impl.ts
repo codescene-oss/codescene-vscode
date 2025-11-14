@@ -2,14 +2,14 @@ import { ExecOptions } from 'child_process';
 import { Command, ExecResult, Task } from '../executor';
 import { SimpleExecutor } from '../simple-executor';
 import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
-import { SingleTaskExecutor } from '../single-task-executor';
+import { AbortingSingleTaskExecutor } from '../aborting-single-task-executor';
 import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
 import { safeJsonParse, rangeStr } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfoError as CreditsInfoErrorModel,
   FnToRefactor,
-  SINGLE_EXECUTOR_TASK_IDS,
+  ABORTING_SINGLE_EXECUTOR_TASK_IDS,
   QUEUED_SINGLE_EXECUTOR_TASK_IDS,
 } from './refactor-models';
 
@@ -33,7 +33,7 @@ function presentCommand(obj: Task | Command): string {
 
 export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public singleTaskExecutor: SingleTaskExecutor = new SingleTaskExecutor(this.simpleExecutor);
+  public abortingSingleTaskExecutor: AbortingSingleTaskExecutor = new AbortingSingleTaskExecutor(this.simpleExecutor);
   public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
   public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
     this.simpleExecutor
@@ -68,11 +68,11 @@ export class DevtoolsAPIImpl {
         ignoreError: true,
       };
       logOutputChannel.info("Running task: " + presentCommand(task));
-      // singleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
-      // `refactor` operation (or any other member of SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
+      // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
+      // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
       // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
-      if (SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
-        result = await this.singleTaskExecutor.execute(task, execOptions, input);
+      if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
+        result = await this.abortingSingleTaskExecutor.execute(task, execOptions, input);
       } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
       } else {
@@ -151,7 +151,7 @@ export interface BinaryOpts {
 
   /*
     optional taskid for the invocation, ensuring only one task with the same id is running.
-    see SingleTaskExecutor for details
+    see AbortingSingleTaskExecutor, QueuedSingleTaskExecutor for details
   */
   taskId?: string;
 }
