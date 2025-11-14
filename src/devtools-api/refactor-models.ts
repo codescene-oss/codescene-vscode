@@ -5,6 +5,7 @@ import { Range } from '../devtools-api/review-model';
 export const REFACTOR_TASK_ID = 'refactor';
 export const TELEMETRY_POST_TASK_ID = 'telemetry-post';
 export const TELEMETRY_DEVICE_ID_TASK_ID = 'telemetry-device-id';
+export const DELTA_TASK_ID_PREFIX = 'delta';
 export const ABORTING_SINGLE_EXECUTOR_TASK_IDS = [REFACTOR_TASK_ID];
 export const QUEUED_SINGLE_EXECUTOR_TASK_IDS = [TELEMETRY_POST_TASK_ID, TELEMETRY_DEVICE_ID_TASK_ID];
 
