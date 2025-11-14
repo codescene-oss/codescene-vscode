@@ -33,17 +33,17 @@ export class ReviewCache {
     return this._cache.get(document.fileName);
   }
 
-  async add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
+  async add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     const item = new ReviewCacheItem(document, review);
     this._cache.set(document.fileName, item);
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
     const baselineCommit = await this.getBaselineCommit(document.uri);
     if (baselineCommit) {
-      item.setBaseline(baselineCommit, skipMonitorUpdate);
+      item.setBaseline(baselineCommit, skipMonitorUpdate, updateDiagnosticsPane);
     }
   }
 
-  update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
+  update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     const reviewItem = this.get(document);
     if (!reviewItem) return false;
 
@@ -70,7 +70,7 @@ export class ReviewCache {
       if (fileFilter(item.document.uri)) {
         const baselineCommit = await this.getBaselineCommit(item.document.uri);
         if (baselineCommit) {
-          void item.setBaseline(baselineCommit, false);
+          void item.setBaseline(baselineCommit, false, false);
         }
       }
     });
