@@ -55,7 +55,7 @@ export class CachingReviewer implements Disposable {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.updateOrAdd(document, csReview, reviewOpts.skipMonitorUpdate);
+    this.updateOrAdd(document, csReview, reviewOpts.skipMonitorUpdate, reviewOpts.updateDiagnosticsPane);
 
     return csReview;
   }
@@ -73,9 +73,9 @@ export class CachingReviewer implements Disposable {
    * @param document
    * @returns
    */
-  async baselineScore(baselineCommit: string, document: vscode.TextDocument, skipMonitorUpdate: boolean) {
+  async baselineScore(baselineCommit: string, document: vscode.TextDocument, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     return this.reviewer
-      .review(document, { baseline: baselineCommit, skipMonitorUpdate })
+      .review(document, { baseline: baselineCommit, skipMonitorUpdate, updateDiagnosticsPane })
       .then((reviewResult) => {
         return reviewResult && reviewResult['raw-score'];
       })
@@ -87,10 +87,11 @@ export class CachingReviewer implements Disposable {
    * @param document
    * @param review
    * @param skipMonitorUpdate
+   * @param updateDiagnosticsPane
    */
-  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
-    if (!this.reviewCache.update(document, review, skipMonitorUpdate)) {
-      void this.reviewCache.add(document, review, skipMonitorUpdate);
+  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
+    if (!this.reviewCache.update(document, review, skipMonitorUpdate, updateDiagnosticsPane)) {
+      void this.reviewCache.add(document, review, skipMonitorUpdate, updateDiagnosticsPane);
     }
   }
 

@@ -127,7 +127,7 @@ export class GitChangeLister {
       void this.executor.executeTask(async () => {
         try {
           const document = await vscode.workspace.openTextDocument(filePath);
-          CsDiagnostics.review(document, { skipMonitorUpdate: false });
+          CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
         } catch (error) {
           logOutputChannel.error(`Could not review ${filePath}: ${error}`);
         }

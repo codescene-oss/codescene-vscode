@@ -22,6 +22,9 @@ export default class Reviewer {
 export interface ReviewOpts {
   skipCache?: string;
   baseline?: string;
-  skipMonitorUpdate: boolean; // Please set this to false if triggering reviews due to opening files, and to true if triggering reviews due to Git changes.
+  skipMonitorUpdate: boolean;     // Please set this to true if triggering reviews due to opening files, and to false if triggering reviews due to Git changes.
+  //                                 (the reason is that Git changes are always processed anyway, so it's redundant to update the Monitor twice for the same change)
+  updateDiagnosticsPane: boolean; // Please set this to true if triggering reviews due to opening files, and to false if triggering reviews due to Git changes.
+  //                                 (the reason is that the Diagnostics pane should only refer to files directly open by the User through the UI)
   [key: string]: string | boolean | undefined;
 }

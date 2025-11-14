@@ -91,7 +91,7 @@ export class GitChangeObserver {
     try {
       // Load the file as a TextDocument (doesn't open in editor UI)
       const document = await vscode.workspace.openTextDocument(filePath);
-      CsDiagnostics.review(document, { skipMonitorUpdate: false });
+      CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
     } catch (error) {
       logOutputChannel.warn(`Could not load file for review ${filePath}: ${error}`);
     }
