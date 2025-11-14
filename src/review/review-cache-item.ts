@@ -37,11 +37,11 @@ export class ReviewCacheItem {
     this.delta = await DevtoolsAPI.delta(this.document, true);
   }
 
-  setBaseline(baselineCommit: string, skipMonitorUpdate: boolean) {
+  setBaseline(baselineCommit: string, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     logOutputChannel.trace(
       `ReviewCacheItem.setBaseline for ${path.basename(this.document.fileName)} to ${baselineCommit}`
     );
-    this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document, skipMonitorUpdate);
+    this.baselineScore = Reviewer.instance.baselineScore(baselineCommit, this.document, skipMonitorUpdate, updateDiagnosticsPane);
     void this.runDeltaAnalysis({ skipMonitorUpdate });
   }
 }

@@ -145,7 +145,7 @@ export async function showDocAtPosition(document: vscode.TextDocument | undefine
     return;
   }
 
-  const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === document.uri.toString());
+  const editor = vscode.window.visibleTextEditors.find((e) => e.document.fileName === document.fileName);
 
   const activeEditor = editor
     ? await vscode.window.showTextDocument(editor.document, editor.viewColumn)
