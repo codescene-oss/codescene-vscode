@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### Unreleased
+
+### Features
+
+* abort tasks on quit ([48cb199](https://github.com/codescene-oss/codescene-vscode/commit/48cb19906817cf7e519dd521dd2b15177134a116))
+* cache most `fns-to-refactor` calls ([59d4f23](https://github.com/codescene-oss/codescene-vscode/commit/59d4f2359cbd756da2588e8cb4441cf912ae3d28))
+* include error codes in error reporting toast ([5952945](https://github.com/codescene-oss/codescene-vscode/commit/59529453759ce3f3ac0ebaf27395d512786743f7))
+* introduce QueuedSingleTaskExecutor ([e37dc1f](https://github.com/codescene-oss/codescene-vscode/commit/e37dc1f77ed5b463d2fba0e1573f20b4b9f19427))
+* make `ConcurrencyLimitingExecutor` abort pending tasks on `dispose` ([cc1d4ec](https://github.com/codescene-oss/codescene-vscode/commit/cc1d4ecd673bf215054337e23d32fde883cbe349))
+* make GitChangeLister also observe the diff vs the mergeBase ([df777bc](https://github.com/codescene-oss/codescene-vscode/commit/df777bc2ec1edb63c73a75d02801de2677f9f85e))
+* make the Code Health Monitor react to Git changes ([27d8a4e](https://github.com/codescene-oss/codescene-vscode/commit/27d8a4ec0837bf1b73621dafc5ce1ff3e9eae30a))
+* observe files open by the user ([fd6c0b8](https://github.com/codescene-oss/codescene-vscode/commit/fd6c0b88d589acd9db9a1eb6536d6bfaa6213879)), closes [src/extension.ts#L147-L185](https://github.com/src/extension.ts/issues/L147-L185)
+* only present Diagnostic off the files directly open by the user. ([c2f82d2](https://github.com/codescene-oss/codescene-vscode/commit/c2f82d2631ef167b05b9aaf5284b700cfd75ef1a))
+* restore SingleTaskExecutor for `refactor` tasks ([2eca0a4](https://github.com/codescene-oss/codescene-vscode/commit/2eca0a428115ae5fa76a09c8007970c72f2d4226))
+* use a deletion tracker in GitChangeObserver ([e471dd1](https://github.com/codescene-oss/codescene-vscode/commit/e471dd1f84e84837b8ecf6a0c4da2802e6e9f267))
+* use caches in fns-to-refactor calls ([ce32d52](https://github.com/codescene-oss/codescene-vscode/commit/ce32d52f0ca359ddd367adec636ef029dd97e86a))
+* use Git merge-base to filter out irrelevant Git changes ([ea9a1d2](https://github.com/codescene-oss/codescene-vscode/commit/ea9a1d2585664aa8b3044982e66c6034424ee7d8))
+
+
+### Bug fixes
+
+* don't `await` `checkFirstRun` ([3a6b716](https://github.com/codescene-oss/codescene-vscode/commit/3a6b716ffd911f5cf8a1c7f9c246482d17566fab))
+* execFile - set a maxBuffer ([07197bc](https://github.com/codescene-oss/codescene-vscode/commit/07197bcfad85cf0f3eee231774828f7c0499d753))
+* handle CLI errors with code 10 but no error details ([79dfd78](https://github.com/codescene-oss/codescene-vscode/commit/79dfd7843da11ef081e1560a9eb851a489f50e1e))
+* honor User settings when Workspace settings are blank ([b89ac4f](https://github.com/codescene-oss/codescene-vscode/commit/b89ac4f444ed6a244b88d5150ae6f464351523e7))
+* make deletions go through Git filtering in GitChangeObserver ([349e355](https://github.com/codescene-oss/codescene-vscode/commit/349e355658d5018df1fbddad66abded9048dca3f))
+* parse stdout on known error codes (and bump cli to corresponding version) ([180af6d](https://github.com/codescene-oss/codescene-vscode/commit/180af6de50f834f3a3742d63979a9758ac0aa510))
+* run telemetry through the SingleTaskExecutor ([65d4bca](https://github.com/codescene-oss/codescene-vscode/commit/65d4bca96561c116baed8ab0f4154f6babcbbe75))
+* temporarily disable staleness detection ([048b37c](https://github.com/codescene-oss/codescene-vscode/commit/048b37cb194db8401cad75bee215c8ae10b04c97))
+* turn error notifications about server connection into warning logs ([1cddb81](https://github.com/codescene-oss/codescene-vscode/commit/1cddb816e368386f3aef6d3a2d1121d47e9bd154))
+
 ### [0.16.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.16.0...v0.16.1) (2025-11-03)
 
 
