@@ -52,7 +52,7 @@ jobs:
         CI: true
 
     - name: Generate coverage data
-      run: npm run coverage
+      run: mkdir -p coverage/tmp && npm run coverage
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
