@@ -3,8 +3,8 @@ import Mocha from 'mocha';
 import glob from 'glob';
 import fs from 'fs';
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 declare global {
+	// eslint-disable-next-line @typescript-eslint/naming-convention
 	var __coverage__: any;
 }
 
