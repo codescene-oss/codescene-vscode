@@ -10,7 +10,7 @@ declare global {
 
 export function writeCoverage() {
 	if (typeof global.__coverage__ !== 'undefined') {
-		const coverageDir = path.resolve(__dirname, '../../.nyc_output');
+		const coverageDir = path.resolve(__dirname, '../../../.nyc_output');
 		if (!fs.existsSync(coverageDir)) {
 		fs.mkdirSync(coverageDir, { recursive: true });
 		}
