@@ -41,7 +41,7 @@ jobs:
       env:
         CI: true
 
-    - run: npm run instrument
+    - run: npm run instrument:js-in-place
 
     - run: xvfb-run -a npm run test:coverage
       if: runner.os == 'Linux'
