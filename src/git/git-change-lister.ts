@@ -79,7 +79,7 @@ export class GitChangeLister {
     context.subscriptions.push(disposable);
   }
 
-  private async collectFilesFromRepoState(): Promise<Set<string>> {
+  async collectFilesFromRepoState(): Promise<Set<string>> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return new Set<string>();
