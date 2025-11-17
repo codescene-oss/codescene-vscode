@@ -28,12 +28,7 @@ export class GitChangeObserver {
   constructor(context: vscode.ExtensionContext, executor: Executor, gitApi: API) {
     this.context = context;
     this.executor = executor;
-    this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/*',
-      false, // Don't ignore create events
-      false, // Don't ignore change events
-      false  // Don't ignore delete events
-    );
+    this.fileWatcher = this.createWatcher('**/*');
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
     const lister = new GitChangeLister(gitApi, executor);
@@ -45,10 +40,7 @@ export class GitChangeObserver {
   }
 
   start(): void {
-    this.fileWatcher.onDidCreate(this.handleFileChange.bind(this));
-    this.fileWatcher.onDidChange(this.handleFileChange.bind(this));
-    this.fileWatcher.onDidDelete(this.handleFileDelete.bind(this));
-
+    this.bindWatcherEvents(this.fileWatcher);
     this.context.subscriptions.push(this.fileWatcher);
   }
 
@@ -119,6 +111,21 @@ export class GitChangeObserver {
     }
 
     return true;
+  }
+
+  private createWatcher(pattern: string | vscode.RelativePattern): vscode.FileSystemWatcher {
+    return vscode.workspace.createFileSystemWatcher(
+      pattern,
+      false, // Don't ignore create events
+      false, // Don't ignore change events
+      false  // Don't ignore delete events
+    );
+  }
+
+  private bindWatcherEvents(watcher: vscode.FileSystemWatcher): void {
+    watcher.onDidCreate(this.handleFileChange.bind(this));
+    watcher.onDidChange(this.handleFileChange.bind(this));
+    watcher.onDidDelete(this.handleFileDelete.bind(this));
   }
 
   private async handleFileChange(uri: vscode.Uri): Promise<void> {
