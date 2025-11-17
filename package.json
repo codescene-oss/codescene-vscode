@@ -213,7 +213,7 @@
     "test": "node ./out/test/runTest.js",
     "test:raw": "node ./out/test/runTest.js",
     "instrument:copy": "rm -rf out-instrumented && cp -R out out-instrumented",
-    "instrument:js": "nyc instrument out-instrumented out-instrumented --exclude test",
+    "instrument:js": "nyc instrument out-instrumented out-instrumented --exclude test --in-place",
     "instrument:patch": "node scripts/patch-package-json.js",
     "instrument": "npm run instrument:copy && npm run instrument:js && npm run instrument:patch",
     "coverage": "nyc report --reporter=lcov --report-dir=coverage",
