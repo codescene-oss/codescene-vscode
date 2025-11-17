@@ -128,6 +128,12 @@ export class GitChangeObserver {
       return;
     }
 
+    // Don't add directories to the tracker - would make deletion handling work incorrectly
+    const isDirectory = !path.extname(filePath);
+    if (isDirectory) {
+      return;
+    }
+
     this.tracker.add(filePath);
     void this.executor.executeTask(() => this.reviewFile(filePath));
   }
@@ -135,15 +141,37 @@ export class GitChangeObserver {
   private async handleFileDelete(uri: vscode.Uri): Promise<void> {
     const filePath = uri.fsPath;
 
+    // 1.- Most likely case: internally tracked file
     if (this.tracker.has(filePath)) {
       this.tracker.delete(filePath);
       fireFileDeletedFromGit(filePath);
       return;
     }
 
+    // 2.- Less likely case: non-internally tracked file
     if (await this.shouldProcessFile(filePath)) {
       fireFileDeletedFromGit(filePath);
+      return;
     }
+
+
+    // 3.- Least likely case: directory deletion event
+    const isDirectory = !path.extname(filePath);
+
+    if (isDirectory) {
+      const directoryPrefix = filePath.endsWith(path.sep) ? filePath : filePath + path.sep;
+      const filesToDelete = Array.from(this.tracker).filter(trackedFile => trackedFile.startsWith(directoryPrefix));
+
+      for (const fileToDelete of filesToDelete) {
+        this.tracker.delete(fileToDelete);
+        fireFileDeletedFromGit(fileToDelete);
+      }
+
+      if (filesToDelete.length > 0) {
+        return;
+      }
+    }
+
   }
 
   dispose(): void {
