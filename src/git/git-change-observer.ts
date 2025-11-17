@@ -70,7 +70,7 @@ export class GitChangeObserver {
 
   private isSupportedFile(filePath: string): boolean {
     const fileExt = path.extname(filePath);
-    return supportedExtensions.includes(fileExt);
+    return !!fileExt && supportedExtensions.includes(fileExt);
   }
 
   private isFileInChangedList(filePath: string, changedFiles: string[]): boolean {
@@ -131,13 +131,13 @@ export class GitChangeObserver {
   private async handleFileChange(uri: vscode.Uri): Promise<void> {
     const filePath = uri.fsPath;
 
-    if (!await this.shouldProcessFile(filePath)) {
-      return;
-    }
-
     // Don't add directories to the tracker - would make deletion handling work incorrectly
     const isDirectory = !path.extname(filePath);
     if (isDirectory) {
+      return;
+    }
+
+    if (!await this.shouldProcessFile(filePath)) {
       return;
     }
 
@@ -161,11 +161,11 @@ export class GitChangeObserver {
       return;
     }
 
-
     // 3.- Least likely case: directory deletion event
     const isDirectory = !path.extname(filePath);
 
     if (isDirectory) {
+
       const directoryPrefix = filePath.endsWith(path.sep) ? filePath : filePath + path.sep;
       const filesToDelete = Array.from(this.tracker).filter(trackedFile => trackedFile.startsWith(directoryPrefix));
 
