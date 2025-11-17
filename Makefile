@@ -5,7 +5,7 @@
 build:
 	npm run build
 
-package:
+package: lint pretest
 	npm i
 	npm run updatecwf
 	vsce package
