@@ -39,6 +39,9 @@ export class DevtoolsAPIImpl {
   public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
     this.simpleExecutor
   );
+  public concurrencyLimitingExecutorForDelta: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
+    this.simpleExecutor
+  );
   public preflightJson?: string;
 
   constructor(public binaryPath: string, context: ExtensionContext) {
@@ -71,8 +74,14 @@ export class DevtoolsAPIImpl {
       logOutputChannel.info("Running task: " + presentCommand(task));
       // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
       // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
+
       // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
-      if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId) || taskId.startsWith(DELTA_TASK_ID_PREFIX)) {
+
+      // DELTA_TASK_ID_PREFIX uses concurrencyLimitingExecutorForDelta. By having a separate ConcurrencyLimitingExecutor for it,
+      // we ensure UI responsiveness in the Monitor even if the main concurrencyLimitingExecutor was fully utilized.
+      if (taskId.startsWith(DELTA_TASK_ID_PREFIX)) {
+        result = await this.concurrencyLimitingExecutorForDelta.execute(task, execOptions, input);
+      } else if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.abortingSingleTaskExecutor.execute(task, execOptions, input);
       } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
