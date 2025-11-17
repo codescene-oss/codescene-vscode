@@ -2,21 +2,20 @@ import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
 
-// V8 raw coverage output
-process.env.NODE_V8_COVERAGE = path.resolve(__dirname, '../../coverage');
 
 async function main() {
 	try {
 		// The folder containing the Extension Manifest package.json
 		// Passed to `--extensionDevelopmentPath`
-		const extensionDevelopmentPath = path.resolve(__dirname, '../../');
+		// const extensionDevelopmentPath = path.resolve(__dirname, '../../');
+		const extensionDevelopmentPath = path.resolve(__dirname, '../../out-instrumented');
 
 		// The path to test runner
 		// Passed to --extensionTestsPath
 		const extensionTestsPath = path.resolve(__dirname, './suite/index');
 
 		// Download VS Code, unzip it and run the integration test
-		await runTests({ extensionDevelopmentPath, extensionTestsPath, extensionTestsEnv: { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE } });
+		await runTests({ extensionDevelopmentPath, extensionTestsPath });
 	} catch (err) {
 		console.error('Failed to run tests:');
 		console.error(err);

@@ -41,7 +41,7 @@ jobs:
       env:
         CI: true
 
-    - run: mkdir -p coverage/tmp
+    - run: npm run instrument
 
     - run: xvfb-run -a npm test
       if: runner.os == 'Linux'
