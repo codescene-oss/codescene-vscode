@@ -10,17 +10,17 @@ declare global {
 
 export function writeCoverage() {
 	if (typeof global.__coverage__ !== 'undefined') {
-	  const coverageDir = path.resolve(__dirname, '../../.nyc_output');
-	  if (!fs.existsSync(coverageDir)) {
+		const coverageDir = path.resolve(__dirname, '../../.nyc_output');
+		if (!fs.existsSync(coverageDir)) {
 		fs.mkdirSync(coverageDir, { recursive: true });
-	  }
-	  const coverageFile = path.join(coverageDir, `out-${Date.now()}.json`);
-	  fs.writeFileSync(coverageFile, JSON.stringify(global.__coverage__));
-	  console.log(`Coverage written to ${coverageFile}`);
+		}
+		const coverageFile = path.join(coverageDir, `out-${Date.now()}.json`);
+		fs.writeFileSync(coverageFile, JSON.stringify(global.__coverage__));
+		console.log(`Coverage written to ${coverageFile}`);
 	} else {
-	  console.log('No coverage data collected.');
+		console.log('No coverage data collected.');
 	}
-  }
+}
 
 export function run(): Promise<void> {
 	// Create the mocha test
