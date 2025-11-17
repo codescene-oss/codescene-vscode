@@ -43,12 +43,12 @@ jobs:
 
     - run: npm run instrument
 
-    - run: xvfb-run -a npm test
+    - run: xvfb-run -a npm run test:raw
       if: runner.os == 'Linux'
       env:
         CI: true
 
-    - run: npm test
+    - run: npm run test:raw
       if: runner.os != 'Linux'
       env:
         CI: true
