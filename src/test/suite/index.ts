@@ -1,6 +1,25 @@
 import path from 'path';
 import Mocha from 'mocha';
 import glob from 'glob';
+import fs from 'fs';
+
+declare global {
+	var __coverage__: any;
+}
+
+export function writeCoverage() {
+	if (typeof global.__coverage__ !== 'undefined') {
+	  const coverageDir = path.resolve(__dirname, '../../.nyc_output');
+	  if (!fs.existsSync(coverageDir)) {
+		fs.mkdirSync(coverageDir, { recursive: true });
+	  }
+	  const coverageFile = path.join(coverageDir, `out-${Date.now()}.json`);
+	  fs.writeFileSync(coverageFile, JSON.stringify(global.__coverage__));
+	  console.log(`Coverage written to ${coverageFile}`);
+	} else {
+	  console.log('No coverage data collected.');
+	}
+  }
 
 export function run(): Promise<void> {
 	// Create the mocha test
@@ -19,6 +38,8 @@ export function run(): Promise<void> {
 
 			// Add files to the test suite
 			files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
+
+			mocha.suite.afterAll('write coverage', writeCoverage);
 
 			try {
 				// Run the mocha test
