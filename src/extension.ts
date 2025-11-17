@@ -26,6 +26,7 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
+import { acquireGitApi } from './git-utils';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -169,9 +170,12 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   context.subscriptions.push(rulesFileWatcher);
 
   // Watch for discrete Git file changes (create, modify, delete)
-  const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
-  gitChangeObserver.start();
-  context.subscriptions.push(gitChangeObserver);
+  const gitApi = acquireGitApi();
+  if (gitApi) {
+    const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, gitApi);
+    gitChangeObserver.start();
+    context.subscriptions.push(gitChangeObserver);
+  }
 }
 
 /**

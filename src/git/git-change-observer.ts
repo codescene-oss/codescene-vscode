@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import * as path from 'path';
+import { API } from '../../types/git';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
@@ -7,6 +8,7 @@ import { fireFileDeletedFromGit, getMergeBaseCommit } from '../git-utils';
 import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
+import { GitChangeLister } from './git-change-lister';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
@@ -23,7 +25,7 @@ export class GitChangeObserver {
   //   (which may have been added to the Monitor treeview, so they need to be removed on deletion events)
   private tracker: Set<string> = new Set();
 
-  constructor(context: vscode.ExtensionContext, executor: Executor) {
+  constructor(context: vscode.ExtensionContext, executor: Executor, gitApi: API) {
     this.context = context;
     this.executor = executor;
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(
@@ -32,6 +34,14 @@ export class GitChangeObserver {
       false, // Don't ignore change events
       false  // Don't ignore delete events
     );
+
+    // Initially fill the tracker - this ensures `handleFileDelete` works well
+    const lister = new GitChangeLister(gitApi, executor);
+    void lister.collectFilesFromRepoState().then(files => {
+      for (const file of files) {
+        this.tracker.add(file);
+      }
+    });
   }
 
   start(): void {
