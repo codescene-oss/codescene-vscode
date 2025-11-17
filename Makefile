@@ -6,6 +6,8 @@ build:
 	npm run build
 
 package:
+	npm i
+	npm run updatecwf
 	vsce package
 
 tsc:
