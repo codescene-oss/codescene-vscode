@@ -44,6 +44,25 @@
     "onStartupFinished"
   ],
   "main": "./out/main.js",
+  "nyc": {
+    "all": true,
+    "include": [
+      "out-instrumented/**/*.js"
+    ],
+    "exclude": [
+      "test/**",
+      "**/*.d.ts"
+    ],
+    "extension": [
+      ".js"
+    ],
+    "sourceMap": true,
+    "instrument": true,
+    "reporter": [
+      "lcov",
+      "text"
+    ]
+  },  
   "contributes": {
     "commands": [
       {
@@ -212,7 +231,7 @@
     "pretest": "npm run maybe-check-cwf && npm run tsc && npm run lint && npm run build",
     "test": "node ./out/test/runTest.js",
     "test:raw": "node ./out/test/runTest.js",
-    "test:coverage": "nyc --silent node ./out/test/runTest.js",
+    "test:coverage": "nyc node ./out/test/runTest.js",
     "instrument:copy": "rm -rf out-instrumented && cp -R out out-instrumented",
     "instrument:js": "nyc instrument out-instrumented out-instrumented --exclude test --in-place",
     "instrument:patch": "node scripts/patch-package-json.js",
