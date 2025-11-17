@@ -28,7 +28,7 @@ export class OpenFilesObserver {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
-    void this.filteringReviewer.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
     return true;
   }
 
