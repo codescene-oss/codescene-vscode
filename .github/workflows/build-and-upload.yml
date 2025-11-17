@@ -28,6 +28,7 @@ jobs:
           npm install --global @vscode/vsce
           vsce package
         env:
+          CI: true
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
       - name: Upload vsix artifact

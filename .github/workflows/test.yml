@@ -38,9 +38,15 @@ jobs:
 
     - name: Pretest
       run: npm run pretest
+      env:
+        CI: true
 
     - run: xvfb-run -a npm test
       if: runner.os == 'Linux'
+      env:
+        CI: true
 
     - run: npm test
       if: runner.os != 'Linux'
+      env:
+        CI: true
