@@ -2,6 +2,9 @@ import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
 
+// V8 raw coverage output
+process.env.NODE_V8_COVERAGE = path.resolve(__dirname, '../../coverage');
+
 async function main() {
 	try {
 		// The folder containing the Extension Manifest package.json

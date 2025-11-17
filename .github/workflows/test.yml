@@ -50,3 +50,12 @@ jobs:
       if: runner.os != 'Linux'
       env:
         CI: true
+
+    - name: Generate coverage data
+      run: npm run coverage
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.os }}
+        path: coverage/lcov.info
