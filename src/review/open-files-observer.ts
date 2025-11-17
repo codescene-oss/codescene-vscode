@@ -1,7 +1,7 @@
 import vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import Reviewer from './reviewer';
+import { FilteringReviewer } from './filtering-reviewer';
 
 /**
  * Observes open file events, and triggers reviews accordingly.
@@ -10,6 +10,7 @@ export class OpenFilesObserver {
   private reviewTimers = new Map<string, NodeJS.Timeout>();
   private context: vscode.ExtensionContext;
   private readonly docSelector: vscode.DocumentSelector;
+  private filteringReviewer = new FilteringReviewer();
 
   // Tracks files that were opened as visible in the UI.
   // The reason for tracking them is that onDidOpenTextDocument does not reflect files open in the UI and can be called at arbitrary times.
@@ -27,7 +28,7 @@ export class OpenFilesObserver {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
-    CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+    void this.filteringReviewer.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
     return true;
   }
 
