@@ -2,6 +2,7 @@ import path from 'path';
 import Mocha from 'mocha';
 import glob from 'glob';
 import fs from 'fs';
+import * as vscode from 'vscode';
 
 declare global {
 	// eslint-disable-next-line @typescript-eslint/naming-convention
@@ -39,6 +40,12 @@ export function run(): Promise<void> {
 
 			// Add files to the test suite
 			files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
+
+			mocha.suite.beforeAll('activate extension', async function () {
+				this.timeout(10000);
+				const ext = vscode.extensions.getExtension('codescene.codescene-vscode');
+				await ext?.activate();
+			});
 
 			mocha.suite.afterAll('write coverage', writeCoverage);
 
