@@ -162,8 +162,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
             currentCached.category,
             currentCached.document,
             codeSmell,
-            currentCached.fnToRefactor,
-            reviewResult
+            { fnToRefactor: currentCached.fnToRefactor, reviewResult }
           );
           void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
         }
