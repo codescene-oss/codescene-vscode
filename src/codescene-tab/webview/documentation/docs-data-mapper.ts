@@ -4,7 +4,8 @@ import { findFnToRefactor } from '../../../refactoring/utils';
 import { getAutoRefactorConfig } from '../ace/acknowledgement/ace-acknowledgement-mapper';
 import { getCWFDocType } from './utils';
 import { CodeSceneTabPanelState } from './cwf-webview-docs-panel';
-import { IssueInfo } from '../../../documentation/commands';
+import { FunctionRange, IssueInfo } from '../../../documentation/commands';
+import { FnToRefactor } from '../../../devtools-api/refactor-models';
 
 export async function getDocsData(state: CodeSceneTabPanelState): Promise<DocsContextViewProps> {
   const { document, issueInfo, codeSmell, fnToRefactor } = state;
@@ -31,29 +32,37 @@ export async function getDocsData(state: CodeSceneTabPanelState): Promise<DocsCo
 }
 
 function getFileData(state: CodeSceneTabPanelState): FileMetaType | undefined {
-  const { issueInfo, document, fnToRefactor } = state;
+  const { issueInfo, document, fnToRefactor, functionRange } = state;
   const fileData =
     document && issueInfo
       ? {
           fileName: document?.fileName || '',
           fn: {
-            name: issueInfo.fnName ?? fnToRefactor?.name ?? '',
-            range: getRange(issueInfo),
+            name: issueInfo.fnName ?? fnToRefactor?.name ?? functionRange?.function ?? '',
+            range: getRange(issueInfo, fnToRefactor, functionRange),
           },
         }
       : undefined;
   return fileData;
 }
 
-function getRange(issueInfo: IssueInfo) {
-  if (!issueInfo.range) {
+function getRange(issueInfo: IssueInfo, fnToRefactor: FnToRefactor | undefined, functionRange?: FunctionRange) {
+  if (fnToRefactor && fnToRefactor.range) {
+    return {
+      startLine: fnToRefactor.range['start-line'] ?? 0, // Adjusted only for display purposes (1-based)
+      startColumn: 0,
+      endLine: fnToRefactor.range['end-line'] ?? 0,
+      endColumn: 1,
+    };
+  } else if (functionRange && functionRange.range) {
+    // Use function range from review result when fnToRefactor is not available
+    return {
+      startLine: functionRange.range['start-line'] ?? 0, // Adjusted only for display purposes (1-based)
+      startColumn: 0,
+      endLine: functionRange.range['end-line'] ?? 0,
+      endColumn: 1,
+    };
+  } else {
     return undefined;
   }
-
-  return {
-    startLine: issueInfo.range.start.line ?? 0, // Adjusted only for display purposes (1-based)
-    startColumn: 0,
-    endLine: issueInfo.range.end.line ?? 0,
-    endColumn: 1,
-  };
 }

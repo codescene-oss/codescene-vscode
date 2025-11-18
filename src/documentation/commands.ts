@@ -4,7 +4,9 @@ import { DeltaIssue } from '../code-health-monitor/delta-issue';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
-import { CodeSmell } from '../devtools-api/review-model';
+import { CodeSmell, Range, Review } from '../devtools-api/review-model';
+import { findFunctionForCodeSmell } from '../review/utils';
+import Reviewer from '../review/reviewer';
 
 export function register(context: vscode.ExtensionContext) {
   context.subscriptions.push(
@@ -19,14 +21,34 @@ export function register(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
       const { category, lineNo, charNo, documentUri, codeSmell } = queryParams;
       Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
+      const document = await findOrOpenDocument(documentUri);
+      
+      // Try to get review result to extract function range info
+      let functionRange: FunctionRange | undefined;
+      const cacheItem = Reviewer.instance.reviewCache.get(document);
+      if (cacheItem) {
+        const reviewResult = await cacheItem.review.reviewResult;
+        if (reviewResult && codeSmell) {
+          const functionInfo = findFunctionForCodeSmell(reviewResult, codeSmell);
+          if (functionInfo) {
+            functionRange = {
+              function: functionInfo.function,
+              range: functionInfo.range,
+            };
+          }
+        }
+      }
+      
       const params: InteractiveDocsParams = {
         issueInfo: {
           category,
           position: new vscode.Position(lineNo, charNo),
           range: getVsCodeRangeByCodeSmell(codeSmell),
+          fnName: functionRange?.function,
         },
-        document: await findOrOpenDocument(documentUri),
+        document,
         codeSmell,
+        functionRange,
       };
       CodeSceneCWFDocsTabPanel.show(params);
     }),
@@ -57,11 +79,17 @@ export interface IssueInfo {
   range?: vscode.Range;
 }
 
+export interface FunctionRange {
+  function: string;
+  range: Range;
+}
+
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document?: vscode.TextDocument;
   fnToRefactor?: FnToRefactor;
   codeSmell?: CodeSmell;
+  functionRange?: FunctionRange;
 }
 
 export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsParams {
@@ -84,8 +112,22 @@ export function toDocsParamsRanged(
   category: string,
   document: vscode.TextDocument,
   codeSmell: CodeSmell,
-  fnToRefactor?: FnToRefactor
+  fnToRefactor?: FnToRefactor,
+  reviewResult?: Review
 ): InteractiveDocsParams {
+  let functionRange: FunctionRange | undefined;
+  
+  // If we don't have fnToRefactor but have a review result, try to find the function range from function-level-code-smells
+  if (!fnToRefactor && reviewResult) {
+    const functionInfo = findFunctionForCodeSmell(reviewResult, codeSmell);
+    if (functionInfo) {
+      functionRange = {
+        function: functionInfo.function,
+        range: functionInfo.range,
+      };
+    }
+  }
+
   return {
     issueInfo: {
       category,
@@ -94,10 +136,12 @@ export function toDocsParamsRanged(
         codeSmell['highlight-range']['start-column'] - 1
       ),
       range: getVsCodeRangeByCodeSmell(codeSmell),
-      fnName: fnToRefactor?.name ?? '',
+      fnName: fnToRefactor?.name ?? functionRange?.function ?? '',
     },
     document,
     fnToRefactor,
+    codeSmell,
+    functionRange,
   };
 }
 
