@@ -108,13 +108,18 @@ export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo)
   return params;
 }
 
+export interface ToDocsParamsRangedOptions {
+  fnToRefactor?: FnToRefactor;
+  reviewResult?: Review;
+}
+
 export function toDocsParamsRanged(
   category: string,
   document: vscode.TextDocument,
   codeSmell: CodeSmell,
-  fnToRefactor?: FnToRefactor,
-  reviewResult?: Review
+  options?: ToDocsParamsRangedOptions
 ): InteractiveDocsParams {
+  const { fnToRefactor, reviewResult } = options || {};
   let functionRange: FunctionRange | undefined;
   
   // If we don't have fnToRefactor but have a review result, try to find the function range from function-level-code-smells

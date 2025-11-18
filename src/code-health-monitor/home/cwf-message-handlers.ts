@@ -92,7 +92,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
         'end-column': payload.fn?.range?.endColumn ?? 1,
       },
     } as CodeSmell,
-    foundFileFunction.fnToRefactor
+    { fnToRefactor: foundFileFunction.fnToRefactor }
   );
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
