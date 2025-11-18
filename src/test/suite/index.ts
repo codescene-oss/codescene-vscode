@@ -42,9 +42,19 @@ export function run(): Promise<void> {
 			files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
 
 			mocha.suite.beforeAll('activate extension', async function () {
-				this.timeout(10000);
-				const ext = vscode.extensions.getExtension('codescene.codescene-vscode');
-				await ext?.activate();
+				this.timeout(15000);
+			
+				const id = 'codescene.codescene-vscode';
+				const ext = vscode.extensions.getExtension(id);
+			
+				console.log('Extension lookup:', id, '→', ext ? 'FOUND' : 'NOT FOUND');
+			
+				if (!ext) {
+					throw new Error(`Extension ${id} was not found by VS Code`);
+				}
+			
+				await ext.activate();
+				console.log('Extension activated.');
 			});
 
 			mocha.suite.afterAll('write coverage', writeCoverage);
