@@ -68,6 +68,29 @@ export function reviewResultToDiagnostics(reviewResult: Review, document: vscode
   return diagnostics;
 }
 
+/**
+ * Finds the Function object that contains the given CodeSmell in a Review result.
+ * Returns undefined if the code smell is not part of a function-level code smell.
+ */
+export function findFunctionForCodeSmell(reviewResult: Review, codeSmell: CodeSmell): Function | undefined {
+  for (const fun of reviewResult['function-level-code-smells'] || []) {
+    // Check if this function's code-smells array contains the given codeSmell
+    // We compare by category and highlight-range to identify the match
+    const matchingCodeSmell = fun['code-smells'].find(
+      (cs) =>
+        cs.category === codeSmell.category &&
+        cs['highlight-range']['start-line'] === codeSmell['highlight-range']['start-line'] &&
+        cs['highlight-range']['start-column'] === codeSmell['highlight-range']['start-column'] &&
+        cs['highlight-range']['end-line'] === codeSmell['highlight-range']['end-line'] &&
+        cs['highlight-range']['end-column'] === codeSmell['highlight-range']['end-column']
+    );
+    if (matchingCodeSmell) {
+      return fun;
+    }
+  }
+  return undefined;
+}
+
 export function getCsDiagnosticCode(code?: string | number | { value: string | number; target: vscode.Uri }) {
   if (typeof code === 'string') return code;
   if (typeof code === 'object') return code.value.toString();
