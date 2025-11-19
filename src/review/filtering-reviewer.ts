@@ -6,6 +6,8 @@ import { Review } from '../devtools-api/review-model';
 import { SimpleExecutor } from '../simple-executor';
 import { ReviewOpts } from './reviewer';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { GitLocator } from '../git/git-locator';
+import { logOutputChannel } from '../log';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -45,8 +47,11 @@ export class FilteringReviewer {
       return this.gitExecutorCache.get(filePath);
     }
 
+    logOutputChannel.info('Locating git binary for check-ignore');
+    const gitPath = await GitLocator.locate();
+    logOutputChannel.info(`Using git binary at: ${gitPath}`);
     const result = await this.gitExecutor.execute(
-      { command: 'git', args: ['check-ignore', filePath], ignoreError: true },
+      { command: gitPath, args: ['check-ignore', filePath], ignoreError: true },
       { cwd: dirname(document.uri.fsPath) }
     );
 

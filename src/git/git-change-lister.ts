@@ -5,7 +5,7 @@ import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { Executor } from '../executor';
-import { getMergeBaseCommit } from '../git-utils';
+import { getMergeBaseCommit, isMainBranch } from '../git-utils';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 
@@ -150,7 +150,13 @@ export class GitChangeLister {
     const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
 
     if (!baseCommit) {
-      logOutputChannel.warn('Could not determine merge-base commit');
+      const currentBranch = repo?.state.HEAD?.name;
+      const repoPath = workspaceFolder.uri.fsPath;
+      const isMain = await isMainBranch(currentBranch, repoPath);
+
+      if (!isMain) {
+        logOutputChannel.warn('Could not determine merge-base commit');
+      }
       return new Set<string>();
     }
 

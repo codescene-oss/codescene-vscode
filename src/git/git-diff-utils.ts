@@ -1,5 +1,6 @@
 import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
+import { GitLocator } from './git-locator';
 
 export function parseGitStatusFilename(line: string): string | null {
   // e.g. "MM src/foo.clj"
@@ -24,8 +25,11 @@ export async function getCommittedChanges(baseCommit: string, workspacePath: str
     return changedFiles;
   }
 
+  logOutputChannel.info('Locating git binary for diff');
+  const gitPath = await GitLocator.locate();
+  logOutputChannel.info(`Using git binary at: ${gitPath}`);
   const result = await gitExecutor.execute(
-    { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
+    { command: gitPath, args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
     { cwd: workspacePath }
   );
 
@@ -47,9 +51,12 @@ export async function getCommittedChanges(baseCommit: string, workspacePath: str
 export async function getStatusChanges(workspacePath: string): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
+  logOutputChannel.info('Locating git binary for status');
+  const gitPath = await GitLocator.locate();
+  logOutputChannel.info(`Using git binary at: ${gitPath}`);
   const result = await gitExecutor.execute(
     // untracked-files is important - makes it return e.g. foo/bar.clj instead of foo/ for untracked files. Else we can produce unreliable results.
-    { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
+    { command: gitPath, args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
     { cwd: workspacePath }
   );
 

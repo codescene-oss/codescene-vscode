@@ -28,6 +28,10 @@ export class SimpleExecutor implements Executor {
 
   execute(command: Command, options: ExecOptions = {}, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
+    const trimmedArgs = command.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
+    const logCommand = [command.command, ...trimmedArgs].join(' ');
+
+    logOutputChannel.info(`Executing: "${logCommand}"`);
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();

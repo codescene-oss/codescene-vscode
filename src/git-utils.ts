@@ -3,6 +3,7 @@ import vscode from 'vscode';
 import { GitExtension, Repository } from '../types/git';
 import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
 import { logOutputChannel } from './log';
+import { GitLocator } from './git/git-locator';
 
 export const GIT_TASK_ID = 'git';
 export const gitExecutor = new QueuedSingleTaskExecutor();
@@ -47,8 +48,11 @@ export async function getBranchCreationCommit(repo: Repository) {
   if (await isMainBranch(currentBranch, repoPath)) return '';
 
   try {
+    logOutputChannel.info('Locating git binary for reflog');
+    const gitPath = await GitLocator.locate();
+    logOutputChannel.info(`Using git binary at: ${gitPath}`);
     const { stdout: reflog } = await gitExecutor.execute(
-      { command: 'git', args: ['reflog', currentBranch, '--no-abbrev'], taskId: GIT_TASK_ID },
+      { command: gitPath, args: ['reflog', currentBranch, '--no-abbrev'], taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
 
@@ -80,8 +84,15 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
   const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
 
   try {
+    logOutputChannel.info('Locating git binary for branch list');
+    const gitPath = await GitLocator.locate();
+    logOutputChannel.info(`Using git binary at: ${gitPath}`);
     const { stdout } = await gitExecutor.execute(
-      { command: 'git', args: ['branch', '--list', '--format=%(refname:short)'], taskId: GIT_TASK_ID },
+      { command: gitPath, args: ['branch',
+                                 '--list',
+                                 // use double-quotes, especially for Windows:
+                                 '--format="%(refname:short)"'],
+        taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
 
@@ -155,8 +166,11 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   const localMainBranches = await getMainBranchCandidates(repoPath);
   for (const mainBranch of localMainBranches) {
     try {
+      logOutputChannel.info('Locating git binary for merge-base');
+      const gitPath = await GitLocator.locate();
+      logOutputChannel.info(`Using git binary at: ${gitPath}`);
       const { stdout: mergeBase } = await gitExecutor.execute(
-        { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
+        { command: gitPath, args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
         { cwd: repoPath }
       );
 
@@ -165,6 +179,7 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
         return commit;
       }
     } catch (err) {
+      logOutputChannel.error(`${err}`);
       continue;
     }
   }
