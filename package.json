@@ -7,7 +7,7 @@
   "icon": "assets/cs-logo.png",
   "displayName": "CodeScene",
   "author": "CodeScene AB",
-  "publisher": "codescene",
+  "publisher": "codescene-coach",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
   "version": "0.16.1",
   "license": "MIT",
