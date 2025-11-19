@@ -1,21 +1,10 @@
 import * as path from 'path';
+import { requiredDevtoolsVersion, artifacts } from './cli-config';
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export const REQUIRED_DEVTOOLS_VERSION = '16c4426cf60833617c827f96f32ec65c23c65cf5';
+export { requiredDevtoolsVersion };
 
-export const artifacts: { [platform: string]: { [arch: string]: string } } = {
-  darwin: {
-    x64: `cs-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  linux: {
-    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  win32: {
-    x64: `cs-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-};
+export { artifacts };
 
 export class ArtifactInfo {
   constructor(readonly extensionPath: string) {}

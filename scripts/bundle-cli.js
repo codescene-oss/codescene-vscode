@@ -10,22 +10,7 @@ const { https } = require('follow-redirects');
 const fs = require('fs');
 const path = require('path');
 const extractZip = require('extract-zip');
-
-const REQUIRED_DEVTOOLS_VERSION = '5e1b0e99b868bc94da2c39514fd7b8e731406bb1';
-
-const artifacts = {
-  darwin: {
-    x64: `cs-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  linux: {
-    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  win32: {
-    x64: `cs-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-};
+const { artifacts } = require('../src/cli-config.ts');
 
 function getBinaryName(platform, arch) {
   return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;

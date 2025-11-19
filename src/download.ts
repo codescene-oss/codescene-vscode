@@ -2,30 +2,17 @@
 //
 // 1. The binary for the current platform is bundled with the extension during the build process.
 // 2. When the extension is activated, we check if the bundled binary exists and verify its version
-//    matches the REQUIRED_DEVTOOLS_VERSION.
+//    matches the required devtools version.
 // 3. If the binary is missing or invalid, the extension will fail to activate with a clear error.
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { SimpleExecutor } from './simple-executor';
 import { logOutputChannel } from './log';
+import { requiredDevtoolsVersion } from './artifact-info';
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
-export const REQUIRED_DEVTOOLS_VERSION = '5e1b0e99b868bc94da2c39514fd7b8e731406bb1';
-
-export const artifacts: { [platform: string]: { [arch: string]: string } } = {
-  darwin: {
-    x64: `cs-ide-macos-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-macos-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  linux: {
-    x64: `cs-ide-linux-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-    arm64: `cs-ide-linux-aarch64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-  win32: {
-    x64: `cs-ide-windows-amd64-${REQUIRED_DEVTOOLS_VERSION}.zip`,
-  },
-};
+// Re-export for backward compatibility
+export { requiredDevtoolsVersion };
 
 /**
  * Get the bundled binary path for the current platform and architecture.
@@ -50,7 +37,7 @@ async function verifyBinaryVersion(binaryPath: string): Promise<boolean> {
     return false;
   }
 
-  const isValid = result.stdout.trim() === REQUIRED_DEVTOOLS_VERSION;
+  const isValid = result.stdout.trim() === requiredDevtoolsVersion;
   if (isValid) {
     logOutputChannel.debug(`Using CodeScene CLI version '${result.stdout}'.`);
   }
@@ -77,7 +64,7 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
   const isValid = await verifyBinaryVersion(binaryPath);
   if (!isValid) {
     throw new Error(
-      `The devtools binary version does not match the required version ${REQUIRED_DEVTOOLS_VERSION}. Please rebuild the extension.`
+      `The devtools binary version does not match the required version ${requiredDevtoolsVersion}. Please rebuild the extension.`
     );
   }
 
