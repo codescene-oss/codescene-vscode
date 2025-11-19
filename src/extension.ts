@@ -32,7 +32,7 @@ interface CsContext {
   csWorkspace: CsWorkspace;
 }
 
-const extId = 'codescene.codescene-vscode';
+const extId = 'codescene-coach.codescene-vscode';
 const migrationKey = 'codescene.lastSeenVersion';
 
 /**
@@ -156,7 +156,9 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
 
-    const visibleDocs = vscode.workspace.textDocuments.filter(doc => vscode.window.visibleTextEditors.some(editor => editor.document.fileName === doc.fileName));
+    const visibleDocs = vscode.workspace.textDocuments.filter((doc) =>
+      vscode.window.visibleTextEditors.some((editor) => editor.document.fileName === doc.fileName)
+    );
 
     // Review visible documents - update Diagnostics pane, not the Monitor
     visibleDocs.forEach((document: vscode.TextDocument) => {
@@ -165,7 +167,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     });
 
     // TODO trigger a review of files based off GitFileLister.
-
   });
   context.subscriptions.push(rulesFileWatcher);
 
@@ -282,10 +283,10 @@ function isUnderTestsOrCI(): boolean {
   const argv = process.argv.join(' ');
   return (
     process.env.VSCODE_TEST === 'true' ||
-      process.env.CI === 'true' ||
-      /- Test/i.test(appName) ||
-      argv.includes('--extensionTestsPath') ||
-      !!process.env.CODE_TESTS_PATH
+    process.env.CI === 'true' ||
+    /- Test/i.test(appName) ||
+    argv.includes('--extensionTestsPath') ||
+    !!process.env.CODE_TESTS_PATH
   );
 }
 
