@@ -4,6 +4,9 @@ import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
 import { Stats } from './executor-stats';
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
+
 export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
     if (childProcess.stdin) {
@@ -28,7 +31,7 @@ export class SimpleExecutor implements Executor {
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
-      const childProcess = execFile(command.command, command.args, options, (error, stdout, stderr) => {
+      const childProcess = execFile(command.command, command.args, { maxBuffer: MAX_BUFFER, ...options }, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
           logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
           reject(error);

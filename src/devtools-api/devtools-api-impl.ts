@@ -2,15 +2,16 @@ import { ExecOptions } from 'child_process';
 import { Command, ExecResult, Task } from '../executor';
 import { SimpleExecutor } from '../simple-executor';
 import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
-import { SingleTaskExecutor } from '../single-task-executor';
+import { AbortingSingleTaskExecutor } from '../aborting-single-task-executor';
 import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
 import { safeJsonParse, rangeStr } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfoError as CreditsInfoErrorModel,
   FnToRefactor,
-  SINGLE_EXECUTOR_TASK_IDS,
+  ABORTING_SINGLE_EXECUTOR_TASK_IDS,
   QUEUED_SINGLE_EXECUTOR_TASK_IDS,
+  DELTA_TASK_ID_PREFIX,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -23,11 +24,22 @@ import { DevtoolsError } from './devtools-error';
 import { CreditsInfoError } from './credits-info-error';
 import { AbortError } from './abort-error';
 
+function presentCommand(obj: Task | Command): string {
+  const trimmedObj = {
+    ...obj,
+    args: obj.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg)),
+  };
+  return JSON.stringify(trimmedObj);
+}
+
 export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public singleTaskExecutor: SingleTaskExecutor = new SingleTaskExecutor(this.simpleExecutor);
+  public abortingSingleTaskExecutor: AbortingSingleTaskExecutor = new AbortingSingleTaskExecutor(this.simpleExecutor);
   public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
   public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
+    this.simpleExecutor
+  );
+  public concurrencyLimitingExecutorForDelta: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
     this.simpleExecutor
   );
   public preflightJson?: string;
@@ -59,12 +71,18 @@ export class DevtoolsAPIImpl {
         taskId,
         ignoreError: true,
       };
-      logOutputChannel.info("Running task: " + JSON.stringify(task));
-      // singleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
-      // `refactor` operation (or any other member of SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
+      logOutputChannel.info("Running task: " + presentCommand(task));
+      // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
+      // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
+
       // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
-      if (SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
-        result = await this.singleTaskExecutor.execute(task, execOptions, input);
+
+      // DELTA_TASK_ID_PREFIX uses concurrencyLimitingExecutorForDelta. By having a separate ConcurrencyLimitingExecutor for it,
+      // we ensure UI responsiveness in the Monitor even if the main concurrencyLimitingExecutor was fully utilized.
+      if (taskId.startsWith(DELTA_TASK_ID_PREFIX)) {
+        result = await this.concurrencyLimitingExecutorForDelta.execute(task, execOptions, input);
+      } else if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
+        result = await this.abortingSingleTaskExecutor.execute(task, execOptions, input);
       } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
       } else {
@@ -76,7 +94,7 @@ export class DevtoolsAPIImpl {
         args,
         ignoreError: true,
       };
-      logOutputChannel.info("Running command: " + JSON.stringify(command));
+      logOutputChannel.info("Running command: " + presentCommand(command));
       result = await this.simpleExecutor.execute(command, execOptions, input);
     }
 
@@ -112,12 +130,16 @@ export class DevtoolsAPIImpl {
           creditsInfoError['trace-id']
         );
       case 'ABORT_ERR': // ABORT_ERR is triggered by AbortController usage
-        throw new AbortError();
+        const abortError = new AbortError();
+        (abortError as any).code = exitCode;
+        throw abortError;
 
       default:
         const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
         logOutputChannel.error(msg);
-        throw new Error(msg);
+        const error = new Error(msg);
+        (error as any).code = exitCode;
+        throw error;
     }
   }
 
@@ -139,7 +161,7 @@ export interface BinaryOpts {
 
   /*
     optional taskid for the invocation, ensuring only one task with the same id is running.
-    see SingleTaskExecutor for details
+    see AbortingSingleTaskExecutor, QueuedSingleTaskExecutor for details
   */
   taskId?: string;
 }

@@ -48,7 +48,8 @@ export async function getStatusChanges(workspacePath: string): Promise<Set<strin
   const changedFiles = new Set<string>();
 
   const result = await gitExecutor.execute(
-    { command: 'git', args: ['status', '--porcelain'], ignoreError: true, taskId: 'git' },
+    // untracked-files is important - makes it return e.g. foo/bar.clj instead of foo/ for untracked files. Else we can produce unreliable results.
+    { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
     { cwd: workspacePath }
   );
 

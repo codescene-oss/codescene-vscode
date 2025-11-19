@@ -42,6 +42,7 @@ jobs:
       - name: Package platform-specific VSIX
         run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
         env:
+          CI: true
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
       - name: Upload vsix artifact

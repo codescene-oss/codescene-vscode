@@ -18,6 +18,12 @@
     "Programming Languages",
     "Linters"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "CodeScene cannot work in untrusted environments because it depends on the Git extension, which cannot work in untrusted environments"
+    }
+  },
   "keywords": [
     "code analysis",
     "code health",
@@ -203,7 +209,9 @@
     "watch": "node ./esbuild.js --watch",
     "tsc": "tsc -p ./",
     "lint": "eslint src --ext ts --max-warnings=0",
-    "pretest": "npm run tsc && npm run lint && npm run build",
+    "check-cwf": "test -f cs-cwf/index.html || (echo 'CWF files missing. Run: npm run updatecwf' && exit 1)",
+    "maybe-check-cwf": "test -n \"$CI\" || npm run check-cwf",
+    "pretest": "npm run maybe-check-cwf && npm run tsc && npm run lint && npm run build",
     "test": "node ./out/test/runTest.js",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
     "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",

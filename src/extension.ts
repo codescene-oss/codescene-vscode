@@ -26,6 +26,7 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
+import { acquireGitApi } from './git-utils';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -154,17 +155,27 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
     logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
-    vscode.workspace.textDocuments.forEach((document: vscode.TextDocument) => {
+
+    const visibleDocs = vscode.workspace.textDocuments.filter(doc => vscode.window.visibleTextEditors.some(editor => editor.document.fileName === doc.fileName));
+
+    // Review visible documents - update Diagnostics pane, not the Monitor
+    visibleDocs.forEach((document: vscode.TextDocument) => {
       // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: false });
+      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: true, updateDiagnosticsPane: true });
     });
+
+    // TODO trigger a review of files based off GitFileLister.
+
   });
   context.subscriptions.push(rulesFileWatcher);
 
   // Watch for discrete Git file changes (create, modify, delete)
-  const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
-  gitChangeObserver.start();
-  context.subscriptions.push(gitChangeObserver);
+  const gitApi = acquireGitApi();
+  if (gitApi) {
+    const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, gitApi);
+    gitChangeObserver.start();
+    context.subscriptions.push(gitChangeObserver);
+  }
 }
 
 /**

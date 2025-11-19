@@ -8,6 +8,7 @@ import {
   REFACTOR_TASK_ID,
   TELEMETRY_POST_TASK_ID,
   TELEMETRY_DEVICE_ID_TASK_ID,
+  DELTA_TASK_ID_PREFIX,
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
@@ -183,7 +184,7 @@ export class DevtoolsAPI {
       const result = await DevtoolsAPI.instance.runBinary({
         args: ['delta', '--output-format', 'json'],
         input: inputJsonString,
-        taskId: taskId('delta', document),
+        taskId: taskId(DELTA_TASK_ID_PREFIX, document),
         execOptions: { cwd: fp.documentDirectory },
       });
       let deltaResult;
@@ -212,7 +213,7 @@ export class DevtoolsAPI {
 
       if (!(e instanceof AbortError)) {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        reportError({ context: 'Unable to enable refactoring capabilities', e });
+        reportError({ context: 'Refactoring (delta operation) failed', e });
       }
     } finally {
       DevtoolsAPI.endAnalysisEvent(document.fileName, true);
@@ -269,7 +270,7 @@ export class DevtoolsAPI {
   private static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
-    const fp = fileParts(document);    
+    const fp = fileParts(document);
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const baseArgs = [
       'refactor',

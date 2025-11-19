@@ -3,7 +3,8 @@ import { logOutputChannel } from './log';
 import { SimpleExecutor } from './simple-executor';
 import { Executor, Task } from './executor';
 
-export class SingleTaskExecutor implements Executor {
+// An executor with 1 item max per taskId, else aborts the previous item with the same taskId.
+export class AbortingSingleTaskExecutor implements Executor {
   private readonly executor;
   private readonly runningCommands: Map<string, AbortController> = new Map();
 
@@ -14,10 +15,10 @@ export class SingleTaskExecutor implements Executor {
   async execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
 
-    // Check if running already
+    // Check if there's an item with the same taskId running already
     const runningProcess = this.runningCommands.get(taskId);
     if (runningProcess) {
-      runningProcess.abort(`[SingleTaskExecutor] Abort current command ${taskId} and re-run`);
+      runningProcess.abort(`[AbortingSingleTaskExecutor] Abort current command ${taskId} and re-run`);
     }
 
     const abortController = new AbortController();
@@ -46,7 +47,7 @@ export class SingleTaskExecutor implements Executor {
   abort(taskId: string) {
     const abortController = this.runningCommands.get(taskId);
     if (abortController) {
-      abortController.abort(`[SingleTaskExecutor] Abort command ${taskId}`);
+      abortController.abort(`[AbortingSingleTaskExecutor] Abort command ${taskId}`);
     }
   }
 
@@ -54,12 +55,11 @@ export class SingleTaskExecutor implements Executor {
     const taskIds = Array.from(this.runningCommands.keys());
     for (const taskId of taskIds) {
       try {
-        logOutputChannel.error(`[SingleTaskExecutor] Aborting task ${taskId}`);
+        logOutputChannel.error(`[AbortingSingleTaskExecutor] Aborting task ${taskId}`);
         this.abort(taskId);
       } catch (error) {
-        logOutputChannel.error(`[SingleTaskExecutor] Error aborting task ${taskId}: ${error}`);
+        logOutputChannel.error(`[AbortingSingleTaskExecutor] Error aborting task ${taskId}: ${error}`);
       }
     }
   }
 }
-

@@ -79,7 +79,7 @@ export class GitChangeLister {
     context.subscriptions.push(disposable);
   }
 
-  private async collectFilesFromRepoState(): Promise<Set<string>> {
+  async collectFilesFromRepoState(): Promise<Set<string>> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return new Set<string>();
@@ -127,7 +127,7 @@ export class GitChangeLister {
       void this.executor.executeTask(async () => {
         try {
           const document = await vscode.workspace.openTextDocument(filePath);
-          CsDiagnostics.review(document, { skipMonitorUpdate: false });
+          CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
         } catch (error) {
           logOutputChannel.error(`Could not review ${filePath}: ${error}`);
         }

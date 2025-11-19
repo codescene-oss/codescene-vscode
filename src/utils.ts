@@ -52,13 +52,38 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
 
   const error = assertError(e);
 
-  const message = resolveErrorMessage(context, error);
-  logOutputChannel.error(message);
+  const fullMessage = resolveErrorMessage(context, error);
+
+  logOutputChannel.error(fullMessage);
+
+  // For user-facing messages, show just the Node.js error code (https://nodejs.org/api/errors.html#nodejs-error-codes ) if available
+  const code = (error as any).code;
+  const userMessage = code ? `${context} (${code})` : context;
+
   if (consoleOnly) {
     logOutputChannel.show();
   } else {
-    void vscode.window.showErrorMessage(message);
+    void vscode.window.showErrorMessage(userMessage);
   }
+}
+
+// Error objects have non-enumerable properties that won't serialize with JSON.stringify.
+function serializeError(error: Error): Record<string, any> {
+  const errorObj: Record<string, any> = {
+    message: error.message,
+    name: error.name,
+  };
+
+  const code = (error as any).code;
+  if (code !== undefined) {
+    errorObj.code = code;
+  }
+
+  if (error.stack) {
+    errorObj.stack = error.stack;
+  }
+
+  return errorObj;
 }
 
 /**
@@ -80,7 +105,7 @@ function resolveErrorMessage(context: string, error: Error): string {
     return `${context}. The latest refactoring has timed out.`;
   }
 
-  return `${context}. ${JSON.stringify(error)}`;
+  return `${context}. ${JSON.stringify(serializeError(error))}`;
 }
 
 export function pluralize(noun: string, count: number) {
@@ -120,7 +145,7 @@ export async function showDocAtPosition(document: vscode.TextDocument | undefine
     return;
   }
 
-  const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === document.uri.toString());
+  const editor = vscode.window.visibleTextEditors.find((e) => e.document.fileName === document.fileName);
 
   const activeEditor = editor
     ? await vscode.window.showTextDocument(editor.document, editor.viewColumn)

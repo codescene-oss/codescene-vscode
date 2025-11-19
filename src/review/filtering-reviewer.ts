@@ -5,6 +5,7 @@ import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { SimpleExecutor } from '../simple-executor';
 import { ReviewOpts } from './reviewer';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -68,6 +69,16 @@ export class FilteringReviewer {
     } else {
       return DevtoolsAPI.reviewContent(document);
     }
+  }
+
+  async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<void> {
+    const ignored = await this.isIgnored(document);
+
+    if (ignored) {
+      return;
+    }
+
+    CsDiagnostics.review(document, reviewOpts);
   }
 
   abort(document: vscode.TextDocument): void {

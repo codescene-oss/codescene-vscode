@@ -35,9 +35,11 @@ export default class CsDiagnostics {
     }
     
     void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
-      // Only include diagnostics with actual code smells in the problems view.
-      const diagnosticsWithCodeSmells = diagnostics.filter((d) => d.codeSmell !== null);
-      CsDiagnostics.set(document.uri, diagnosticsWithCodeSmells);
+      if (reviewOpts.updateDiagnosticsPane) {
+        // Only include diagnostics with actual code smells in the diagnostics view.
+        const diagnosticsWithCodeSmells = diagnostics.filter((d) => d.codeSmell !== null);
+        CsDiagnostics.set(document.uri, diagnosticsWithCodeSmells);
+      }
 
       const queuedReviewOpts = CsDiagnostics.reviewQueue.finishReview(document.fileName);
       if (queuedReviewOpts) {

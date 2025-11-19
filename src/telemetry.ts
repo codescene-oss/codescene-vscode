@@ -29,7 +29,9 @@ export default class Telemetry {
 
   static async init(context: vscode.ExtensionContext): Promise<void> {
     try {
-      await this.checkFirstRun();
+      // this `void` used to be an `await`, but it turned out to needlessly block execution.
+      // `checkFirstRun` doesn't immediately change the settings value anyway - it just opens a settings form.
+      void this.checkFirstRun();
 
       const enableTelemetry = getConfiguration('enableTelemetry');
       if (enableTelemetry) {
