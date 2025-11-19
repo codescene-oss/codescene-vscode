@@ -1,11 +1,14 @@
 /**
  * Shared configuration for CLI artifacts and version.
- * This file is used by both TypeScript source files and build scripts.
+ * This JavaScript file is the single source of truth for CLI configuration.
+ * It is used by:
+ * - Build scripts (bundle-cli.js) that run before TypeScript compilation
+ * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-export const requiredDevtoolsVersion = '5a24d744e6af8f69ff1d6098dabf318fe7f9c699';
+const requiredDevtoolsVersion = '5a24d744e6af8f69ff1d6098dabf318fe7f9c699';
 
-export const artifacts: { [platform: string]: { [arch: string]: string } } = {
+const artifacts = {
   darwin: {
     x64: `cs-ide-macos-amd64-${requiredDevtoolsVersion}.zip`,
     arm64: `cs-ide-macos-aarch64-${requiredDevtoolsVersion}.zip`,
@@ -17,5 +20,10 @@ export const artifacts: { [platform: string]: { [arch: string]: string } } = {
   win32: {
     x64: `cs-ide-windows-amd64-${requiredDevtoolsVersion}.zip`,
   },
+};
+
+module.exports = {
+  requiredDevtoolsVersion,
+  artifacts,
 };
 

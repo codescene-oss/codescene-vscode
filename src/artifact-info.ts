@@ -1,10 +1,11 @@
 import * as path from 'path';
-import { requiredDevtoolsVersion, artifacts } from './cli-config';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const cliConfig = require('../scripts/cli-config.js');
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export { requiredDevtoolsVersion };
+export const requiredDevtoolsVersion: string = cliConfig.requiredDevtoolsVersion;
 
-export { artifacts };
+export const artifacts: { [platform: string]: { [arch: string]: string } } = cliConfig.artifacts;
 
 export class ArtifactInfo {
   constructor(readonly extensionPath: string) {}

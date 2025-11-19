@@ -10,7 +10,7 @@ const { https } = require('follow-redirects');
 const fs = require('fs');
 const path = require('path');
 const extractZip = require('extract-zip');
-const { artifacts } = require('../src/cli-config.ts');
+const { artifacts } = require('./cli-config.js');
 
 function getBinaryName(platform, arch) {
   return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
