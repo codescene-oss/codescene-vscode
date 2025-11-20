@@ -4,7 +4,7 @@ import { API } from '../../types/git';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { fireFileDeletedFromGit, getMergeBaseCommit } from '../git-utils';
+import { fireFileDeletedFromGit, getMergeBaseCommit, getWorkspacePath } from '../git-utils';
 import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
@@ -54,7 +54,7 @@ export class GitChangeObserver {
     const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
 
     try {
-      const workspacePath = workspaceFolder.uri.fsPath;
+      const workspacePath = getWorkspacePath(workspaceFolder);
       const committedChanges = await getCommittedChanges(baseCommit, workspacePath);
       const statusChanges = await getStatusChanges(workspacePath);
 
@@ -80,7 +80,7 @@ export class GitChangeObserver {
       return true;
     }
 
-    const relativePath = path.relative(workspaceFolder.uri.fsPath, filePath);
+    const relativePath = path.relative(getWorkspacePath(workspaceFolder), filePath);
 
     if (!changedFiles.includes(relativePath)) {
       return false;

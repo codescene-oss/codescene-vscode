@@ -5,7 +5,7 @@ import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { Executor } from '../executor';
-import { getMergeBaseCommit } from '../git-utils';
+import { getMergeBaseCommit, isMainBranch, getWorkspacePath } from '../git-utils';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 
@@ -85,7 +85,7 @@ export class GitChangeLister {
       return new Set<string>();
     }
 
-    const workspacePath = workspaceFolder.uri.fsPath;
+    const workspacePath = getWorkspacePath(workspaceFolder);
     const statusChanges = await getStatusChanges(workspacePath);
     const files = new Set<string>();
 
@@ -111,7 +111,7 @@ export class GitChangeLister {
     const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase();
 
     for (const relativeFilePath of changedFilesVsMergeBase) {
-      const absolutePath = path.join(workspaceFolder.uri.fsPath, relativeFilePath);
+      const absolutePath = path.join(getWorkspacePath(workspaceFolder), relativeFilePath);
       const fileUri = vscode.Uri.file(absolutePath);
 
       if (this.shouldReviewFile(fileUri)) {
@@ -150,12 +150,20 @@ export class GitChangeLister {
     const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
 
     if (!baseCommit) {
-      logOutputChannel.warn('Could not determine merge-base commit');
+      const currentBranch = repo?.state.HEAD?.name;
+      if (currentBranch){
+        const repoPath = getWorkspacePath(workspaceFolder);
+        const isMain = await isMainBranch(currentBranch, repoPath);
+
+        if (!isMain) {
+          logOutputChannel.warn('Could not determine merge-base commit');
+        }
+      }
       return new Set<string>();
     }
 
     try {
-      const workspacePath = workspaceFolder.uri.fsPath;
+      const workspacePath = getWorkspacePath(workspaceFolder);
       return await getCommittedChanges(baseCommit, workspacePath);
     } catch (error) {
       logOutputChannel.warn(`Error getting changed files vs merge-base ${baseCommit}: ${error}`);

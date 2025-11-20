@@ -3,7 +3,7 @@ import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
-import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, updateGitState } from '../git-utils';
+import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, getRepoRootPath, updateGitState } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
@@ -109,8 +109,9 @@ function onRepoStateChange(repo: Repository) {
 }
 
 function setBaseline(repo: Repository) {
+  const repoPath = getRepoRootPath(repo);
   Reviewer.instance.setBaseline((fileUri: Uri) => {
     const r = getRepo(fileUri);
-    return r?.rootUri.path === repo.rootUri.path;
+    return r ? getRepoRootPath(r) === repoPath : false;
   });
 }

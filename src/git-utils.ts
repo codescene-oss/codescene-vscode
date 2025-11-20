@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+import path from 'path';
 import vscode from 'vscode';
 import { GitExtension, Repository } from '../types/git';
 import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
@@ -33,6 +34,16 @@ export function acquireGitApi() {
   }
 }
 
+export function getRepoRootPath(repo: Repository): string {
+  const fsPath = repo.rootUri.fsPath;
+  return path.normalize(fsPath);
+}
+
+export function getWorkspacePath(workspaceFolder: vscode.WorkspaceFolder): string {
+  const fsPath = workspaceFolder.uri.fsPath;
+  return path.normalize(fsPath);
+}
+
 /**
  * Retrieves the commit hash where the current branch was created from, by checking
  * the git reflog.
@@ -41,16 +52,21 @@ export function acquireGitApi() {
  */
 export async function getBranchCreationCommit(repo: Repository) {
   const currentBranch = repo.state.HEAD?.name;
-  const repoPath = repo.rootUri.path;
+  const repoPath = getRepoRootPath(repo);
   if (!currentBranch || !repoPath) return '';
 
   if (await isMainBranch(currentBranch, repoPath)) return '';
 
   try {
-    const { stdout: reflog } = await gitExecutor.execute(
+    const { stdout: reflog, stderr, exitCode } = await gitExecutor.execute(
       { command: 'git', args: ['reflog', currentBranch, '--no-abbrev'], taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
+
+    if (exitCode !== 0) {
+      logOutputChannel.error(`Could not get branch creation point for file ${repoPath} (exit code ${exitCode}): ${stderr}`);
+      return '';
+    }
 
     const creationKeyword = 'created from';
 
@@ -61,7 +77,7 @@ export async function getBranchCreationCommit(repo: Repository) {
 
     return creationLine?.split(' ')?.[0] ?? '';
   } catch (err) {
-    logOutputChannel.error(`Could not get branch creation point for file ${repo.rootUri.fsPath}: ${err}`);
+    logOutputChannel.error(`Could not get branch creation point for file ${repoPath}: ${err}`);
     return '';
   }
 }
@@ -80,10 +96,15 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
   const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
 
   try {
-    const { stdout } = await gitExecutor.execute(
+    const { stdout, stderr, exitCode } = await gitExecutor.execute(
       { command: 'git', args: ['branch', '--list', '--format=%(refname:short)'], taskId: GIT_TASK_ID },
       { cwd: repoPath }
     );
+
+    if (exitCode !== 0) {
+      logOutputChannel.error(`Could not get local branches for ${repoPath} (exit code ${exitCode}): ${stderr}`);
+      return [];
+    }
 
     const localBranches = stdout.split('\n').map(branch => branch.trim()).filter(Boolean);
     const result = possibleMainBranches.filter(branch => localBranches.includes(branch));
@@ -119,8 +140,13 @@ export async function isMainBranch(currentBranch: string | undefined, repoPath: 
  * @returns The commit hash or empty string if not available
  */
 export async function getDefaultCommit(repo: Repository): Promise<string> {
-  const repoPath = repo.rootUri.path;
-  const isMain = await isMainBranch(repo.state.HEAD?.name, repoPath);
+  const headName = repo.state.HEAD?.name;
+  if (!headName) {
+    return '';
+  }
+
+  const repoPath = getRepoRootPath(repo);
+  const isMain = await isMainBranch(headName, repoPath);
 
   if (isMain) {
     // On main branch, use HEAD commit
@@ -139,7 +165,7 @@ export async function getDefaultCommit(repo: Repository): Promise<string> {
  */
 export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   const currentBranch = repo.state.HEAD?.name;
-  const repoPath = repo.rootUri.path;
+  const repoPath = getRepoRootPath(repo);
 
   if (!currentBranch || !repoPath) {
     return '';
@@ -155,16 +181,22 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   const localMainBranches = await getMainBranchCandidates(repoPath);
   for (const mainBranch of localMainBranches) {
     try {
-      const { stdout: mergeBase } = await gitExecutor.execute(
+      const { stdout: mergeBase, stderr, exitCode } = await gitExecutor.execute(
         { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
         { cwd: repoPath }
       );
+
+      if (exitCode !== 0) {
+        logOutputChannel.error(`Could not get merge-base for ${currentBranch} and ${mainBranch} (exit code ${exitCode}): ${stderr}`);
+        continue;
+      }
 
       const commit = mergeBase.trim();
       if (commit) {
         return commit;
       }
     } catch (err) {
+      logOutputChannel.error(`${err}`);
       continue;
     }
   }
@@ -176,12 +208,13 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
  * Retrieves the latest commit hashes from the repository.
  */
 export async function getLatestCommits(repo: Repository, amount: number = 2) {
+  const repoPath = getRepoRootPath(repo);
   try {
     const result = await repo.log({ maxEntries: amount });
 
     return result.map((res) => res.hash);
   } catch (err) {
-    logOutputChannel.error(`Unable to get latest ${amount} commits for ${repo?.rootUri.path}: ${err}`);
+    logOutputChannel.error(`Unable to get latest ${amount} commits for ${repoPath}: ${err}`);
     return [];
   }
 }

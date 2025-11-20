@@ -12,7 +12,7 @@ interface QueuedTask {
 
 // An executor with 1 item max per taskId, else the new item is queued for later execution.
 export class QueuedSingleTaskExecutor implements Executor {
-  private readonly executor;
+  private readonly executor: Executor;
   private readonly taskQueues: Map<string, QueuedTask[]> = new Map();
   private readonly runningTasks: Set<string> = new Set();
 

@@ -28,12 +28,18 @@ export class SimpleExecutor implements Executor {
 
   execute(command: Command, options: ExecOptions = {}, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
+    const trimmedArgs = command.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
+    const logCommand = [command.command, ...trimmedArgs].join(' ');
+    const allOptions = { maxBuffer: MAX_BUFFER, ...options };
+
+    logOutputChannel.info(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
-      const childProcess = execFile(command.command, command.args, { maxBuffer: MAX_BUFFER, ...options }, (error, stdout, stderr) => {
+
+      const childProcess = execFile(command.command, command.args, allOptions, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
+          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`);
           reject(error);
           return;
         }
