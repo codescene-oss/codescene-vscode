@@ -10,6 +10,9 @@ import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation
 import { BackgroundServiceView } from './background-view';
 import { GitChangeLister } from '../git/git-change-lister';
 import { DevtoolsAPI } from '../devtools-api';
+import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
+import { logOutputChannel } from '../log';
+import { SimpleExecutor } from '../simple-executor';
 
 let gitApi: API | undefined;
 
@@ -38,12 +41,18 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // Review all changed/added files once when repository state is ready
+  // Review all changed/added files every 7 seconds
   const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
-  gitChangeLister.start(context);
+  const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
+
+  void scheduledExecutor.executeTask(async () => {
+    logOutputChannel.info('Starting scheduled git change review');
+    await gitChangeLister.startAsync(context);
+  });
 
   context.subscriptions.push(
     codeHealthMonitorView,
+    scheduledExecutor,
     ...repoStateListeners,
     vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
       const params: InteractiveDocsParams = {
