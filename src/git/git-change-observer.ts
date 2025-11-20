@@ -181,6 +181,10 @@ export class GitChangeObserver {
 
   }
 
+  public removeFromTracker(filePath: string): void {
+    this.tracker.delete(filePath);
+  }
+
   dispose(): void {
     this.fileWatcher.dispose();
   }
