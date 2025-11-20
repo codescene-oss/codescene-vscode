@@ -1,4 +1,6 @@
 import vscode from 'vscode';
+import fs from 'fs';
+import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
@@ -26,7 +28,10 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi } from './git-utils';
+import { acquireGitApi, fireFileDeletedFromGit } from './git-utils';
+import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
+import { SimpleExecutor } from './simple-executor';
+import { getHomeViewInstance } from './code-health-monitor/home/home-view';
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -151,6 +156,38 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   openFilesObserver.start();
   context.subscriptions.push(openFilesObserver);
 
+  // Watch for discrete Git file changes (create, modify, delete)
+  const gitApi = acquireGitApi();
+  let gitChangeObserver: GitChangeObserver | undefined;
+  if (gitApi) {
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, gitApi);
+    gitChangeObserver.start();
+    context.subscriptions.push(gitChangeObserver);
+  }
+
+  // Remove CFM stale files
+  const filenameInspectorExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
+  void filenameInspectorExecutor.executeTask(async () => {
+    const homeView = getHomeViewInstance();
+    if (homeView) {
+      const filenames = Array.from(homeView.getFileIssueMap().keys());
+
+      // Check each file and fire deletion event for files that don't exist
+      for (const filePath of filenames) {
+        try {
+          await access(filePath);
+        } catch {
+          logOutputChannel.info(`File no longer exists: ${filePath}`);
+          fireFileDeletedFromGit(filePath);
+          if (gitChangeObserver) {
+            gitChangeObserver.removeFromTracker(filePath);
+          }
+        }
+      }
+    }
+  });
+  context.subscriptions.push(filenameInspectorExecutor);
+
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
@@ -168,14 +205,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   });
   context.subscriptions.push(rulesFileWatcher);
-
-  // Watch for discrete Git file changes (create, modify, delete)
-  const gitApi = acquireGitApi();
-  if (gitApi) {
-    const gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, gitApi);
-    gitChangeObserver.start();
-    context.subscriptions.push(gitChangeObserver);
-  }
 }
 
 /**
