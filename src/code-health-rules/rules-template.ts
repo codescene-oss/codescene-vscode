@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { QuickPickItem, Uri, WorkspaceFolder, window, workspace } from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
+import { getWorkspacePath } from '../git-utils';
 
 const rulesPathAndFile: string = '.codescene/code-health-rules.json';
 
@@ -38,7 +39,7 @@ export async function createRulesTemplate() {
   if (!folders) {
     throw new Error('A CodeScene rules template can only be generated if VS Code is opened on a workspace folder.');
   }
-  const noRulesFolders = folders.filter((folder) => !fs.existsSync(path.join(folder.uri.fsPath, rulesPathAndFile)));
+  const noRulesFolders = folders.filter((folder) => !fs.existsSync(path.join(getWorkspacePath(folder), rulesPathAndFile)));
   if (noRulesFolders.length === 0) {
     if (folders.length === 1) {
       void window.showInformationMessage('The workspace already contains a CodeScene rules file.');
