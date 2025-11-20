@@ -30,7 +30,7 @@ export class GitChangeLister {
     void this.startAsync(context);
   }
 
-  private async startAsync(context: vscode.ExtensionContext): Promise<void> {
+  async startAsync(context: vscode.ExtensionContext): Promise<void> {
 
     // Sometimes the Git facilities don't immediately work,
     // so we use isGitAvailable to see if there's evidence of them being immediately available.
@@ -44,7 +44,7 @@ export class GitChangeLister {
     const repo = this.gitApi.repositories[0];
 
     // State not ready yet, set up listener to wait for changes
-    this.setupChangeListener(repo, context);
+    return this.setupChangeListener(repo, context);
   }
 
   /**
@@ -66,17 +66,22 @@ export class GitChangeLister {
     return new Set([...filesFromRepoState, ...filesFromGitDiff]);
   }
 
-  private setupChangeListener(repo: any, context: vscode.ExtensionContext): void {
-    let disposable: vscode.Disposable;
-    disposable = repo.state.onDidChange(async () => {
-      if (await this.isGitAvailable()) {
-        const allChangedFiles = await this.getAllChangedFiles();
-        void this.reviewFiles(allChangedFiles);
-        disposable.dispose();
-      }
-    });
+  private setupChangeListener(repo: any, context: vscode.ExtensionContext): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let disposable: vscode.Disposable;
+      disposable = repo.state.onDidChange(async () => {
+        if (await this.isGitAvailable()) {
+          const allChangedFiles = await this.getAllChangedFiles();
+          if (allChangedFiles.size > 0) {
+            this.reviewFiles(allChangedFiles);
+            disposable.dispose();
+            resolve();
+          }
+        }
+      });
 
-    context.subscriptions.push(disposable);
+      context.subscriptions.push(disposable);
+    });
   }
 
   async collectFilesFromRepoState(): Promise<Set<string>> {
