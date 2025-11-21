@@ -16,6 +16,13 @@ jobs:
 
       - uses: './.github/actions/setup'
 
+      - name: Validate release
+        run: |
+          npm run tsc
+          npm run lint
+          npm run build
+          rm -rf out/
+
       - name: Set PRERELEASE version
         run: |
           current_version=$(jq -r '.version' package.json)
@@ -26,6 +33,8 @@ jobs:
       - name: Build extension vsix file
         run: |
           npm install --global @vscode/vsce
+          npm run updatedocs
+          npm run updatecwf
           vsce package
         env:
           CI: true
