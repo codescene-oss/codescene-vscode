@@ -72,7 +72,6 @@ export class DroppingScheduledExecutor implements Executor {
 
   private async runScheduledTask(): Promise<any> {
     if (this.isRunning) {
-      logOutputChannel.info('[DroppingScheduledExecutor] Task still running, dropping new execution');
       return;
     }
 
