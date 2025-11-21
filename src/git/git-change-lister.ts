@@ -41,7 +41,12 @@ export class GitChangeLister {
       return;
     }
 
-    const repo = this.gitApi.repositories[0];
+    const repo = this.gitApi.repositories.find(r => r?.state);
+
+    if (!repo) {
+      logOutputChannel.error('No Git repository with valid state found');
+      return;
+    }
 
     // State not ready yet, set up listener to wait for changes
     return this.setupChangeListener(repo, context);

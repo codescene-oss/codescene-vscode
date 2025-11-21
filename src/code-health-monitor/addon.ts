@@ -33,7 +33,9 @@ export function activate(context: vscode.ExtensionContext) {
     void onRepoStateChange(repo);
   }
 
-  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
+  const repoStateListeners = gitApi.repositories
+    .filter((repo) => repo?.state)
+    .map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
   CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
