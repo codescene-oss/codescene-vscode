@@ -1,7 +1,7 @@
 import assert from 'assert';
-import vscode from 'vscode';
 import { CodeSmell, Range, Function, Review } from '../../devtools-api/review-model';
 import { reviewFunctionToDiagnostics, reviewResultToDiagnostics } from '../../review/utils';
+import { openTextDocument, DiagnosticSeverity } from '../mocks/vscode';
 
 suite('reviewIssueToDiagnostics', () => {
   const fileCodeSmellRange: Range = {
@@ -50,14 +50,14 @@ suite('reviewIssueToDiagnostics', () => {
   };
 
   test('returns info diagnostic for document level issues', async () => {
-    const document = await vscode.workspace.openTextDocument({
+    const document = await openTextDocument({
       content: 'Sample content',
       language: 'typescript',
     });
 
     const diagnostics = reviewFunctionToDiagnostics(functionCodeSmell, document);
     assert.strictEqual(diagnostics.length, 1);
-    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning);
+    assert.strictEqual(diagnostics[0].severity, DiagnosticSeverity.Warning);
     assert.strictEqual(diagnostics[0].message, 'Primitive Obsession (cc = 3)');
     assert.strictEqual(diagnostics[0].range.start.line, functionCodeSmellRange['start-line'] - 1);
     assert.strictEqual(diagnostics[0].range.end.line, functionCodeSmellRange['end-line'] - 1);
@@ -79,7 +79,7 @@ suite('reviewIssueToDiagnostics', () => {
       'raw-score': '',
     };
 
-    const document = await vscode.workspace.openTextDocument({
+    const document = await openTextDocument({
       content: `function foo() {
                   if (a && b && c ||
                       d) {
@@ -97,7 +97,7 @@ suite('reviewIssueToDiagnostics', () => {
     assert.strictEqual(diagnostics[0].range.end.line, expressionCodeSmellRange['end-line'] - 1);
     assert.strictEqual(diagnostics[0].range.start.character, expressionCodeSmellRange['start-column'] - 1);
     assert.strictEqual(diagnostics[0].range.end.character, expressionCodeSmellRange['end-column'] - 1);
-    assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning, 'Wrong severity');
+    assert.strictEqual(diagnostics[0].severity, DiagnosticSeverity.Warning, 'Wrong severity');
   });
 
   test('handles file and function level code smells', async () => {
@@ -107,7 +107,7 @@ suite('reviewIssueToDiagnostics', () => {
       'function-level-code-smells': [functionCodeSmell],
       'raw-score': '',
     };
-    const document = await vscode.workspace.openTextDocument({
+    const document = await openTextDocument({
       content: `function foo() {
                   if (a && b && c ||
                       d) {
@@ -125,13 +125,13 @@ suite('reviewIssueToDiagnostics', () => {
       let expectedSeverity;
       if (d.message === 'Complex Conditional (2 complex conditional expressions)') {
         expectedRange = expressionCodeSmellRange;
-        expectedSeverity = vscode.DiagnosticSeverity.Warning;
+        expectedSeverity = DiagnosticSeverity.Warning;
       } else if (d.message === 'Primitive Obsession (cc = 3)') {
         expectedRange = functionCodeSmellRange;
-        expectedSeverity = vscode.DiagnosticSeverity.Warning;
+        expectedSeverity = DiagnosticSeverity.Warning;
       } else if (d.message === 'Large number of lines (test details)') {
         expectedRange = fileCodeSmellRange;
-        expectedSeverity = vscode.DiagnosticSeverity.Warning;
+        expectedSeverity = DiagnosticSeverity.Warning;
       }
       assert.ok(expectedRange, 'Range should be defined if it matches any of the expected message: ' + d.message);
       assert.ok(
