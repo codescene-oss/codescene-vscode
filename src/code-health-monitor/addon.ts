@@ -43,7 +43,9 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // Review all changed/added files every 7 seconds
+  // Review all changed/added files every 9 seconds.
+  // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
+  // because `CsDiagnostics.review` has built-in caching.
   const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
