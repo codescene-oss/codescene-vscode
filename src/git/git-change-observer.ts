@@ -32,11 +32,15 @@ export class GitChangeObserver {
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
     const lister = new GitChangeLister(gitApi, executor);
-    void lister.collectFilesFromRepoState().then(files => {
-      for (const file of files) {
-        this.tracker.add(file);
-      }
-    });
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+      const workspacePath = getWorkspacePath(workspaceFolder);
+      void lister.collectFilesFromRepoState(workspacePath).then(files => {
+        for (const file of files) {
+          this.tracker.add(file);
+        }
+      });
+    }
   }
 
   start(): void {

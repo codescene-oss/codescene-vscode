@@ -36,8 +36,12 @@ export class GitChangeLister {
     // so we use isGitAvailable to see if there's evidence of them being immediately available.
     // If not, we set a temporary change listener so that we can operate only when Git finally becomes available.
     if (await this.isGitAvailable()) {
-      const allChangedFiles = await this.getAllChangedFiles();
-      this.reviewFiles(allChangedFiles);
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (workspaceFolder) {
+        const workspacePath = getWorkspacePath(workspaceFolder);
+        const allChangedFiles = await this.getAllChangedFiles(workspacePath);
+        this.reviewFiles(allChangedFiles);
+      }
       return;
     }
 
@@ -56,18 +60,24 @@ export class GitChangeLister {
    * Heuristic showing if Git is ready to use.
    */
   private async isGitAvailable(): Promise<boolean> {
-    const files = await this.collectFilesFromRepoState();
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      return false;
+    }
+
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const files = await this.collectFilesFromRepoState(workspacePath);
     if (files.size > 0) {
       return true;
     }
 
-    const gitDiffFiles = await this.collectFilesFromGitDiff();
+    const gitDiffFiles = await this.collectFilesFromGitDiff(workspacePath);
     return gitDiffFiles.size > 0;
   }
 
-  private async getAllChangedFiles(): Promise<Set<string>> {
-    const filesFromRepoState = await this.collectFilesFromRepoState();
-    const filesFromGitDiff = await this.collectFilesFromGitDiff();
+  async getAllChangedFiles(workspacePath: string): Promise<Set<string>> {
+    const filesFromRepoState = await this.collectFilesFromRepoState(workspacePath);
+    const filesFromGitDiff = await this.collectFilesFromGitDiff(workspacePath);
     return new Set([...filesFromRepoState, ...filesFromGitDiff]);
   }
 
@@ -76,11 +86,15 @@ export class GitChangeLister {
       let disposable: vscode.Disposable;
       disposable = repo.state.onDidChange(async () => {
         if (await this.isGitAvailable()) {
-          const allChangedFiles = await this.getAllChangedFiles();
-          if (allChangedFiles.size > 0) {
-            this.reviewFiles(allChangedFiles);
-            disposable.dispose();
-            resolve();
+          const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+          if (workspaceFolder) {
+            const workspacePath = getWorkspacePath(workspaceFolder);
+            const allChangedFiles = await this.getAllChangedFiles(workspacePath);
+            if (allChangedFiles.size > 0) {
+              this.reviewFiles(allChangedFiles);
+              disposable.dispose();
+              resolve();
+            }
           }
         }
       });
@@ -89,13 +103,7 @@ export class GitChangeLister {
     });
   }
 
-  async collectFilesFromRepoState(): Promise<Set<string>> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      return new Set<string>();
-    }
-
-    const workspacePath = getWorkspacePath(workspaceFolder);
+  async collectFilesFromRepoState(workspacePath: string): Promise<Set<string>> {
     const statusChanges = await getStatusChanges(workspacePath);
     const files = new Set<string>();
 
@@ -111,17 +119,12 @@ export class GitChangeLister {
     return files;
   }
 
-  private async collectFilesFromGitDiff(): Promise<Set<string>> {
+  private async collectFilesFromGitDiff(workspacePath: string): Promise<Set<string>> {
     const files = new Set<string>();
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-
-    if (!workspaceFolder) {
-      return files;
-    }
-    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase();
+    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase(workspacePath);
 
     for (const relativeFilePath of changedFilesVsMergeBase) {
-      const absolutePath = path.join(getWorkspacePath(workspaceFolder), relativeFilePath);
+      const absolutePath = path.join(workspacePath, relativeFilePath);
       const fileUri = vscode.Uri.file(absolutePath);
 
       if (this.shouldReviewFile(fileUri)) {
@@ -150,7 +153,7 @@ export class GitChangeLister {
     return supportedExtensions.includes(fileExt);
   }
 
-  async getChangedFilesVsMergeBase(): Promise<Set<string>> {
+  async getChangedFilesVsMergeBase(workspacePath: string): Promise<Set<string>> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return new Set<string>();
@@ -162,8 +165,7 @@ export class GitChangeLister {
     if (!baseCommit) {
       const currentBranch = repo?.state.HEAD?.name;
       if (currentBranch){
-        const repoPath = getWorkspacePath(workspaceFolder);
-        const isMain = await isMainBranch(currentBranch, repoPath);
+        const isMain = await isMainBranch(currentBranch, workspacePath);
 
         if (!isMain) {
           logOutputChannel.warn('Could not determine merge-base commit');
@@ -173,7 +175,6 @@ export class GitChangeLister {
     }
 
     try {
-      const workspacePath = getWorkspacePath(workspaceFolder);
       return await getCommittedChanges(baseCommit, workspacePath);
     } catch (error) {
       logOutputChannel.warn(`Error getting changed files vs merge-base ${baseCommit}: ${error}`);

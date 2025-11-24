@@ -2,7 +2,7 @@ import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
 
 export function parseGitStatusFilename(line: string): string | null {
-  // e.g. "MM src/foo.clj"
+  // e.g. "MM src/foo.clj" or '?? "file with spaces.ts"'
   const match = line.match(/^\S+\s+(.+)$/);
 
   if (!match?.[1]) {
@@ -10,9 +10,14 @@ export function parseGitStatusFilename(line: string): string | null {
   }
 
   // Handle renames: "R  old -> new" becomes "new"
-  const filename = match[1].includes(' -> ')
+  let filename = match[1].includes(' -> ')
     ? match[1].split(' -> ')[1].trim()
     : match[1];
+
+  // Strip surrounding double-quotes if present (can happen for filenames with whitespace in them):
+  if (filename.startsWith('"') && filename.endsWith('"')) {
+    filename = filename.slice(1, -1);
+  }
 
   return filename;
 }

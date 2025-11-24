@@ -16,7 +16,11 @@ const vscodeStub = {
       warn: () => {},
       info: () => {},
       debug: () => {},
+      trace: () => {},
     }),
+  },
+  workspace: {
+    workspaceFolders: undefined,
   },
   Diagnostic: DiagnosticStub,
   EventEmitter: EventEmitterStub,
@@ -26,6 +30,9 @@ const vscodeStub = {
     Warning: 1,
     Information: 2,
     Hint: 3,
+  },
+  ThemeColor: class ThemeColor {
+    constructor(public id: string) {}
   },
   Uri: {
     parse: (value: string) => ({

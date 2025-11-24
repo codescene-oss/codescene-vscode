@@ -2,5 +2,6 @@
   "ui": "tdd",
   "color": true,
   "spec": "out/test/suite/**/*.test.js",
-  "require": ["out/test/setup.js"]
+  "require": ["out/test/setup.js"],
+  "slow": 12000
 }
