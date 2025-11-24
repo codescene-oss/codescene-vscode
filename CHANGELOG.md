@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.17.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.1...v0.17.2) (2025-11-24)
+
+
+### Bug fixes
+
+* add ability to parse Git filenames containing whitespace ([b1dddba](https://github.com/codescene-oss/codescene-vscode/commit/b1dddba00a1facc7ff73307f20745e00d5dbcfbf))
+* support monorepos in Git operations ([#227](https://github.com/codescene-oss/codescene-vscode/issues/227)) ([e7d94c6](https://github.com/codescene-oss/codescene-vscode/commit/e7d94c664c50eddaf730357e7486ab3d49dd9f58))
+
 ### [0.17.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.16.1...v0.17.1) (2025-11-21)
 
 
