@@ -213,9 +213,10 @@ suite('Git Diff Utils Test Suite', () => {
       const changes = await getStatusChanges(testRepoPath, subDir);
       const fileNames = Array.from(changes);
 
-      assert.ok(fileNames.includes('workspace-subdir/inside.ts'), 'Should include file inside workspacePath');
+      assert.ok(fileNames.includes('inside.ts'), 'Should include file inside workspacePath with workspace prefix stripped');
 
       assert.ok(!fileNames.includes('outside.ts'), 'Should not include file outside workspacePath');
+      assert.ok(!fileNames.includes('workspace-subdir/inside.ts'), 'Should strip workspace prefix from paths');
     });
 
     test('handles workspacePath with trailing slash', async () => {
@@ -228,7 +229,27 @@ suite('Git Diff Utils Test Suite', () => {
       const changes = await getStatusChanges(testRepoPath, workspacePathWithSlash);
       const fileNames = Array.from(changes);
 
-      assert.ok(fileNames.includes('workspace/file.ts'), 'Should handle workspacePath with trailing slash');
+      assert.ok(fileNames.includes('file.ts'), 'Should handle workspacePath with trailing slash and strip prefix');
+    });
+
+    test('filters and strips prefix for files with same name in different locations', async () => {
+      const uiDir = path.join(testRepoPath, 'ui');
+      fs.mkdirSync(uiDir, { recursive: true });
+
+      fs.writeFileSync(path.join(testRepoPath, 'gc.cpp'), '// bad gc.cpp at root');
+
+      fs.writeFileSync(path.join(uiDir, 'gc.cpp'), '// good gc.cpp in ui');
+
+      const changes = await getStatusChanges(testRepoPath, uiDir);
+      const fileNames = Array.from(changes);
+
+      assert.strictEqual(fileNames.length, 1, 'Should only include one gc.cpp file');
+      assert.ok(fileNames.includes('gc.cpp'), 'Should include gc.cpp from ui directory with prefix stripped');
+
+      const returnedFilePath = path.join(uiDir, fileNames[0]);
+      const content = fs.readFileSync(returnedFilePath, 'utf8');
+      assert.ok(content.includes('good gc.cpp in ui'), 'Should return the gc.cpp from ui directory with good content');
+      assert.ok(!content.includes('bad gc.cpp at root'), 'Should not return the gc.cpp from root with bad content');
     });
   });
 
@@ -252,9 +273,10 @@ suite('Git Diff Utils Test Suite', () => {
       const changes = await getCommittedChanges(testRepoPath, baseCommit, workspaceDir);
       const fileNames = Array.from(changes);
 
-      assert.ok(fileNames.includes('workspace/inside.ts'), 'Should include committed file inside workspacePath');
+      assert.ok(fileNames.includes('inside.ts'), 'Should include committed file inside workspacePath with prefix stripped');
 
       assert.ok(!fileNames.includes('outside.ts'), 'Should not include committed file outside workspacePath');
+      assert.ok(!fileNames.includes('workspace/inside.ts'), 'Should strip workspace prefix from paths');
     });
 
     test('handles committed files with trailing slash in workspacePath', async () => {
@@ -273,12 +295,40 @@ suite('Git Diff Utils Test Suite', () => {
       const changes = await getCommittedChanges(testRepoPath, baseCommit, workspacePathWithSlash);
       const fileNames = Array.from(changes);
 
-      assert.ok(fileNames.includes('workspace/file.ts'), 'Should handle committed files with trailing slash in workspacePath');
+      assert.ok(fileNames.includes('file.ts'), 'Should handle committed files with trailing slash in workspacePath and strip prefix');
     });
 
     test('returns empty set when baseCommit is empty', async () => {
       const changes = await getCommittedChanges(testRepoPath, '', testRepoPath);
       assert.strictEqual(changes.size, 0, 'Should return empty set when baseCommit is empty');
+    });
+
+    test('filters and strips prefix for committed files with same name in different locations', async () => {
+      const { execSync } = require('child_process');
+
+      const uiDir = path.join(testRepoPath, 'ui');
+      fs.mkdirSync(uiDir, { recursive: true });
+
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      fs.writeFileSync(path.join(testRepoPath, 'gc.cpp'), '// bad gc.cpp at root');
+      execSync('git add gc.cpp', { cwd: testRepoPath });
+      execSync('git commit -m "Add gc.cpp at root"', { cwd: testRepoPath });
+
+      fs.writeFileSync(path.join(uiDir, 'gc.cpp'), '// good gc.cpp in ui');
+      execSync('git add ui/gc.cpp', { cwd: testRepoPath });
+      execSync('git commit -m "Add gc.cpp in ui"', { cwd: testRepoPath });
+
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, uiDir);
+      const fileNames = Array.from(changes);
+
+      assert.strictEqual(fileNames.length, 1, 'Should only include one gc.cpp file');
+      assert.ok(fileNames.includes('gc.cpp'), 'Should include gc.cpp from ui directory with prefix stripped');
+
+      const returnedFilePath = path.join(uiDir, fileNames[0]);
+      const content = fs.readFileSync(returnedFilePath, 'utf8');
+      assert.ok(content.includes('good gc.cpp in ui'), 'Should return the gc.cpp from ui directory with good content');
+      assert.ok(!content.includes('bad gc.cpp at root'), 'Should not return the gc.cpp from root with bad content');
     });
 
     test('returns all committed files when gitRootPath equals workspacePath', async () => {
@@ -297,8 +347,9 @@ suite('Git Diff Utils Test Suite', () => {
       const changes = await getCommittedChanges(testRepoPath, baseCommit, testRepoPath);
       const fileNames = Array.from(changes);
 
-      assert.ok(fileNames.includes('root-file.ts'), 'Should include root-file.ts');
-      assert.ok(fileNames.includes('subdir/sub-file.ts'), 'Should include subdir/sub-file.ts');
+      assert.ok(fileNames.includes('root-file.ts'), `Should include root-file.ts. Found: ${JSON.stringify(fileNames)}`);
+      const expectedSubdirPath = path.join('subdir', 'sub-file.ts');
+      assert.ok(fileNames.includes(expectedSubdirPath), `Should include ${expectedSubdirPath}. Found: ${JSON.stringify(fileNames)}`);
     });
   });
 });

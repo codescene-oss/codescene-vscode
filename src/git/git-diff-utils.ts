@@ -46,6 +46,19 @@ export function isFileInWorkspace(
   return absolutePath.startsWith(workspacePrefix) || absolutePath === normalizedWorkspacePath;
 }
 
+export function convertGitPathToWorkspacePath(
+  file: string,
+  gitRootPath: string,
+  normalizedWorkspacePath: string
+): string {
+  // Git returns paths relative to gitRootPath. Convert to absolute, then make relative to workspacePath:
+  const normalizedGitRootPath = path.normalize(gitRootPath);
+  const normalizedFile = path.normalize(file);
+  const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+  const relativeToWorkspace = path.relative(normalizedWorkspacePath, absolutePath);
+  return relativeToWorkspace;
+}
+
 export async function getCommittedChanges(gitRootPath: string, baseCommit: string, workspacePath: string): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
@@ -67,7 +80,8 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
       .filter(line => line.length > 0)
       .forEach(file => {
         if (isFileInWorkspace(file, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
-          changedFiles.add(file);
+          const relativeToWorkspace = convertGitPathToWorkspacePath(file, gitRootPath, normalizedWorkspacePath);
+          changedFiles.add(relativeToWorkspace);
         }
       });
   } else {
@@ -104,7 +118,8 @@ export async function getStatusChanges(gitRootPath: string, workspacePath: strin
       .forEach(line => {
         const filename = parseGitStatusFilename(line);
         if (filename && isFileInWorkspace(filename, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
-          changedFiles.add(filename);
+          const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
+          changedFiles.add(relativeToWorkspace);
         }
       });
   } else {
