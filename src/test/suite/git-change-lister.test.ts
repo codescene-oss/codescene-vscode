@@ -40,7 +40,7 @@ suite('GitChangeLister Test Suite', () => {
   });
 
   test('getAllChangedFiles returns empty set for clean repository', async () => {
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
     assert.strictEqual(changedFiles.size, 0);
   });
 
@@ -50,7 +50,7 @@ suite('GitChangeLister Test Suite', () => {
     const newFile = path.join(testRepoPath, 'test.ts');
     fs.writeFileSync(newFile, 'console.log("test");');
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     assert.ok(changedFiles.size > 0);
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('test.ts')));
@@ -66,7 +66,7 @@ suite('GitChangeLister Test Suite', () => {
 
     fs.writeFileSync(testFile, 'console.log("modified");');
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     assert.ok(changedFiles.size > 0);
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('index.js')));
@@ -79,7 +79,7 @@ suite('GitChangeLister Test Suite', () => {
     fs.writeFileSync(newFile, 'print("hello")');
     execSync('git add script.py', { cwd: testRepoPath });
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     assert.ok(changedFiles.size > 0);
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('script.py')));
@@ -93,7 +93,7 @@ suite('GitChangeLister Test Suite', () => {
     fs.writeFileSync(mdFile, '# Documentation');
     fs.writeFileSync(tsFile, 'export const x = 1;');
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
     const fileNames = Array.from(changedFiles).map(f => path.basename(f));
 
     assert.strictEqual(changedFiles.size, 1, 'Should only include supported file type');
@@ -112,7 +112,7 @@ suite('GitChangeLister Test Suite', () => {
     fs.renameSync(originalFile, renamedFile);
     execSync('git add -A', { cwd: testRepoPath });
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     assert.ok(changedFiles.size > 0);
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('renamed.js')));
@@ -131,7 +131,7 @@ suite('GitChangeLister Test Suite', () => {
     const uncommittedFile = path.join(testRepoPath, 'uncommitted.ts');
     fs.writeFileSync(uncommittedFile, 'export const bar = 2;');
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     const fileNames = Array.from(changedFiles).map(f => path.basename(f));
     assert.ok(fileNames.includes('uncommitted.ts'), 'Should include uncommitted file');
@@ -145,7 +145,7 @@ suite('GitChangeLister Test Suite', () => {
     fs.writeFileSync(fileWithSpaces, 'console.log("has spaces");');
     fs.writeFileSync(anotherFileWithSpaces, 'console.log("also has spaces");');
 
-    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath);
+    const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
 
     const fileNames = Array.from(changedFiles).map(f => path.basename(f));
     assert.ok(fileNames.includes('my file.ts'), 'Should include file with spaces: my file.ts');
