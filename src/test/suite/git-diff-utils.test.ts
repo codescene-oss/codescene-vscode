@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getStatusChanges, parseGitStatusFilename } from '../../git/git-diff-utils';
+import { getStatusChanges, getCommittedChanges, parseGitStatusFilename, createWorkspacePrefix, isFileInWorkspace } from '../../git/git-diff-utils';
 
 suite('Git Diff Utils Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-diff-utils');
@@ -30,6 +30,54 @@ suite('Git Diff Utils Test Suite', () => {
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }
+  });
+
+  suite('createWorkspacePrefix', () => {
+    test('adds separator to path without trailing separator', () => {
+      const inputPath = path.join(path.sep, 'foo', 'bar');
+      const result = createWorkspacePrefix(inputPath);
+      const resolvedPath = path.resolve(inputPath);
+      assert.strictEqual(result.workspacePrefix, `${resolvedPath}${path.sep}`);
+      assert.strictEqual(result.normalizedWorkspacePath, resolvedPath);
+    });
+
+    test('preserves separator for path with trailing separator', () => {
+      const inputPath = path.join(path.sep, 'foo', 'bar') + path.sep;
+      const result = createWorkspacePrefix(inputPath);
+      const resolvedPath = path.resolve(inputPath) + path.sep;
+      assert.strictEqual(result.workspacePrefix, resolvedPath);
+    });
+  });
+
+  suite('isFileInWorkspace', () => {
+    test('returns true for file inside workspace', () => {
+      const repoPath = path.join(path.sep, 'repo');
+      const workspacePath = path.join(repoPath, 'workspace');
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const filePath = 'workspace/file.ts';
+      const normalizedFile = path.normalize(filePath);
+      const absolutePath = path.resolve(path.normalize(repoPath), normalizedFile);
+      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(result, `Expected file to be in workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+    });
+
+    test('returns false for file outside workspace', () => {
+      const repoPath = path.join(path.sep, 'repo');
+      const workspacePath = path.join(repoPath, 'workspace');
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const filePath = 'other/file.ts';
+      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+    });
+
+    test('returns false for file with similar prefix', () => {
+      const repoPath = path.join(path.sep, 'repo');
+      const workspacePath = path.join(repoPath, 'workspace');
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const filePath = 'workspace-other/file.ts';
+      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+    });
   });
 
   suite('parseGitStatusFilename', () => {
@@ -76,7 +124,7 @@ suite('Git Diff Utils Test Suite', () => {
       fs.copyFileSync(srcPath, copiedPath);
       execSync('git add -A', { cwd: testRepoPath });
 
-      const changes = await getStatusChanges(testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('untracked.ts'), 'Should detect ?? status');
@@ -130,7 +178,7 @@ suite('Git Diff Utils Test Suite', () => {
       execSync('git add "new modified file.js"', { cwd: testRepoPath });
       fs.writeFileSync(path.join(testRepoPath, 'new modified file.js'), 'console.log(2);');
 
-      const changes = await getStatusChanges(testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('untracked file.ts'), 'Should detect ?? with spaces');
@@ -143,13 +191,114 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('returns empty set for clean repository and excludes deleted files', async () => {
-      let changes = await getStatusChanges(testRepoPath);
+      let changes = await getStatusChanges(testRepoPath, testRepoPath);
       assert.strictEqual(changes.size, 0, 'Should return empty set for clean repo');
 
       fs.unlinkSync(path.join(testRepoPath, 'existing.ts'));
-      changes = await getStatusChanges(testRepoPath);
+      changes = await getStatusChanges(testRepoPath, testRepoPath);
       const fileNames = Array.from(changes);
       assert.ok(!fileNames.includes('existing.ts'), 'Should not include deleted file');
+    });
+
+    test('filters files outside workspacePath when gitRootPath differs', async () => {
+      const { execSync } = require('child_process');
+
+      const subDir = path.join(testRepoPath, 'workspace-subdir');
+      fs.mkdirSync(subDir, { recursive: true });
+
+      fs.writeFileSync(path.join(subDir, 'inside.ts'), 'export const inside = 1;');
+
+      fs.writeFileSync(path.join(testRepoPath, 'outside.ts'), 'export const outside = 1;');
+
+      const changes = await getStatusChanges(testRepoPath, subDir);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('workspace-subdir/inside.ts'), 'Should include file inside workspacePath');
+
+      assert.ok(!fileNames.includes('outside.ts'), 'Should not include file outside workspacePath');
+    });
+
+    test('handles workspacePath with trailing slash', async () => {
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+
+      fs.writeFileSync(path.join(workspaceDir, 'file.ts'), 'export const a = 1;');
+
+      const workspacePathWithSlash = workspaceDir + path.sep;
+      const changes = await getStatusChanges(testRepoPath, workspacePathWithSlash);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('workspace/file.ts'), 'Should handle workspacePath with trailing slash');
+    });
+  });
+
+  suite('getCommittedChanges', () => {
+    test('filters committed files outside workspacePath when gitRootPath differs', async () => {
+      const { execSync } = require('child_process');
+
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+
+      fs.writeFileSync(path.join(workspaceDir, 'inside.ts'), 'export const inside = 1;');
+      execSync('git add workspace/inside.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add inside file"', { cwd: testRepoPath });
+
+      const baseCommit = execSync('git rev-parse HEAD~1', { cwd: testRepoPath }).toString().trim();
+
+      fs.writeFileSync(path.join(testRepoPath, 'outside.ts'), 'export const outside = 1;');
+      execSync('git add outside.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add outside file"', { cwd: testRepoPath });
+
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, workspaceDir);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('workspace/inside.ts'), 'Should include committed file inside workspacePath');
+
+      assert.ok(!fileNames.includes('outside.ts'), 'Should not include committed file outside workspacePath');
+    });
+
+    test('handles committed files with trailing slash in workspacePath', async () => {
+      const { execSync } = require('child_process');
+
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      fs.writeFileSync(path.join(workspaceDir, 'file.ts'), 'export const a = 1;');
+      execSync('git add workspace/file.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add file"', { cwd: testRepoPath });
+
+      const workspacePathWithSlash = workspaceDir + path.sep;
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, workspacePathWithSlash);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('workspace/file.ts'), 'Should handle committed files with trailing slash in workspacePath');
+    });
+
+    test('returns empty set when baseCommit is empty', async () => {
+      const changes = await getCommittedChanges(testRepoPath, '', testRepoPath);
+      assert.strictEqual(changes.size, 0, 'Should return empty set when baseCommit is empty');
+    });
+
+    test('returns all committed files when gitRootPath equals workspacePath', async () => {
+      const { execSync } = require('child_process');
+
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      fs.writeFileSync(path.join(testRepoPath, 'root-file.ts'), 'export const a = 1;');
+      const subDir = path.join(testRepoPath, 'subdir');
+      fs.mkdirSync(subDir, { recursive: true });
+      fs.writeFileSync(path.join(subDir, 'sub-file.ts'), 'export const b = 1;');
+
+      execSync('git add .', { cwd: testRepoPath });
+      execSync('git commit -m "Add multiple files"', { cwd: testRepoPath });
+
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('root-file.ts'), 'Should include root-file.ts');
+      assert.ok(fileNames.includes('subdir/sub-file.ts'), 'Should include subdir/sub-file.ts');
     });
   });
 });

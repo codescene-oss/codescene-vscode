@@ -39,7 +39,9 @@ export class GitChangeLister {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (workspaceFolder) {
         const workspacePath = getWorkspacePath(workspaceFolder);
-        const allChangedFiles = await this.getAllChangedFiles(workspacePath);
+        const repo = getRepo(workspaceFolder.uri);
+        const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+        const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
         this.reviewFiles(allChangedFiles);
       }
       return;
@@ -66,18 +68,20 @@ export class GitChangeLister {
     }
 
     const workspacePath = getWorkspacePath(workspaceFolder);
-    const files = await this.collectFilesFromRepoState(workspacePath);
+    const repo = getRepo(workspaceFolder.uri);
+    const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+    const files = await this.collectFilesFromRepoState(gitRootPath, workspacePath);
     if (files.size > 0) {
       return true;
     }
 
-    const gitDiffFiles = await this.collectFilesFromGitDiff(workspacePath);
+    const gitDiffFiles = await this.collectFilesFromGitDiff(gitRootPath, workspacePath);
     return gitDiffFiles.size > 0;
   }
 
-  async getAllChangedFiles(workspacePath: string): Promise<Set<string>> {
-    const filesFromRepoState = await this.collectFilesFromRepoState(workspacePath);
-    const filesFromGitDiff = await this.collectFilesFromGitDiff(workspacePath);
+  async getAllChangedFiles(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
+    const filesFromRepoState = await this.collectFilesFromRepoState(gitRootPath, workspacePath);
+    const filesFromGitDiff = await this.collectFilesFromGitDiff(gitRootPath, workspacePath);
     return new Set([...filesFromRepoState, ...filesFromGitDiff]);
   }
 
@@ -89,7 +93,9 @@ export class GitChangeLister {
           const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
           if (workspaceFolder) {
             const workspacePath = getWorkspacePath(workspaceFolder);
-            const allChangedFiles = await this.getAllChangedFiles(workspacePath);
+            const repoObj = getRepo(workspaceFolder.uri);
+            const gitRootPath = repoObj?.rootUri.fsPath || workspacePath;
+            const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
             if (allChangedFiles.size > 0) {
               this.reviewFiles(allChangedFiles);
               disposable.dispose();
@@ -103,8 +109,8 @@ export class GitChangeLister {
     });
   }
 
-  async collectFilesFromRepoState(workspacePath: string): Promise<Set<string>> {
-    const statusChanges = await getStatusChanges(workspacePath);
+  async collectFilesFromRepoState(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
+    const statusChanges = await getStatusChanges(gitRootPath, workspacePath);
     const files = new Set<string>();
 
     for (const relativeFilePath of statusChanges) {
@@ -119,9 +125,9 @@ export class GitChangeLister {
     return files;
   }
 
-  private async collectFilesFromGitDiff(workspacePath: string): Promise<Set<string>> {
+  private async collectFilesFromGitDiff(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
     const files = new Set<string>();
-    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase(workspacePath);
+    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase(gitRootPath, workspacePath);
 
     for (const relativeFilePath of changedFilesVsMergeBase) {
       const absolutePath = path.join(workspacePath, relativeFilePath);
@@ -153,7 +159,7 @@ export class GitChangeLister {
     return supportedExtensions.includes(fileExt);
   }
 
-  async getChangedFilesVsMergeBase(workspacePath: string): Promise<Set<string>> {
+  async getChangedFilesVsMergeBase(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return new Set<string>();
@@ -175,7 +181,7 @@ export class GitChangeLister {
     }
 
     try {
-      return await getCommittedChanges(baseCommit, workspacePath);
+      return await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
     } catch (error) {
       logOutputChannel.warn(`Error getting changed files vs merge-base ${baseCommit}: ${error}`);
       return new Set<string>();

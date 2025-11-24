@@ -35,7 +35,9 @@ export class GitChangeObserver {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (workspaceFolder) {
       const workspacePath = getWorkspacePath(workspaceFolder);
-      void lister.collectFilesFromRepoState(workspacePath).then(files => {
+      const repo = getRepo(workspaceFolder.uri);
+      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+      void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
         for (const file of files) {
           this.tracker.add(file);
         }
@@ -59,8 +61,9 @@ export class GitChangeObserver {
 
     try {
       const workspacePath = getWorkspacePath(workspaceFolder);
-      const committedChanges = await getCommittedChanges(baseCommit, workspacePath);
-      const statusChanges = await getStatusChanges(workspacePath);
+      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+      const committedChanges = await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
+      const statusChanges = await getStatusChanges(gitRootPath, workspacePath);
 
       const allChangedFiles = new Set([...committedChanges, ...statusChanges]);
 
