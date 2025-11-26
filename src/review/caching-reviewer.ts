@@ -2,6 +2,7 @@ import vscode, { Disposable, Uri } from 'vscode';
 import { AbortError } from '../devtools-api/abort-error';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
+import { reportError } from '../utils';
 import { FilteringReviewer } from './filtering-reviewer';
 import { ReviewCache } from './review-cache';
 import { ReviewOpts } from './reviewer';
@@ -29,7 +30,7 @@ export class CachingReviewer implements Disposable {
       // Otherwise it won't be reviewed immediately when the document is opened again
       this.reviewCache.delete(document.uri.fsPath);
     } else {
-      logOutputChannel.error(e.message);
+      reportError({context: "Review error", e, consoleOnly: true});
     }
   }
 
