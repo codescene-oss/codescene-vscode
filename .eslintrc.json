@@ -11,11 +11,27 @@
     ],
     "rules": {
         "@typescript-eslint/naming-convention": ["warn", {
-            "selector": ["objectLiteralProperty"],
+            "selector": ["objectLiteralProperty", "objectLiteralMethod"],
             "format": null
         }, {
             "selector": ["default"],
-            "format": ["camelCase"]
+            "format": ["camelCase"],
+            "leadingUnderscore": "allow"
+        }, {
+            "selector": ["parameter"],
+            "format": ["camelCase"],
+            "leadingUnderscore": "allowDouble",
+            "filter": {
+                "regex": "^_+$",
+                "match": false
+            }
+        }, {
+            "selector": ["parameter"],
+            "format": null,
+            "filter": {
+                "regex": "^_+$",
+                "match": true
+            }
         }, {
             "selector": ["typeLike"],
             "format": ["PascalCase"]
@@ -23,6 +39,14 @@
             "selector": ["classProperty"],
             "format": ["camelCase"],
             "leadingUnderscore": "allow"
+        }, {
+            "selector": ["parameterProperty"],
+            "format": ["camelCase"],
+            "leadingUnderscore": "allow"
+        }, {
+            "selector": ["variable"],
+            "modifiers": ["const", "global"],
+            "format": ["UPPER_CASE", "camelCase"]
         }],
         "@typescript-eslint/no-floating-promises": ["warn"],
         "@typescript-eslint/semi": "warn",

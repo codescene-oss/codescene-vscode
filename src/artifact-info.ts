@@ -1,6 +1,5 @@
 import * as path from 'path';
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const REQUIRED_DEVTOOLS_VERSION = 'cb32f163c8ae13cf8f3aa67abadd7c358fe25a53';
 
 export const artifacts: { [platform: string]: { [arch: string]: string } } = {
