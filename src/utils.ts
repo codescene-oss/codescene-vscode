@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
+import Telemetry from './telemetry';
 import { AbortError } from './devtools-api/abort-error';
 import { DevtoolsError } from './devtools-api/devtools-error';
 
@@ -32,6 +33,7 @@ interface ReportErrorProps {
   context: string;
   e: unknown; // From catch clause
   consoleOnly?: boolean;
+  extraData?: any;
 }
 
 export const networkErrors = {
@@ -46,7 +48,7 @@ export const networkErrors = {
  *
  * Print the error to logOutputChannel and show an error message, or optionally focus the log output.
  */
-export function reportError({ context, e, consoleOnly = false }: ReportErrorProps) {
+export function reportError({ context, e, consoleOnly = false, extraData }: ReportErrorProps) {
   // Ignore abort errors - they are expected when sending abort signal to the devtools API
   if (e instanceof AbortError) return;
 
@@ -59,6 +61,7 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
   // For user-facing messages, show just the Node.js error code (https://nodejs.org/api/errors.html#nodejs-error-codes ) if available
   const code = (error as any).code;
   const userMessage = code ? `${context} (${code})` : context;
+  Telemetry.logError(error, {...extraData, context});
 
   if (consoleOnly) {
     logOutputChannel.show();
@@ -68,7 +71,7 @@ export function reportError({ context, e, consoleOnly = false }: ReportErrorProp
 }
 
 // Error objects have non-enumerable properties that won't serialize with JSON.stringify.
-function serializeError(error: Error): Record<string, any> {
+export function serializeError(error: Error): Record<string, any> {
   const errorObj: Record<string, any> = {
     message: error.message,
     name: error.name,
@@ -160,9 +163,12 @@ export async function showDocAtPosition(document: vscode.TextDocument | undefine
 export function safeJsonParse(input: string, context?: any) {
   try {
     return JSON.parse(input);
-  } catch (error) {
+  } catch (e) {
     const contextStr = context ? `\nContext: ${JSON.stringify(context)}` : '';
-    logOutputChannel.error(`JSON parsing failed: ${error}\nInput: ${input}${contextStr}`);
-    throw error;
+    reportError({context: "JSON parsing failed",
+                 e,
+                 consoleOnly: true,
+                 extraData: {input, contextStr}});
+    throw e;
   }
 }
