@@ -6,7 +6,6 @@ export class CsDiagnostic extends vscode.Diagnostic {
     range: vscode.Range,
     message: string,
     severity: vscode.DiagnosticSeverity,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     private _codeSmell?: CodeSmell
   ) {
     let msg;
