@@ -16,3 +16,4 @@ cs-cwf/
 .idea/
 test-git-repo/
 test-git-repo-diff-utils/
+test-cs-diagnostics/
