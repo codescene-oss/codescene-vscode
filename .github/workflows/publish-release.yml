@@ -67,4 +67,4 @@ jobs:
           while IFS='=' read -r target file; do
             echo "🚀 Publishing ${file} to Open VSX (target=${target})"
             ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath "${file}"
-          done <<< "$(cat vsix-map.txt)"
+          done < vsix-map.txt
