@@ -110,7 +110,7 @@ async function main() {
     console.log('\nStep 5: Packaging VSIX...');
     const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
     const target = `${platform}-${arch}`;
-    const vsixName = `codescene-vscode-${version}-${target}.vsix`;
+    const vsixName = `codescene-vscode-test-${version}-${target}.vsix`;
     
     execSync(`vsce package --target ${target} --no-yarn --out ${vsixName}`, { 
       stdio: 'inherit',

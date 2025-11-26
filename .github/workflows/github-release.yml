@@ -41,8 +41,8 @@ jobs:
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          path: 'codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
-          name: 'codescene-vscode-${{ matrix.platform }}-${{ matrix.arch }}'
+          path: 'codescene-vscode-test-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
+          name: 'codescene-vscode-test-${{ matrix.platform }}-${{ matrix.arch }}'
 
   release:
     name: 'Create Release'
