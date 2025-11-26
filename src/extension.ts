@@ -2,7 +2,7 @@ import vscode from 'vscode';
 import fs from 'fs';
 import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
+import { activate as activateCHMonitor, deactivate as deactivateAddon, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -14,7 +14,7 @@ import { register as registerDocumentationCommands } from './documentation/comma
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
-import { logOutputChannel, registerShowLogCommand } from './log';
+import { deactivate as deactivateLog, logOutputChannel, registerShowLogCommand } from './log';
 import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
@@ -28,7 +28,7 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, fireFileDeletedFromGit } from './git-utils';
+import { acquireGitApi, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
@@ -78,9 +78,11 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startExtension(context: vscode.ExtensionContext) {
+  const csWorkspace = new CsWorkspace(context);
   const csContext: CsContext = {
-    csWorkspace: new CsWorkspace(context),
+    csWorkspace,
   };
+  context.subscriptions.push(csWorkspace);
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context);
@@ -282,6 +284,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
 
 // This method is called when your extension is deactivated
 export function deactivate() {
+  deactivateAddon();
+  deactivateGitUtils();
+  deactivateLog();
   DevtoolsAPI.dispose();
 }
 
