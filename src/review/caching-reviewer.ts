@@ -107,5 +107,6 @@ export class CachingReviewer implements Disposable {
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+    this.reviewer.dispose();
   }
 }

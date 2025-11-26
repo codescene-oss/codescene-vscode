@@ -154,5 +154,6 @@ export class OpenFilesObserver {
     // Clear all pending timers
     this.reviewTimers.forEach((timer) => clearTimeout(timer));
     this.reviewTimers.clear();
+    this.filteringReviewer.dispose();
   }
 }
