@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene-coach",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.16.1",
+  "version": "0.17.2",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -212,7 +212,7 @@
     "check-cwf": "test -f cs-cwf/index.html || (echo 'CWF files missing. Run: npm run updatecwf' && exit 1)",
     "maybe-check-cwf": "test -n \"$CI\" || npm run check-cwf",
     "pretest": "npm run maybe-check-cwf && npm run tsc && npm run lint && npm run build",
-    "test": "node ./out/test/runTest.js",
+    "test": "mocha",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
     "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
     "release:minor": "standard-version --release-as minor",
@@ -233,7 +233,6 @@
     "@types/vscode": "1.75.1",
     "@typescript-eslint/eslint-plugin": "^5.51.0",
     "@typescript-eslint/parser": "^5.45.0",
-    "@vscode/test-electron": "2.3.9",
     "esbuild": "^0.25.1",
     "esbuild-plugin-copy": "^2.1.1",
     "eslint": "^8.33.0",

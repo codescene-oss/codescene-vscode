@@ -14,3 +14,5 @@ cs-ide-*
 cs-cwf/
 *.zip
 .idea/
+test-git-repo/
+test-git-repo-diff-utils/

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { DevtoolsAPI } from '../devtools-api';
+import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
@@ -28,10 +29,10 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ) {
-    const review = Reviewer.instance.reviewCache.get(document);
-    if (!review) return;
+    const reviewCacheItem = Reviewer.instance.reviewCache.get(document);
+    if (!reviewCacheItem) return;
 
-    const diagnostics: CsDiagnostic[] = await review.review.diagnostics;
+    const diagnostics: CsDiagnostic[] = await reviewCacheItem.review.diagnostics;
     const actions: vscode.CodeAction[] = [];
     const diagnosticsInRange = diagnostics.filter((diagnostic) => diagnostic.range.contains(range));
 
@@ -46,6 +47,10 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
     );
     const fnToRefactor = fnsToRefactor.find(isDefined);
+
+    // Get review result to extract function range info when fnToRefactor is not available
+    const reviewResultRaw = await reviewCacheItem.review.reviewResult;
+    const reviewResult: Review | undefined = reviewResultRaw && typeof reviewResultRaw === 'object' ? reviewResultRaw : undefined;
 
     if (fnToRefactor) {
       const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
@@ -74,7 +79,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParamsRanged(category, document, codeSmell, fnToRefactor), 'codeaction'],
+        arguments: [toDocsParamsRanged(category, document, codeSmell, { fnToRefactor, reviewResult }), 'codeaction'],
       };
       actions.push(action);
     });

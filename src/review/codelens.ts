@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
+import { Review } from '../devtools-api/review-model';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
@@ -146,14 +147,22 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       // Register a unique command without arguments to avoid VS Code's CommandsConverter cache, as mentioned above.
       const commandId = `codescene.openInteractiveDocs.${cacheKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-      const command = vscode.commands.registerCommand(commandId, () => {
+      const command = vscode.commands.registerCommand(commandId, async () => {
         const currentCached = this.commandCache.get(cacheKey);
         if (currentCached) {
+          // Get review result to extract function range info when fnToRefactor is not available
+          const cacheItem = Reviewer.instance.reviewCache.get(currentCached.document);
+          let reviewResult: Review | undefined = undefined;
+          if (cacheItem) {
+            const reviewResultRaw = await cacheItem.review.reviewResult;
+            reviewResult = reviewResultRaw && typeof reviewResultRaw === 'object' ? reviewResultRaw : undefined;
+          }
+          
           const params = toDocsParamsRanged(
             currentCached.category,
             currentCached.document,
             codeSmell,
-            currentCached.fnToRefactor
+            { fnToRefactor: currentCached.fnToRefactor, reviewResult }
           );
           void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
         }

@@ -4,7 +4,7 @@ import { API } from '../../types/git';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { fireFileDeletedFromGit, getMergeBaseCommit } from '../git-utils';
+import { fireFileDeletedFromGit, getMergeBaseCommit, getWorkspacePath } from '../git-utils';
 import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
@@ -32,11 +32,17 @@ export class GitChangeObserver {
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
     const lister = new GitChangeLister(gitApi, executor);
-    void lister.collectFilesFromRepoState().then(files => {
-      for (const file of files) {
-        this.tracker.add(file);
-      }
-    });
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (workspaceFolder) {
+      const workspacePath = getWorkspacePath(workspaceFolder);
+      const repo = getRepo(workspaceFolder.uri);
+      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+      void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
+        for (const file of files) {
+          this.tracker.add(file);
+        }
+      });
+    }
   }
 
   start(): void {
@@ -54,9 +60,10 @@ export class GitChangeObserver {
     const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
 
     try {
-      const workspacePath = workspaceFolder.uri.fsPath;
-      const committedChanges = await getCommittedChanges(baseCommit, workspacePath);
-      const statusChanges = await getStatusChanges(workspacePath);
+      const workspacePath = getWorkspacePath(workspaceFolder);
+      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+      const committedChanges = await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
+      const statusChanges = await getStatusChanges(gitRootPath, workspacePath);
 
       const allChangedFiles = new Set([...committedChanges, ...statusChanges]);
 
@@ -80,7 +87,7 @@ export class GitChangeObserver {
       return true;
     }
 
-    const relativePath = path.relative(workspaceFolder.uri.fsPath, filePath);
+    const relativePath = path.relative(getWorkspacePath(workspaceFolder), filePath);
 
     if (!changedFiles.includes(relativePath)) {
       return false;
@@ -179,6 +186,10 @@ export class GitChangeObserver {
       }
     }
 
+  }
+
+  public removeFromTracker(filePath: string): void {
+    this.tracker.delete(filePath);
   }
 
   dispose(): void {

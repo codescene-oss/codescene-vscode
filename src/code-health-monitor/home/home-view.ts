@@ -26,9 +26,16 @@ function getUserName(accountLabel: string | undefined) {
   return accountLabel;
 }
 
+let homeViewInstance: HomeView | undefined;
+
 export function register(context: ExtensionContext, backgroundSeriveView: BackgroundServiceView) {
   const viewProvider = new HomeView(context, backgroundSeriveView);
+  homeViewInstance = viewProvider;
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('codescene.homeView', viewProvider));
+}
+
+export function getHomeViewInstance(): HomeView | undefined {
+  return homeViewInstance;
 }
 
 interface IdeContextData {

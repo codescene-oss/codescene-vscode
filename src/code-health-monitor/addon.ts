@@ -3,13 +3,16 @@ import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
-import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, updateGitState } from '../git-utils';
+import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, getRepoRootPath, updateGitState } from '../git-utils';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
 import { GitChangeLister } from '../git/git-change-lister';
 import { DevtoolsAPI } from '../devtools-api';
+import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
+import { logOutputChannel } from '../log';
+import { SimpleExecutor } from '../simple-executor';
 
 let gitApi: API | undefined;
 
@@ -30,7 +33,9 @@ export function activate(context: vscode.ExtensionContext) {
     void onRepoStateChange(repo);
   }
 
-  const repoStateListeners = gitApi.repositories.map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
+  const repoStateListeners = gitApi.repositories
+    .filter((repo) => repo?.state)
+    .map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
   CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
@@ -38,12 +43,20 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // Review all changed/added files once when repository state is ready
+  // Review all changed/added files every 9 seconds.
+  // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
+  // because `CsDiagnostics.review` has built-in caching.
   const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
-  gitChangeLister.start(context);
+  const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
+
+  void scheduledExecutor.executeTask(async () => {
+    logOutputChannel.info('Starting scheduled git change review');
+    await gitChangeLister.startAsync(context);
+  });
 
   context.subscriptions.push(
     codeHealthMonitorView,
+    scheduledExecutor,
     ...repoStateListeners,
     vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
       const params: InteractiveDocsParams = {
@@ -109,8 +122,9 @@ function onRepoStateChange(repo: Repository) {
 }
 
 function setBaseline(repo: Repository) {
+  const repoPath = getRepoRootPath(repo);
   Reviewer.instance.setBaseline((fileUri: Uri) => {
     const r = getRepo(fileUri);
-    return r?.rootUri.path === repo.rootUri.path;
+    return r ? getRepoRootPath(r) === repoPath : false;
   });
 }

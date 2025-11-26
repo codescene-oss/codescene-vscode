@@ -29,6 +29,13 @@ jobs:
 
       - uses: './.github/actions/setup'
 
+      - name: Validate release
+        run: |
+          npm run tsc
+          npm run lint
+          npm run build
+          rm -rf out/
+
       - name: Set PRERELEASE version
         run: |
           current_version=$(jq -r '.version' package.json)
@@ -36,11 +43,12 @@ jobs:
           jq --arg new_version "${current_version}-PRERELEASE-${short_sha}" '.version = $new_version' package.json > tmp.json
           mv tmp.json package.json
 
-      - name: Install vsce
-        run: npm install --global @vscode/vsce
-
-      - name: Package platform-specific VSIX
-        run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
+      - name: Build extension vsix file
+        run: |
+          npm install --global @vscode/vsce
+          npm run updatedocs
+          npm run updatecwf
+          vsce package
         env:
           CI: true
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}

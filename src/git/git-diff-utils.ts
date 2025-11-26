@@ -1,8 +1,9 @@
+import * as path from 'path';
 import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
 
 export function parseGitStatusFilename(line: string): string | null {
-  // e.g. "MM src/foo.clj"
+  // e.g. "MM src/foo.clj" or '?? "file with spaces.ts"'
   const match = line.match(/^\S+\s+(.+)$/);
 
   if (!match?.[1]) {
@@ -10,14 +11,55 @@ export function parseGitStatusFilename(line: string): string | null {
   }
 
   // Handle renames: "R  old -> new" becomes "new"
-  const filename = match[1].includes(' -> ')
+  let filename = match[1].includes(' -> ')
     ? match[1].split(' -> ')[1].trim()
     : match[1];
+
+  // Strip surrounding double-quotes if present (can happen for filenames with whitespace in them):
+  if (filename.startsWith('"') && filename.endsWith('"')) {
+    filename = filename.slice(1, -1);
+  }
 
   return filename;
 }
 
-export async function getCommittedChanges(baseCommit: string, workspacePath: string): Promise<Set<string>> {
+export function createWorkspacePrefix(workspacePath: string): { normalizedWorkspacePath: string; workspacePrefix: string } {
+  const normalizedWorkspacePath = path.resolve(workspacePath);
+  const workspacePrefix = normalizedWorkspacePath.endsWith(path.sep)
+    ? normalizedWorkspacePath
+    : normalizedWorkspacePath + path.sep;
+  return { normalizedWorkspacePath, workspacePrefix };
+}
+
+export function isFileInWorkspace(
+  file: string,
+  gitRootPath: string,
+  normalizedWorkspacePath: string,
+  workspacePrefix: string
+): boolean {
+  const normalizedGitRootPath = path.normalize(gitRootPath);
+  // Git returns paths relative to gitRootPath, so resolve them to absolute paths:
+  // Normalize the file path to handle Git's forward slashes on all platforms
+  const normalizedFile = path.normalize(file);
+  const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+  // Only include files that are within the workspace:
+  return absolutePath.startsWith(workspacePrefix) || absolutePath === normalizedWorkspacePath;
+}
+
+export function convertGitPathToWorkspacePath(
+  file: string,
+  gitRootPath: string,
+  normalizedWorkspacePath: string
+): string {
+  // Git returns paths relative to gitRootPath. Convert to absolute, then make relative to workspacePath:
+  const normalizedGitRootPath = path.normalize(gitRootPath);
+  const normalizedFile = path.normalize(file);
+  const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+  const relativeToWorkspace = path.relative(normalizedWorkspacePath, absolutePath);
+  return relativeToWorkspace;
+}
+
+export async function getCommittedChanges(gitRootPath: string, baseCommit: string, workspacePath: string): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
   if (!baseCommit) {
@@ -26,16 +68,21 @@ export async function getCommittedChanges(baseCommit: string, workspacePath: str
 
   const result = await gitExecutor.execute(
     { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
-    { cwd: workspacePath }
+    { cwd: gitRootPath }
   );
 
   if (result.exitCode === 0) {
+    const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+
     result.stdout
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .forEach(file => {
-        changedFiles.add(file);
+        if (isFileInWorkspace(file, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
+          const relativeToWorkspace = convertGitPathToWorkspacePath(file, gitRootPath, normalizedWorkspacePath);
+          changedFiles.add(relativeToWorkspace);
+        }
       });
   } else {
     logOutputChannel.warn(`Failed to get committed changes vs ${baseCommit}: ${result.stderr}`);
@@ -44,16 +91,18 @@ export async function getCommittedChanges(baseCommit: string, workspacePath: str
   return changedFiles;
 }
 
-export async function getStatusChanges(workspacePath: string): Promise<Set<string>> {
+export async function getStatusChanges(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
   const result = await gitExecutor.execute(
     // untracked-files is important - makes it return e.g. foo/bar.clj instead of foo/ for untracked files. Else we can produce unreliable results.
     { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
-    { cwd: workspacePath }
+    { cwd: gitRootPath }
   );
 
   if (result.exitCode === 0) {
+    const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+
     result.stdout
       .split('\n')
       .map(line => line.trim())
@@ -68,8 +117,9 @@ export async function getStatusChanges(workspacePath: string): Promise<Set<strin
       })
       .forEach(line => {
         const filename = parseGitStatusFilename(line);
-        if (filename) {
-          changedFiles.add(filename);
+        if (filename && isFileInWorkspace(filename, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
+          const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
+          changedFiles.add(relativeToWorkspace);
         }
       });
   } else {

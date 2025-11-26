@@ -41,12 +41,10 @@ jobs:
       env:
         CI: true
 
-    - run: xvfb-run -a npm test
-      if: runner.os == 'Linux'
-      env:
-        CI: true
+    # silence a warning when running tests
+    - name: Configure Git
+      run: git config --global advice.defaultBranchName false
 
     - run: npm test
-      if: runner.os != 'Linux'
       env:
         CI: true
