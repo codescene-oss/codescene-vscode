@@ -25,13 +25,13 @@ export class GitChangeObserver {
   //   (which may have been added to the Monitor treeview, so they need to be removed on deletion events)
   private tracker: Set<string> = new Set();
 
-  constructor(context: vscode.ExtensionContext, executor: Executor, gitApi: API) {
+  constructor(context: vscode.ExtensionContext, executor: Executor) {
     this.context = context;
     this.executor = executor;
     this.fileWatcher = this.createWatcher('**/*');
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
-    const lister = new GitChangeLister(gitApi, executor);
+    const lister = new GitChangeLister(executor);
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (workspaceFolder) {
       const workspacePath = getWorkspacePath(workspaceFolder);
