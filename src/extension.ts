@@ -40,6 +40,8 @@ interface CsContext {
 const extId = 'codescene.codescene-vscode';
 const migrationKey = 'codescene.lastSeenVersion';
 
+let DISPOSABLES: vscode.Disposable[] = [];
+
 /**
  * Extension entry point
  * @param context
@@ -82,6 +84,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   const csContext: CsContext = {
     csWorkspace,
   };
+  DISPOSABLES.push(csWorkspace);
   context.subscriptions.push(csWorkspace);
   CsServerVersion.init();
 
@@ -100,8 +103,11 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
+  DISPOSABLES.push(codeLensProvider);
   context.subscriptions.push(codeLensProvider);
-  context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
+  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider);
+  DISPOSABLES.push(codeLensProviderRegistration);
+  context.subscriptions.push(codeLensProviderRegistration);
 
   registerCodeActionProvider(context);
 
@@ -109,11 +115,11 @@ async function startExtension(context: vscode.ExtensionContext) {
   const debouncedSetEnabledAce = debounce((enabled: boolean) => {
     void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
   }, 500);
-  context.subscriptions.push(
-    onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedSetEnabledAce(e.value);
-    })
-  );
+  const aceConfigDisposable = onDidChangeConfiguration('enableAutoRefactor', (e) => {
+    debouncedSetEnabledAce(e.value);
+  });
+  DISPOSABLES.push(aceConfigDisposable);
+  context.subscriptions.push(aceConfigDisposable);
 }
 
 /**
@@ -136,17 +142,18 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
   });
+  DISPOSABLES.push(toggleReviewCodeLensesCmd);
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
 }
 
 function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
-      await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
-    })
-  );
+  const openSettingsCmd = vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
+    await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
+  });
+  DISPOSABLES.push(openSettingsCmd);
+  context.subscriptions.push(openSettingsCmd);
 }
 
 /**
@@ -156,6 +163,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   // Observe open file events and trigger reviews
   const openFilesObserver = new OpenFilesObserver(context);
   openFilesObserver.start();
+  DISPOSABLES.push(openFilesObserver);
   context.subscriptions.push(openFilesObserver);
 
   // Watch for discrete Git file changes (create, modify, delete)
@@ -164,6 +172,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   if (gitApi) {
     gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
     gitChangeObserver.start();
+    DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);
   }
 
@@ -188,6 +197,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
       }
     }
   });
+  DISPOSABLES.push(filenameInspectorExecutor);
   context.subscriptions.push(filenameInspectorExecutor);
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
@@ -206,6 +216,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     // TODO trigger a review of files based off GitFileLister.
 
   });
+  DISPOSABLES.push(rulesFileWatcher);
   context.subscriptions.push(rulesFileWatcher);
 }
 
@@ -229,17 +240,19 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.signIn', async () => {
-      const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
-      vscode.authentication
-        .getSession(AUTH_TYPE, [], { createIfNone: true })
-        .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
-    })
-  );
+  const signInCmd = vscode.commands.registerCommand('codescene.signIn', async () => {
+    const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
+    vscode.authentication
+      .getSession(AUTH_TYPE, [], { createIfNone: true })
+      .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
+  });
+  DISPOSABLES.push(signInCmd);
+  context.subscriptions.push(signInCmd);
 
   // Register manual sign out command
-  context.subscriptions.push(vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider)));
+  const signOutCmd = vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider));
+  DISPOSABLES.push(signOutCmd);
+  context.subscriptions.push(signOutCmd);
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
   // sign in in the accounts menu - see AuthenticationGetSessionOptions
@@ -279,6 +292,9 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     // TODO: refresh CWF view(s)
   });
 
+  DISPOSABLES.push(authProvider);
+  DISPOSABLES.push(serverUrlChangedDisposable);
+  DISPOSABLES.push(authTokenChangedDisposable);
   context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
 }
 
@@ -288,6 +304,14 @@ export function deactivate() {
   deactivateGitUtils();
   deactivateLog();
   DevtoolsAPI.dispose();
+
+  for (const disposable of DISPOSABLES) {
+    try {
+      disposable.dispose();
+    } catch (e) {
+    }
+  }
+  DISPOSABLES = [];
 }
 
 function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {
