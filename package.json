@@ -5,11 +5,11 @@
     "url": "https://github.com/codescene-oss/codescene-vscode.git"
   },
   "icon": "assets/cs-logo.png",
-  "displayName": "CodeScene test",
+  "displayName": "CodeScene",
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.17.6",
+  "version": "0.17.2",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
