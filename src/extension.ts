@@ -209,8 +209,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
     // Review visible documents - update Diagnostics pane, not the Monitor
     visibleDocs.forEach((document: vscode.TextDocument) => {
-      // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: true, updateDiagnosticsPane: true });
+      CsDiagnostics.review(document, { skipCache: true, skipMonitorUpdate: true, updateDiagnosticsPane: true });
     });
 
     // TODO trigger a review of files based off GitFileLister.
