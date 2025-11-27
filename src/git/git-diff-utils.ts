@@ -2,6 +2,10 @@ import * as path from 'path';
 import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
 
+//  https://git-scm.com/docs/git#Documentation/git.txt---no-optional-locks
+// Can help creating unnecessary index.lock files:
+const GIT_ENV_NO_OPTIONAL_LOCKS = { GIT_OPTIONAL_LOCKS: "0" };
+
 export function parseGitStatusFilename(line: string): string | null {
   // e.g. "MM src/foo.clj" or '?? "file with spaces.ts"'
   const match = line.match(/^\S+\s+(.+)$/);
@@ -68,7 +72,7 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
 
   const result = await gitExecutor.execute(
     { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
-    { cwd: gitRootPath }
+    { cwd: gitRootPath, env: GIT_ENV_NO_OPTIONAL_LOCKS }
   );
 
   if (result.exitCode === 0) {
@@ -97,7 +101,7 @@ export async function getStatusChanges(gitRootPath: string, workspacePath: strin
   const result = await gitExecutor.execute(
     // untracked-files is important - makes it return e.g. foo/bar.clj instead of foo/ for untracked files. Else we can produce unreliable results.
     { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
-    { cwd: gitRootPath }
+    { cwd: gitRootPath, env: GIT_ENV_NO_OPTIONAL_LOCKS }
   );
 
   if (result.exitCode === 0) {

@@ -68,7 +68,6 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
   private async handleMessage(request: RefactoringRequest, message: MessageToIDEType) {
     const handlers: Record<string, () => void> = {
       init: () => this.handleInit(message),
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'goto-function-location': async () => {
         await showDocAtPosition(request.document, request.fnToRefactor.vscodeRange.start);
         void highlightCode(request, false);

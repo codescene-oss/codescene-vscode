@@ -4,7 +4,6 @@ import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
 import { Stats } from './executor-stats';
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
 
 export class SimpleExecutor implements Executor {

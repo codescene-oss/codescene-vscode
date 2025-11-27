@@ -11,4 +11,8 @@ export function registerShowLogCommand(context: vscode.ExtensionContext) {
   );
 }
 
+export function deactivate() {
+  logOutputChannel.dispose();
+}
+
 export { logOutputChannel };

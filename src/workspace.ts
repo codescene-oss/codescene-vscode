@@ -35,4 +35,8 @@ export class CsWorkspace {
   clearProjectAssociation() {
     this.updateIsWorkspaceAssociatedContext(undefined);
   }
+
+  dispose() {
+    this.projectAssociationChangedEmitter.dispose();
+  }
 }

@@ -29,7 +29,6 @@ export function promiseFromEvent<T, U>(
 
   return {
     promise: new Promise<U>((resolve, reject) => {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       cancel.event((_) => reject('Cancelled'));
       subscription = event((value: T) => {
         try {

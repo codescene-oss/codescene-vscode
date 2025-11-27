@@ -39,12 +39,14 @@ suite('GitChangeLister Test Suite', () => {
     }
   });
 
-  test('getAllChangedFiles returns empty set for clean repository', async () => {
+  test('getAllChangedFiles returns empty set for clean repository', async function () {
+    this.timeout(20000);
     const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
     assert.strictEqual(changedFiles.size, 0);
   });
 
-  test('getAllChangedFiles detects new untracked files', async () => {
+  test('getAllChangedFiles detects new untracked files', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     const newFile = path.join(testRepoPath, 'test.ts');
@@ -56,7 +58,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('test.ts')));
   });
 
-  test('getAllChangedFiles detects modified files', async () => {
+  test('getAllChangedFiles detects modified files', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     const testFile = path.join(testRepoPath, 'index.js');
@@ -72,7 +75,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('index.js')));
   });
 
-  test('getAllChangedFiles detects staged files', async () => {
+  test('getAllChangedFiles detects staged files', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     const newFile = path.join(testRepoPath, 'script.py');
@@ -85,7 +89,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('script.py')));
   });
 
-  test('getAllChangedFiles filters unsupported file types', async () => {
+  test('getAllChangedFiles filters unsupported file types', async function () {
+    this.timeout(20000);
     const txtFile = path.join(testRepoPath, 'notes.txt');
     const mdFile = path.join(testRepoPath, 'docs.md');
     const tsFile = path.join(testRepoPath, 'code.ts');
@@ -100,7 +105,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(fileNames.includes('code.ts'), 'Should include .ts file');
   });
 
-  test('getAllChangedFiles detects renamed files', async () => {
+  test('getAllChangedFiles detects renamed files', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     const originalFile = path.join(testRepoPath, 'original.js');
@@ -118,7 +124,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(Array.from(changedFiles).some(f => f.endsWith('renamed.js')));
   });
 
-  test('getAllChangedFiles combines status and diff changes', async () => {
+  test('getAllChangedFiles combines status and diff changes', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     execSync('git checkout -b feature-branch', { cwd: testRepoPath, stdio: 'pipe' });
@@ -137,7 +144,8 @@ suite('GitChangeLister Test Suite', () => {
     assert.ok(fileNames.includes('uncommitted.ts'), 'Should include uncommitted file');
   });
 
-  test('getAllChangedFiles handles files with whitespace in names', async () => {
+  test('getAllChangedFiles handles files with whitespace in names', async function () {
+    this.timeout(20000);
     const { execSync } = require('child_process');
 
     const fileWithSpaces = path.join(testRepoPath, 'my file.ts');

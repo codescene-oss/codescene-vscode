@@ -22,7 +22,7 @@ jobs:
         uses: dsaltares/fetch-gh-release-asset@master
         with:
           regex: true
-          file: 'codescene-vscode-test.*\.vsix'
+          file: 'codescene-vscode.*\.vsix'
           version: 'latest'
           target: './'
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,7 +33,7 @@ jobs:
           rm -f vsix-map.txt
           targets=("win32-x64" "darwin-x64" "darwin-arm64" "linux-x64" "linux-arm64")
           for target in "${targets[@]}"; do
-            file=$(find . -name "codescene-vscode-test-*-${target}.vsix" | head -1)
+            file=$(find . -name "codescene-vscode-*-${target}.vsix" | head -1)
             if [ -z "$file" ]; then
               echo "❌ Missing VSIX for ${target}"
               exit 1

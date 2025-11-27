@@ -437,7 +437,14 @@ skipCache === true ? ' (retry)' : ''
   }
 
   static dispose() {
-    DevtoolsAPI.instance.concurrencyLimitingExecutor.dispose();
+    try { DevtoolsAPI.instance?.concurrencyLimitingExecutor.dispose(); } catch {}
+    try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.deltaAnalysisEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.preflightRequestEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.refactoringRequestEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.refactoringErrorEmitter.dispose(); } catch {}
   }
 }
 

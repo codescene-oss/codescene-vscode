@@ -239,3 +239,7 @@ export function updateGitState(repo: Repository) : GitStateChange {
   };
   return gitStateChange;
 }
+
+export function deactivate() {
+  gitFileDeleteEvent.dispose();
+}
