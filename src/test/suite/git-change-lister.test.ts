@@ -30,7 +30,7 @@ suite('GitChangeLister Test Suite', () => {
 
     mockGitApi = new MockGitAPI();
     mockExecutor = new MockExecutor();
-    gitChangeLister = new GitChangeLister(mockGitApi as API, mockExecutor);
+    gitChangeLister = new GitChangeLister(mockExecutor);
   });
 
   teardown(() => {

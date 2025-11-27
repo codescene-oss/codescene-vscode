@@ -13,100 +13,32 @@ import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
  * Lists all changed files exhaustively from Git status, and Git diff vs. merge-base.
  */
 export class GitChangeLister {
-  private gitApi: API;
   private executor: Executor;
 
-  constructor(gitApi: API, executor: Executor) {
-    this.gitApi = gitApi;
+  constructor(executor: Executor) {
     this.executor = executor;
   }
 
-  start(context: vscode.ExtensionContext): void {
-    if (this.gitApi.repositories.length === 0) {
-      logOutputChannel.error('Code Health Monitor: No repositories found for initial review');
-      return;
-    }
-
-    void this.startAsync(context);
-  }
-
-  async startAsync(context: vscode.ExtensionContext): Promise<void> {
-
-    // Sometimes the Git facilities don't immediately work,
-    // so we use isGitAvailable to see if there's evidence of them being immediately available.
-    // If not, we set a temporary change listener so that we can operate only when Git finally becomes available.
-    if (await this.isGitAvailable()) {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (workspaceFolder) {
-        const workspacePath = getWorkspacePath(workspaceFolder);
-        const repo = getRepo(workspaceFolder.uri);
-        const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-        const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
-        this.reviewFiles(allChangedFiles);
-      }
-      return;
-    }
-
-    const repo = this.gitApi.repositories.find(r => r?.state);
-
-    if (!repo) {
-      logOutputChannel.error('No Git repository with valid state found');
-      return;
-    }
-
-    // State not ready yet, set up listener to wait for changes
-    return this.setupChangeListener(repo, context);
-  }
-
-  /**
-   * Heuristic showing if Git is ready to use.
-   */
-  private async isGitAvailable(): Promise<boolean> {
+  // NOTE:
+  // At times, Git may not immediately work.
+  // However, that doesn't matter, because GitChangeLister is always run within a DroppingScheduledExecutor,
+  // so if it fails at the first run, a second one will succeed.
+  // We used to have some code trying to avoid that unreliability, but it turned out to be complex and expensive.
+  async start(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      return false;
+    if (workspaceFolder) {
+      const workspacePath = getWorkspacePath(workspaceFolder);
+      const repo = getRepo(workspaceFolder.uri);
+      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+      const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
+      this.reviewFiles(allChangedFiles);
     }
-
-    const workspacePath = getWorkspacePath(workspaceFolder);
-    const repo = getRepo(workspaceFolder.uri);
-    const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-    const files = await this.collectFilesFromRepoState(gitRootPath, workspacePath);
-    if (files.size > 0) {
-      return true;
-    }
-
-    const gitDiffFiles = await this.collectFilesFromGitDiff(gitRootPath, workspacePath);
-    return gitDiffFiles.size > 0;
   }
 
   async getAllChangedFiles(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
     const filesFromRepoState = await this.collectFilesFromRepoState(gitRootPath, workspacePath);
     const filesFromGitDiff = await this.collectFilesFromGitDiff(gitRootPath, workspacePath);
     return new Set([...filesFromRepoState, ...filesFromGitDiff]);
-  }
-
-  private setupChangeListener(repo: any, context: vscode.ExtensionContext): Promise<void> {
-    return new Promise<void>((resolve) => {
-      let disposable: vscode.Disposable;
-      disposable = repo.state.onDidChange(async () => {
-        if (await this.isGitAvailable()) {
-          const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-          if (workspaceFolder) {
-            const workspacePath = getWorkspacePath(workspaceFolder);
-            const repoObj = getRepo(workspaceFolder.uri);
-            const gitRootPath = repoObj?.rootUri.fsPath || workspacePath;
-            const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
-            if (allChangedFiles.size > 0) {
-              this.reviewFiles(allChangedFiles);
-              disposable.dispose();
-              resolve();
-            }
-          }
-        }
-      });
-
-      context.subscriptions.push(disposable);
-    });
   }
 
   async collectFilesFromRepoState(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
