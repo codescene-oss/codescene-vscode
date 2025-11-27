@@ -37,7 +37,7 @@ interface CsContext {
   csWorkspace: CsWorkspace;
 }
 
-const extId = 'codescene-coach.codescene-vscode-test';
+const extId = 'codescene.codescene-vscode';
 const migrationKey = 'codescene.lastSeenVersion';
 
 /**
