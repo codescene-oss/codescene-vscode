@@ -7,9 +7,10 @@ export default class Reviewer {
 
   static init(
     context: vscode.ExtensionContext,
-    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>
+    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
+    getCodeHealthFileVersions: () => Map<string, number>
   ): void {
-    Reviewer._instance = new CachingReviewer(getBaselineCommit);
+    Reviewer._instance = new CachingReviewer(getBaselineCommit, getCodeHealthFileVersions);
     context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
   }

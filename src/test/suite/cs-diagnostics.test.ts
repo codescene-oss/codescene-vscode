@@ -65,7 +65,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     originalCollection = (CsDiagnostics as any).collection;
     (CsDiagnostics as any).collection = mockCollection;
     CsDiagnostics.init(mockContext);
-    Reviewer.init(mockContext, async () => undefined);
+    Reviewer.init(mockContext, async () => undefined, () => new Map());
   });
 
   teardown(() => {

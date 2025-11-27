@@ -13,8 +13,11 @@ export class CachingReviewer implements Disposable {
   private disposables: vscode.Disposable[] = [];
   readonly reviewCache: ReviewCache;
 
-  constructor(getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>) {
-    this.reviewCache = new ReviewCache(getBaselineCommit);
+  constructor(
+    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
+    getCodeHealthFileVersions: () => Map<string, number>
+  ) {
+    this.reviewCache = new ReviewCache(getBaselineCommit, getCodeHealthFileVersions);
     const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     this.disposables.push(
       deleteFileWatcher,
