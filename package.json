@@ -178,6 +178,7 @@
           "type": "string",
           "default": "",
           "description": "Authentication token for CodeScene ACE. Has priority over the Sign In with CodeScene command.",
+          "secret": true,
           "order": 19.5
         },
         "codescene.enableTelemetry": {
