@@ -90,7 +90,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
           }
         }
       },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'open-settings': async () => {
         Telemetry.logUsage('control-center/open-settings');
         try {
@@ -102,7 +101,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
           await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
         }
       },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'goto-function-location': () => {
         void showDocAtPosition(params.document, params.issueInfo.position);
       },
@@ -119,7 +117,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
         );
         this.webViewPanel.dispose();
       },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'request-and-present-refactoring': () => {
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',

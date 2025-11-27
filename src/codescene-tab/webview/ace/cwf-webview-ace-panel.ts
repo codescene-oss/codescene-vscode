@@ -147,7 +147,6 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       showLogoutput: () => {
         logOutputChannel.show();
       },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'goto-function-location': async () => {
         await showDocAtPosition(request.document, request.fnToRefactor.vscodeRange.start);
         void highlightCode(request, false);

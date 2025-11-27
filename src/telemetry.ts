@@ -5,12 +5,18 @@ import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
+import { serializeError } from './utils';
 
 export default class Telemetry {
   private static _instance?: Telemetry;
 
   private static eventPrefix = 'vscode';
   private telemetryLogger: vscode.TelemetryLogger;
+
+  static serializeErrorWithExtraData(error: Error, data?: Record<string, any>): Record<string, any> {
+    const serializedError = serializeError(error);
+    return data ? { ...serializedError, extraData: data } : serializedError;
+  }
 
   constructor(private extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
@@ -19,12 +25,19 @@ export default class Telemetry {
         const evtName = eventName.replace(extension.id, Telemetry.eventPrefix);
         void this.postTelemetry(evtName, eventData);
       },
-      sendErrorData: (error) => {
-        logOutputChannel.error(error);
+      sendErrorData: (error: Error, data?: Record<string, any>) => {
+        try {
+          Telemetry.logError(error, data);
+        } catch (omit) {
+          // Do nothing - can't risk entering in some sort of error loop if failing when reporting errors
+        }
       },
     };
 
-    this.telemetryLogger = vscode.env.createTelemetryLogger(sender, { ignoreUnhandledErrors: true });
+    this.telemetryLogger = vscode.env.createTelemetryLogger(sender,
+                                                            // Important: let the Telemetry instance handle uncaught exceptions,
+                                                            // as propagated by VS Code:
+                                                            { ignoreUnhandledErrors: false });
   }
 
   static async init(context: vscode.ExtensionContext): Promise<void> {
@@ -56,13 +69,30 @@ export default class Telemetry {
   }
 
   static logUsage(eventName: string, eventData?: any) {
-    if (!Telemetry._instance || !getConfiguration('enableTelemetry')) {
+    if (!Telemetry._instance) {
       return;
     }
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
 
+  static logError(error: Error, data?: Record<string, any>) {
+    if (!Telemetry._instance) {
+      return;
+    }
+    // note that stacktraces and other user data are already sanitized by VS Code, which is perfect for us.
+    logOutputChannel.error(error, data);
+    const telemetryData = Telemetry.serializeErrorWithExtraData(error, data);
+    try {
+      void Telemetry._instance.postTelemetry('vscode/unhandledError', telemetryData);
+    } catch (omit) {
+      // Do nothing - can't risk entering in some sort of error loop if failing when reporting errors
+    }
+  }
+
   private async postTelemetry(eventName: string, eventData: any) {
+    if (!getConfiguration('enableTelemetry')){
+      return;
+    }
     const telemetryEvent: TelemetryEvent = {
       ...eventData,
       'event-time': new Date().toISOString(),

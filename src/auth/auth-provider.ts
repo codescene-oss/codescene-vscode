@@ -21,9 +21,7 @@ import { safeJsonParse } from '../utils';
 import { UriEventHandler } from './uri-event-handler';
 import { PromiseAdapter, promiseFromEvent } from './util';
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const AUTH_TYPE = 'codescene';
-// eslint-disable-next-line @typescript-eslint/naming-convention
 const SESSIONS_STORAGE_KEY = `${AUTH_TYPE}.sessions`;
 
 interface LoginResponse {
@@ -158,7 +156,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
         title: 'Signing in to CodeScene...',
         cancellable: true,
       },
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       async (_, cancelButtonToken) => {
         const loginUrl = await this.loginUrl();
         logOutputChannel.debug(`Opening ${loginUrl.toString()}`);
@@ -167,11 +164,9 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
         const promises: Promise<any>[] = [];
         const codeExchangePromise = promiseFromEvent(this.uriHandler.event, this.handleUri());
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         const timeoutPromise = new Promise<LoginResponse>((_, reject) => setTimeout(() => reject('Cancelled'), 60000));
         const cancelledByButtonPromise = promiseFromEvent(
           cancelButtonToken.onCancellationRequested,
-          // eslint-disable-next-line @typescript-eslint/naming-convention
           (_, __, reject) => {
             Telemetry.logUsage('auth/cancelled');
             reject('User Cancelled');
@@ -181,7 +176,6 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
 
         if (CsAuthenticationProvider.runningLogin) {
           promises.push(
-            // eslint-disable-next-line @typescript-eslint/naming-convention
             promiseFromEvent(CsAuthenticationProvider.runningLogin.token.onCancellationRequested, (_, __, reject) => {
               Telemetry.logUsage('auth/cancelled');
               reject('Cancelled due to starting another login attempt');

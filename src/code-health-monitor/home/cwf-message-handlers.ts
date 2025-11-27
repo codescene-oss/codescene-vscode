@@ -195,11 +195,9 @@ async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType)
  */
 function handlePanelMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     case 'request-and-present-refactoring':
       void handleAutoRefactor(homeView, message.payload);
       return;
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     case 'open-docs-for-function':
       handleOpenDocs(homeView, message.payload);
       return;
