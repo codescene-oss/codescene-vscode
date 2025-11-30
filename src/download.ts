@@ -77,16 +77,21 @@ function download({ artifactName: artifactDownloadName, absoluteDownloadPath, ab
  */
 async function verifyBinaryVersion({
   binaryPath,
+  cwd,
   throwOnError = false,
 }: {
   binaryPath: string;
+  cwd: string;
   throwOnError?: boolean;
 }) {
-  const result = await new SimpleExecutor().execute({
-    command: binaryPath,
-    args: ['version', '--sha'],
-    ignoreError: true,
-  });
+  const result = await new SimpleExecutor().execute(
+    {
+      command: binaryPath,
+      args: ['version', '--sha'],
+      ignoreError: true,
+    },
+    { cwd }
+  );
   if (result.exitCode !== 0) {
     if (throwOnError) throw new Error(`Error when verifying devtools binary version: ${result.stderr}`);
     logOutputChannel.debug(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
@@ -107,14 +112,14 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
   const artifactInfo = new ArtifactInfo(extensionPath);
   const binaryPath = artifactInfo.absoluteBinaryPath;
 
-  if (await verifyBinaryVersion({ binaryPath })) return binaryPath;
+  if (await verifyBinaryVersion({ binaryPath, cwd: extensionPath })) return binaryPath;
 
   await download(artifactInfo);
   await unzipFile(artifactInfo);
   await ensureExecutable(binaryPath);
 
   if (fs.existsSync(binaryPath)) {
-    await verifyBinaryVersion({ binaryPath, throwOnError: true });
+    await verifyBinaryVersion({ binaryPath, cwd: extensionPath, throwOnError: true });
     return binaryPath;
   } else {
     throw new Error(`The devtools binary "${binaryPath}" does not exist!`);

@@ -1,10 +1,11 @@
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
 import Telemetry from './telemetry';
 import { AbortError } from './devtools-api/abort-error';
 import { DevtoolsError } from './devtools-api/devtools-error';
+import { getWorkspacePath } from './git-utils';
 
 export function toUppercase(word: String) {
   return word.charAt(0).toUpperCase() + word.slice(1);
@@ -171,4 +172,20 @@ export function safeJsonParse(input: string, context?: any) {
                  extraData: {input, contextStr}});
     throw e;
   }
+}
+
+export function getWorkspaceFolder(): vscode.WorkspaceFolder | undefined {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders) {
+    return undefined;
+  }
+  return folders.find(folder => folder !== null);
+}
+
+export function getWorkspaceCwd(): string {
+  const workspaceFolder = getWorkspaceFolder();
+  if (workspaceFolder) {
+    return getWorkspacePath(workspaceFolder);
+  }
+  return normalize(process.cwd());
 }
