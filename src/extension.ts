@@ -32,6 +32,8 @@ import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
 
+const ENABLE_AUTH_COMMANDS = false;
+
 interface CsContext {
   csWorkspace: CsWorkspace;
 }
@@ -264,10 +266,7 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
-function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
-  const authProvider = new CsAuthenticationProvider(context);
-
-  // Register manual sign in command
+function registerSignInCommand(context: vscode.ExtensionContext, csContext: CsContext) {
   const signInCmd = vscode.commands.registerCommand('codescene.signIn', async () => {
     const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
     vscode.authentication
@@ -276,11 +275,26 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   });
   DISPOSABLES.push(signInCmd);
   context.subscriptions.push(signInCmd);
+}
 
-  // Register manual sign out command
+function registerSignOutCommand(context: vscode.ExtensionContext, authProvider: CsAuthenticationProvider) {
   const signOutCmd = vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider));
   DISPOSABLES.push(signOutCmd);
   context.subscriptions.push(signOutCmd);
+}
+
+function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
+  const authProvider = new CsAuthenticationProvider(context);
+
+  // Register manual sign in command
+  if (ENABLE_AUTH_COMMANDS) {
+    registerSignInCommand(context, csContext);
+  }
+
+  // Register manual sign out command
+  if (ENABLE_AUTH_COMMANDS) {
+    registerSignOutCommand(context, authProvider);
+  }
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
   // sign in in the accounts menu - see AuthenticationGetSessionOptions

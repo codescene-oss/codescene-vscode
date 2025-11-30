@@ -73,14 +73,6 @@
         "title": "CodeScene: Show output log"
       },
       {
-        "command": "codescene.signIn",
-        "title": "CodeScene: Sign in to CodeScene"
-      },
-      {
-        "command": "codescene.signOut",
-        "title": "CodeScene: Sign out from CodeScene"
-      },
-      {
         "command": "codescene.printDevtoolsApiStats",
         "title": "CodeScene: Print Devtools API stats"
       },
