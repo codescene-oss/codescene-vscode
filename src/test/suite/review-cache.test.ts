@@ -287,4 +287,149 @@ suite('ReviewCache Test Suite', () => {
       assert.strictEqual(reviewCache.snapshotsEqual(a, b), false);
     });
   });
+
+  suite('refreshDeltas', () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    let tempDir: string;
+
+    setup(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-cache-test-'));
+    });
+
+    teardown(() => {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    function createTempFilePath(filename: string): string {
+      return path.join(tempDir, filename);
+    }
+
+    function createExistingFile(filename: string, content: string = 'export const test = 1;'): string {
+      const filePath = createTempFilePath(filename);
+      fs.writeFileSync(filePath, content);
+      return filePath;
+    }
+
+    async function addDocumentToCache(filePath: string): Promise<vscode.TextDocument> {
+      const document = createMockDocument(filePath);
+      await addReview(document);
+      return document;
+    }
+
+    function spyOnRunDeltaAnalysis(document: vscode.TextDocument): { called: boolean; getCalled: () => boolean } {
+      const cacheItem = reviewCache.get(document);
+      assert.ok(cacheItem, 'Cache item should exist');
+
+      const state = { called: false };
+      cacheItem.runDeltaAnalysis = async (options: any) => {
+        state.called = true;
+        return Promise.resolve(undefined);
+      };
+
+      return {
+        called: state.called,
+        getCalled: () => state.called
+      };
+    }
+
+    async function runRefreshDeltasAndWait(): Promise<void> {
+      reviewCache.refreshDeltas();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    test('should call runDeltaAnalysis for files that exist', async () => {
+      const testFilePath = createExistingFile('existing.ts');
+      const document = await addDocumentToCache(testFilePath);
+
+      assert.ok(fs.existsSync(testFilePath), 'Test file should exist on filesystem');
+
+      try {
+        await vscode.workspace.fs.stat(document.uri);
+      } catch (error) {
+        assert.fail(`vscode.workspace.fs.stat failed: ${error}`);
+      }
+
+      const spy = spyOnRunDeltaAnalysis(document);
+      await runRefreshDeltasAndWait();
+
+      assert.strictEqual(spy.getCalled(), true, 'runDeltaAnalysis should be called for existing file');
+    });
+
+    test('should not call runDeltaAnalysis for files that do not exist', async () => {
+      const nonExistentFilePath = createTempFilePath('nonexistent.ts');
+      const document = await addDocumentToCache(nonExistentFilePath);
+
+      const spy = spyOnRunDeltaAnalysis(document);
+      await runRefreshDeltasAndWait();
+
+      assert.strictEqual(spy.getCalled(), false, 'runDeltaAnalysis should not be called for non-existent file');
+    });
+
+    test('should remove cache entry for non-existent file', async () => {
+      const nonExistentFilePath = createTempFilePath('to-be-deleted.ts');
+      const document = await addDocumentToCache(nonExistentFilePath);
+
+      let cacheItem = reviewCache.get(document);
+      assert.ok(cacheItem, 'Cache item should exist before refreshDeltas');
+
+      await runRefreshDeltasAndWait();
+
+      cacheItem = reviewCache.get(document);
+      assert.strictEqual(cacheItem, undefined, 'Cache item should be removed for non-existent file');
+    });
+
+    test('should remove all versions of a file when none exist', async () => {
+      const nonExistentFilePath = createTempFilePath('multi-version.ts');
+      const document = createMockDocument(nonExistentFilePath);
+
+      await addReview(document);
+
+      setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
+      await addReview(document);
+
+      setRulesVersions({ '/project/.codescene/code-health-rules.json': 2 });
+      await addReview(document);
+
+      let cacheItem = reviewCache.get(document);
+      assert.ok(cacheItem, 'Cache item should exist before refreshDeltas');
+
+      await runRefreshDeltasAndWait();
+
+      cacheItem = reviewCache.get(document);
+      assert.strictEqual(cacheItem, undefined, 'All versions should be removed for non-existent file');
+
+      codeHealthFileVersions.clear();
+      cacheItem = reviewCache.get(document);
+      assert.strictEqual(cacheItem, undefined, 'Empty snapshot version should also be removed');
+
+      setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
+      cacheItem = reviewCache.get(document);
+      assert.strictEqual(cacheItem, undefined, 'Version 1 snapshot should also be removed');
+    });
+
+    test('should handle mixed scenario with existing and non-existing files', async () => {
+      const existingFilePath = createExistingFile('existing.ts');
+      const nonExistentFilePath = createTempFilePath('nonexistent.ts');
+
+      const existingDoc = await addDocumentToCache(existingFilePath);
+      const nonExistentDoc = await addDocumentToCache(nonExistentFilePath);
+
+      const existingSpy = spyOnRunDeltaAnalysis(existingDoc);
+      const nonExistentSpy = spyOnRunDeltaAnalysis(nonExistentDoc);
+
+      await runRefreshDeltasAndWait();
+
+      assert.strictEqual(existingSpy.getCalled(), true, 'runDeltaAnalysis should be called for existing file');
+      assert.strictEqual(nonExistentSpy.getCalled(), false, 'runDeltaAnalysis should not be called for non-existent file');
+
+      const existingStillInCache = reviewCache.get(existingDoc);
+      const nonExistentStillInCache = reviewCache.get(nonExistentDoc);
+      assert.ok(existingStillInCache, 'Existing file should still be in cache');
+      assert.strictEqual(nonExistentStillInCache, undefined, 'Non-existent file should be removed from cache');
+    });
+  });
 });

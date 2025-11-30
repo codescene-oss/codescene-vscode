@@ -33,9 +33,17 @@ export class ReviewCache {
   }
 
   refreshDeltas() {
-    this._cache.forEach((innerMap) => {
-      innerMap.forEach((item) => {
-        void item.runDeltaAnalysis({ skipMonitorUpdate: false });
+    this._cache.forEach((innerMap, fileName) => {
+      innerMap.forEach(async (item, snapshot) => {
+        try {
+          await vscode.workspace.fs.stat(item.document.uri);
+          void item.runDeltaAnalysis({ skipMonitorUpdate: false });
+        } catch { // File doesn't exist
+          innerMap.delete(snapshot);
+          if (innerMap.size === 0) {
+            this._cache.delete(fileName);
+          }
+        }
       });
     });
   }
