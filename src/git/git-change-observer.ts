@@ -9,6 +9,7 @@ import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 import { GitChangeLister } from './git-change-lister';
+import { getWorkspaceFolder } from '../utils';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
@@ -25,14 +26,14 @@ export class GitChangeObserver {
   //   (which may have been added to the Monitor treeview, so they need to be removed on deletion events)
   private tracker: Set<string> = new Set();
 
-  constructor(context: vscode.ExtensionContext, executor: Executor, gitApi: API) {
+  constructor(context: vscode.ExtensionContext, executor: Executor) {
     this.context = context;
     this.executor = executor;
     this.fileWatcher = this.createWatcher('**/*');
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
-    const lister = new GitChangeLister(gitApi, executor);
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const lister = new GitChangeLister(executor);
+    const workspaceFolder = getWorkspaceFolder();
     if (workspaceFolder) {
       const workspacePath = getWorkspacePath(workspaceFolder);
       const repo = getRepo(workspaceFolder.uri);
@@ -51,7 +52,7 @@ export class GitChangeObserver {
   }
 
   async getChangedFilesVsBaseline(): Promise<string[]> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
       return [];
     }
@@ -81,7 +82,7 @@ export class GitChangeObserver {
   }
 
   private isFileInChangedList(filePath: string, changedFiles: string[]): boolean {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
 
     if (!workspaceFolder) {
       return true;

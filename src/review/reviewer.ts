@@ -7,9 +7,10 @@ export default class Reviewer {
 
   static init(
     context: vscode.ExtensionContext,
-    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>
+    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
+    getCodeHealthFileVersions: () => Map<string, number>
   ): void {
-    Reviewer._instance = new CachingReviewer(getBaselineCommit);
+    Reviewer._instance = new CachingReviewer(getBaselineCommit, getCodeHealthFileVersions);
     context.subscriptions.push(Reviewer._instance);
     logOutputChannel.info('Code reviewer initialized');
   }
@@ -20,7 +21,7 @@ export default class Reviewer {
 }
 
 export interface ReviewOpts {
-  skipCache?: string;
+  skipCache?: boolean;
   baseline?: string;
   skipMonitorUpdate: boolean;     // Please set this to true if triggering reviews due to opening files, and to false if triggering reviews due to Git changes.
   //                                 (the reason is that Git changes are always processed anyway, so it's redundant to update the Monitor twice for the same change)

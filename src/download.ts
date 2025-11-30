@@ -26,12 +26,12 @@ function getBundledBinaryPath(extensionPath: string): string {
 /**
  * Verify that the binary matches the expected required version.
  */
-async function verifyBinaryVersion(binaryPath: string): Promise<boolean> {
+async function verifyBinaryVersion(binaryPath: string, cwd: string): Promise<boolean> {
   const result = await new SimpleExecutor().execute({
     command: binaryPath,
     args: ['version', '--sha'],
     ignoreError: true,
-  });
+  }, { cwd });
   if (result.exitCode !== 0) {
     logOutputChannel.debug(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
     return false;
@@ -61,7 +61,7 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
   }
 
   // Verify version
-  const isValid = await verifyBinaryVersion(binaryPath);
+  const isValid = await verifyBinaryVersion(binaryPath, extensionPath);
   if (!isValid) {
     throw new Error(
       `The devtools binary version does not match the required version ${requiredDevtoolsVersion}. Please rebuild the extension.`
