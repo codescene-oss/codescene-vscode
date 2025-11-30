@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.18.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.2...v0.18.0) (2025-11-30)
+
+
+### Features
+
+* cached reviews should use code-health-rules.json as part of the cache key ([#237](https://github.com/codescene-oss/codescene-vscode/issues/237)) ([08e8541](https://github.com/codescene-oss/codescene-vscode/commit/08e8541ef567bc68a4ab621c00e4fa59c164dca9))
+* hide 'Sign In' commands ([#240](https://github.com/codescene-oss/codescene-vscode/issues/240)) ([3764436](https://github.com/codescene-oss/codescene-vscode/commit/37644360cbd87d26a94f4e661639e8c0df063bda))
+* send errors over Telemetry ([#229](https://github.com/codescene-oss/codescene-vscode/issues/229)) ([0d7cc3e](https://github.com/codescene-oss/codescene-vscode/commit/0d7cc3e45a630bf700cb20927b6946043e2ba877))
+
+
+### Bug fixes
+
+* avoid recursion when relaying errors through Telemetry ([#234](https://github.com/codescene-oss/codescene-vscode/issues/234)) ([e0f4d3b](https://github.com/codescene-oss/codescene-vscode/commit/e0f4d3bfceaeedc60e2b9de1128a305b3ef1db98))
+* improve extension deactivation ([e41661a](https://github.com/codescene-oss/codescene-vscode/commit/e41661a52488dbbac6ffb4bdbe9739a485881c32))
+* set GIT_OPTIONAL_LOCKS=0 ([1894774](https://github.com/codescene-oss/codescene-vscode/commit/1894774dd09a7722c65016aedcae7129c82b7a58))
+* simplify GitChangeLister ([#233](https://github.com/codescene-oss/codescene-vscode/issues/233)) ([10ef136](https://github.com/codescene-oss/codescene-vscode/commit/10ef136f431957f61042083603c7c21f1ef30427))
+
 ### [0.17.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.1...v0.17.2) (2025-11-24)
 
 
