@@ -1,5 +1,5 @@
 import { CodeSmell, Review } from '../devtools-api/review-model';
-import { assertError, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
+import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import {
   FnToRefactor,
@@ -46,7 +46,7 @@ export class DevtoolsAPI {
    * Executes the command for creating a code health rules template.
    */
   static async codeHealthRulesTemplate() {
-    const result = await DevtoolsAPI.instance.runBinary({ args: ['code-health-rules-template'] });
+    const result = await DevtoolsAPI.instance.runBinary({ args: ['code-health-rules-template'], execOptions: { cwd: getWorkspaceCwd() } });
     return result.stdout;
   }
 
@@ -235,7 +235,7 @@ export class DevtoolsAPI {
     const args = ['refactor', 'preflight'];
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
     try {
-      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({ args });
+      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({ args, execOptions: { cwd: getWorkspaceCwd() } });
       DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
@@ -286,6 +286,7 @@ export class DevtoolsAPI {
         cachePath ? ['--cache-path', cachePath] : []
       ),
       input: document.getText(),
+      execOptions: { cwd: fp.documentDirectory },
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     logOutputChannel.debug(
@@ -341,9 +342,10 @@ export class DevtoolsAPI {
 skipCache === true ? ' (retry)' : ''
 }, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
       );
+      const fp = fileParts(document);
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,
-        execOptions: { signal },
+        execOptions: { signal, cwd: fp.documentDirectory },
         taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
       });
       logOutputChannel.info(
@@ -375,6 +377,7 @@ skipCache === true ? ' (retry)' : ''
     const jsonEvent = JSON.stringify(event);
     return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({
       args: ['telemetry', '--event', jsonEvent],
+      execOptions: { cwd: getWorkspaceCwd() },
       taskId: TELEMETRY_POST_TASK_ID
     });
   }
@@ -382,6 +385,7 @@ skipCache === true ? ' (retry)' : ''
   static async getDeviceId() {
     return (await DevtoolsAPI.instance.runBinary({
       args: ['telemetry', '--device-id'],
+      execOptions: { cwd: getWorkspaceCwd() },
       taskId: TELEMETRY_DEVICE_ID_TASK_ID
     })).stdout;
   }

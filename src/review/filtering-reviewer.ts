@@ -6,6 +6,7 @@ import { Review } from '../devtools-api/review-model';
 import { SimpleExecutor } from '../simple-executor';
 import { ReviewOpts } from './reviewer';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { getWorkspaceFolder } from '../utils';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -20,8 +21,8 @@ export class FilteringReviewer {
   private watcher: vscode.FileSystemWatcher | null = null;
 
   constructor() {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders) {
+    const workspaceFolder = getWorkspaceFolder();
+    if (workspaceFolder) {
       this.gitExecutor = new SimpleExecutor();
       this.watcher = vscode.workspace.createFileSystemWatcher('**/.gitignore');
       this.watcher.onDidChange(() => this.clearCache());

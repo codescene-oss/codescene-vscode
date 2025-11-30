@@ -154,7 +154,7 @@ export interface BinaryOpts {
   args: string[];
 
   // ExecOptions (signal, cwd etc...)
-  execOptions?: ExecOptions;
+  execOptions: ExecOptions & { cwd: string };
 
   // optional string to send on stdin
   input?: string;

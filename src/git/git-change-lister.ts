@@ -8,6 +8,7 @@ import { Executor } from '../executor';
 import { getMergeBaseCommit, isMainBranch, getWorkspacePath } from '../git-utils';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
+import { getWorkspaceFolder } from '../utils';
 
 /**
  * Lists all changed files exhaustively from Git status, and Git diff vs. merge-base.
@@ -25,7 +26,7 @@ export class GitChangeLister {
   // so if it fails at the first run, a second one will succeed.
   // We used to have some code trying to avoid that unreliability, but it turned out to be complex and expensive.
   async start(): Promise<void> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (workspaceFolder) {
       const workspacePath = getWorkspacePath(workspaceFolder);
       const repo = getRepo(workspaceFolder.uri);
@@ -92,7 +93,7 @@ export class GitChangeLister {
   }
 
   async getChangedFilesVsMergeBase(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
       return new Set<string>();
     }

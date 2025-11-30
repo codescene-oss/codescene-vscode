@@ -8,6 +8,30 @@ export function setEnableTestLogging(value: boolean) {
   enableTestLogging = value;
 }
 
+const defaultWorkspaceFolders = [
+  {
+    uri: { fsPath: '/Users/vemv/ext', scheme: 'file', authority: '', path: '/Users/vemv/ext', query: '', fragment: '' },
+    name: 'ext',
+    index: 0,
+  },
+];
+
+export function mockWorkspaceFolders(workspaceFolders: any[] | undefined | null) {
+  vscodeStub.workspace.workspaceFolders = workspaceFolders as any;
+}
+
+export function createMockWorkspaceFolder(fsPath: string, name: string = 'test-workspace', index: number = 0) {
+  return {
+    uri: { fsPath, scheme: 'file', authority: '', path: fsPath, query: '', fragment: '' },
+    name,
+    index,
+  };
+}
+
+export function restoreDefaultWorkspaceFolders() {
+  vscodeStub.workspace.workspaceFolders = defaultWorkspaceFolders as any;
+}
+
 const vscodeStub = {
   window: {
     createOutputChannel: (name: string) => ({
@@ -30,13 +54,7 @@ const vscodeStub = {
     executeCommand: () => Promise.resolve(),
   },
   workspace: {
-    workspaceFolders: [
-      {
-        uri: { fsPath: '/Users/vemv/ext', scheme: 'file', authority: '', path: '/Users/vemv/ext', query: '', fragment: '' },
-        name: 'ext',
-        index: 0,
-      },
-    ],
+    workspaceFolders: defaultWorkspaceFolders as any,
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
