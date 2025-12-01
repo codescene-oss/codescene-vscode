@@ -33,7 +33,7 @@ jobs:
       with:
         cs-token:  ${{ secrets.CS_API_TOKEN }}
         format: lcov
-        metric: statement-coverage
+        metric: function-coverage
         file: coverage/lcov.info
 
     - name: Upload branch coverage data
