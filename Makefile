@@ -8,7 +8,7 @@ build:
 package: lint pretest
 	npm i
 	npm run updatecwf
-	vsce package
+	npx @vscode/vsce@3.7.1 package
 
 tsc:
 	npx tsc --noEmit

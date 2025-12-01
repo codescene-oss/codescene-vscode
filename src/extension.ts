@@ -1,8 +1,7 @@
 import vscode from 'vscode';
-import fs from 'fs';
 import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor, getBaselineCommit } from './code-health-monitor/addon';
+import { activate as activateCHMonitor, deactivate as deactivateAddon, getBaselineCommit } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -14,7 +13,7 @@ import { register as registerDocumentationCommands } from './documentation/comma
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
-import { logOutputChannel, registerShowLogCommand } from './log';
+import { deactivate as deactivateLog, logOutputChannel, registerShowLogCommand } from './log';
 import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
@@ -28,10 +27,12 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, fireFileDeletedFromGit } from './git-utils';
+import { acquireGitApi, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
+
+const ENABLE_AUTH_COMMANDS = false;
 
 interface CsContext {
   csWorkspace: CsWorkspace;
@@ -39,6 +40,27 @@ interface CsContext {
 
 const extId = 'codescene.codescene-vscode';
 const migrationKey = 'codescene.lastSeenVersion';
+
+let DISPOSABLES: vscode.Disposable[] = [];
+
+const codeHealthFileVersion = new Map<string, number>();
+
+export function getCodeHealthFileVersions(): Map<string, number> {
+  return codeHealthFileVersion;
+}
+
+async function initializeCodeHealthFileVersions() {
+  const rulesFiles = await vscode.workspace.findFiles('**/.codescene/code-health-rules.json');
+
+  for (const uri of rulesFiles) {
+    try {
+      const document = await vscode.workspace.openTextDocument(uri);
+      codeHealthFileVersion.set(document.fileName, document.version);
+    } catch (e) {
+      logOutputChannel.warn(`Failed to open code-health-rules.json: ${uri.fsPath}`, e);
+    }
+  }
+}
 
 /**
  * Extension entry point
@@ -57,7 +79,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await Telemetry.init(context);
 
       try {
-        Reviewer.init(context, getBaselineCommit);
+        Reviewer.init(context, getBaselineCommit, getCodeHealthFileVersions);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
         finalizeActivation(context);
@@ -78,9 +100,12 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 async function startExtension(context: vscode.ExtensionContext) {
+  const csWorkspace = new CsWorkspace(context);
   const csContext: CsContext = {
-    csWorkspace: new CsWorkspace(context),
+    csWorkspace,
   };
+  DISPOSABLES.push(csWorkspace);
+  context.subscriptions.push(csWorkspace);
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context);
@@ -91,6 +116,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
+  await initializeCodeHealthFileVersions();
   addReviewListeners(context);
   setupStatsCollector(context);
 
@@ -98,8 +124,11 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
+  DISPOSABLES.push(codeLensProvider);
   context.subscriptions.push(codeLensProvider);
-  context.subscriptions.push(vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider));
+  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider);
+  DISPOSABLES.push(codeLensProviderRegistration);
+  context.subscriptions.push(codeLensProviderRegistration);
 
   registerCodeActionProvider(context);
 
@@ -107,11 +136,11 @@ async function startExtension(context: vscode.ExtensionContext) {
   const debouncedSetEnabledAce = debounce((enabled: boolean) => {
     void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
   }, 500);
-  context.subscriptions.push(
-    onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedSetEnabledAce(e.value);
-    })
-  );
+  const aceConfigDisposable = onDidChangeConfiguration('enableAutoRefactor', (e) => {
+    debouncedSetEnabledAce(e.value);
+  });
+  DISPOSABLES.push(aceConfigDisposable);
+  context.subscriptions.push(aceConfigDisposable);
 }
 
 /**
@@ -134,17 +163,18 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
   });
+  DISPOSABLES.push(toggleReviewCodeLensesCmd);
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
 }
 
 function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
-      await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
-    })
-  );
+  const openSettingsCmd = vscode.commands.registerCommand('codescene.openSettingsAndFocusToken', async () => {
+    await vscode.commands.executeCommand('workbench.action.openSettings', 'codescene.authToken');
+  });
+  DISPOSABLES.push(openSettingsCmd);
+  context.subscriptions.push(openSettingsCmd);
 }
 
 /**
@@ -154,14 +184,16 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   // Observe open file events and trigger reviews
   const openFilesObserver = new OpenFilesObserver(context);
   openFilesObserver.start();
+  DISPOSABLES.push(openFilesObserver);
   context.subscriptions.push(openFilesObserver);
 
   // Watch for discrete Git file changes (create, modify, delete)
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
   if (gitApi) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, gitApi);
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
     gitChangeObserver.start();
+    DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);
   }
 
@@ -186,24 +218,35 @@ function addReviewListeners(context: vscode.ExtensionContext) {
       }
     }
   });
+  DISPOSABLES.push(filenameInspectorExecutor);
   context.subscriptions.push(filenameInspectorExecutor);
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
-  rulesFileWatcher.onDidChange((uri: vscode.Uri) => {
-    logOutputChannel.info(`code-health-rules.json changed, updating diagnostics`);
 
-    const visibleDocs = vscode.workspace.textDocuments.filter(doc => vscode.window.visibleTextEditors.some(editor => editor.document.fileName === doc.fileName));
-
-    // Review visible documents - update Diagnostics pane, not the Monitor
-    visibleDocs.forEach((document: vscode.TextDocument) => {
-      // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: 'true', skipMonitorUpdate: true, updateDiagnosticsPane: true });
-    });
-
-    // TODO trigger a review of files based off GitFileLister.
-
+  rulesFileWatcher.onDidChange(async (uri: vscode.Uri) => {
+    try {
+      const document = await vscode.workspace.openTextDocument(uri);
+      codeHealthFileVersion.set(document.fileName, document.version);
+    } catch (e) {
+      logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
+    }
   });
+
+  rulesFileWatcher.onDidCreate(async (uri: vscode.Uri) => {
+    try {
+      const document = await vscode.workspace.openTextDocument(uri);
+      codeHealthFileVersion.set(document.fileName, document.version);
+    } catch (e) {
+      logOutputChannel.warn(`Failed to add code-health-rules.json version: ${uri.fsPath}`, e);
+    }
+  });
+
+  rulesFileWatcher.onDidDelete((uri: vscode.Uri) => {
+    codeHealthFileVersion.delete(uri.fsPath);
+  });
+
+  DISPOSABLES.push(rulesFileWatcher);
   context.subscriptions.push(rulesFileWatcher);
 }
 
@@ -223,21 +266,35 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
+function registerSignInCommand(context: vscode.ExtensionContext, csContext: CsContext) {
+  const signInCmd = vscode.commands.registerCommand('codescene.signIn', async () => {
+    const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
+    vscode.authentication
+      .getSession(AUTH_TYPE, [], { createIfNone: true })
+      .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
+  });
+  DISPOSABLES.push(signInCmd);
+  context.subscriptions.push(signInCmd);
+}
+
+function registerSignOutCommand(context: vscode.ExtensionContext, authProvider: CsAuthenticationProvider) {
+  const signOutCmd = vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider));
+  DISPOSABLES.push(signOutCmd);
+  context.subscriptions.push(signOutCmd);
+}
+
 function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codescene.signIn', async () => {
-      const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
-      vscode.authentication
-        .getSession(AUTH_TYPE, [], { createIfNone: true })
-        .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
-    })
-  );
+  if (ENABLE_AUTH_COMMANDS) {
+    registerSignInCommand(context, csContext);
+  }
 
   // Register manual sign out command
-  context.subscriptions.push(vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider)));
+  if (ENABLE_AUTH_COMMANDS) {
+    registerSignOutCommand(context, authProvider);
+  }
 
   // If there's already a session we enable the remote features, otherwise silently add an option to
   // sign in in the accounts menu - see AuthenticationGetSessionOptions
@@ -277,12 +334,26 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     // TODO: refresh CWF view(s)
   });
 
+  DISPOSABLES.push(authProvider);
+  DISPOSABLES.push(serverUrlChangedDisposable);
+  DISPOSABLES.push(authTokenChangedDisposable);
   context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() {
+  deactivateAddon();
+  deactivateGitUtils();
+  deactivateLog();
   DevtoolsAPI.dispose();
+
+  for (const disposable of DISPOSABLES) {
+    try {
+      disposable.dispose();
+    } catch (e) {
+    }
+  }
+  DISPOSABLES = [];
 }
 
 function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {

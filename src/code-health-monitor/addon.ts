@@ -19,6 +19,8 @@ let gitApi: API | undefined;
 const clearTreeEmitter = new vscode.EventEmitter<void>();
 export const onTreeDataCleared = clearTreeEmitter.event;
 
+let ALL_DISPOSABLES: vscode.Disposable[] = [];
+
 export function activate(context: vscode.ExtensionContext) {
   gitApi = acquireGitApi();
   if (!gitApi) return;
@@ -37,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
     .filter((repo) => repo?.state)
     .map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
-  CsExtensionState.onBaselineChanged(async () => {
+  const baselineChangedListener = CsExtensionState.onBaselineChanged(async () => {
     for (const repo of gitApi!.repositories) {
       await setBaseline(repo);
     }
@@ -46,26 +48,32 @@ export function activate(context: vscode.ExtensionContext) {
   // Review all changed/added files every 9 seconds.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
   // because `CsDiagnostics.review` has built-in caching.
-  const gitChangeLister = new GitChangeLister(gitApi, DevtoolsAPI.concurrencyLimitingExecutor);
+  const gitChangeLister = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor);
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
   void scheduledExecutor.executeTask(async () => {
     logOutputChannel.info('Starting scheduled git change review');
-    await gitChangeLister.startAsync(context);
+    await gitChangeLister.start();
   });
 
-  context.subscriptions.push(
+  const codeHealthMonitorHelpCommand = vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
+    const params: InteractiveDocsParams = {
+      issueInfo: { category: 'docs_code_health_monitor', position: new vscode.Position(0, 0) },
+      document: undefined,
+    };
+    CodeSceneCWFDocsTabPanel.show(params);
+  });
+
+  ALL_DISPOSABLES = [
+    clearTreeEmitter,
     codeHealthMonitorView,
     scheduledExecutor,
+    baselineChangedListener,
+    codeHealthMonitorHelpCommand,
     ...repoStateListeners,
-    vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
-      const params: InteractiveDocsParams = {
-        issueInfo: { category: 'docs_code_health_monitor', position: new vscode.Position(0, 0) },
-        document: undefined,
-      };
-      CodeSceneCWFDocsTabPanel.show(params);
-    })
-  );
+  ];
+
+  context.subscriptions.push(...ALL_DISPOSABLES);
 }
 
 const baselineHandlers: Record<Baseline, (repo: Repository) => Promise<string>> = {
@@ -127,4 +135,9 @@ function setBaseline(repo: Repository) {
     const r = getRepo(fileUri);
     return r ? getRepoRootPath(r) === repoPath : false;
   });
+}
+
+export function deactivate() {
+  ALL_DISPOSABLES.forEach((disposable) => disposable.dispose());
+  ALL_DISPOSABLES = [];
 }

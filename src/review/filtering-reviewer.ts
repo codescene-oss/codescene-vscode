@@ -6,6 +6,7 @@ import { Review } from '../devtools-api/review-model';
 import { SimpleExecutor } from '../simple-executor';
 import { ReviewOpts } from './reviewer';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { getWorkspaceFolder } from '../utils';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -17,15 +18,16 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 export class FilteringReviewer {
   private gitExecutor: SimpleExecutor | null = null;
   private gitExecutorCache = new Map<string, boolean>();
+  private watcher: vscode.FileSystemWatcher | null = null;
 
   constructor() {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders) {
+    const workspaceFolder = getWorkspaceFolder();
+    if (workspaceFolder) {
       this.gitExecutor = new SimpleExecutor();
-      const watcher = vscode.workspace.createFileSystemWatcher('**/.gitignore');
-      watcher.onDidChange(() => this.clearCache());
-      watcher.onDidCreate(() => this.clearCache());
-      watcher.onDidDelete(() => this.clearCache());
+      this.watcher = vscode.workspace.createFileSystemWatcher('**/.gitignore');
+      this.watcher.onDidChange(() => this.clearCache());
+      this.watcher.onDidCreate(() => this.clearCache());
+      this.watcher.onDidDelete(() => this.clearCache());
     }
   }
 
@@ -83,5 +85,9 @@ export class FilteringReviewer {
 
   abort(document: vscode.TextDocument): void {
     DevtoolsAPI.abortReviews(document);
+  }
+
+  dispose() {
+    this.watcher?.dispose();
   }
 }

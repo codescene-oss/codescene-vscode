@@ -1,4 +1,5 @@
 import Module from 'module';
+import * as fs from 'fs';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
@@ -6,6 +7,30 @@ import { RangeStub } from './stubs/range-stub';
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
   enableTestLogging = value;
+}
+
+const defaultWorkspaceFolders = [
+  {
+    uri: { fsPath: '/Users/vemv/ext', scheme: 'file', authority: '', path: '/Users/vemv/ext', query: '', fragment: '' },
+    name: 'ext',
+    index: 0,
+  },
+];
+
+export function mockWorkspaceFolders(workspaceFolders: any[] | undefined | null) {
+  vscodeStub.workspace.workspaceFolders = workspaceFolders as any;
+}
+
+export function createMockWorkspaceFolder(fsPath: string, name: string = 'test-workspace', index: number = 0) {
+  return {
+    uri: { fsPath, scheme: 'file', authority: '', path: fsPath, query: '', fragment: '' },
+    name,
+    index,
+  };
+}
+
+export function restoreDefaultWorkspaceFolders() {
+  vscodeStub.workspace.workspaceFolders = defaultWorkspaceFolders as any;
 }
 
 const vscodeStub = {
@@ -30,13 +55,7 @@ const vscodeStub = {
     executeCommand: () => Promise.resolve(),
   },
   workspace: {
-    workspaceFolders: [
-      {
-        uri: { fsPath: '/Users/vemv/ext', scheme: 'file', authority: '', path: '/Users/vemv/ext', query: '', fragment: '' },
-        name: 'ext',
-        index: 0,
-      },
-    ],
+    workspaceFolders: defaultWorkspaceFolders as any,
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
@@ -49,6 +68,25 @@ const vscodeStub = {
       inspect: () => undefined,
       update: () => Promise.resolve(),
     }),
+    fs: {
+      stat: async (uri: any) => {
+        const fsPath = uri.fsPath || uri.path;
+        return new Promise((resolve, reject) => {
+          fs.stat(fsPath, (err: any, stats: any) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve({
+                type: stats.isFile() ? 1 : stats.isDirectory() ? 2 : 0,
+                ctime: stats.ctimeMs,
+                mtime: stats.mtimeMs,
+                size: stats.size,
+              });
+            }
+          });
+        });
+      },
+    },
   },
   languages: {
     match: (selector: any, document: any) => {

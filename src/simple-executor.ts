@@ -25,7 +25,7 @@ export class SimpleExecutor implements Executor {
     this.stats.logStats();
   }
 
-  execute(command: Command, options: ExecOptions = {}, input?: string) {
+  execute(command: Command, options: ExecOptions & { cwd: string }, input?: string) {
     const logName = [command.command, ...command.args].join(' ');
     const trimmedArgs = command.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
     const logCommand = [command.command, ...trimmedArgs].join(' ');
