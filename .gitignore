@@ -17,3 +17,4 @@ cs-cwf/
 test-git-repo/
 test-git-repo-diff-utils/
 test-cs-diagnostics/
+coverage/
