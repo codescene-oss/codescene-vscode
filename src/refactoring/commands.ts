@@ -5,6 +5,7 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
+import { reportError } from '../utils';
 import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 import { logOutputChannel } from '../log';
@@ -70,7 +71,29 @@ export class CsRefactoringCommands implements vscode.Disposable {
     });
   }
 
+  private async closeExistingDiffTabs() {
+    const tabsToClose = vscode.window.tabGroups.all
+      .flatMap((group) => group.tabs)
+      .filter(
+        (tab) =>
+          tab.input instanceof vscode.TabInputTextDiff &&
+          (tab.input.original.scheme === 'tmp-diff' || tab.input.modified.scheme === 'tmp-diff')
+      );
+
+    for (const tab of tabsToClose) {
+      await vscode.window.tabGroups.close(tab);
+    }
+  }
+
   private async showDiffForRefactoringCmd(refactoring: RefactoringRequest) {
+    // Close any existing diff tabs before opening a new one.
+    // This ensures that hitting the 'Show Diff' button can be clicked multiple times without creating new Diff panes (CS-5755).
+    // This is the best possible approach atm, since VS Code doesn't offer an API to focus on a specific tab (https://github.com/microsoft/vscode/issues/162446)
+    try {
+      await this.closeExistingDiffTabs();
+    } catch (e) {
+      reportError({e, context: "Error closing diff tabs"});
+    }
     const {
       document,
       fnToRefactor: { vscodeRange },
