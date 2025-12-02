@@ -55,11 +55,8 @@ export function onDidChangeConfiguration(
   });
 }
 
-/**
- * Get the configured URL of the CodeScene server.
- */
 export function getServerUrl() {
-  return getConfiguration<string>('serverUrl', 'https://codescene.io');
+  return "https://codescene.io";
 }
 
 export function reviewCodeLensesEnabled() {

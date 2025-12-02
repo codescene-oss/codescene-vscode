@@ -16,7 +16,7 @@ import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-
 import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
-import { onDidChangeConfiguration } from '../../configuration';
+import { onDidChangeConfiguration, getServerUrl } from '../../configuration';
 import { onFileDeletedFromGit } from '../../git-utils';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
@@ -287,7 +287,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     await webView.postMessage({
       messageType: 'update-renderer',
       payload: getLoginData({
-        baseUrl: 'https://codescene.io',
+        baseUrl: getServerUrl(),
         availableProjects: [],
         state: this.loginFlowState.loginState,
         user: { name: getUserName(this.session?.account.label) },
