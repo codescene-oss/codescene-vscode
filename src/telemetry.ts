@@ -30,7 +30,7 @@ export default class Telemetry {
           const msg = error.message || '';
           const isNetworkError = Object.values(networkErrors).some(errMsg => msg.includes(errMsg));
           if (!isNetworkError && !msg.toLowerCase().includes("telemetry")){ // Avoid recursion
-            Telemetry.logError(error, data);
+            Telemetry.logError(error, false, data);
           }
         } catch (omit) {
           // Do nothing - can't risk entering in some sort of error loop if failing when reporting errors
@@ -79,12 +79,14 @@ export default class Telemetry {
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
 
-  static logError(error: Error, data?: Record<string, any>) {
+  static logError(error: Error, skipLogging: boolean, data?: Record<string, any>) {
     if (!Telemetry._instance) {
       return;
     }
     // note that stacktraces and other user data are already sanitized by VS Code, which is perfect for us.
-    logOutputChannel.error(error, data);
+    if (!skipLogging){
+      logOutputChannel.error(error, data);
+    }
     const telemetryData = Telemetry.serializeErrorWithExtraData(error, data);
     try {
       void Telemetry._instance.postTelemetry('vscode/unhandledError', telemetryData);
