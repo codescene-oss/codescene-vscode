@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "codescene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.17.2",
+  "version": "0.18.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.75.1"
@@ -71,14 +71,6 @@
       {
         "command": "codescene.showLogOutput",
         "title": "CodeScene: Show output log"
-      },
-      {
-        "command": "codescene.signIn",
-        "title": "CodeScene: Sign in to CodeScene"
-      },
-      {
-        "command": "codescene.signOut",
-        "title": "CodeScene: Sign out from CodeScene"
       },
       {
         "command": "codescene.printDevtoolsApiStats",

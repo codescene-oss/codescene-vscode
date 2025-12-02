@@ -26,12 +26,23 @@ function getBundledBinaryPath(extensionPath: string): string {
 /**
  * Verify that the binary matches the expected required version.
  */
-async function verifyBinaryVersion(binaryPath: string): Promise<boolean> {
-  const result = await new SimpleExecutor().execute({
-    command: binaryPath,
-    args: ['version', '--sha'],
-    ignoreError: true,
-  });
+async function verifyBinaryVersion({
+  binaryPath,
+  cwd,
+  throwOnError = false,
+}: {
+  binaryPath: string;
+  cwd: string;
+  throwOnError?: boolean;
+}) {
+  const result = await new SimpleExecutor().execute(
+    {
+      command: binaryPath,
+      args: ['version', '--sha'],
+      ignoreError: true,
+    },
+    { cwd }
+  );
   if (result.exitCode !== 0) {
     logOutputChannel.debug(`Failed verifying CodeScene devtools binary: exit(${result.exitCode}) ${result.stderr}`);
     return false;
@@ -52,6 +63,7 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
   logOutputChannel.info('Checking for bundled CodeScene devtools binary...');
 
   const binaryPath = getBundledBinaryPath(extensionPath);
+  if (await verifyBinaryVersion({ binaryPath, cwd: extensionPath })) return binaryPath;
 
   // Check if binary exists
   if (!fs.existsSync(binaryPath)) {
@@ -60,12 +72,11 @@ export async function ensureCompatibleBinary(extensionPath: string): Promise<str
     );
   }
 
-  // Verify version
-  const isValid = await verifyBinaryVersion(binaryPath);
-  if (!isValid) {
-    throw new Error(
-      `The devtools binary version does not match the required version ${requiredDevtoolsVersion}. Please rebuild the extension.`
-    );
+  if (fs.existsSync(binaryPath)) {
+    await verifyBinaryVersion({ binaryPath, cwd: extensionPath, throwOnError: true });
+    return binaryPath;
+  } else {
+    throw new Error(`The devtools binary "${binaryPath}" does not exist!`);
   }
 
   logOutputChannel.info('CodeScene devtools binary is ready.');

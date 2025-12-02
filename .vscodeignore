@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 .idea/
+.claude/
 src/**
 .gitignore
 .yarnrc
@@ -10,12 +11,15 @@ esbuild.js
 **/*.map
 **/*.ts
 node_modules/
-
+out/test/**
 ## Ignore executables and zips created (in the download process) when running the extension in dev mode
 cs-*
 *.zip
 
 ## Misc dotfiles
+.mocharc.json
+Makefile
+commitlint.config.js
 .github/**
 .versionrc.json
 .codescene/

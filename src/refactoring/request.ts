@@ -10,7 +10,7 @@ export class RefactoringRequest {
   private abortController = new AbortController();
   readonly signal = this.abortController.signal;
 
-  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, readonly skipCache = false) {
+  constructor(readonly fnToRefactor: FnToRefactor, readonly document: TextDocument, readonly skipCache: boolean = false) {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
