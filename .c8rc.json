@@ -13,8 +13,8 @@
     "**/setup.ts",
     "**/setup.js",
     "out/test/**",
-    "**/types/**"
-    "scripts/**"
+    "**/types/**",
+    "scripts/**",
     "out/**/*.test.js"
   ],
   "include": [
