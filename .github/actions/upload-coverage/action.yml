@@ -1,0 +1,29 @@
+name: 'Upload Coverage'
+description: 'Used to upload coverage data to CodeScene'
+inputs:
+  cs-token:
+    required: true
+  format:
+    required: true
+  metric:
+    required: true
+  file:
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Download cs-coverage binary, unzip it and make it executable
+      run: |
+        curl -s -o "$(pwd)/cs-coverage.zip" https://downloads.codescene.io/enterprise/cli/cs-coverage-linux-amd64-latest.zip
+        unzip -oq "$(pwd)/cs-coverage.zip"
+        chmod +x "$(pwd)/cs-coverage"
+      shell: bash
+    - name: Upload coverage data
+      run: |
+        $(pwd)/cs-coverage upload \
+          --format ${{ inputs.format }} \
+          --metric ${{ inputs.metric }} \
+          ${{ inputs.file }}
+      env:
+        CS_ACCESS_TOKEN: ${{ inputs.cs-token }}
+      shell: bash

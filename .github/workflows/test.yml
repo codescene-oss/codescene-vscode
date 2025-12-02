@@ -36,11 +36,6 @@ jobs:
 
     - uses: './.github/actions/setup'
 
-    - name: Pretest
-      run: npm run pretest
-      env:
-        CI: true
-
     # silence a warning when running tests
     - name: Configure Git
       run: git config --global advice.defaultBranchName false

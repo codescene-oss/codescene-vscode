@@ -1,0 +1,27 @@
+{
+  "reporter": ["text", "lcov", "html"],
+  "reports-dir": "coverage",
+  "exclude": [
+    "**/test/**",
+    "**/node_modules/**",
+    "**/coverage/**",
+    "**/*.test.ts",
+    "**/*.test.js",
+    "**/mocks/**",
+    "**/stubs/**",
+    "**/fixtures/**",
+    "**/setup.ts",
+    "**/setup.js",
+    "out/test/**",
+    "**/types/**"
+    "scripts/**"
+    "out/**/*.test.js"
+  ],
+  "include": [
+    "out/**/*.js"
+  ],
+  "all": true,
+  "src": ["src"],
+  "temp-directory": "coverage/tmp"
+}
+

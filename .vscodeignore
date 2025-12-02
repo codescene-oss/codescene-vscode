@@ -27,3 +27,4 @@ commitlint.config.js
 screenshots
 *.vsix
 .DS_Store
+coverage/
