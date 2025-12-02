@@ -318,16 +318,6 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
     CodeSceneTabPanel.refreshIfExists();
   });
 
-  const serverUrlChangedDisposable = onDidChangeConfiguration('serverUrl', async (e) => {
-    const changed = await CsServerVersion.reloadVersion();
-    if (changed.serverChanged) {
-      if (CsExtensionState.session?.id) {
-        logOutputChannel.info('Server changed while signed in, removing obsolete auth session.');
-        void authProvider.removeSession(CsExtensionState.session.id);
-      }
-    }
-  });
-
   const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
     refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
@@ -335,9 +325,8 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   });
 
   DISPOSABLES.push(authProvider);
-  DISPOSABLES.push(serverUrlChangedDisposable);
   DISPOSABLES.push(authTokenChangedDisposable);
-  context.subscriptions.push(authProvider, serverUrlChangedDisposable, authTokenChangedDisposable);
+  context.subscriptions.push(authProvider, authTokenChangedDisposable);
 }
 
 // This method is called when your extension is deactivated

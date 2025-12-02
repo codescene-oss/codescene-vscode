@@ -136,16 +136,11 @@ function handleCloseLogin(homeView: HomeView) {
 }
 
 /**
- * Initiate the login flow first checking if the baseUrl has been changed by the user (Enterprise)
+ * Initiate the login.
  * @param homeView
  * @param payload
  */
 async function handleInitLogin(homeView: HomeView, payload: { baseUrl: string; type: 'cloud' | 'enterprise' }) {
-  const cfg = vscode.workspace.getConfiguration('codescene');
-  const currentServerUrl = cfg.get('serverUrl');
-  if (payload.baseUrl !== currentServerUrl) {
-    await cfg.update('serverUrl', payload.baseUrl, vscode.ConfigurationTarget.Workspace);
-  }
   void vscode.commands.executeCommand('codescene.signIn');
   homeView.setLoginFlowState({
     loginOpen: true,

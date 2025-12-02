@@ -35,7 +35,7 @@ export class CsServerVersion {
   }
 
   private async loadVersion(): Promise<ServerInfo> {
-    const url = getServerUrl() || 'https://codescene.io';
+    const url = getServerUrl();
     logOutputChannel.debug(`Fetching server version from ${url}`);
     let cloudVersion = {
       server: 'cloud',
