@@ -102,12 +102,17 @@ async function main() {
     console.log('\nStep 3: Updating .vscodeignore...');
     updateVscodeIgnore(platform, arch, originalVscodeIgnore);
     
-    // Step 4: Build extension
-    console.log('\nStep 4: Building extension...');
+    // Step 4: Update docs and webview
+    console.log('\nStep 4: Updating docs and webview...');
+    execSync('npm run updatedocs', { stdio: 'inherit', env: { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' } });
+    execSync('npm run updatecwf', { stdio: 'inherit', env: { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' } });
+    
+    // Step 5: Build extension
+    console.log('\nStep 5: Building extension...');
     execSync('npm run build', { stdio: 'inherit' });
     
-    // Step 5: Package VSIX
-    console.log('\nStep 5: Packaging VSIX...');
+    // Step 6: Package VSIX
+    console.log('\nStep 6: Packaging VSIX...');
     const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
     const target = `${platform}-${arch}`;
     const vsixName = `codescene-vscode-${version}-${target}.vsix`;

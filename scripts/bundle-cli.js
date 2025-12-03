@@ -34,7 +34,11 @@ function downloadBinary(artifactName) {
             })
             .on('error', (e) => {
               writeStream.close();
-              fs.unlinkSync(filePath).catch(() => {});
+              try {
+                fs.unlinkSync(filePath);
+              } catch (unlinkError) {
+                // Ignore cleanup errors
+              }
               reject(new Error(`Download error: ${e.message}`));
             })
             .pipe(writeStream);

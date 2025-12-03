@@ -43,12 +43,11 @@ jobs:
           jq --arg new_version "${current_version}-PRERELEASE-${short_sha}" '.version = $new_version' package.json > tmp.json
           mv tmp.json package.json
 
-      - name: Build extension vsix file
-        run: |
-          npm install --global @vscode/vsce
-          npm run updatedocs
-          npm run updatecwf
-          vsce package
+      - name: Install vsce
+        run: npm install --global @vscode/vsce
+
+      - name: Package platform-specific VSIX
+        run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
         env:
           CI: true
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
