@@ -1,7 +1,11 @@
 import vscode from 'vscode';
 import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor, deactivate as deactivateAddon, getBaselineCommit } from './code-health-monitor/addon';
+import {
+  activate as activateCHMonitor,
+  deactivate as deactivateAddon,
+  getBaselineCommit,
+} from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -126,7 +130,10 @@ async function startExtension(context: vscode.ExtensionContext) {
   const codeLensProvider = new CsReviewCodeLensProvider();
   DISPOSABLES.push(codeLensProvider);
   context.subscriptions.push(codeLensProvider);
-  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider);
+  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(
+    reviewDocumentSelector(),
+    codeLensProvider
+  );
   DISPOSABLES.push(codeLensProviderRegistration);
   context.subscriptions.push(codeLensProviderRegistration);
 
@@ -339,8 +346,7 @@ export function deactivate() {
   for (const disposable of DISPOSABLES) {
     try {
       disposable.dispose();
-    } catch (e) {
-    }
+    } catch (e) {}
   }
   DISPOSABLES = [];
 }
@@ -371,10 +377,10 @@ function isUnderTestsOrCI(): boolean {
   const argv = process.argv.join(' ');
   return (
     process.env.VSCODE_TEST === 'true' ||
-      process.env.CI === 'true' ||
-      /- Test/i.test(appName) ||
-      argv.includes('--extensionTestsPath') ||
-      !!process.env.CODE_TESTS_PATH
+    process.env.CI === 'true' ||
+    /- Test/i.test(appName) ||
+    argv.includes('--extensionTestsPath') ||
+    !!process.env.CODE_TESTS_PATH
   );
 }
 
