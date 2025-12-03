@@ -11,6 +11,8 @@ export default class Telemetry {
   private static _instance?: Telemetry;
 
   private static eventPrefix = 'vscode';
+  private static sentErrorsCount = 0;
+  private static readonly MAX_ERRORS_TO_SEND = 5;
   private telemetryLogger: vscode.TelemetryLogger;
 
   static serializeErrorWithExtraData(error: Error, data?: Record<string, any>): Record<string, any> {
@@ -86,11 +88,21 @@ export default class Telemetry {
     if (!skipLogging){
       logOutputChannel.error(error, data);
     }
+
+    if (Telemetry.sentErrorsCount >= Telemetry.MAX_ERRORS_TO_SEND) {
+      // Never send more than MAX_ERRORS_TO_SEND errors over Telemetry per session.
+      // This is a last-resource measure to prevent recursive or otherwise excessive reporting
+      // (besides other existing measures)
+      return;
+    }
+
     const telemetryData = Telemetry.serializeErrorWithExtraData(error, data);
     try {
       void Telemetry._instance.postTelemetry('vscode/unhandledError', telemetryData);
     } catch (omit) {
       // Do nothing - can't risk entering in some sort of error loop if failing when reporting errors
+    } finally {
+      Telemetry.sentErrorsCount++;
     }
   }
 
@@ -146,6 +158,7 @@ export default class Telemetry {
   }
 
   dispose() {
+    Telemetry.sentErrorsCount = 0;
     logOutputChannel.info('Telemetry logger disposed');
     this.telemetryLogger.dispose();
   }
