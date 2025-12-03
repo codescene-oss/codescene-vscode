@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.19.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.18.0...v0.19.0) (2025-12-03)
+
+
+### Features
+
+* remove `Server Url` setting ([#242](https://github.com/codescene-oss/codescene-vscode/issues/242)) ([d4dfd7e](https://github.com/codescene-oss/codescene-vscode/commit/d4dfd7e5d48359e152186e60be46b728f20e2f45))
+
+
+### Bug fixes
+
+* add missing comma to c8 json ([b65746f](https://github.com/codescene-oss/codescene-vscode/commit/b65746f7720dfa5a1ea09f260ae96964973e32a0))
+* make 'Show Diff' button idempotent ([#243](https://github.com/codescene-oss/codescene-vscode/issues/243)) ([48b8927](https://github.com/codescene-oss/codescene-vscode/commit/48b8927535d4dd16f1f89571f097af577dcee1f9))
+* prevent duplicate logging in certain circumstances ([a4c4683](https://github.com/codescene-oss/codescene-vscode/commit/a4c46836850fb619098ae35e771a9135786f6399))
+
+### [0.17.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.5...v0.17.6) (2025-11-26)
+
+### [0.17.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.3...v0.17.5) (2025-11-26)
+
+### [0.17.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.1.4...v0.17.3) (2025-11-26)
+
+
+### Features
+
+* platform specific extensions on marketplace ([cc43de1](https://github.com/codescene-oss/codescene-vscode/commit/cc43de16bafdfa9d6a940d4a003a1d8fc2d02c9c))
+
 ## [0.18.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.17.2...v0.18.0) (2025-11-30)
 
 
