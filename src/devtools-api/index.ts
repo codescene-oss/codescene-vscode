@@ -42,6 +42,10 @@ export class DevtoolsAPI {
     return DevtoolsAPI.instance.concurrencyLimitingExecutor;
   }
 
+  static get networkError() {
+    return DevtoolsAPI.instance?.networkError ?? false;
+  }
+
   /**
    * Executes the command for creating a code health rules template.
    */

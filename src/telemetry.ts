@@ -5,7 +5,7 @@ import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
-import { networkErrors, serializeError } from './utils';
+import { serializeError } from './utils';
 
 export default class Telemetry {
   private static _instance?: Telemetry;
@@ -28,8 +28,7 @@ export default class Telemetry {
       sendErrorData: (error: Error, data?: Record<string, any>) => {
         try {
           const msg = error.message || '';
-          const isNetworkError = Object.values(networkErrors).some(errMsg => msg.includes(errMsg));
-          if (!isNetworkError && !msg.toLowerCase().includes("telemetry")){ // Avoid recursion
+          if (!DevtoolsAPI.networkError && !msg.toLowerCase().includes("telemetry")){ // Avoid recursion
             Telemetry.logError(error, false, data);
           }
         } catch (omit) {

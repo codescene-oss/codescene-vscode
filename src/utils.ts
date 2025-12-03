@@ -41,6 +41,11 @@ export const networkErrors = {
   javaConnectException: 'java.net.ConnectException',
   getAddrInfoNotFound: 'getaddrinfo ENOTFOUND',
   eConnRefused: 'ECONNREFUSED',
+  exceptionalStatusCode: "Exceptional status code",
+  bbError: "at babashka.http_client",
+  status3xx: "status 3",
+  status4xx: "status 4",
+  status5xx: "status 5"
   // add more later if needed
 } as const;
 

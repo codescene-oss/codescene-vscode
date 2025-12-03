@@ -4,7 +4,7 @@ import { SimpleExecutor } from '../simple-executor';
 import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
 import { AbortingSingleTaskExecutor } from '../aborting-single-task-executor';
 import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
-import { safeJsonParse, rangeStr } from '../utils';
+import { safeJsonParse, rangeStr, networkErrors } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
 import {
   CreditsInfoError as CreditsInfoErrorModel,
@@ -43,6 +43,7 @@ export class DevtoolsAPIImpl {
     this.simpleExecutor
   );
   public preflightJson?: string;
+  public networkError: boolean = false;
 
   constructor(public binaryPath: string, context: ExtensionContext) {
     context.subscriptions.push(
@@ -135,7 +136,11 @@ export class DevtoolsAPIImpl {
         throw abortError;
 
       default:
+        // IMPORTANT: keep stderr as part of the `msg`, so that network errors can be detected as such.
         const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
+        if (Object.values(networkErrors).some(errMsg => msg.includes(errMsg))) {
+          this.networkError = true;
+        }
         logOutputChannel.error(msg);
         const error = new Error(msg);
         (error as any).code = exitCode;
