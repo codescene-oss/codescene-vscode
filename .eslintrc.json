@@ -37,6 +37,10 @@
             "format": ["PascalCase"]
         }, {
             "selector": ["classProperty"],
+            "modifiers": ["static", "readonly"],
+            "format": ["UPPER_CASE", "camelCase"]
+        }, {
+            "selector": ["classProperty"],
             "format": ["camelCase"],
             "leadingUnderscore": "allow"
         }, {
