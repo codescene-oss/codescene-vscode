@@ -1,7 +1,11 @@
 import vscode from 'vscode';
 import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import { activate as activateCHMonitor, deactivate as deactivateAddon, getBaselineCommit } from './code-health-monitor/addon';
+import {
+  activate as activateCHMonitor,
+  deactivate as deactivateAddon,
+  getBaselineCommit,
+} from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -126,7 +130,10 @@ async function startExtension(context: vscode.ExtensionContext) {
   const codeLensProvider = new CsReviewCodeLensProvider();
   DISPOSABLES.push(codeLensProvider);
   context.subscriptions.push(codeLensProvider);
-  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(reviewDocumentSelector(), codeLensProvider);
+  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(
+    reviewDocumentSelector(),
+    codeLensProvider
+  );
   DISPOSABLES.push(codeLensProviderRegistration);
   context.subscriptions.push(codeLensProviderRegistration);
 
@@ -224,17 +231,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
 
-    const visibleDocs = vscode.workspace.textDocuments.filter((doc) =>
-      vscode.window.visibleTextEditors.some((editor) => editor.document.fileName === doc.fileName)
-    );
-
-    // Review visible documents - update Diagnostics pane, not the Monitor
-    visibleDocs.forEach((document: vscode.TextDocument) => {
-      // TODO: knorrest - looks really weird to have true as string here...
-      CsDiagnostics.review(document, { skipCache: true, skipMonitorUpdate: true, updateDiagnosticsPane: true });
-    });
-
-    // TODO trigger a review of files based off GitFileLister.
   rulesFileWatcher.onDidChange(async (uri: vscode.Uri) => {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
@@ -361,8 +357,7 @@ export function deactivate() {
   for (const disposable of DISPOSABLES) {
     try {
       disposable.dispose();
-    } catch (e) {
-    }
+    } catch (e) {}
   }
   DISPOSABLES = [];
 }
