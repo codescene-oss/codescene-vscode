@@ -20,6 +20,22 @@ export default class Telemetry {
     return data ? { ...serializedError, extraData: data } : serializedError;
   }
 
+  static isFullyRedacted(telemetryData: Record<string, any>): boolean {
+    const message = telemetryData.message;
+    const stack = telemetryData.stack;
+    const redacted = '<REDACTED: Generic Secret>';
+
+    if (message === redacted && stack === redacted) {
+      return true;
+    }
+
+    if ((message === redacted && !stack) || (stack === redacted && !message)) {
+      return true;
+    }
+
+    return false;
+  }
+
   constructor(private extension: vscode.Extension<any>) {
     const sender: vscode.TelemetrySender = {
       sendEventData: (eventName, eventData) => {
@@ -84,10 +100,6 @@ export default class Telemetry {
     if (!Telemetry._instance) {
       return;
     }
-    // note that stacktraces and other user data are already sanitized by VS Code, which is perfect for us.
-    if (!skipLogging){
-      logOutputChannel.error(error, data);
-    }
 
     if (Telemetry.sentErrorsCount >= Telemetry.MAX_ERRORS_TO_SEND) {
       // Never send more than MAX_ERRORS_TO_SEND errors over Telemetry per session.
@@ -96,7 +108,18 @@ export default class Telemetry {
       return;
     }
 
+    // note that stacktraces and other user data are already sanitized by VS Code, which is perfect for us.
+    if (!skipLogging){
+      logOutputChannel.error(error, data);
+    }
+
     const telemetryData = Telemetry.serializeErrorWithExtraData(error, data);
+
+    // If the Error has no useful data, don't send it over the network
+    if (Telemetry.isFullyRedacted(telemetryData)) {
+      return;
+    }
+
     try {
       void Telemetry._instance.postTelemetry('vscode/unhandledError', telemetryData);
     } catch (omit) {

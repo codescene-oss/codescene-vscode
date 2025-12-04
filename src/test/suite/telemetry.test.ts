@@ -69,4 +69,41 @@ suite('Telemetry Test Suite', () => {
       assert.ok(result.stack);
     });
   });
+
+  suite('isFullyRedacted', () => {
+    const redacted = '<REDACTED: Generic Secret>';
+
+    test('identifies fully redacted telemetry data', () => {
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: redacted, stack: redacted }), true);
+
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: redacted, stack: undefined }), true);
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: redacted, stack: null }), true);
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: redacted, stack: '' }), true);
+
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: undefined, stack: redacted }), true);
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: null, stack: redacted }), true);
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: '', stack: redacted }), true);
+
+      assert.strictEqual(
+        Telemetry.isFullyRedacted({
+          message: 'Regular error message',
+          stack: 'Error: Regular error\n    at someFn (file.ts:10:5)',
+        }),
+        false
+      );
+
+      assert.strictEqual(
+        Telemetry.isFullyRedacted({
+          message: redacted,
+          stack: 'Error: Some error\n    at someFn (file.ts:10:5)',
+        }),
+        false
+      );
+
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: 'Some error message', stack: redacted }), false);
+
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: undefined, stack: undefined }), false);
+      assert.strictEqual(Telemetry.isFullyRedacted({ message: '', stack: '' }), false);
+    });
+  });
 });
