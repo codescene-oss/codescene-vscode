@@ -130,6 +130,14 @@ export default class Telemetry {
   }
 
   private async postTelemetry(eventName: string, eventData: any) {
+    try {
+      await this.postTelemetryImpl(eventName, eventData);
+    } catch (e) {
+      logOutputChannel.error(JSON.stringify(e instanceof Error ? serializeError(e) : e));
+    }
+  }
+
+  private async postTelemetryImpl(eventName: string, eventData: any) {
     if (!getConfiguration('enableTelemetry')){
       return;
     }
