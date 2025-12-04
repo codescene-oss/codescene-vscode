@@ -4,12 +4,17 @@ import vscode from 'vscode';
 import { GitExtension, Repository } from '../types/git';
 import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
 import { logOutputChannel } from './log';
+import { markGitAsUnavailable } from './git/git-detection';
 
 export const GIT_TASK_ID = 'git';
 export const gitExecutor = new QueuedSingleTaskExecutor();
 const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
 export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
+
+function isEnoentError(err: unknown): boolean {
+  return (err as any)?.code === 'ENOENT';
+}
 
 interface RepoState {
   branch: string | undefined;
@@ -64,6 +69,9 @@ export async function getBranchCreationCommit(repo: Repository) {
     );
 
     if (exitCode !== 0) {
+      if (exitCode === "ENOENT") {
+        markGitAsUnavailable();
+      }
       logOutputChannel.error(`Could not get branch creation point for file ${repoPath} (exit code ${exitCode}): ${stderr}`);
       return '';
     }
@@ -77,6 +85,9 @@ export async function getBranchCreationCommit(repo: Repository) {
 
     return creationLine?.split(' ')?.[0] ?? '';
   } catch (err) {
+    if (isEnoentError(err)) {
+      markGitAsUnavailable();
+    }
     logOutputChannel.error(`Could not get branch creation point for file ${repoPath}: ${err}`);
     return '';
   }
@@ -102,6 +113,9 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
     );
 
     if (exitCode !== 0) {
+      if (exitCode === "ENOENT") {
+        markGitAsUnavailable();
+      }
       logOutputChannel.error(`Could not get local branches for ${repoPath} (exit code ${exitCode}): ${stderr}`);
       return [];
     }
@@ -111,6 +125,9 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
     mainBranchCandidatesCache.set(repoPath, result);
     return result;
   } catch (err) {
+    if (isEnoentError(err)) {
+      markGitAsUnavailable();
+    }
     logOutputChannel.error(`Could not get local branches for ${repoPath}: ${err}`);
     return [];
   }
@@ -187,6 +204,9 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
       );
 
       if (exitCode !== 0) {
+        if (exitCode === "ENOENT") {
+          markGitAsUnavailable();
+        }
         logOutputChannel.error(`Could not get merge-base for ${currentBranch} and ${mainBranch} (exit code ${exitCode}): ${stderr}`);
         continue;
       }
@@ -196,6 +216,9 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
         return commit;
       }
     } catch (err) {
+      if (isEnoentError(err)) {
+        markGitAsUnavailable();
+      }
       logOutputChannel.error(`${err}`);
       continue;
     }

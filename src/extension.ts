@@ -35,6 +35,7 @@ import { acquireGitApi, deactivate as deactivateGitUtils, fireFileDeletedFromGit
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
+import { onGitDetectedAsUnavailable } from './git/git-detection';
 
 const ENABLE_AUTH_COMMANDS = false;
 
@@ -114,6 +115,12 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   CsExtensionState.addListeners(context);
   initAce(context);
+
+  const gitUnavailableDisposable = onGitDetectedAsUnavailable(() => {
+    void vscode.window.showWarningMessage("'Git' binary not found by the CodeScene extenision. Is it installed?");
+  });
+  DISPOSABLES.push(gitUnavailableDisposable);
+  context.subscriptions.push(gitUnavailableDisposable);
 
   // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
