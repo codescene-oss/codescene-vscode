@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.20.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.19.4...v0.20.0) (2025-12-04)
+
+
+### Features
+
+* catch any errors produced while invoking Telemetry ([d86a762](https://github.com/codescene-oss/codescene-vscode/commit/d86a762ce6481a4d94b3fdd494b9829203cb0517))
+
 ### [0.19.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.19.3...v0.19.4) (2025-12-04)
 
 
