@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
+import { markGitAsUnavailable } from './git-detection';
 
 //  https://git-scm.com/docs/git#Documentation/git.txt---no-optional-locks
 // Can help creating unnecessary index.lock files:
@@ -89,6 +90,9 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
         }
       });
   } else {
+    if (result.exitCode === "ENOENT") {
+      markGitAsUnavailable();
+    }
     logOutputChannel.warn(`Failed to get committed changes vs ${baseCommit}: ${result.stderr}`);
   }
 
@@ -127,7 +131,10 @@ export async function getStatusChanges(gitRootPath: string, workspacePath: strin
         }
       });
   } else {
-    logOutputChannel.info(`Failed to get status changes: ${result.stderr}`);
+    if (result.exitCode === "ENOENT") {
+      markGitAsUnavailable();
+    }
+    logOutputChannel.info(`Failed to get status changes: ${result.exitCode} ${result.stderr}`);
   }
 
   return changedFiles;
