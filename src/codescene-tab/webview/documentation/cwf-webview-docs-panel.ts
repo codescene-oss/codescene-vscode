@@ -17,9 +17,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
   private static _instance: CodeSceneCWFDocsTabPanel | undefined;
   private static readonly viewType = 'codescene-docs-tab';
   private readonly webViewPanel: WebviewPanel;
+  private webViewPanelDisposable?: Disposable | null;
   private disposables: Disposable[] = [];
   private state?: CodeSceneTabPanelState;
   private initialized: boolean = false;
+  private isDisposing: boolean = false;
 
   public static get instance() {
     if (!CodeSceneCWFDocsTabPanel._instance) {
@@ -38,11 +40,12 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
         localResourceRoots: commonResourceRoots(),
       }
     );
-    this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
+    // NOTE: this line used to cause recursion. That's why we keep a separate webViewPanelDisposable variable instead of `this.disposables`
+    // We want bi-directional disposing: disposing CodeSceneCWFDocsTabPanel should cause the webViewPanel to be disposed, and vice versa
+    this.webViewPanelDisposable = this.webViewPanel.onDidDispose(() => this.dispose());
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
     this.disposables.push(
-      this,
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
     );
@@ -161,10 +164,18 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
   }
 
   dispose() {
+    if (this.isDisposing) return;
+    this.isDisposing = true;
+
     CodeSceneCWFDocsTabPanel._instance = undefined;
     this.state = undefined;
     this.initialized = false;
 
+    const disposable = this.webViewPanelDisposable;
+    this.webViewPanelDisposable = null;
+    disposable?.dispose();
+
+    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
   }
 
