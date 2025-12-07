@@ -34,10 +34,12 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   private static _instance: CodeSceneCWFAceTabPanel | undefined;
   private static readonly viewType = 'codescene-ace-tab';
   private readonly webViewPanel: WebviewPanel;
+  private webViewPanelDisposable?: Disposable | null;
   private disposables: Disposable[] = [];
   private state?: CwfAceTabParams;
   private initialized: boolean = false;
   private debouncedUpdateWebView: (request: RefactoringRequest) => void;
+  private isDisposing: boolean = false;
 
   public static get instance() {
     if (!CodeSceneCWFAceTabPanel._instance) {
@@ -59,7 +61,10 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       }
     );
 
-    this.webViewPanel.onDidDispose(() => this.dispose(), null, this.disposables);
+    // NOTE: this line used to cause recursion. That's why keep a separate webViewPanelDisposable variable instead of `this.disposables`
+    // We want bi-directional disposing: disposing CodeSceneCWFAceTabPanel should cause the webViewPanel to be disposed, and vice versa
+    this.webViewPanelDisposable = this.webViewPanel.onDidDispose(() => this.dispose());
+
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
     vscode.workspace.onDidChangeTextDocument((e) => this.handleIsStale(e), this, this.disposables);
@@ -283,12 +288,20 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   }
 
   dispose() {
+    if (this.isDisposing) return;
+    this.isDisposing = true;
+
     CodeSceneCWFAceTabPanel._instance = undefined;
 
     this.state = undefined;
     this.initialized = false;
     this.hasSetInitialScript = false;
 
+    const disposable = this.webViewPanelDisposable;
+    this.webViewPanelDisposable = null;
+    disposable?.dispose();
+
+    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
   }
 
