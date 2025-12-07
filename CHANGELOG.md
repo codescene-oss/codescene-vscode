@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.21.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.20.0...v0.21.0) (2025-12-07)
+
+
+### Features
+
+* inform users when Git is unavailable ([c8f078f](https://github.com/codescene-oss/codescene-vscode/commit/c8f078facf73688e7e3c9bc2ac9e3182067c6097))
+
+
+### Bug fixes
+
+* prevent recursion while rendering docs ([3787b70](https://github.com/codescene-oss/codescene-vscode/commit/3787b70e66282ef81a07c15ac99c7faa9719dfdd))
+* update CLI dependency to improve behavior on errors ([824538c](https://github.com/codescene-oss/codescene-vscode/commit/824538c0b7980846bf461aa32a40376cba5c0f07))
+
 ## [0.20.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.19.4...v0.20.0) (2025-12-04)
 
 
