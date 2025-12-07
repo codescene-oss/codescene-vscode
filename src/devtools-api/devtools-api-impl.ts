@@ -106,6 +106,19 @@ export class DevtoolsAPIImpl {
     this.handleNonZeroExitCodes(args, result);
   }
 
+  private fullErrorMessage(
+    exitCode: number | string,
+    args: string[],
+    errorMessage: string,
+    stdout: string,
+    stderr: string
+  ): string {
+    // IMPORTANT: keep stderr as part of the `msg`, so that network errors can be detected as such.
+    const message = `devtools exit(${exitCode}) '${args.join(' ')}': ${errorMessage} - stdout: '${stdout}', stderr: '${stderr}'`;
+    logOutputChannel.debug(message);
+    return message;
+  }
+
   /**
    * Handles the exit code of the devtools binary
    * Output on debug level, avoiding the default level of info. Error presentation should be done
@@ -120,11 +133,13 @@ export class DevtoolsAPIImpl {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
         const devtoolsError = safeJsonParse(stdout) as DevtoolsErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${devtoolsError.message}`);
+        devtoolsError.message = devtoolsError.message?.trim() || "DevtoolsError";
+        devtoolsError.message = this.fullErrorMessage(exitCode, args, devtoolsError.message, stdout, stderr);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
         const creditsInfoError = safeJsonParse(stdout) as CreditsInfoErrorModel;
-        logOutputChannel.debug(`devtools exit(${exitCode}) '${args.join(' ')}': ${creditsInfoError.message}`);
+        creditsInfoError.message = creditsInfoError.message?.trim() || "CreditsInfoError";
+        creditsInfoError.message = this.fullErrorMessage(exitCode, args, creditsInfoError.message, stdout, stderr);
         throw new CreditsInfoError(
           creditsInfoError.message,
           creditsInfoError['credits-info'],
@@ -132,16 +147,17 @@ export class DevtoolsAPIImpl {
         );
       case 'ABORT_ERR': // ABORT_ERR is triggered by AbortController usage
         const abortError = new AbortError();
+        abortError.name = "AbortError";
+        abortError.message = "AbortError";
         (abortError as any).code = exitCode;
+        abortError.message = this.fullErrorMessage(exitCode, args, abortError.message, stdout, stderr);
         throw abortError;
 
       default:
-        // IMPORTANT: keep stderr as part of the `msg`, so that network errors can be detected as such.
-        const msg = `devtools exit(${exitCode}) '${args.join(' ')}' - stdout: '${stdout}', stderr: '${stderr}'`;
+        const msg = this.fullErrorMessage(exitCode, args, '', stdout, stderr);
         if (Object.values(networkErrors).some(errMsg => msg.includes(errMsg))) {
           this.networkError = true;
         }
-        logOutputChannel.error(msg);
         const error = new Error(msg);
         (error as any).code = exitCode;
         throw error;
