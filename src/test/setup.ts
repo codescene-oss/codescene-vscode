@@ -62,7 +62,7 @@ const vscodeStub = {
       onDidDelete: () => ({ dispose: () => {} }),
       dispose: () => {},
     }),
-    getConfiguration: () => ({
+    getConfiguration: (section?: string) => ({
       get: () => undefined,
       has: () => false,
       inspect: () => undefined,
@@ -157,6 +157,32 @@ const vscodeStub = {
     }),
   },
 };
+
+const defaultGetConfiguration = vscodeStub.workspace.getConfiguration;
+
+export function mockConfiguration(section: string, config: Record<string, any>) {
+  const originalGetConfiguration = vscodeStub.workspace.getConfiguration;
+  vscodeStub.workspace.getConfiguration = ((configSection?: string) => {
+    if (configSection === section) {
+      return {
+        get: (key: string, defaultValue?: any) => {
+          if (key in config) {
+            return config[key];
+          }
+          return defaultValue;
+        },
+        has: () => false,
+        inspect: () => undefined,
+        update: () => Promise.resolve(),
+      };
+    }
+    return originalGetConfiguration(configSection);
+  }) as any;
+}
+
+export function restoreDefaultConfiguration() {
+  vscodeStub.workspace.getConfiguration = defaultGetConfiguration;
+}
 
 const originalRequire = Module.prototype.require;
 (Module.prototype.require as any) = function (this: any, id: string) {

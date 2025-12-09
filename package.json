@@ -149,12 +149,6 @@
           "description": "Show CodeLenses for review diagnostics",
           "order": 1
         },
-        "codescene.gitignore": {
-          "type": "boolean",
-          "default": true,
-          "description": "Exclude files in .gitignore from analysis",
-          "order": 8
-        },
         "codescene.enableAutoRefactor": {
           "type": "boolean",
           "default": true,
