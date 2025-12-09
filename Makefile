@@ -8,7 +8,11 @@ build:
 package: lint pretest
 	npm i
 	npm run updatecwf
-	npx @vscode/vsce@3.7.1 package
+	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
+	sed -i '' '/^cs-\*/d' .vscodeignore; \
+	node ./scripts/bundle-cli-for-current-platform.js; \
+	npx @vscode/vsce@3.7.1 package; \
+	git checkout .vscodeignore; \
 
 tsc:
 	npx tsc --noEmit

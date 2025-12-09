@@ -1,6 +1,8 @@
 const { build, context } = require('esbuild');
 const { copy } = require('esbuild-plugin-copy');
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const baseConfig = {
   bundle: true,
@@ -22,6 +24,22 @@ function buildCounter(counterName) {
   };
 }
 
+const PROD_BUILD_MARKER_PATH = path.join(__dirname, 'out', '.cs-prod-build');
+
+function createProdBuildMarker() {
+  return {
+    name: 'create-prod-build-marker',
+    setup(build) {
+      build.onEnd(() => {
+        if (process.env.CI === 'true' || process.env.CI === '1') {
+          fs.writeFileSync(PROD_BUILD_MARKER_PATH, '');
+          console.log('Created .cs-prod-build marker file');
+        }
+      });
+    },
+  };
+}
+
 const extensionConfig = {
   ...baseConfig,
   platform: 'node',
@@ -30,7 +48,10 @@ const extensionConfig = {
   entryPoints: ['./src/extension.ts'],
   outfile: './out/main.js',
   external: ['vscode'],
-  plugins: [buildCounter('extension')],
+  plugins: [
+    buildCounter('extension'),
+    createProdBuildMarker(),
+  ],
 };
 
 function webviewConfig(watch = false) {
@@ -75,6 +96,11 @@ function webviewConfig(watch = false) {
 
 (async () => {
   const args = process.argv.slice(2);
+
+  if (fs.existsSync(PROD_BUILD_MARKER_PATH)) {
+    fs.unlinkSync(PROD_BUILD_MARKER_PATH);
+  }
+
   if (args.includes('--watch')) {
     // Build and watch source code
     console.log('[watch] starting');
