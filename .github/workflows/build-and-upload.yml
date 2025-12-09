@@ -52,6 +52,19 @@ jobs:
           CI: true
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
+      # .cs-prod-build is expected for correct functioning of the extension, so we validate its presence:
+      - name: Verify .cs-prod-build marker in VSIX
+        run: |
+          VSIX_FILE=$(ls codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
+          unzip -l "$VSIX_FILE" | tee vsix-contents.txt
+          if grep -q "\.cs-prod-build" vsix-contents.txt; then
+            echo ".cs-prod-build marker found in VSIX"
+            exit 0
+          else
+            echo ".cs-prod-build marker not found in VSIX!"
+            exit 1
+          fi
+
       - name: Upload vsix artifact
         uses: actions/upload-artifact@v4
         with:

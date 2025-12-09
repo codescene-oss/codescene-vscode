@@ -18,3 +18,4 @@ test-git-repo/
 test-git-repo-diff-utils/
 test-cs-diagnostics/
 coverage/
+.cs-prod-build
