@@ -4,7 +4,7 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
 
 /**
- * Observes open file events, and triggers reviews accordingly.
+ * Observes open file events, and triggers reviews accordingly (only meant for Problems, not for the Code Health Monitor).
  */
 export class OpenFilesObserver {
   private reviewTimers = new Map<string, NodeJS.Timeout>();

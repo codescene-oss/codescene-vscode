@@ -135,7 +135,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   // Detect changes to the delta result, updates the list and lastly converts the data to CWF webview format
   private updateFileDeltaData(event: DeltaAnalysisEvent) {
-    const { document, result } = event;
+    const { document, result, updateMonitor } = event;
+    if (!updateMonitor) return;
+
     const evtData = (fileWithIssues: FileWithIssues) => {
       const { nIssues, scoreChange } = fileWithIssues;
       return { visible: this.view?.visible, scoreChange, nIssues };
@@ -195,6 +197,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   private handleDeltaUpdate(event: DeltaAnalysisEvent) {
+    if (!event.updateMonitor) {
+      return;
+    }
     this.updateFileDeltaData(event);
     this.update();
   }
