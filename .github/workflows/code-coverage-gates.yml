@@ -1,0 +1,60 @@
+name: Code Coverage Gates
+
+on: 
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+
+permissions:
+  contents: read # required for actions/checkout
+
+jobs:
+  code-coverage-data:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - uses: './.github/actions/setup'
+
+    # silence a warning when running tests
+    - name: Configure Git
+      run: git config --global advice.defaultBranchName false
+
+    - name: Generate code coverage
+      run: npm run test:coverage
+      env:
+        CI: true
+
+    - uses: actions/upload-artifact@v4
+      with:
+        path: coverage/lcov.info
+        name: lcov.info
+
+  cs-coverage-check:
+    runs-on: ubuntu-latest
+    needs: [ code-coverage-data ]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch everything so that `cs-coverage-check` can find merge-base.
+          fetch-depth: 0
+      - name: download coverage
+        uses: actions/download-artifact@v5
+        with:
+          path: coverage/
+      - uses: ./.github/actions/check-coverage
+        if: always()
+        with:
+          access-token: ${{ secrets.secrets.CS_API_TOKEN }}
+          project-url: "https://api.codescene.io/v2/projects/36131"
+          coverage-files: "**/coverage/lcov.info"
