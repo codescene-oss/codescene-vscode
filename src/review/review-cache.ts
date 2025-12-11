@@ -4,9 +4,14 @@ import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { ReviewCacheItem } from './review-cache-item';
 
+interface CacheEntry {
+  item: ReviewCacheItem;
+  skipMonitorUpdate: boolean;
+}
+
 export class ReviewCache {
-  // filename -> CodeHealthRulesSnapshot (Map) -> ReviewCacheItem
-  private _cache = new Map<string, Map<Map<string, number>, ReviewCacheItem>>();
+  // filename -> CodeHealthRulesSnapshot (Map) -> CacheEntry
+  private _cache = new Map<string, Map<Map<string, number>, CacheEntry>>();
 
   constructor(
     private getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
@@ -34,10 +39,10 @@ export class ReviewCache {
 
   refreshDeltas() {
     this._cache.forEach((innerMap, fileName) => {
-      innerMap.forEach(async (item, snapshot) => {
+      innerMap.forEach(async (entry, snapshot) => {
         try {
-          await vscode.workspace.fs.stat(item.document.uri);
-          void item.runDeltaAnalysis({ skipMonitorUpdate: false });
+          await vscode.workspace.fs.stat(entry.item.document.uri);
+          void entry.item.runDeltaAnalysis({ skipMonitorUpdate: entry.skipMonitorUpdate });
         } catch { // File doesn't exist
           innerMap.delete(snapshot);
           if (innerMap.size === 0) {
@@ -56,9 +61,9 @@ export class ReviewCache {
     if (!innerMap) return undefined;
 
     const currentSnapshot = this.createCodeHealthRulesSnapshot();
-    for (const [snapshot, item] of innerMap.entries()) {
+    for (const [snapshot, entry] of innerMap.entries()) {
       if (this.snapshotsEqual(snapshot, currentSnapshot)) {
-        return item;
+        return entry.item;
       }
     }
     return undefined;
@@ -79,12 +84,12 @@ export class ReviewCache {
 
     let innerMap = this._cache.get(document.fileName);
     if (!innerMap) {
-      innerMap = new Map<Map<string, number>, ReviewCacheItem>();
+      innerMap = new Map<Map<string, number>, CacheEntry>();
       this._cache.set(document.fileName, innerMap);
     }
 
     const snapshot = this.createCodeHealthRulesSnapshot();
-    innerMap.set(snapshot, item);
+    innerMap.set(snapshot, { item, skipMonitorUpdate });
 
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
     const baselineCommit = await this.getBaselineCommit(document.uri);
@@ -94,20 +99,27 @@ export class ReviewCache {
   }
 
   update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
-    const reviewItem = this.get(document);
-    if (!reviewItem) return false;
+    const innerMap = this._cache.get(document.fileName);
+    if (!innerMap) return false;
 
-    logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
-    reviewItem.setReview(document, review, skipMonitorUpdate);
-    void reviewItem.runDeltaAnalysis({ skipMonitorUpdate });
-    return true;
+    const currentSnapshot = this.createCodeHealthRulesSnapshot();
+    for (const [snapshot, entry] of innerMap.entries()) {
+      if (this.snapshotsEqual(snapshot, currentSnapshot)) {
+        logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
+        entry.item.setReview(document, review, skipMonitorUpdate);
+        entry.skipMonitorUpdate = skipMonitorUpdate;
+        void entry.item.runDeltaAnalysis({ skipMonitorUpdate });
+        return true;
+      }
+    }
+    return false;
   }
 
   delete(fsPath: string) {
     const innerMap = this._cache.get(fsPath);
     if (innerMap) {
-      for (const item of innerMap.values()) {
-        void item.deleteDelta();
+      for (const entry of innerMap.values()) {
+        void entry.item.deleteDelta(entry.skipMonitorUpdate);
       }
       this._cache.delete(fsPath);
     }
@@ -119,11 +131,11 @@ export class ReviewCache {
 
   setBaseline(fileFilter: (fileUri: Uri) => boolean) {
     this._cache.forEach((innerMap) => {
-      innerMap.forEach(async (item) => {
-        if (fileFilter(item.document.uri)) {
-          const baselineCommit = await this.getBaselineCommit(item.document.uri);
+      innerMap.forEach(async (entry) => {
+        if (fileFilter(entry.item.document.uri)) {
+          const baselineCommit = await this.getBaselineCommit(entry.item.document.uri);
           if (baselineCommit) {
-            void item.setBaseline(baselineCommit, false, false);
+            void entry.item.setBaseline(baselineCommit, false, false);
           }
         }
       });

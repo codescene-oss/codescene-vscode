@@ -33,8 +33,8 @@ export class ReviewCacheItem {
   /**
    * Deletes the delta for this item, and makes sure that (empty) DeltaAnalysisEvents are triggered properly
    */
-  async deleteDelta() {
-    this.delta = await DevtoolsAPI.delta(this.document, true);
+  async deleteDelta(skipMonitorUpdate: boolean) {
+    this.delta = await DevtoolsAPI.delta(this.document, !skipMonitorUpdate);
   }
 
   setBaseline(baselineCommit: string, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
