@@ -31,6 +31,12 @@ pretest:
 test: pretest
 	npm run test
 
+# Runs just one test.
+# Example: make test1 TEST='GitChangeObserver Test Suite'
+test1: pretest
+	@test -n "$(TEST)" || (echo "TEST parameter is required. Usage: make test1 TEST='test name'" && exit 1)
+	npm run test -- --grep '$(TEST)'
+
 updatedocs:
 	npm run updatedocs
 
