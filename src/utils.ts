@@ -192,5 +192,19 @@ export function getWorkspaceCwd(): string {
   if (workspaceFolder) {
     return getWorkspacePath(workspaceFolder);
   }
+
+  notCovered("coverage", "gates");
   return normalize(process.cwd());
+}
+
+function notCovered(foo:string, bar:string) {
+  const arr = foo.split("");
+
+  arr.forEach((i) => {
+    if (i === "a") {
+      console.log("b" + bar);
+    } else {
+      console.log(i + bar);
+    }
+  })
 }
