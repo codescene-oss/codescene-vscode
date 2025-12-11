@@ -193,7 +193,7 @@ export function getWorkspaceCwd(): string {
     return getWorkspacePath(workspaceFolder);
   }
 
-  notCovered("coverage", "gates");
+  // notCovered("coverage", "gates");
   return normalize(process.cwd());
 }
 
