@@ -206,5 +206,5 @@ function notCovered(foo:string, bar:string) {
     } else {
       console.log(i + bar);
     }
-  })
+  });
 }
