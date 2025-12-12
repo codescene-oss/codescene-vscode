@@ -9,7 +9,10 @@ import { Executor } from '../executor';
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 import { GitChangeLister } from './git-change-lister';
+import { isGitAvailable } from './git-detection';
 import { getWorkspaceFolder } from '../utils';
+import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
+import { SimpleExecutor } from '../simple-executor';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
@@ -17,6 +20,7 @@ import { getWorkspaceFolder } from '../utils';
 export class GitChangeObserver {
   private fileWatcher: vscode.FileSystemWatcher;
   private executor: Executor;
+  private scheduledExecutor: DroppingScheduledExecutor;
   private context: vscode.ExtensionContext;
 
   // Tracks the files that have been added though this Observer.
@@ -26,9 +30,12 @@ export class GitChangeObserver {
   //   (which may have been added to the Monitor treeview, so they need to be removed on deletion events)
   private tracker: Set<string> = new Set();
 
+  private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
+
   constructor(context: vscode.ExtensionContext, executor: Executor) {
     this.context = context;
     this.executor = executor;
+    this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
     this.fileWatcher = this.createWatcher('**/*');
 
     // Initially fill the tracker - this ensures `handleFileDelete` works well
@@ -49,9 +56,39 @@ export class GitChangeObserver {
   start(): void {
     this.bindWatcherEvents(this.fileWatcher);
     this.context.subscriptions.push(this.fileWatcher);
+
+    void this.scheduledExecutor.executeTask(() => this.processQueuedEvents());
+  }
+
+  private async processQueuedEvents(): Promise<void> {
+    const events = [...this.eventQueue];
+    this.eventQueue = [];
+
+    if (events.length === 0) {
+      return;
+    }
+
+    const changedFiles = await this.getChangedFilesVsBaseline();
+
+    for (const event of events) {
+
+      // NOTE: we _don't_ need to use gitignore to efficiently determine if a file should be processed,
+      // because we use `getChangedFilesVsBaseline` as the computation basis, which uses `git diff` and `git status`,
+      // which inherently honor gitignore.
+
+      if (event.type === 'delete') {
+        await this.handleFileDelete(event.uri, changedFiles);
+      } else {
+        await this.handleFileChange(event.uri, changedFiles);
+      }
+    }
   }
 
   async getChangedFilesVsBaseline(): Promise<string[]> {
+    if (!isGitAvailable()){
+      return [];
+    }
+
     const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
       return [];
@@ -107,12 +144,10 @@ export class GitChangeObserver {
     }
   }
 
-  private async shouldProcessFile(filePath: string): Promise<boolean> {
+  private shouldProcessFile(filePath: string, changedFiles: string[]): boolean {
     if (!this.isSupportedFile(filePath)) {
       return false;
     }
-
-    const changedFiles = await this.getChangedFilesVsBaseline();
 
     if (!this.isFileInChangedList(filePath, changedFiles)) {
       return false;
@@ -131,12 +166,18 @@ export class GitChangeObserver {
   }
 
   private bindWatcherEvents(watcher: vscode.FileSystemWatcher): void {
-    watcher.onDidCreate(this.handleFileChange.bind(this));
-    watcher.onDidChange(this.handleFileChange.bind(this));
-    watcher.onDidDelete(this.handleFileDelete.bind(this));
+    watcher.onDidCreate((uri) => {
+      this.eventQueue.push({type: 'create', uri});
+    });
+    watcher.onDidChange((uri) => {
+      this.eventQueue.push({type: 'change', uri});
+    });
+    watcher.onDidDelete((uri) => {
+      this.eventQueue.push({type: 'delete', uri});
+    });
   }
 
-  private async handleFileChange(uri: vscode.Uri): Promise<void> {
+  private async handleFileChange(uri: vscode.Uri, changedFiles: string[]): Promise<void> {
     const filePath = uri.fsPath;
 
     // Don't add directories to the tracker - would make deletion handling work incorrectly
@@ -145,7 +186,7 @@ export class GitChangeObserver {
       return;
     }
 
-    if (!await this.shouldProcessFile(filePath)) {
+    if (!this.shouldProcessFile(filePath, changedFiles)) {
       return;
     }
 
@@ -153,7 +194,7 @@ export class GitChangeObserver {
     void this.executor.executeTask(() => this.reviewFile(filePath));
   }
 
-  private async handleFileDelete(uri: vscode.Uri): Promise<void> {
+  private async handleFileDelete(uri: vscode.Uri, changedFiles: string[]): Promise<void> {
     const filePath = uri.fsPath;
 
     // 1.- Most likely case: internally tracked file
@@ -164,7 +205,7 @@ export class GitChangeObserver {
     }
 
     // 2.- Less likely case: non-internally tracked file
-    if (await this.shouldProcessFile(filePath)) {
+    if (this.shouldProcessFile(filePath, changedFiles)) {
       fireFileDeletedFromGit(filePath);
       return;
     }
@@ -195,5 +236,6 @@ export class GitChangeObserver {
 
   dispose(): void {
     this.fileWatcher.dispose();
+    this.scheduledExecutor.dispose();
   }
 }

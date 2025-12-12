@@ -45,7 +45,8 @@ suite('GitChangeObserver Test Suite', () => {
 
   const triggerFileChange = async (filePath: string) => {
     const observer = getObserverInternals();
-    await observer.handleFileChange(Uri.file(filePath));
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline();
+    await observer.handleFileChange(Uri.file(filePath), changedFiles);
   };
 
   const assertFileInChangedList = (changedFiles: string[], filename: string, shouldExist: boolean = true) => {
@@ -203,7 +204,8 @@ suite('GitChangeObserver Test Suite', () => {
     await triggerFileChange(newFile);
     assertFileInTracker(newFile);
     fs.unlinkSync(newFile);
-    await getObserverInternals().handleFileDelete(Uri.file(newFile));
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline();
+    await getObserverInternals().handleFileDelete(Uri.file(newFile), changedFiles);
     assertFileInTracker(newFile, false);
   });
 
@@ -224,7 +226,8 @@ suite('GitChangeObserver Test Suite', () => {
     assertFileInTracker(file2);
 
     fs.rmSync(subDir, { recursive: true, force: true });
-    await getObserverInternals().handleFileDelete(Uri.file(subDir));
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline();
+    await getObserverInternals().handleFileDelete(Uri.file(subDir), changedFiles);
     assertFileInTracker(file1, false);
     assertFileInTracker(file2, false);
   });
@@ -232,14 +235,16 @@ suite('GitChangeObserver Test Suite', () => {
   test('shouldProcessFile rejects unsupported file types', async function () {
     this.timeout(20000);
     const txtFile = createFile('notes.txt', 'Some notes');
-    const shouldProcess = await getObserverInternals().shouldProcessFile(txtFile);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline();
+    const shouldProcess = getObserverInternals().shouldProcessFile(txtFile, changedFiles);
     assert.strictEqual(shouldProcess, false, 'Should not process .txt files');
   });
 
   test('shouldProcessFile accepts supported file types', async function () {
     this.timeout(20000);
     const tsFile = createFile('code.ts', 'export const x = 1;');
-    const shouldProcess = await getObserverInternals().shouldProcessFile(tsFile);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline();
+    const shouldProcess = getObserverInternals().shouldProcessFile(tsFile, changedFiles);
     assert.strictEqual(shouldProcess, true, 'Should process .ts files');
   });
 
@@ -314,5 +319,90 @@ suite('GitChangeObserver Test Suite', () => {
     assert.ok(getObserverInternals().fileWatcher, 'File watcher should exist');
     gitChangeObserver.dispose();
     assert.ok(true, 'Dispose completed without errors');
+  });
+
+  test('events are queued instead of processed immediately', async function () {
+    this.timeout(20000);
+    const file1 = createFile('queued1.ts', 'export const a = 1;');
+    const file2 = createFile('queued2.ts', 'export const b = 2;');
+
+    gitChangeObserver.start();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const observer = getObserverInternals();
+    observer.eventQueue.push({type: 'create', uri: Uri.file(file1)});
+    observer.eventQueue.push({type: 'create', uri: Uri.file(file2)});
+
+    assert.strictEqual(observer.eventQueue.length, 2, 'Events should get queued');
+    assertFileInTracker(file1, false);
+    assertFileInTracker(file2, false);
+
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    assert.strictEqual(observer.eventQueue.length, 0, 'Queue should be empty after processing');
+    assertFileInTracker(file1);
+    assertFileInTracker(file2);
+  });
+
+  test('getChangedFilesVsBaseline is called once per batch, not per file', async function () {
+    this.timeout(20000);
+    const files = [
+      createFile('cache1.ts', 'export const a = 1;'),
+      createFile('cache2.ts', 'export const b = 2;'),
+      createFile('cache3.ts', 'export const c = 3;')
+    ];
+
+    gitChangeObserver.start();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const observer = getObserverInternals();
+
+    let getChangedFilesCallCount = 0;
+    const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
+    gitChangeObserver.getChangedFilesVsBaseline = async function() {
+      getChangedFilesCallCount++;
+      return originalGetChangedFiles();
+    };
+
+    for (const file of files) {
+      observer.eventQueue.push({type: 'create', uri: Uri.file(file)});
+    }
+
+    assert.strictEqual(getChangedFilesCallCount, 0, "getChangedFilesVsBaseline doesn't get called until the batch gets processed");
+
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    assert.strictEqual(getChangedFilesCallCount, 1, 'getChangedFilesVsBaseline should be called once per batch');
+
+    files.forEach(file => assertFileInTracker(file));
+  });
+
+  test('empty queue does not trigger unnecessary processing', async function () {
+    this.timeout(20000);
+
+    gitChangeObserver.start();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    let getChangedFilesCallCount = 0;
+    const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
+    gitChangeObserver.getChangedFilesVsBaseline = async function() {
+      getChangedFilesCallCount++;
+      return originalGetChangedFiles();
+    };
+
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    assert.strictEqual(getChangedFilesCallCount, 0, 'getChangedFilesVsBaseline should not be called for empty queue');
+  });
+
+  test('dispose cleans up scheduled executor', function () {
+    this.timeout(20000);
+    const observer = getObserverInternals();
+    assert.ok(observer.scheduledExecutor, 'Scheduled executor should exist');
+
+    gitChangeObserver.dispose();
+
+    // After dispose, the interval should be cleared
+    assert.strictEqual(observer.scheduledExecutor.intervalHandle, null, 'Interval should be cleared after dispose');
   });
 });
