@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { FilteringReviewer } from '../../review/filtering-reviewer';
+import { GitIgnoreChecker } from '../../git/git-ignore-checker';
 import {
   mockWorkspaceFolders,
   createMockWorkspaceFolder,
@@ -14,9 +14,9 @@ import { resetGitAvailability } from '../../git/git-detection';
 
 const execAsync = promisify(exec);
 
-suite('FilteringReviewer Test Suite', () => {
+suite('GitIgnoreChecker Test Suite', () => {
   let testDir: string;
-  let reviewer: FilteringReviewer;
+  let checker: GitIgnoreChecker;
 
   async function initGitRepo(dir: string) {
     await execAsync('git init', { cwd: dir });
@@ -33,12 +33,12 @@ suite('FilteringReviewer Test Suite', () => {
     if (!fs.existsSync(testBaseDir)) {
       fs.mkdirSync(testBaseDir, { recursive: true });
     }
-    testDir = fs.mkdtempSync(path.join(testBaseDir, 'filtering-reviewer-test-'));
+    testDir = fs.mkdtempSync(path.join(testBaseDir, 'git-ignore-checker-test-'));
   });
 
   teardown(() => {
-    if (reviewer) {
-      reviewer.dispose();
+    if (checker) {
+      checker.dispose();
     }
     const gitignorePath = path.join(testDir, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
@@ -70,7 +70,7 @@ suite('FilteringReviewer Test Suite', () => {
 
   async function assertIsIgnored(filePath: string, content: string, expected: boolean, message: string) {
     const mockDocument = createFileAndMockDocument(filePath, content);
-    const result = await (reviewer as any).gitIgnoreChecker.isIgnored(mockDocument);
+    const result = await (checker as any).isIgnored(mockDocument);
     assert.strictEqual(
       result,
       expected,
@@ -80,7 +80,7 @@ suite('FilteringReviewer Test Suite', () => {
 
   async function assertMatchesGitCheckIgnore(filePath: string, content: string) {
     const mockDocument = createFileAndMockDocument(filePath, content);
-    const result = await (reviewer as any).gitIgnoreChecker.isIgnored(mockDocument);
+    const result = await (checker as any).isIgnored(mockDocument);
 
     let gitIgnored = false;
     try {
@@ -100,8 +100,8 @@ suite('FilteringReviewer Test Suite', () => {
   suite('when git is unavailable (uses heuristics)', () => {
     setup(async () => {
       mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
-      reviewer = new FilteringReviewer();
-      await (reviewer as any).gitIgnoreChecker.gitAvailabilityCheck;
+      checker = new GitIgnoreChecker();
+      await (checker as any).gitAvailabilityCheck;
     });
 
     test('should ignore files in node_modules directory', async () => {
@@ -145,14 +145,50 @@ suite('FilteringReviewer Test Suite', () => {
       const testFile = path.join(dir, 'index.js');
       await assertIsIgnored(testFile, 'console.log("hello");', false, 'regular files should not be ignored by heuristic');
     });
+
+    test('should ignore files in build directory', async () => {
+      const dir = createNestedDirs(['build']);
+      const testFile = path.join(dir, 'output.js');
+      await assertIsIgnored(testFile, 'console.log("build");', true, 'build directory should be ignored by heuristic');
+    });
+
+    test('should ignore files in dist directory', async () => {
+      const dir = createNestedDirs(['dist']);
+      const testFile = path.join(dir, 'bundle.js');
+      await assertIsIgnored(testFile, 'console.log("dist");', true, 'dist directory should be ignored by heuristic');
+    });
+
+    test('should ignore files in target directory', async () => {
+      const dir = createNestedDirs(['target']);
+      const testFile = path.join(dir, 'classes.jar');
+      await assertIsIgnored(testFile, 'compiled code', true, 'target directory should be ignored by heuristic');
+    });
+
+    test('should ignore files in out directory', async () => {
+      const dir = createNestedDirs(['out']);
+      const testFile = path.join(dir, 'compiled.js');
+      await assertIsIgnored(testFile, 'console.log("out");', true, 'out directory should be ignored by heuristic');
+    });
+
+    test('should ignore files in vendor directory', async () => {
+      const dir = createNestedDirs(['vendor']);
+      const testFile = path.join(dir, 'lib.php');
+      await assertIsIgnored(testFile, '<?php echo "vendor"; ?>', true, 'vendor directory should be ignored by heuristic');
+    });
+
+    test('should ignore files in coverage directory', async () => {
+      const dir = createNestedDirs(['coverage']);
+      const testFile = path.join(dir, 'lcov.info');
+      await assertIsIgnored(testFile, 'coverage data', true, 'coverage directory should be ignored by heuristic');
+    });
   });
 
   suite('when git is available (uses git check-ignore)', () => {
     setup(async () => {
       await initGitRepo(testDir);
       mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
-      reviewer = new FilteringReviewer();
-      await (reviewer as any).gitIgnoreChecker.gitAvailabilityCheck;
+      checker = new GitIgnoreChecker();
+      await (checker as any).gitAvailabilityCheck;
     });
 
     test('should ignore node_modules when in .gitignore', async () => {
@@ -232,6 +268,91 @@ suite('FilteringReviewer Test Suite', () => {
       const regularFile = path.join(createNestedDirs(['src']), 'index.js');
       await assertIsIgnored(regularFile, 'console.log("hello");', false, 'regular files should not be ignored');
       await assertMatchesGitCheckIgnore(regularFile, 'console.log("hello");');
+    });
+
+    test('should handle wildcard patterns in .gitignore', async () => {
+      fs.writeFileSync(
+        path.join(testDir, '.gitignore'),
+        '*.tmp\ntest-*\n'
+      );
+
+      const tmpFile = path.join(testDir, 'data.tmp');
+      await assertIsIgnored(tmpFile, 'temporary data', true, '*.tmp files should be ignored');
+      await assertMatchesGitCheckIgnore(tmpFile, 'temporary data');
+
+      const testPrefixFile = path.join(testDir, 'test-file.js');
+      await assertIsIgnored(testPrefixFile, 'console.log("test");', true, 'test-* files should be ignored');
+      await assertMatchesGitCheckIgnore(testPrefixFile, 'console.log("test");');
+
+      const normalFile = path.join(testDir, 'normal.js');
+      await assertIsIgnored(normalFile, 'console.log("normal");', false, 'normal files should not be ignored');
+      await assertMatchesGitCheckIgnore(normalFile, 'console.log("normal");');
+    });
+
+    test('should handle negation patterns in .gitignore', async () => {
+      fs.writeFileSync(
+        path.join(testDir, '.gitignore'),
+        '*.log\n!important.log\n'
+      );
+
+      const ignoredLog = path.join(testDir, 'debug.log');
+      await assertIsIgnored(ignoredLog, 'debug log', true, '*.log files should be ignored');
+      await assertMatchesGitCheckIgnore(ignoredLog, 'debug log');
+
+      const importantLog = path.join(testDir, 'important.log');
+      await assertIsIgnored(importantLog, 'important log', false, 'important.log should not be ignored due to negation');
+      await assertMatchesGitCheckIgnore(importantLog, 'important log');
+    });
+
+    test('should handle directory-specific patterns', async () => {
+      fs.writeFileSync(
+        path.join(testDir, '.gitignore'),
+        'tests/*.tmp\n'
+      );
+
+      const dir = createNestedDirs(['tests']);
+      const tmpInTests = path.join(dir, 'data.tmp');
+      await assertIsIgnored(tmpInTests, 'test data', true, '*.tmp in tests/ should be ignored');
+      await assertMatchesGitCheckIgnore(tmpInTests, 'test data');
+
+      const jsInTests = path.join(dir, 'test.js');
+      await assertIsIgnored(jsInTests, 'console.log("test");', false, '.js in tests/ should not be ignored');
+      await assertMatchesGitCheckIgnore(jsInTests, 'console.log("test");');
+
+      const tmpInRoot = path.join(testDir, 'root.tmp');
+      await assertIsIgnored(tmpInRoot, 'root data', false, '*.tmp in root should not be ignored by tests/*.tmp pattern');
+      await assertMatchesGitCheckIgnore(tmpInRoot, 'root data');
+    });
+
+    test('should use cache for repeated checks on same file', async () => {
+      fs.writeFileSync(path.join(testDir, '.gitignore'), 'ignored.txt\n');
+      const testFile = path.join(testDir, 'ignored.txt');
+      const mockDocument = createFileAndMockDocument(testFile, 'content');
+
+      const result1 = await (checker as any).isIgnored(mockDocument);
+      assert.strictEqual(result1, true, 'First call should return true');
+
+      const result2 = await (checker as any).isIgnored(mockDocument);
+      assert.strictEqual(result2, true, 'Second call should return cached true');
+
+      const cacheHasEntry = (checker as any).gitExecutorCache.has(testFile);
+      assert.strictEqual(cacheHasEntry, true, 'Cache should contain entry for file');
+    });
+
+    test('should clear cache when .gitignore changes', async () => {
+      const testFile = path.join(testDir, 'test.txt');
+      const mockDocument = createFileAndMockDocument(testFile, 'content');
+
+      const result1 = await (checker as any).isIgnored(mockDocument);
+      assert.strictEqual(result1, false, 'File should not be ignored initially');
+
+      let cacheSize = (checker as any).gitExecutorCache.size;
+      assert.strictEqual(cacheSize, 1, 'Cache should have one entry');
+
+      (checker as any).clearCache();
+
+      cacheSize = (checker as any).gitExecutorCache.size;
+      assert.strictEqual(cacheSize, 0, 'Cache should be empty after clear');
     });
   });
 });
