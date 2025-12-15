@@ -68,7 +68,8 @@ export class GitChangeObserver {
       return;
     }
 
-    const changedFiles = await this.getChangedFilesVsBaseline();
+    const workspaceFolder = getWorkspaceFolder();
+    const changedFiles = await this.getChangedFilesVsBaseline(workspaceFolder);
 
     for (const event of events) {
 
@@ -77,19 +78,18 @@ export class GitChangeObserver {
       // which inherently honor gitignore.
 
       if (event.type === 'delete') {
-        await this.handleFileDelete(event.uri, changedFiles);
+        await this.handleFileDelete(event.uri, changedFiles, workspaceFolder);
       } else {
-        await this.handleFileChange(event.uri, changedFiles);
+        await this.handleFileChange(event.uri, changedFiles, workspaceFolder);
       }
     }
   }
 
-  async getChangedFilesVsBaseline(): Promise<string[]> {
+  async getChangedFilesVsBaseline(workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<string[]> {
     if (!isGitAvailable()){
       return [];
     }
 
-    const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) {
       return [];
     }
@@ -118,9 +118,7 @@ export class GitChangeObserver {
     return !!fileExt && supportedExtensions.includes(fileExt);
   }
 
-  private isFileInChangedList(filePath: string, changedFiles: string[]): boolean {
-    const workspaceFolder = getWorkspaceFolder();
-
+  private isFileInChangedList(filePath: string, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): boolean {
     if (!workspaceFolder) {
       return true;
     }
@@ -144,12 +142,12 @@ export class GitChangeObserver {
     }
   }
 
-  private shouldProcessFile(filePath: string, changedFiles: string[]): boolean {
+  private shouldProcessFile(filePath: string, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): boolean {
     if (!this.isSupportedFile(filePath)) {
       return false;
     }
 
-    if (!this.isFileInChangedList(filePath, changedFiles)) {
+    if (!this.isFileInChangedList(filePath, changedFiles, workspaceFolder)) {
       return false;
     }
 
@@ -177,7 +175,7 @@ export class GitChangeObserver {
     });
   }
 
-  private async handleFileChange(uri: vscode.Uri, changedFiles: string[]): Promise<void> {
+  private async handleFileChange(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<void> {
     const filePath = uri.fsPath;
 
     // Don't add directories to the tracker - would make deletion handling work incorrectly
@@ -186,7 +184,7 @@ export class GitChangeObserver {
       return;
     }
 
-    if (!this.shouldProcessFile(filePath, changedFiles)) {
+    if (!this.shouldProcessFile(filePath, changedFiles, workspaceFolder)) {
       return;
     }
 
@@ -194,7 +192,7 @@ export class GitChangeObserver {
     void this.executor.executeTask(() => this.reviewFile(filePath));
   }
 
-  private async handleFileDelete(uri: vscode.Uri, changedFiles: string[]): Promise<void> {
+  private async handleFileDelete(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<void> {
     const filePath = uri.fsPath;
 
     // 1.- Most likely case: internally tracked file
@@ -205,7 +203,7 @@ export class GitChangeObserver {
     }
 
     // 2.- Less likely case: non-internally tracked file
-    if (this.shouldProcessFile(filePath, changedFiles)) {
+    if (this.shouldProcessFile(filePath, changedFiles, workspaceFolder)) {
       fireFileDeletedFromGit(filePath);
       return;
     }
