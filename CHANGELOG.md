@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.22.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.21.0...v0.22.0) (2025-12-15)
+
+
+### Features
+
+* add a mechanism to deprecate old extension versions ([51d8b71](https://github.com/codescene-oss/codescene-vscode/commit/51d8b71b3a3316f57fe444fe9df9449d1b1648ae))
+* exclude from analysis commonly irrelevant directories ([27c2a08](https://github.com/codescene-oss/codescene-vscode/commit/27c2a08124f67b202024c68c25800a1598853201))
+
+
+### Bug fixes
+
+* debounce workload in GitChangeObserver ([b0c8ee0](https://github.com/codescene-oss/codescene-vscode/commit/b0c8ee0ba4149f0c01e9427edbc30d6a58a53ccc))
+* don't run scheduled Git tasks when Git unavailable ([83baea5](https://github.com/codescene-oss/codescene-vscode/commit/83baea552146cae6c807dc1ed589dd52e02ff20d))
+* prevent analyses from Diagnostics from showing up in the Code Health Monitor ([87a3eb7](https://github.com/codescene-oss/codescene-vscode/commit/87a3eb7715eafb25155979057e4ecce425472c02))
+
 ## [0.21.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.20.0...v0.21.0) (2025-12-07)
 
 
