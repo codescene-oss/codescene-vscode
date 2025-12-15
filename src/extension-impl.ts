@@ -117,7 +117,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   initAce(context);
 
   const gitUnavailableDisposable = onGitDetectedAsUnavailable(() => {
-    void vscode.window.showWarningMessage("'Git' binary not found by the CodeScene extenision. Is it installed?");
+    void vscode.window.showWarningMessage("'Git' binary not found by the CodeScene extension, or Git not initialized in this project.");
   });
   DISPOSABLES.push(gitUnavailableDisposable);
   context.subscriptions.push(gitUnavailableDisposable);
