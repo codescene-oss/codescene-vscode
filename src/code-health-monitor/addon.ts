@@ -13,6 +13,7 @@ import { DevtoolsAPI } from '../devtools-api';
 import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
 import { logOutputChannel } from '../log';
 import { SimpleExecutor } from '../simple-executor';
+import { isGitAvailable } from '../git/git-detection';
 
 let gitApi: API | undefined;
 
@@ -52,6 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
   void scheduledExecutor.executeTask(async () => {
+    if (!isGitAvailable()) return;
     logOutputChannel.info('Starting scheduled git change review');
     await gitChangeLister.start();
   });
