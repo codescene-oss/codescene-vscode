@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.22.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.22.0...v0.22.1) (2025-12-16)
+
+
+### Bug fixes
+
+* cached true skipMonitorUpdate values should lose priority over false ones ([a672899](https://github.com/codescene-oss/codescene-vscode/commit/a67289901a012dd40cf7aaf44b1f76ad0f3cea04))
+
 ## [0.22.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.21.0...v0.22.0) (2025-12-15)
 
 
