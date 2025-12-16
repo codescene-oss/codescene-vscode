@@ -51,12 +51,12 @@ suite('ReviewCache Test Suite', () => {
   }
 
   function assertCacheHit(document: vscode.TextDocument, message: string): void {
-    const retrieved = reviewCache.get(document);
+    const retrieved = reviewCache.get(document, false);
     assert.ok(retrieved, message);
   }
 
   function assertCacheMiss(document: vscode.TextDocument, message: string): void {
-    const retrieved = reviewCache.get(document);
+    const retrieved = reviewCache.get(document, false);
     assert.strictEqual(retrieved, undefined, message);
   }
 
@@ -70,7 +70,7 @@ suite('ReviewCache Test Suite', () => {
     const document = createMockDocument('/test/file.ts');
     await addReview(document);
 
-    const retrieved = reviewCache.get(document);
+    const retrieved = reviewCache.get(document, false);
     assert.ok(retrieved, 'Should retrieve cached review');
     assert.strictEqual(retrieved!.document, document);
   });
@@ -84,11 +84,11 @@ suite('ReviewCache Test Suite', () => {
     const document = createMockDocument('/test/file.ts', 'content', 1);
     await addReview(document);
 
-    const exactMatch = reviewCache.getExactVersion(document);
+    const exactMatch = reviewCache.getExactVersion(document, false);
     assert.ok(exactMatch, 'Should find exact version match');
 
     const documentV2 = createMockDocument('/test/file.ts', 'content', 2);
-    const noMatch = reviewCache.getExactVersion(documentV2);
+    const noMatch = reviewCache.getExactVersion(documentV2, false);
     assert.strictEqual(noMatch, undefined, 'Should not find match for different version');
   });
 
@@ -288,6 +288,76 @@ suite('ReviewCache Test Suite', () => {
     });
   });
 
+  suite('skipMonitorUpdate override behavior', () => {
+    function getCacheEntry(document: vscode.TextDocument): { skipMonitorUpdate: boolean } | undefined {
+      const cache = (reviewCache as any)._cache;
+      const innerMap = cache.get(document.fileName);
+      if (!innerMap) return undefined;
+
+      const currentSnapshot = (reviewCache as any).createCodeHealthRulesSnapshot();
+      for (const [snapshot, entry] of innerMap.entries()) {
+        if (reviewCache.snapshotsEqual(snapshot, currentSnapshot)) {
+          return entry;
+        }
+      }
+      return undefined;
+    }
+
+    async function testAddBehavior(initial: boolean, second: boolean, expected: boolean): Promise<void> {
+      const document = createMockDocument('/test/file.ts');
+
+      await reviewCache.add(document, createMockReview(document), initial, false);
+      let entry = getCacheEntry(document);
+      assert.ok(entry);
+      assert.strictEqual(entry.skipMonitorUpdate, initial);
+
+      await reviewCache.add(document, createMockReview(document), second, false);
+      entry = getCacheEntry(document);
+      assert.ok(entry);
+      assert.strictEqual(entry.skipMonitorUpdate, expected);
+    }
+
+    async function testUpdateBehavior(initial: boolean, second: boolean, expected: boolean): Promise<void> {
+      const document = createMockDocument('/test/file.ts');
+
+      await reviewCache.add(document, createMockReview(document), initial, false);
+      let entry = getCacheEntry(document);
+      assert.ok(entry);
+      assert.strictEqual(entry.skipMonitorUpdate, initial);
+
+      const updated = reviewCache.update(document, createMockReview(document), second, false);
+      assert.strictEqual(updated, true);
+
+      entry = getCacheEntry(document);
+      assert.ok(entry);
+      assert.strictEqual(entry.skipMonitorUpdate, expected);
+    }
+
+    test('should override skipMonitorUpdate true with false when adding', async () => {
+      await testAddBehavior(true, false, false);
+    });
+
+    test('should not override skipMonitorUpdate false with true when adding', async () => {
+      await testAddBehavior(false, true, false);
+    });
+
+    test('should override skipMonitorUpdate true with false when updating', async () => {
+      await testUpdateBehavior(true, false, false);
+    });
+
+    test('should not override skipMonitorUpdate false with true when updating', async () => {
+      await testUpdateBehavior(false, true, false);
+    });
+
+    test('should keep skipMonitorUpdate true when both are true', async () => {
+      await testUpdateBehavior(true, true, true);
+    });
+
+    test('should keep skipMonitorUpdate false when both are false', async () => {
+      await testUpdateBehavior(false, false, false);
+    });
+  });
+
   suite('refreshDeltas', () => {
     const fs = require('fs');
     const os = require('os');
@@ -321,7 +391,7 @@ suite('ReviewCache Test Suite', () => {
     }
 
     function spyOnRunDeltaAnalysis(document: vscode.TextDocument): { called: boolean; getCalled: () => boolean } {
-      const cacheItem = reviewCache.get(document);
+      const cacheItem = reviewCache.get(document, false);
       assert.ok(cacheItem, 'Cache item should exist');
 
       const state = { called: false };
@@ -373,12 +443,12 @@ suite('ReviewCache Test Suite', () => {
       const nonExistentFilePath = createTempFilePath('to-be-deleted.ts');
       const document = await addDocumentToCache(nonExistentFilePath);
 
-      let cacheItem = reviewCache.get(document);
+      let cacheItem = reviewCache.get(document, false);
       assert.ok(cacheItem, 'Cache item should exist before refreshDeltas');
 
       await runRefreshDeltasAndWait();
 
-      cacheItem = reviewCache.get(document);
+      cacheItem = reviewCache.get(document, false);
       assert.strictEqual(cacheItem, undefined, 'Cache item should be removed for non-existent file');
     });
 
@@ -394,20 +464,20 @@ suite('ReviewCache Test Suite', () => {
       setRulesVersions({ '/project/.codescene/code-health-rules.json': 2 });
       await addReview(document);
 
-      let cacheItem = reviewCache.get(document);
+      let cacheItem = reviewCache.get(document, false);
       assert.ok(cacheItem, 'Cache item should exist before refreshDeltas');
 
       await runRefreshDeltasAndWait();
 
-      cacheItem = reviewCache.get(document);
+      cacheItem = reviewCache.get(document, false);
       assert.strictEqual(cacheItem, undefined, 'All versions should be removed for non-existent file');
 
       codeHealthFileVersions.clear();
-      cacheItem = reviewCache.get(document);
+      cacheItem = reviewCache.get(document, false);
       assert.strictEqual(cacheItem, undefined, 'Empty snapshot version should also be removed');
 
       setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
-      cacheItem = reviewCache.get(document);
+      cacheItem = reviewCache.get(document, false);
       assert.strictEqual(cacheItem, undefined, 'Version 1 snapshot should also be removed');
     });
 
@@ -426,8 +496,8 @@ suite('ReviewCache Test Suite', () => {
       assert.strictEqual(existingSpy.getCalled(), true, 'runDeltaAnalysis should be called for existing file');
       assert.strictEqual(nonExistentSpy.getCalled(), false, 'runDeltaAnalysis should not be called for non-existent file');
 
-      const existingStillInCache = reviewCache.get(existingDoc);
-      const nonExistentStillInCache = reviewCache.get(nonExistentDoc);
+      const existingStillInCache = reviewCache.get(existingDoc, false);
+      const nonExistentStillInCache = reviewCache.get(nonExistentDoc, false);
       assert.ok(existingStillInCache, 'Existing file should still be in cache');
       assert.strictEqual(nonExistentStillInCache, undefined, 'Non-existent file should be removed from cache');
     });

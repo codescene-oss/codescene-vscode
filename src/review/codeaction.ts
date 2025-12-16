@@ -29,7 +29,7 @@ class ReviewCodeActionProvider implements vscode.CodeActionProvider, vscode.Disp
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ) {
-    const reviewCacheItem = Reviewer.instance.reviewCache.get(document);
+    const reviewCacheItem = Reviewer.instance.reviewCache.get(document, "any");
     if (!reviewCacheItem) return;
 
     const diagnostics: CsDiagnostic[] = await reviewCacheItem.review.diagnostics;

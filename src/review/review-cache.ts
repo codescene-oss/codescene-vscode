@@ -29,9 +29,9 @@ export class ReviewCache {
   /**
    * Get the current review for this document given the document.version matches the review item version.
    */
-  getExactVersion(document: vscode.TextDocument): ReviewCacheItem | undefined {
+  getExactVersion(document: vscode.TextDocument, skipMonitorUpdate: boolean | "any"): ReviewCacheItem | undefined {
     // If we have a cached promise for this document, return it.
-    const reviewItem = this.get(document);
+    const reviewItem = this.get(document, skipMonitorUpdate);
     if (reviewItem && reviewItem.documentVersion === document.version) {
       return reviewItem;
     }
@@ -56,13 +56,14 @@ export class ReviewCache {
   /**
    * Get review cache item. (note that fileName is same as uri.fsPath)
    */
-  get(document: vscode.TextDocument): ReviewCacheItem | undefined {
+  get(document: vscode.TextDocument, skipMonitorUpdate: boolean | "any"): ReviewCacheItem | undefined {
     const innerMap = this._cache.get(document.fileName);
     if (!innerMap) return undefined;
 
     const currentSnapshot = this.createCodeHealthRulesSnapshot();
     for (const [snapshot, entry] of innerMap.entries()) {
-      if (this.snapshotsEqual(snapshot, currentSnapshot)) {
+      const skipMonitorMatches = skipMonitorUpdate === "any" || skipMonitorUpdate === entry.skipMonitorUpdate;
+      if (this.snapshotsEqual(snapshot, currentSnapshot) && skipMonitorMatches) {
         return entry.item;
       }
     }
@@ -79,6 +80,10 @@ export class ReviewCache {
     return true;
   }
 
+  private resolveSkipMonitorUpdate(newValue: boolean, cachedValue: boolean): boolean {
+    return cachedValue === false ? false : newValue;
+  }
+
   async add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     const item = new ReviewCacheItem(document, review);
 
@@ -89,12 +94,28 @@ export class ReviewCache {
     }
 
     const snapshot = this.createCodeHealthRulesSnapshot();
-    innerMap.set(snapshot, { item, skipMonitorUpdate });
+
+    let finalSkipMonitorUpdate = skipMonitorUpdate;
+    let existingSnapshotKey: Map<string, number> | undefined;
+    for (const [existingSnapshot, existingEntry] of innerMap.entries()) {
+      if (this.snapshotsEqual(existingSnapshot, snapshot)) {
+        finalSkipMonitorUpdate = this.resolveSkipMonitorUpdate(skipMonitorUpdate, existingEntry.skipMonitorUpdate);
+        existingSnapshotKey = existingSnapshot;
+        break;
+      }
+    }
+
+    // Delete old snapshot key if it exists (since Map uses object identity)
+    if (existingSnapshotKey) {
+      innerMap.delete(existingSnapshotKey);
+    }
+
+    innerMap.set(snapshot, { item, skipMonitorUpdate: finalSkipMonitorUpdate });
 
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
     const baselineCommit = await this.getBaselineCommit(document.uri);
     if (baselineCommit) {
-      item.setBaseline(baselineCommit, skipMonitorUpdate, updateDiagnosticsPane);
+      item.setBaseline(baselineCommit, finalSkipMonitorUpdate, updateDiagnosticsPane);
     }
   }
 
@@ -106,9 +127,12 @@ export class ReviewCache {
     for (const [snapshot, entry] of innerMap.entries()) {
       if (this.snapshotsEqual(snapshot, currentSnapshot)) {
         logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
-        entry.item.setReview(document, review, skipMonitorUpdate);
-        entry.skipMonitorUpdate = skipMonitorUpdate;
-        void entry.item.runDeltaAnalysis({ skipMonitorUpdate });
+
+        const finalSkipMonitorUpdate = this.resolveSkipMonitorUpdate(skipMonitorUpdate, entry.skipMonitorUpdate);
+
+        entry.item.setReview(document, review, finalSkipMonitorUpdate);
+        entry.skipMonitorUpdate = finalSkipMonitorUpdate;
+        void entry.item.runDeltaAnalysis({ skipMonitorUpdate: finalSkipMonitorUpdate });
         return true;
       }
     }
