@@ -38,9 +38,10 @@ export class CachingReviewer implements Disposable {
   }
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts): CsReview {
+    const {skipMonitorUpdate} = reviewOpts;
     if (!reviewOpts.skipCache) {
       // If we have a cached CsReview for this document/version combination, return it.
-      const reviewCacheItem = this.reviewCache.getExactVersion(document);
+      const reviewCacheItem = this.reviewCache.getExactVersion(document, skipMonitorUpdate);
       if (reviewCacheItem) {
         return reviewCacheItem.review;
       }

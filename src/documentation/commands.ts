@@ -25,7 +25,7 @@ export function register(context: vscode.ExtensionContext) {
       
       // Try to get review result to extract function range info
       let functionRange: FunctionRange | undefined;
-      const cacheItem = Reviewer.instance.reviewCache.get(document);
+      const cacheItem = Reviewer.instance.reviewCache.get(document, "any");
       if (cacheItem) {
         const reviewResult = await cacheItem.review.reviewResult;
         if (reviewResult && codeSmell) {
