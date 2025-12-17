@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import { logOutputChannel } from '../log';
 import { gitExecutor } from '../git-utils';
 import { markGitAsUnavailable } from './git-detection';
@@ -47,6 +48,12 @@ export function isFileInWorkspace(
   // Normalize the file path to handle Git's forward slashes on all platforms
   const normalizedFile = path.normalize(file);
   const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+
+  // Safety layer useful for misc purposes - I think that at times, despite our efforts, our Git parsing can return non-existing files:
+  if (!fs.existsSync(absolutePath)) {
+    return false;
+  }
+
   // Only include files that are within the workspace:
   return absolutePath.startsWith(workspacePrefix) || absolutePath === normalizedWorkspacePath;
 }
