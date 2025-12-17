@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 import { getStatusChanges, getCommittedChanges, parseGitStatusFilename, createWorkspacePrefix, isFileInWorkspace } from '../../git/git-diff-utils';
 
 suite('Git Diff Utils Test Suite', () => {
@@ -12,7 +13,6 @@ suite('Git Diff Utils Test Suite', () => {
     }
     fs.mkdirSync(testRepoPath, { recursive: true });
 
-    const { execSync } = require('child_process');
     execSync('git init', { cwd: testRepoPath });
     execSync('git config user.email "test@example.com"', { cwd: testRepoPath });
     execSync('git config user.name "Test User"', { cwd: testRepoPath });
@@ -98,8 +98,6 @@ suite('Git Diff Utils Test Suite', () => {
 
   suite('getStatusChanges', () => {
     test('detects all file statuses: ??, A, M, MM, AM, R, C', async () => {
-      const { execSync } = require('child_process');
-
       fs.writeFileSync(path.join(testRepoPath, 'untracked.ts'), 'export const x = 1;');
 
       fs.writeFileSync(path.join(testRepoPath, 'added.js'), 'console.log("new");');
@@ -137,8 +135,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('detects files with whitespace in various statuses: ??, A, M, MM, AM, R, C', async () => {
-      const { execSync } = require('child_process');
-
       // === Phase 1: Commit files needed for M, MM, R ===
 
       fs.writeFileSync(path.join(testRepoPath, 'spaced file.ts'), 'export const x = 1;');
@@ -201,8 +197,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('filters files outside workspacePath when gitRootPath differs', async () => {
-      const { execSync } = require('child_process');
-
       const subDir = path.join(testRepoPath, 'workspace-subdir');
       fs.mkdirSync(subDir, { recursive: true });
 
@@ -251,12 +245,30 @@ suite('Git Diff Utils Test Suite', () => {
       assert.ok(content.includes('good gc.cpp in ui'), 'Should return the gc.cpp from ui directory with good content');
       assert.ok(!content.includes('bad gc.cpp at root'), 'Should not return the gc.cpp from root with bad content');
     });
+
+    test('handles renamed files and excludes old filename', async () => {
+      fs.writeFileSync(path.join(testRepoPath, 'file-to-rename.ts'), 'export const value = 1;');
+      execSync('git add file-to-rename.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add file to rename"', { cwd: testRepoPath });
+
+      fs.renameSync(path.join(testRepoPath, 'file-to-rename.ts'), path.join(testRepoPath, 'file-renamed.ts'));
+      execSync('git add -A', { cwd: testRepoPath });
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('file-renamed.ts'), 'Should include new filename');
+      assert.ok(!fileNames.includes('file-to-rename.ts'), 'Should not include old filename');
+
+      for (const fileName of fileNames) {
+        const filePath = path.join(testRepoPath, fileName);
+        assert.ok(fs.existsSync(filePath), `File should exist: ${fileName}`);
+      }
+    });
   });
 
   suite('getCommittedChanges', () => {
     test('filters committed files outside workspacePath when gitRootPath differs', async () => {
-      const { execSync } = require('child_process');
-
       const workspaceDir = path.join(testRepoPath, 'workspace');
       fs.mkdirSync(workspaceDir, { recursive: true });
 
@@ -280,8 +292,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('handles committed files with trailing slash in workspacePath', async () => {
-      const { execSync } = require('child_process');
-
       const workspaceDir = path.join(testRepoPath, 'workspace');
       fs.mkdirSync(workspaceDir, { recursive: true });
 
@@ -304,8 +314,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('filters and strips prefix for committed files with same name in different locations', async () => {
-      const { execSync } = require('child_process');
-
       const uiDir = path.join(testRepoPath, 'ui');
       fs.mkdirSync(uiDir, { recursive: true });
 
@@ -332,8 +340,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('returns all committed files when gitRootPath equals workspacePath', async () => {
-      const { execSync } = require('child_process');
-
       const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
 
       fs.writeFileSync(path.join(testRepoPath, 'root-file.ts'), 'export const a = 1;');
@@ -353,8 +359,6 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('handles renamed files and excludes old filename', async () => {
-      const { execSync } = require('child_process');
-
       const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
 
       fs.writeFileSync(path.join(testRepoPath, 'old-name.ts'), 'export const value = 1;');
