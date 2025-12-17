@@ -51,32 +51,42 @@ suite('Git Diff Utils Test Suite', () => {
 
   suite('isFileInWorkspace', () => {
     test('returns true for file inside workspace', () => {
-      const repoPath = path.join(path.sep, 'repo');
-      const workspacePath = path.join(repoPath, 'workspace');
-      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+      fs.writeFileSync(path.join(workspaceDir, 'file.ts'), 'export const x = 1;');
+
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspaceDir);
       const filePath = 'workspace/file.ts';
-      const normalizedFile = path.normalize(filePath);
-      const absolutePath = path.resolve(path.normalize(repoPath), normalizedFile);
-      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
-      assert.ok(result, `Expected file to be in workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+      const result = isFileInWorkspace(filePath, testRepoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(result, `Expected file to be in workspace. filePath: ${filePath}, repoPath: ${testRepoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
     });
 
     test('returns false for file outside workspace', () => {
-      const repoPath = path.join(path.sep, 'repo');
-      const workspacePath = path.join(repoPath, 'workspace');
-      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+
+      const otherDir = path.join(testRepoPath, 'other');
+      fs.mkdirSync(otherDir, { recursive: true });
+      fs.writeFileSync(path.join(otherDir, 'file.ts'), 'export const y = 1;');
+
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspaceDir);
       const filePath = 'other/file.ts';
-      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
-      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+      const result = isFileInWorkspace(filePath, testRepoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${testRepoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
     });
 
     test('returns false for file with similar prefix', () => {
-      const repoPath = path.join(path.sep, 'repo');
-      const workspacePath = path.join(repoPath, 'workspace');
-      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+      const workspaceDir = path.join(testRepoPath, 'workspace');
+      fs.mkdirSync(workspaceDir, { recursive: true });
+
+      const similarDir = path.join(testRepoPath, 'workspace-other');
+      fs.mkdirSync(similarDir, { recursive: true });
+      fs.writeFileSync(path.join(similarDir, 'file.ts'), 'export const z = 1;');
+
+      const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspaceDir);
       const filePath = 'workspace-other/file.ts';
-      const result = isFileInWorkspace(filePath, repoPath, normalizedWorkspacePath, workspacePrefix);
-      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${repoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
+      const result = isFileInWorkspace(filePath, testRepoPath, normalizedWorkspacePath, workspacePrefix);
+      assert.ok(!result, `Expected file to be outside workspace. filePath: ${filePath}, repoPath: ${testRepoPath}, normalizedWorkspacePath: ${normalizedWorkspacePath}, workspacePrefix: ${workspacePrefix}`);
     });
   });
 
