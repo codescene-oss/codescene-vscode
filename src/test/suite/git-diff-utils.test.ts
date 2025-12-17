@@ -351,5 +351,31 @@ suite('Git Diff Utils Test Suite', () => {
       const expectedSubdirPath = path.join('subdir', 'sub-file.ts');
       assert.ok(fileNames.includes(expectedSubdirPath), `Should include ${expectedSubdirPath}. Found: ${JSON.stringify(fileNames)}`);
     });
+
+    test('handles renamed files and excludes old filename', async () => {
+      const { execSync } = require('child_process');
+
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      fs.writeFileSync(path.join(testRepoPath, 'old-name.ts'), 'export const value = 1;');
+      execSync('git add old-name.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add file to rename"', { cwd: testRepoPath });
+      var fileNames = Array.from(await getCommittedChanges(testRepoPath, baseCommit, testRepoPath));
+
+
+      fs.renameSync(path.join(testRepoPath, 'old-name.ts'), path.join(testRepoPath, 'new-name.ts'));
+      execSync('git add -A', { cwd: testRepoPath });
+      execSync('git commit -m "Rename file"', { cwd: testRepoPath });
+
+      fileNames = Array.from(await getCommittedChanges(testRepoPath, baseCommit, testRepoPath));
+
+      assert.ok(fileNames.includes('new-name.ts'), 'Should include new filename');
+      assert.ok(!fileNames.includes('old-name.ts'), 'Should not include old filename');
+
+      for (const fileName of fileNames) {
+        const filePath = path.join(testRepoPath, fileName);
+        assert.ok(fs.existsSync(filePath), `File should exist: ${fileName}`);
+      }
+    });
   });
 });
