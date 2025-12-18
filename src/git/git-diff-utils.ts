@@ -8,6 +8,11 @@ import { markGitAsUnavailable } from './git-detection';
 // Can help creating unnecessary index.lock files:
 const GIT_ENV_NO_OPTIONAL_LOCKS = { GIT_OPTIONAL_LOCKS: "0" };
 
+// Maximum number of untracked files allowed per location (root or directory)
+// This has the purpose of ignoring abundant files that may have not been gitignored by the user yet.
+// e.g. .clj-kondo/.cache/foo/bar.clj
+export const MAX_UNTRACKED_FILES_PER_LOCATION = 5;
+
 export function parseGitStatusFilename(line: string): string | null {
   // e.g. "MM src/foo.clj" or '?? "file with spaces.ts"'
   const match = line.match(/^\S+\s+(.+)$/);
@@ -106,42 +111,100 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
   return changedFiles;
 }
 
+// Returns a list of files from `git status`, while ignoring untracked files if too abundant
+// (those probably are files that will be gitignored by the user later)
 export async function getStatusChanges(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
-  const result = await gitExecutor.execute(
-    // untracked-files is important - makes it return e.g. foo/bar.clj instead of foo/ for untracked files. Else we can produce unreliable results.
-    { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
+  // First pass: run git status with --untracked-files=normal to detect untracked directories
+  const normalResult = await gitExecutor.execute(
+    { command: 'git', args: ['status', '--porcelain', '--untracked-files=normal'], ignoreError: true, taskId: 'git' },
     { cwd: gitRootPath, env: GIT_ENV_NO_OPTIONAL_LOCKS }
   );
 
-  if (result.exitCode === 0) {
-    const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
-
-    result.stdout
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .filter(line => {
-        // Only include created and modified files.
-        // Include: A (added), M (modified), R (renamed), C (copied), ? (untracked)
-        // Exclude: deletions (not needed for our use cases) and merge conflicts (we don't want to review broken files)
-        const statusCodes = line.substring(0, 2).trim();
-        const includedStatuses = ['A', 'M', 'R', 'C', 'AM', 'MM', '??'];
-        return includedStatuses.includes(statusCodes);
-      })
-      .forEach(line => {
-        const filename = parseGitStatusFilename(line);
-        if (filename && isFileInWorkspace(filename, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
-          const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
-          changedFiles.add(relativeToWorkspace);
-        }
-      });
-  } else {
-    if (result.exitCode === "ENOENT") {
+  if (normalResult.exitCode !== 0) {
+    if (normalResult.exitCode === "ENOENT") {
       markGitAsUnavailable();
     }
-    logOutputChannel.info(`Failed to get status changes: ${result.exitCode} ${result.stderr}`);
+    logOutputChannel.info(`Failed to get status changes: ${normalResult.exitCode} ${normalResult.stderr}`);
+    return changedFiles;
+  }
+
+  const untrackedDirectories = new Set<string>();
+  const normalLines = normalResult.stdout
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  for (const line of normalLines) {
+    if (line.startsWith('??')) {
+      const filename = parseGitStatusFilename(line);
+      if (filename) {
+        if (filename.endsWith('/')) {
+          untrackedDirectories.add(filename.slice(0, -1));
+        }
+      }
+    }
+  }
+
+  // Second pass: run git status with --untracked-files=all *if* there were untracked directories
+  // (this is an optimization to avoid calling git twice when not needed)
+  let linesToParse = normalLines;
+  if (untrackedDirectories.size > 0) {
+    const allResult = await gitExecutor.execute(
+      { command: 'git', args: ['status', '--porcelain', '--untracked-files=all'], ignoreError: true, taskId: 'git' },
+      { cwd: gitRootPath, env: GIT_ENV_NO_OPTIONAL_LOCKS }
+    );
+
+    if (allResult.exitCode === 0) {
+      linesToParse = allResult.stdout
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+    }
+  }
+
+  const { normalizedWorkspacePath, workspacePrefix } = createWorkspacePrefix(workspacePath);
+
+  const untrackedFilesByLocation = new Map<string, string[]>();
+
+  for (const line of linesToParse) {
+    const statusCodes = line.substring(0, 2).trim();
+    const includedStatuses = ['A', 'M', 'R', 'C', 'AM', 'MM', '??'];
+    if (!includedStatuses.includes(statusCodes)) {
+      continue;
+    }
+
+    const filename = parseGitStatusFilename(line);
+    if (!filename || !isFileInWorkspace(filename, gitRootPath, normalizedWorkspacePath, workspacePrefix)) {
+      continue;
+    }
+
+    if (statusCodes === '??') {
+      const dir = path.dirname(filename);
+      const location = dir === '.' ? '__root__' : dir;
+
+      if (!untrackedFilesByLocation.has(location)) {
+        untrackedFilesByLocation.set(location, []);
+      }
+      untrackedFilesByLocation.get(location)!.push(filename);
+    } else {
+      const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
+      changedFiles.add(relativeToWorkspace);
+    }
+  }
+
+  for (const [location, files] of untrackedFilesByLocation) {
+    const shouldExclude =
+      (location === '__root__' && files.length > MAX_UNTRACKED_FILES_PER_LOCATION) ||
+      (location !== '__root__' && untrackedDirectories.has(location) && files.length > MAX_UNTRACKED_FILES_PER_LOCATION);
+
+    if (!shouldExclude) {
+      for (const filename of files) {
+        const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
+        changedFiles.add(relativeToWorkspace);
+      }
+    }
   }
 
   return changedFiles;
