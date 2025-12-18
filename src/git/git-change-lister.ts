@@ -9,15 +9,18 @@ import { getMergeBaseCommit, isMainBranch, getWorkspacePath } from '../git-utils
 import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 import { getWorkspaceFolder } from '../utils';
+import { SavedFilesTracker } from '../saved-files-tracker';
 
 /**
  * Lists all changed files exhaustively from Git status, and Git diff vs. merge-base.
  */
 export class GitChangeLister {
   private executor: Executor;
+  private savedFilesTracker: SavedFilesTracker;
 
-  constructor(executor: Executor) {
+  constructor(executor: Executor, savedFilesTracker: SavedFilesTracker) {
     this.executor = executor;
+    this.savedFilesTracker = savedFilesTracker;
   }
 
   // NOTE:
@@ -43,7 +46,8 @@ export class GitChangeLister {
   }
 
   async collectFilesFromRepoState(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
-    const statusChanges = await getStatusChanges(gitRootPath, workspacePath);
+    const filesToExcludeFromHeuristic = this.savedFilesTracker.getSavedFiles();
+    const statusChanges = await getStatusChanges(gitRootPath, workspacePath, filesToExcludeFromHeuristic);
     const files = new Set<string>();
 
     for (const relativeFilePath of statusChanges) {

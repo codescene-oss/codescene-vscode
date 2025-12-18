@@ -30,7 +30,8 @@ suite('GitChangeLister Test Suite', () => {
 
     mockGitApi = new MockGitAPI();
     mockExecutor = new MockExecutor();
-    gitChangeLister = new GitChangeLister(mockExecutor);
+    const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
+    gitChangeLister = new GitChangeLister(mockExecutor, mockSavedFilesTracker);
   });
 
   teardown(() => {
