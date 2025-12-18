@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.23.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.23.0...v0.23.1) (2025-12-18)
+
+
+### Features
+
+* files directly saved by the user should be excluded from heuristics ([cedf735](https://github.com/codescene-oss/codescene-vscode/commit/cedf735451c4eea78fd539b230830640ab782a14))
+
 ## [0.23.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.22.2...v0.23.0) (2025-12-18)
 
 
