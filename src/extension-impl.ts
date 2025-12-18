@@ -23,6 +23,7 @@ import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
+import { SavedFilesTracker } from './saved-files-tracker';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
@@ -49,6 +50,8 @@ const migrationKey = 'codescene.lastSeenVersion';
 let DISPOSABLES: vscode.Disposable[] = [];
 
 const codeHealthFileVersion = new Map<string, number>();
+
+let savedFilesTrackerInstance: SavedFilesTracker;
 
 export function getCodeHealthFileVersions(): Map<string, number> {
   return codeHealthFileVersion;
@@ -129,9 +132,12 @@ async function startExtension(context: vscode.ExtensionContext) {
   registerCsDocProvider(context);
   await initializeCodeHealthFileVersions();
   addReviewListeners(context);
+  savedFilesTrackerInstance = new SavedFilesTracker(context);
+  savedFilesTrackerInstance.start();
+  DISPOSABLES.push(savedFilesTrackerInstance);
   setupStatsCollector(context);
 
-  activateCHMonitor(context);
+  activateCHMonitor(context, savedFilesTrackerInstance);
 
   // Add Review CodeLens support
   const codeLensProvider = new CsReviewCodeLensProvider();
@@ -205,7 +211,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
   if (gitApi) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor);
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance);
     gitChangeObserver.start();
     DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);

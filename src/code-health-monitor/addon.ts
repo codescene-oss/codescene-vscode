@@ -14,6 +14,7 @@ import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
 import { logOutputChannel } from '../log';
 import { SimpleExecutor } from '../simple-executor';
 import { isGitAvailable } from '../git/git-detection';
+import { SavedFilesTracker } from '../saved-files-tracker';
 
 let gitApi: API | undefined;
 
@@ -22,7 +23,7 @@ export const onTreeDataCleared = clearTreeEmitter.event;
 
 let ALL_DISPOSABLES: vscode.Disposable[] = [];
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
   gitApi = acquireGitApi();
   if (!gitApi) return;
 
@@ -49,7 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Review all changed/added files every 9 seconds.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
   // because `CsDiagnostics.review` has built-in caching.
-  const gitChangeLister = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor);
+  const gitChangeLister = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker);
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
   void scheduledExecutor.executeTask(async () => {

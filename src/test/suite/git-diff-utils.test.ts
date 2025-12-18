@@ -132,7 +132,7 @@ suite('Git Diff Utils Test Suite', () => {
       fs.copyFileSync(srcPath, copiedPath);
       execSync('git add -A', { cwd: testRepoPath });
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('untracked.ts'), 'Should detect ?? status');
@@ -184,7 +184,7 @@ suite('Git Diff Utils Test Suite', () => {
       execSync('git add "new modified file.js"', { cwd: testRepoPath });
       fs.writeFileSync(path.join(testRepoPath, 'new modified file.js'), 'console.log(2);');
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('untracked file.ts'), 'Should detect ?? with spaces');
@@ -197,11 +197,11 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('returns empty set for clean repository and excludes deleted files', async () => {
-      let changes = await getStatusChanges(testRepoPath, testRepoPath);
+      let changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       assert.strictEqual(changes.size, 0, 'Should return empty set for clean repo');
 
       fs.unlinkSync(path.join(testRepoPath, 'existing.ts'));
-      changes = await getStatusChanges(testRepoPath, testRepoPath);
+      changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
       assert.ok(!fileNames.includes('existing.ts'), 'Should not include deleted file');
     });
@@ -214,7 +214,7 @@ suite('Git Diff Utils Test Suite', () => {
 
       fs.writeFileSync(path.join(testRepoPath, 'outside.ts'), 'export const outside = 1;');
 
-      const changes = await getStatusChanges(testRepoPath, subDir);
+      const changes = await getStatusChanges(testRepoPath, subDir, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('inside.ts'), 'Should include file inside workspacePath with workspace prefix stripped');
@@ -230,7 +230,7 @@ suite('Git Diff Utils Test Suite', () => {
       fs.writeFileSync(path.join(workspaceDir, 'file.ts'), 'export const a = 1;');
 
       const workspacePathWithSlash = workspaceDir + path.sep;
-      const changes = await getStatusChanges(testRepoPath, workspacePathWithSlash);
+      const changes = await getStatusChanges(testRepoPath, workspacePathWithSlash, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('file.ts'), 'Should handle workspacePath with trailing slash and strip prefix');
@@ -244,7 +244,7 @@ suite('Git Diff Utils Test Suite', () => {
 
       fs.writeFileSync(path.join(uiDir, 'gc.cpp'), '// good gc.cpp in ui');
 
-      const changes = await getStatusChanges(testRepoPath, uiDir);
+      const changes = await getStatusChanges(testRepoPath, uiDir, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.strictEqual(fileNames.length, 1, 'Should only include one gc.cpp file');
@@ -264,7 +264,7 @@ suite('Git Diff Utils Test Suite', () => {
       fs.renameSync(path.join(testRepoPath, 'file-to-rename.ts'), path.join(testRepoPath, 'file-renamed.ts'));
       execSync('git add -A', { cwd: testRepoPath });
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       assert.ok(fileNames.includes('file-renamed.ts'), 'Should include new filename');
@@ -282,7 +282,7 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= count; i++) {
@@ -296,7 +296,7 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= count; i++) {
@@ -313,7 +313,7 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(untrackedDir, `file${i}.ts`), `export const x${i} = 1;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= count; i++) {
@@ -330,7 +330,7 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(untrackedDir, `file${i}.ts`), `export const x${i} = 1;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= count; i++) {
@@ -354,7 +354,7 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(dir2, `file${i}.ts`), `export const y${i} = 1;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= manyCount; i++) {
@@ -379,11 +379,89 @@ suite('Git Diff Utils Test Suite', () => {
         fs.writeFileSync(path.join(testRepoPath, `tracked${i}.ts`), `export const x${i} = 2;`);
       }
 
-      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, new Set<string>());
       const fileNames = Array.from(changes);
 
       for (let i = 1; i <= count; i++) {
         assert.ok(fileNames.includes(`tracked${i}.ts`), `Should include tracked${i}.ts`);
+      }
+    });
+
+    test('includes untracked files that are in filesToExcludeFromHeuristic even when exceeding MAX_UNTRACKED_FILES_PER_LOCATION', async () => {
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION + 3;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const file2Path = path.join(testRepoPath, 'untracked2.ts');
+      const file5Path = path.join(testRepoPath, 'untracked5.ts');
+      const filesToExcludeFromHeuristic = new Set<string>([file2Path, file5Path]);
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, filesToExcludeFromHeuristic);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('untracked2.ts'), 'Should include untracked2.ts (in filesToExcludeFromHeuristic)');
+      assert.ok(fileNames.includes('untracked5.ts'), 'Should include untracked5.ts (in filesToExcludeFromHeuristic)');
+
+      for (let i = 1; i <= count; i++) {
+        if (i !== 2 && i !== 5) {
+          assert.ok(!fileNames.includes(`untracked${i}.ts`), `Should not include untracked${i}.ts (not in filesToExcludeFromHeuristic)`);
+        }
+      }
+    });
+
+    test('includes untracked files in directory that are in filesToExcludeFromHeuristic even when exceeding MAX_UNTRACKED_FILES_PER_LOCATION', async () => {
+      const untrackedDir = path.join(testRepoPath, 'untracked-dir');
+      fs.mkdirSync(untrackedDir, { recursive: true });
+
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION + 3;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(untrackedDir, `file${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const file1Path = path.join(untrackedDir, 'file1.ts');
+      const file4Path = path.join(untrackedDir, 'file4.ts');
+      const filesToExcludeFromHeuristic = new Set<string>([file1Path, file4Path]);
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, filesToExcludeFromHeuristic);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('untracked-dir/file1.ts') || fileNames.includes('untracked-dir\\file1.ts'), 'Should include file1.ts (in filesToExcludeFromHeuristic)');
+      assert.ok(fileNames.includes('untracked-dir/file4.ts') || fileNames.includes('untracked-dir\\file4.ts'), 'Should include file4.ts (in filesToExcludeFromHeuristic)');
+
+      for (let i = 1; i <= count; i++) {
+        if (i !== 1 && i !== 4) {
+          const found = fileNames.some(name => name.includes(`file${i}.ts`));
+          assert.ok(!found, `Should not include file${i}.ts (not in filesToExcludeFromHeuristic)`);
+        }
+      }
+    });
+
+    test('includes mix of tracked modified files and untracked files from filesToExcludeFromHeuristic', async () => {
+      fs.writeFileSync(path.join(testRepoPath, 'tracked.ts'), 'export const tracked = 1;');
+      execSync('git add tracked.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add tracked file"', { cwd: testRepoPath });
+
+      fs.writeFileSync(path.join(testRepoPath, 'tracked.ts'), 'export const tracked = 2;');
+
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION + 2;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const file3Path = path.join(testRepoPath, 'untracked3.ts');
+      const filesToExcludeFromHeuristic = new Set<string>([file3Path]);
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath, filesToExcludeFromHeuristic);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('tracked.ts'), 'Should include tracked modified file');
+      assert.ok(fileNames.includes('untracked3.ts'), 'Should include untracked3.ts (in filesToExcludeFromHeuristic)');
+
+      for (let i = 1; i <= count; i++) {
+        if (i !== 3) {
+          assert.ok(!fileNames.includes(`untracked${i}.ts`), `Should not include untracked${i}.ts`);
+        }
       }
     });
   });

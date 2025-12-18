@@ -63,15 +63,22 @@ export function isFileInWorkspace(
   return absolutePath.startsWith(workspacePrefix) || absolutePath === normalizedWorkspacePath;
 }
 
+export function convertGitPathToAbsolutePath(
+  file: string,
+  gitRootPath: string
+): string {
+  const normalizedGitRootPath = path.normalize(gitRootPath);
+  const normalizedFile = path.normalize(file);
+  const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+  return absolutePath;
+}
+
 export function convertGitPathToWorkspacePath(
   file: string,
   gitRootPath: string,
   normalizedWorkspacePath: string
 ): string {
-  // Git returns paths relative to gitRootPath. Convert to absolute, then make relative to workspacePath:
-  const normalizedGitRootPath = path.normalize(gitRootPath);
-  const normalizedFile = path.normalize(file);
-  const absolutePath = path.resolve(normalizedGitRootPath, normalizedFile);
+  const absolutePath = convertGitPathToAbsolutePath(file, gitRootPath);
   const relativeToWorkspace = path.relative(normalizedWorkspacePath, absolutePath);
   return relativeToWorkspace;
 }
@@ -113,7 +120,7 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
 
 // Returns a list of files from `git status`, while ignoring untracked files if too abundant
 // (those probably are files that will be gitignored by the user later)
-export async function getStatusChanges(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
+export async function getStatusChanges(gitRootPath: string, workspacePath: string, filesToExcludeFromHeuristic: Set<string>): Promise<Set<string>> {
   const changedFiles = new Set<string>();
 
   // First pass: run git status with --untracked-files=normal to detect untracked directories
@@ -199,8 +206,11 @@ export async function getStatusChanges(gitRootPath: string, workspacePath: strin
       (location === '__root__' && files.length > MAX_UNTRACKED_FILES_PER_LOCATION) ||
       (location !== '__root__' && untrackedDirectories.has(location) && files.length > MAX_UNTRACKED_FILES_PER_LOCATION);
 
-    if (!shouldExclude) {
-      for (const filename of files) {
+    for (const filename of files) {
+      const absolutePath = convertGitPathToAbsolutePath(filename, gitRootPath);
+      const shouldExcludeFromHeuristic = filesToExcludeFromHeuristic.has(absolutePath);
+
+      if (!shouldExclude || shouldExcludeFromHeuristic) {
         const relativeToWorkspace = convertGitPathToWorkspacePath(filename, gitRootPath, normalizedWorkspacePath);
         changedFiles.add(relativeToWorkspace);
       }
