@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
-import { getStatusChanges, getCommittedChanges, parseGitStatusFilename, createWorkspacePrefix, isFileInWorkspace } from '../../git/git-diff-utils';
+import { getStatusChanges, getCommittedChanges, parseGitStatusFilename, createWorkspacePrefix, isFileInWorkspace, MAX_UNTRACKED_FILES_PER_LOCATION } from '../../git/git-diff-utils';
 
 suite('Git Diff Utils Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-diff-utils');
@@ -273,6 +273,117 @@ suite('Git Diff Utils Test Suite', () => {
       for (const fileName of fileNames) {
         const filePath = path.join(testRepoPath, fileName);
         assert.ok(fs.existsSync(filePath), `File should exist: ${fileName}`);
+      }
+    });
+
+    test('excludes untracked files when more than MAX_UNTRACKED_FILES_PER_LOCATION at root level', async () => {
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION + 1;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= count; i++) {
+        assert.ok(!fileNames.includes(`untracked${i}.ts`), `Should not include untracked${i}.ts`);
+      }
+    });
+
+    test('includes untracked files when MAX_UNTRACKED_FILES_PER_LOCATION or fewer at root level', async () => {
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `untracked${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= count; i++) {
+        assert.ok(fileNames.includes(`untracked${i}.ts`), `Should include untracked${i}.ts`);
+      }
+    });
+
+    test('excludes untracked files in directory when more than MAX_UNTRACKED_FILES_PER_LOCATION in that directory', async () => {
+      const untrackedDir = path.join(testRepoPath, 'untracked-dir');
+      fs.mkdirSync(untrackedDir, { recursive: true });
+
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION + 1;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(untrackedDir, `file${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= count; i++) {
+        assert.ok(!fileNames.includes(path.join('untracked-dir', `file${i}.ts`)), `Should not include untracked-dir/file${i}.ts`);
+      }
+    });
+
+    test('includes untracked files in directory when MAX_UNTRACKED_FILES_PER_LOCATION or fewer in that directory', async () => {
+      const untrackedDir = path.join(testRepoPath, 'untracked-dir');
+      fs.mkdirSync(untrackedDir, { recursive: true });
+
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(untrackedDir, `file${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= count; i++) {
+        const expectedPath = path.join('untracked-dir', `file${i}.ts`);
+        assert.ok(fileNames.includes(expectedPath), `Should include ${expectedPath}`);
+      }
+    });
+
+    test('handles multiple directories with different untracked file counts', async () => {
+      const dir1 = path.join(testRepoPath, 'many-files');
+      fs.mkdirSync(dir1, { recursive: true });
+      const manyCount = MAX_UNTRACKED_FILES_PER_LOCATION + 1;
+      for (let i = 1; i <= manyCount; i++) {
+        fs.writeFileSync(path.join(dir1, `file${i}.ts`), `export const x${i} = 1;`);
+      }
+
+      const dir2 = path.join(testRepoPath, 'few-files');
+      fs.mkdirSync(dir2, { recursive: true });
+      const fewCount = MAX_UNTRACKED_FILES_PER_LOCATION - 2;
+      for (let i = 1; i <= fewCount; i++) {
+        fs.writeFileSync(path.join(dir2, `file${i}.ts`), `export const y${i} = 1;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= manyCount; i++) {
+        assert.ok(!fileNames.includes(path.join('many-files', `file${i}.ts`)), `Should not include many-files/file${i}.ts`);
+      }
+
+      for (let i = 1; i <= fewCount; i++) {
+        const expectedPath = path.join('few-files', `file${i}.ts`);
+        assert.ok(fileNames.includes(expectedPath), `Should include ${expectedPath}`);
+      }
+    });
+
+    test('always includes tracked modified files regardless of count', async () => {
+      const count = MAX_UNTRACKED_FILES_PER_LOCATION * 2;
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `tracked${i}.ts`), `export const x${i} = 1;`);
+      }
+      execSync('git add .', { cwd: testRepoPath });
+      execSync('git commit -m "Add tracked files"', { cwd: testRepoPath });
+
+      for (let i = 1; i <= count; i++) {
+        fs.writeFileSync(path.join(testRepoPath, `tracked${i}.ts`), `export const x${i} = 2;`);
+      }
+
+      const changes = await getStatusChanges(testRepoPath, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      for (let i = 1; i <= count; i++) {
+        assert.ok(fileNames.includes(`tracked${i}.ts`), `Should include tracked${i}.ts`);
       }
     });
   });
