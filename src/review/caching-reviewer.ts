@@ -37,7 +37,7 @@ export class CachingReviewer implements Disposable {
     }
   }
 
-  review(document: vscode.TextDocument, reviewOpts: ReviewOpts): CsReview {
+  review(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean): CsReview {
     const {skipMonitorUpdate} = reviewOpts;
     if (!reviewOpts.skipCache) {
       // If we have a cached CsReview for this document/version combination, return it.
@@ -60,7 +60,7 @@ export class CachingReviewer implements Disposable {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.updateOrAdd(document, csReview, reviewOpts.skipMonitorUpdate, reviewOpts.updateDiagnosticsPane);
+    this.updateOrAdd(document, csReview, skipMonitorUpdateForDelta ?? skipMonitorUpdate, reviewOpts.updateDiagnosticsPane);
 
     return csReview;
   }

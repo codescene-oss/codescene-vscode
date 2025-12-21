@@ -33,14 +33,14 @@ export class FilteringReviewer {
     }
   }
 
-  async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<void> {
+  async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean): Promise<void> {
     const ignored = await this.gitIgnoreChecker.isIgnored(document);
 
     if (ignored) {
       return;
     }
 
-    CsDiagnostics.review(document, reviewOpts);
+    CsDiagnostics.review(document, reviewOpts, skipMonitorUpdateForDelta);
   }
 
   abort(document: vscode.TextDocument): void {
