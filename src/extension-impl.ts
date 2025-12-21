@@ -217,7 +217,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     context.subscriptions.push(gitChangeObserver);
   }
 
-  // Remove CFM stale files
+  // Remove CHM stale files
   const filenameInspectorExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
   void filenameInspectorExecutor.executeTask(async () => {
     const homeView = getHomeViewInstance();
@@ -229,7 +229,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
         try {
           await access(filePath);
         } catch {
-          logOutputChannel.info(`File no longer exists: ${filePath}`);
           fireFileDeletedFromGit(filePath);
           if (gitChangeObserver) {
             gitChangeObserver.removeFromTracker(filePath);

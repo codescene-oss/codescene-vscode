@@ -24,11 +24,11 @@ export class OpenFilesObserver {
     this.docSelector = reviewDocumentSelector();
   }
 
-  private reviewDocument(document: vscode.TextDocument): boolean {
+  private reviewDocument(document: vscode.TextDocument, skipMonitorUpdateForDelta?: boolean): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
-    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
     return true;
   }
 
@@ -130,7 +130,7 @@ export class OpenFilesObserver {
       })
     );
 
-    // This provides the diagnostics when a file is edited.
+    // This provides the diagnostics when a file is changed (without waiting for the changes to be saved).
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
         const filePath = e.document.fileName;
@@ -142,7 +142,10 @@ export class OpenFilesObserver {
         this.reviewTimers.set(
           filePath,
           setTimeout(() => {
-            this.reviewDocument(e.document);
+            // The `true` param is for CS-6117 - unsaved changes should show up in the Monitor,
+            // but only if they come from a live change (i.e. `onDidChangeTextDocument` callback) -
+            // not from merely opening this file at startup.
+            this.reviewDocument(e.document, true);
           }, 1000)
         );
       })

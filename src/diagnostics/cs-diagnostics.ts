@@ -24,7 +24,7 @@ export default class CsDiagnostics {
     CsDiagnostics.collection.set(uri, diagnostics);
   }
 
-  static review(document: vscode.TextDocument, reviewOpts: ReviewOpts) {
+  static review(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean) {
     if (vscode.languages.match(CsDiagnostics.documentSelector, document) === 0) {
       return;
     }
@@ -33,8 +33,8 @@ export default class CsDiagnostics {
       logOutputChannel.trace(`Queued up a review of "${document.fileName}"`);
       return;
     }
-    
-    void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
+
+    void Reviewer.instance.review(document, reviewOpts, skipMonitorUpdateForDelta).diagnostics.then((diagnostics) => {
       if (reviewOpts.updateDiagnosticsPane) {
         // Only include diagnostics with actual code smells in the diagnostics view.
         const diagnosticsWithCodeSmells = diagnostics.filter((d) => d.codeSmell !== null);
