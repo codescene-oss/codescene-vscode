@@ -211,7 +211,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
   if (gitApi) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance);
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserver);
     gitChangeObserver.start();
     DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);
