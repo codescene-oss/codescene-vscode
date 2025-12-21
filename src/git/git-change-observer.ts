@@ -14,6 +14,7 @@ import { getWorkspaceFolder } from '../utils';
 import { SavedFilesTracker } from '../saved-files-tracker';
 import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
 import { SimpleExecutor } from '../simple-executor';
+import { OpenFilesObserver } from '../review/open-files-observer';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
@@ -24,6 +25,7 @@ export class GitChangeObserver {
   private scheduledExecutor: DroppingScheduledExecutor;
   private context: vscode.ExtensionContext;
   private savedFilesTracker: SavedFilesTracker;
+  private openFilesObserver: OpenFilesObserver;
 
   // Tracks the files that have been added though this Observer.
   // We need this because deletion events are tricky:
@@ -34,10 +36,11 @@ export class GitChangeObserver {
 
   private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
 
-  constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker) {
+  constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver) {
     this.context = context;
     this.executor = executor;
     this.savedFilesTracker = savedFilesTracker;
+    this.openFilesObserver = openFilesObserver;
     this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
     this.fileWatcher = this.createWatcher('**/*');
 
@@ -103,7 +106,10 @@ export class GitChangeObserver {
     try {
       const workspacePath = getWorkspacePath(workspaceFolder);
       const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-      const filesToExcludeFromHeuristic = this.savedFilesTracker.getSavedFiles();
+      const filesToExcludeFromHeuristic = new Set([
+        ...this.savedFilesTracker.getSavedFiles(),
+        ...this.openFilesObserver.getAllVisibleFileNames()
+      ]);
       const committedChanges = await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
       const statusChanges = await getStatusChanges(gitRootPath, workspacePath, filesToExcludeFromHeuristic);
 

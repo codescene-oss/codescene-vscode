@@ -52,7 +52,7 @@ export class OpenFilesObserver {
     return fileNames;
   }
 
-  private getAllVisibleFileNames(): Set<string> {
+  getAllVisibleFileNames(): Set<string> {
     const fileNames = new Set<string>();
 
     vscode.window.visibleTextEditors.forEach(editor => {

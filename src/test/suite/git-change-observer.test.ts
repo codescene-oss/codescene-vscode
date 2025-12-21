@@ -118,7 +118,8 @@ suite('GitChangeObserver Test Suite', () => {
 
     mockExecutor = new MockExecutor();
     const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
-    gitChangeObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker);
+    const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
+    gitChangeObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver);
     await new Promise(resolve => setTimeout(resolve, 500));
   });
 
