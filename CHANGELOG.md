@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.24.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.23.1...v0.24.0) (2025-12-21)
+
+
+### Features
+
+* files shown in UI tabs should be excluded from analysis heuristic ([11515f1](https://github.com/codescene-oss/codescene-vscode/commit/11515f1aea2b32e626c9afe34809ad39bd73cc70))
+
+
+### Bug fixes
+
+* reflect unsaved changes on the Code Health Monitor ([e2d29a6](https://github.com/codescene-oss/codescene-vscode/commit/e2d29a6989bbdd42030a4c3463311da80c560626))
+
 ### [0.23.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.23.0...v0.23.1) (2025-12-18)
 
 
