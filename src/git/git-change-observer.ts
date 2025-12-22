@@ -37,6 +37,13 @@ export class GitChangeObserver {
   private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
 
   constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver) {
+    if (!savedFilesTracker) {
+      throw new Error('SavedFilesTracker must be provided to GitChangeObserver');
+    }
+    if (!openFilesObserver) {
+      throw new Error('OpenFilesObserver must be provided to GitChangeObserver');
+    }
+
     this.context = context;
     this.executor = executor;
     this.savedFilesTracker = savedFilesTracker;

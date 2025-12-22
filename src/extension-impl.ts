@@ -131,10 +131,12 @@ async function startExtension(context: vscode.ExtensionContext) {
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   await initializeCodeHealthFileVersions();
-  addReviewListeners(context);
   savedFilesTrackerInstance = new SavedFilesTracker(context);
   savedFilesTrackerInstance.start();
   DISPOSABLES.push(savedFilesTrackerInstance);
+
+  addReviewListeners(context);
+
   setupStatsCollector(context);
 
   activateCHMonitor(context, savedFilesTrackerInstance);
@@ -201,6 +203,10 @@ function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
  * Adds listeners for all events that should trigger a review.
  */
 function addReviewListeners(context: vscode.ExtensionContext) {
+  if (!savedFilesTrackerInstance) {
+    throw new Error('SavedFilesTracker must be initialized before calling addReviewListeners');
+  }
+
   // Observe open file events and trigger reviews
   const openFilesObserver = new OpenFilesObserver(context);
   openFilesObserver.start();
