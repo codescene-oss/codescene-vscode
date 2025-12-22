@@ -19,6 +19,9 @@ export class GitChangeLister {
   private savedFilesTracker: SavedFilesTracker;
 
   constructor(executor: Executor, savedFilesTracker: SavedFilesTracker) {
+    if (!savedFilesTracker) {
+      throw new Error('SavedFilesTracker must be provided to GitChangeLister');
+    }
     this.executor = executor;
     this.savedFilesTracker = savedFilesTracker;
   }

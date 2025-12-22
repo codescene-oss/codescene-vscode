@@ -24,6 +24,10 @@ export const onTreeDataCleared = clearTreeEmitter.event;
 let ALL_DISPOSABLES: vscode.Disposable[] = [];
 
 export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
+  if (!savedFilesTracker) {
+    throw new Error('SavedFilesTracker must be provided to activate Code Health Monitor');
+  }
+
   gitApi = acquireGitApi();
   if (!gitApi) return;
 
