@@ -142,10 +142,10 @@ export class OpenFilesObserver {
         this.reviewTimers.set(
           filePath,
           setTimeout(() => {
-            // The `true` param is for CS-6117 - unsaved changes should show up in the Monitor,
+            // The `false` param is for CS-6117 - unsaved changes should show up in the Monitor,
             // but only if they come from a live change (i.e. `onDidChangeTextDocument` callback) -
             // not from merely opening this file at startup.
-            this.reviewDocument(e.document, true);
+            this.reviewDocument(e.document, false);
           }, 1000)
         );
       })
