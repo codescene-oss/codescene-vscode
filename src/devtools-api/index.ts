@@ -284,11 +284,35 @@ export class DevtoolsAPI {
       '--preflight',
       DevtoolsAPI.instance.preflightJson!, // aceEnabled() implies preflightJson is defined
     ];
+    
+    const allArgs = baseArgs.concat(
+      args,
+      cachePath ? ['--cache-path', cachePath] : []
+    );
+    
+    // Check if command line would be too long (Windows OS limit is ~32KB)
+    const lengthCheck = DevtoolsAPI.checkCommandLineLength(allArgs);
+    if (lengthCheck.shouldSkip) {
+      logOutputChannel.warn(
+        `Skipping fns-to-refactor for ${basename(document.fileName)}: ${lengthCheck.reason}`
+      );
+      
+      // Show user-friendly popup notification
+      void vscode.window.showWarningMessage(
+        `CodeScene: Cannot analyze refactoring suggestions for "${basename(document.fileName)}". ` +
+        `The file is too large and would exceed Windows command line limits. ` +
+        'View Details'
+      ).then((selection) => {
+        if (selection === 'View Details') {
+          logOutputChannel.show();
+        }
+      });
+      
+      return []; // Return empty array instead of failing
+    }
+    
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs.concat(
-        args,
-        cachePath ? ['--cache-path', cachePath] : []
-      ),
+      args: allArgs,
       input: document.getText(),
       execOptions: { cwd: fp.documentDirectory },
     });
@@ -442,6 +466,54 @@ skipCache === true ? ' (retry)' : ''
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }
+  }
+
+  /**
+   * Checks if command line arguments would exceed Windows operating system command line length limit.
+   * 
+   * Windows OS has a hard limit of 32,767 characters for the entire command line string when spawning
+   * a process. This includes: executable path + all arguments + spaces between them.
+   * This is an OS-level limitation, not a limitation of our code or the CLI binary.
+   * 
+   * Since the binary doesn't support file-based arguments for --code-smells or --delta-result,
+   * we need to check if the command line would be too long and skip processing if so.
+   * 
+   * @param args Command line arguments
+   * @returns Object indicating if processing should be skipped and the reason
+   */
+  private static checkCommandLineLength(args: string[]): { shouldSkip: boolean; reason?: string } {
+    // Windows OS limit: 32,767 characters for the entire command line (executable + all args)
+    const winCmdLineLimit = 32767;
+    // Safe threshold: stop before hitting the limit to account for executable path and overhead
+    const safeThreshold = 30000;
+
+    // Estimate total command line length (including spaces between args)
+    let estimatedLength = 0;
+    const largeArgs: string[] = [];
+    
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      estimatedLength += arg.length + 1; // +1 for space separator
+      
+      // Track large arguments for the error message
+      if (arg.length > 5000) {
+        const prevArg = i > 0 ? args[i - 1] : '';
+        const argName = prevArg.startsWith('--') ? prevArg : `arg[${i}]`;
+        largeArgs.push(`${argName} (${arg.length} chars)`);
+      }
+    }
+
+    // Add estimated executable path length (typically 100-200 chars on Windows)
+    estimatedLength += 200;
+
+    if (estimatedLength >= safeThreshold) {
+      return {
+        shouldSkip: true,
+        reason: `Command line length (${estimatedLength} chars) would exceed Windows OS limit (${winCmdLineLimit} chars). ${largeArgs.length > 0 ? `Large arguments: ${largeArgs.join(', ')}. ` : ''}This is a Windows operating system limitation, not a code limitation. The binary needs to be updated to support file-based arguments for large JSON data.`,
+      };
+    }
+
+    return { shouldSkip: false };
   }
 
   static dispose() {
