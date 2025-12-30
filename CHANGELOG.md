@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.25.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.24.2...v0.25.0) (2025-12-30)
+
+
+### Features
+
+* prevent CLI commands from running over non-existing cwds ([084cf4a](https://github.com/codescene-oss/codescene-vscode/commit/084cf4ab791f273d088b960ec21c4dd1a5ca880a))
+
 ### [0.24.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.24.1...v0.24.2) (2025-12-22)
 
 
