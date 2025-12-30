@@ -12,6 +12,7 @@ import {
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
+import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { getAuthToken } from '../configuration';
@@ -93,6 +94,9 @@ export class DevtoolsAPI {
 
   static async reviewContent(document: vscode.TextDocument) {
     const fp = fileParts(document);
+    if (!validateFileParts('reviewContent', fp, document)) {
+      return;
+    }
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const binaryOpts = {
       args: ['review', '--output-format', 'json', '--file-name', fp.fileName].concat(
@@ -125,6 +129,9 @@ export class DevtoolsAPI {
 
   static async reviewBaseline(baselineCommit: string, document: vscode.TextDocument) {
     const fp = fileParts(document);
+    if (!validateFileParts('reviewBaseline', fp, document)) {
+      return;
+    }
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
 
     const path = `${baselineCommit}:./${fp.fileName}`;
@@ -181,10 +188,13 @@ export class DevtoolsAPI {
       logOutputChannel.debug(`Delta analysis skipped for ${basename(document.fileName)}: no input scores`);
       return;
     }
+    const fp = fileParts(document);
+    if (!validateFileParts('delta', fp, document)) {
+      return;
+    }
 
     DevtoolsAPI.startAnalysisEvent(document.fileName, true);
     try {
-      const fp = fileParts(document);
       const result = await DevtoolsAPI.instance.runBinary({
         args: ['delta', '--output-format', 'json'],
         input: inputJsonString,
@@ -275,6 +285,9 @@ export class DevtoolsAPI {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const fp = fileParts(document);
+    if (!validateFileParts('fnsToRefactor', fp, document)) {
+      return;
+    }
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
     const baseArgs = [
       'refactor',
@@ -347,6 +360,9 @@ skipCache === true ? ' (retry)' : ''
 }, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
       );
       const fp = fileParts(document);
+      if (!validateFileParts('postRefactoring', fp, document)) {
+        throw new Error('Invalid file parts: document directory is missing or does not exist');
+      }
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
         args,
         execOptions: { signal, cwd: fp.documentDirectory },
@@ -473,6 +489,24 @@ function fileParts(document: vscode.TextDocument): FileParts {
   // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
   const documentDirectory = dirname(document.fileName);
   return { fileName, documentDirectory };
+}
+
+function validateFileParts(operation: string, fp: FileParts, document: vscode.TextDocument): boolean {
+  if (!fp.documentDirectory?.trim()) { // Cheap check (null / blank string)
+    logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory is empty`);
+    return false;
+  }
+  let exists = true;
+  try {
+    exists = existsSync(fp.documentDirectory);  // Slightly more expensive check (filesystem-based)
+  } catch (e) {
+    // If existsSync throws, default to true (we don't want to foil an operation for an unknown reason)
+  }
+  if (!exists) {
+    logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory does not exist: ${fp.documentDirectory}`);
+    return false;
+  }
+  return true;
 }
 
 export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
