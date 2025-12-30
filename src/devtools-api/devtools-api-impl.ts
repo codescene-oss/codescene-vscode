@@ -15,6 +15,7 @@ import {
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
+import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { getAuthToken } from '../configuration';
@@ -103,7 +104,7 @@ export class DevtoolsAPIImpl {
       return result;
     }
 
-    this.handleNonZeroExitCodes(args, result);
+    this.handleNonZeroExitCodes(args, result, execOptions.cwd);
   }
 
   private fullErrorMessage(
@@ -111,10 +112,17 @@ export class DevtoolsAPIImpl {
     args: string[],
     errorMessage: string,
     stdout: string,
-    stderr: string
+    stderr: string,
+    cwd: string
   ): string {
     // IMPORTANT: keep stderr as part of the `msg`, so that network errors can be detected as such.
-    const message = `devtools exit(${exitCode}) '${args.join(' ')}': ${errorMessage} - stdout: '${stdout}', stderr: '${stderr}'`;
+    let cwdExists;
+    try {
+      cwdExists = existsSync(cwd);
+    } catch {
+      cwdExists = undefined;
+    }
+    const message = `devtools exit(${exitCode}) '${args.join(' ')}': ${errorMessage} - stdout: '${stdout}', stderr: '${stderr}', cwd: '${cwd} (exists: ${cwdExists})'`;
     logOutputChannel.debug(message);
     return message;
   }
@@ -127,19 +135,20 @@ export class DevtoolsAPIImpl {
    * @param exitCode exit code from the devtools binary
    * @param stderr stderr from the devtools binary
    * @param args args for logging purposes
+   * @param cwd current working directory
    * @throws appropriate Errors
    */
-  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult): never {
+  private handleNonZeroExitCodes(args: string[], { exitCode, stdout, stderr }: ExecResult, cwd: string): never {
     switch (exitCode) {
       case 10: // exit code for DevtoolsErrorModel
         const devtoolsError = safeJsonParse(stdout) as DevtoolsErrorModel;
         devtoolsError.message = devtoolsError.message?.trim() || "DevtoolsError";
-        devtoolsError.message = this.fullErrorMessage(exitCode, args, devtoolsError.message, stdout, stderr);
+        devtoolsError.message = this.fullErrorMessage(exitCode, args, devtoolsError.message, stdout, stderr, cwd);
         throw new DevtoolsError(devtoolsError);
       case 11: // exit code for CreditInfoError
         const creditsInfoError = safeJsonParse(stdout) as CreditsInfoErrorModel;
         creditsInfoError.message = creditsInfoError.message?.trim() || "CreditsInfoError";
-        creditsInfoError.message = this.fullErrorMessage(exitCode, args, creditsInfoError.message, stdout, stderr);
+        creditsInfoError.message = this.fullErrorMessage(exitCode, args, creditsInfoError.message, stdout, stderr, cwd);
         throw new CreditsInfoError(
           creditsInfoError.message,
           creditsInfoError['credits-info'],
@@ -150,11 +159,11 @@ export class DevtoolsAPIImpl {
         abortError.name = "AbortError";
         abortError.message = "AbortError";
         (abortError as any).code = exitCode;
-        abortError.message = this.fullErrorMessage(exitCode, args, abortError.message, stdout, stderr);
+        abortError.message = this.fullErrorMessage(exitCode, args, abortError.message, stdout, stderr, cwd);
         throw abortError;
 
       default:
-        const msg = this.fullErrorMessage(exitCode, args, '', stdout, stderr);
+        const msg = this.fullErrorMessage(exitCode, args, '', stdout, stderr, cwd);
         if (Object.values(networkErrors).some(errMsg => msg.includes(errMsg))) {
           this.networkError = true;
         }
