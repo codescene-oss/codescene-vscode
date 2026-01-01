@@ -96,38 +96,52 @@ suite('CsDiagnostics Integration Test Suite', () => {
     fs.writeFileSync(testFile, fileContent);
     const document = new TestTextDocument(testFile, fileContent, 'cpp');
     const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
+
+    let analysisError: Error | undefined;
+    const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
+      analysisError = error;
+    });
+
     CsDiagnostics.review(document, reviewOpts);
 
-    const start1 = Date.now();
-    const diagnosticsFromReviewer = await Reviewer.instance.review(document, reviewOpts).diagnostics;
-    const duration1 = Date.now() - start1;
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const start1 = Date.now();
+      const diagnosticsFromReviewer = await Reviewer.instance.review(document, reviewOpts).diagnostics;
+      const duration1 = Date.now() - start1;
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const diagnostics = mockCollection.get(document.uri);
-    const expectedResults = JSON.parse(fs.readFileSync(expectedResultsPath, 'utf-8'));
-    const expectedFileSmellsCount = expectedResults['file-level-code-smells'].length;
+      if (analysisError) {
+        assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
+      }
 
-    assert.ok(diagnosticsFromReviewer.length > 0, `Reviewer should return diagnostics for gc.cpp (got ${diagnosticsFromReviewer.length})`);
-    assert.ok(diagnostics, 'Diagnostics should be set in collection');
-    assert.ok(diagnostics!.length > 0, `Should have diagnostics in collection (got ${diagnostics!.length})`);
+      const diagnostics = mockCollection.get(document.uri);
+      const expectedResults = JSON.parse(fs.readFileSync(expectedResultsPath, 'utf-8'));
+      const expectedFileSmellsCount = expectedResults['file-level-code-smells'].length;
 
-    const firstDiagnostic = diagnostics![0];
-    assert.ok(firstDiagnostic.message, 'Diagnostic should have a message');
-    assert.ok(firstDiagnostic.range, 'Diagnostic should have a range');
-    assert.ok(firstDiagnostic.severity !== undefined, 'Diagnostic should have severity');
-    assert.ok(diagnostics!.length >= expectedFileSmellsCount,
-              `Should have at least ${expectedFileSmellsCount} diagnostics (file-level smells)`);
+      assert.ok(diagnosticsFromReviewer.length > 0, `Reviewer should return diagnostics for gc.cpp (got ${diagnosticsFromReviewer.length})`);
+      assert.ok(diagnostics, 'Diagnostics should be set in collection');
+      assert.ok(diagnostics!.length > 0, `Should have diagnostics in collection (got ${diagnostics!.length})`);
 
-    const start2 = Date.now();
-    await Reviewer.instance.review(document, reviewOpts).diagnostics;
-    const duration2 = Date.now() - start2;
+      const firstDiagnostic = diagnostics![0];
+      assert.ok(firstDiagnostic.message, 'Diagnostic should have a message');
+      assert.ok(firstDiagnostic.range, 'Diagnostic should have a range');
+      assert.ok(firstDiagnostic.severity !== undefined, 'Diagnostic should have severity');
+      assert.ok(diagnostics!.length >= expectedFileSmellsCount,
+                `Should have at least ${expectedFileSmellsCount} diagnostics (file-level smells)`);
 
-    if (duration2 === 0) {
-      assert.ok(true, `Cache was instant (0ms), first review took ${duration1}ms`);
-    } else {
-      const ratio = duration1 / duration2;
-      assert.ok(ratio >= 5,
-                `Second review should be at least 5x faster due to caching (first: ${duration1}ms, second: ${duration2}ms, ratio: ${ratio.toFixed(2)}x)`);
+      const start2 = Date.now();
+      await Reviewer.instance.review(document, reviewOpts).diagnostics;
+      const duration2 = Date.now() - start2;
+
+      if (duration2 === 0) {
+        assert.ok(true, `Cache was instant (0ms), first review took ${duration1}ms`);
+      } else {
+        const ratio = duration1 / duration2;
+        assert.ok(ratio >= 5,
+                  `Second review should be at least 5x faster due to caching (first: ${duration1}ms, second: ${duration2}ms, ratio: ${ratio.toFixed(2)}x)`);
+      }
+    } finally {
+      errorListener.dispose();
     }
   });
 
@@ -148,10 +162,25 @@ return 0;
     fs.writeFileSync(cleanFile, cleanCode);
     const document = new TestTextDocument(cleanFile, cleanCode, 'cpp');
     const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
-    CsDiagnostics.review(document, reviewOpts);
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    const diagnostics = mockCollection.get(document.uri);
-    assert.ok(diagnostics !== undefined, 'Diagnostics should be set');
+
+    let analysisError: Error | undefined;
+    const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
+      analysisError = error;
+    });
+
+    try {
+      CsDiagnostics.review(document, reviewOpts);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      if (analysisError) {
+        assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
+      }
+
+      const diagnostics = mockCollection.get(document.uri);
+      assert.ok(diagnostics !== undefined, 'Diagnostics should be set');
+    } finally {
+      errorListener.dispose();
+    }
   });
 
   test('review respects document selector for C++ files', async function() {
@@ -161,10 +190,25 @@ return 0;
     fs.writeFileSync(cppFile, code);
     const document = new TestTextDocument(cppFile, code, 'cpp');
     const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
-    CsDiagnostics.review(document, reviewOpts);
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    const diagnostics = mockCollection.get(document.uri);
-    assert.ok(diagnostics !== undefined, 'C++ file should be reviewed');
+
+    let analysisError: Error | undefined;
+    const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
+      analysisError = error;
+    });
+
+    try {
+      CsDiagnostics.review(document, reviewOpts);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      if (analysisError) {
+        assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
+      }
+
+      const diagnostics = mockCollection.get(document.uri);
+      assert.ok(diagnostics !== undefined, 'C++ file should be reviewed');
+    } finally {
+      errorListener.dispose();
+    }
   });
 
   test('review ignores unsupported file types', async function() {
@@ -174,10 +218,25 @@ return 0;
     fs.writeFileSync(txtFile, content);
     const document = new TestTextDocument(txtFile, content, 'plaintext');
     const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
-    mockCollection.clear();
-    CsDiagnostics.review(document, reviewOpts);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    const diagnostics = mockCollection.get(document.uri);
-    assert.ok(diagnostics === undefined, 'Unsupported file should not be reviewed');
+
+    let analysisError: Error | undefined;
+    const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
+      analysisError = error;
+    });
+
+    try {
+      mockCollection.clear();
+      CsDiagnostics.review(document, reviewOpts);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      if (analysisError) {
+        assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
+      }
+
+      const diagnostics = mockCollection.get(document.uri);
+      assert.ok(diagnostics === undefined, 'Unsupported file should not be reviewed');
+    } finally {
+      errorListener.dispose();
+    }
   });
 });
