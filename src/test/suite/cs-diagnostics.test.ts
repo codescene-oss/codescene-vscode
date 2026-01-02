@@ -11,6 +11,7 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { ArtifactInfo } from '../../artifact-info';
 import { ensureCompatibleBinary } from '../../download';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
+import { createMockExtensionContext } from '../mocks/mock-extension-context';
 
 suite('CsDiagnostics Integration Test Suite', () => {
   const testDir = path.join(os.homedir(), '.codescene-test-data', 'test-cs-diagnostics');
@@ -51,18 +52,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
       );
     }
 
-    const mockContext = {
-      subscriptions: [] as vscode.Disposable[],
-      extensionPath: path.join(__dirname, '../../..'),
-      extensionUri: vscode.Uri.file(path.join(__dirname, '../../..')),
-      globalState: {} as any,
-      workspaceState: {} as any,
-      secrets: {} as any,
-      storagePath: testDir,
-      globalStoragePath: testDir,
-      logPath: testDir,
-      extensionMode: 3 // ExtensionMode.Test
-    } as vscode.ExtensionContext;
+    const mockContext = createMockExtensionContext(testDir);
 
     DevtoolsAPI.init(binaryPath, mockContext);
     mockCollection = new MockDiagnosticCollection();
