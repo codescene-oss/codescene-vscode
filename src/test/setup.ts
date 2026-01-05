@@ -49,6 +49,9 @@ const vscodeStub = {
       trace: (text: string) => enableTestLogging && console.log(`[${name}] TRACE: ${text}`),
     }),
     setStatusBarMessage: (text: string, timeout?: number) => ({ dispose: () => {} }),
+    showErrorMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
+    showInformationMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
+    showWarningMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
   },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),
