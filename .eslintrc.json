@@ -14,6 +14,9 @@
             "selector": ["objectLiteralProperty", "objectLiteralMethod"],
             "format": null
         }, {
+            "selector": ["typeProperty"],
+            "format": null
+        }, {
             "selector": ["default"],
             "format": ["camelCase"],
             "leadingUnderscore": "allow"

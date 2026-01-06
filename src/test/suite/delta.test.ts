@@ -202,7 +202,7 @@ suite('Delta Integration Test Suite', () => {
 
     const codeSmell = firstFunction['code-smells'][0];
 
-    const result = await DevtoolsAPI.fnsToRefactor(doc, ['--code-smells', JSON.stringify([codeSmell])]);
+    const result = await DevtoolsAPI.fnsToRefactor(doc, { 'code-smells': [codeSmell] });
 
     const expected = [{
       'file-type': 'cpp',
