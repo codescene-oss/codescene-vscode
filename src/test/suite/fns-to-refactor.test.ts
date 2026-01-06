@@ -62,39 +62,51 @@ suite('FnsToRefactor Integration Test Suite', () => {
   test('fnsToRefactorFromDelta returns refactorable functions', async function() {
     this.timeout(60000);
 
+    const cleanContent = 'int f(int a) { return a + 1; }\n';
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
 
-    const doc = createTestFile('complex.cpp', complexContent);
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const cleanDoc = createTestFile('complex.cpp', cleanContent);
+    const cleanReview = await DevtoolsAPI.reviewContent(cleanDoc);
+    const oldScore = cleanReview?.['raw-score'];
+    assert.ok(oldScore, 'Clean review should have a raw-score');
 
-    assert.ok(review, 'Review should return a result');
-    assert.ok(review?.['raw-score'], 'Review should have a raw-score');
+    const complexDoc = createTestFile('complex.cpp', complexContent);
+    const complexReview = await DevtoolsAPI.reviewContent(complexDoc);
+    const newScore = complexReview?.['raw-score'];
+    assert.ok(newScore, 'Complex review should have a raw-score');
 
-    const deltaResult = {
-      'score-change': -1.5,
-      'file-level-findings': [],
-      'function-level-findings': [{
-        function: {
-          name: 'f',
-          range: {
-            'start-line': 1,
-            'start-column': 1,
-            'end-line': 12,
-            'end-column': 2
-          }
-        },
-        'change-details': [{
-          category: 'Deep, Nested Complexity',
-          'change-type': ChangeType.Degraded,
-          description: 'Nested complexity increased to depth = 5',
-          line: 2
-        }]
-      }]
-    };
-
-    const result = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const deltaResult = await DevtoolsAPI.delta(complexDoc, false, oldScore, newScore);
 
     assertNoAnalysisError();
+
+    assert.ok(deltaResult, 'Delta should return a result');
+    assert.ok(deltaResult['function-level-findings'].length > 0, 'Delta should have function-level findings');
+
+    const result = await DevtoolsAPI.fnsToRefactorFromDelta(complexDoc, deltaResult);
+
+    assertNoAnalysisError();
+
+    assert.deepStrictEqual(result, [
+      {
+        name: 'f',
+        body: 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}',
+        range: {
+          'start-line': 1,
+          'start-column': 1,
+          'end-line': 12,
+          'end-column': 2
+        },
+        'file-type': 'cpp',
+        'refactoring-targets': [
+          {
+            category: 'Deep, Nested Complexity',
+            line: 1
+          }
+        ],
+        vscodeRange: new vscode.Range(0, 0, 11, 1),
+        'nippy-b64': 'TlBZAHAFagRuYW1laQFmagRib2R5EACUaW50IGYoaW50IGEpIHsKICBpZiAoYSA+IDApIHsKICAgIGlmIChhID4gMSkgewogICAgICBpZiAoYSA+IDIpIHsKICAgICAgICBpZiAoYSA+IDMpIHsKICAgICAgICAgIHJldHVybiBhOwogICAgICAgIH0KICAgICAgfQogICAgfQogIH0KICByZXR1cm4gMDsKfWoJZmlsZS10eXBlaQNjcHBqBXJhbmdlcARqCnN0YXJ0LWxpbmUqAAAAAWoIZW5kLWxpbmUqAAAADGoMc3RhcnQtY29sdW1uZAFqCmVuZC1jb2x1bW5kAmoTcmVmYWN0b3JpbmctdGFyZ2V0c24BcAJqCGNhdGVnb3J5aRdEZWVwLCBOZXN0ZWQgQ29tcGxleGl0eWoEbGluZSoAAAAB'
+      }
+    ]);
 
     assert.ok(Array.isArray(result), 'Result should be an array');
     assert.ok(result.length > 0, 'Should find at least one refactorable function');
@@ -150,37 +162,51 @@ suite('FnsToRefactor Integration Test Suite', () => {
   test('fnsToRefactorFromDelta includes refactoring targets from delta', async function() {
     this.timeout(60000);
 
-    const content = 'int complex(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          if (a > 4) {\n            return a;\n          }\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
-    const doc = createTestFile('nested.cpp', content);
+    const cleanContent = 'int complex(int a) { return a + 1; }\n';
+    const complexContent = 'int complex(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          if (a > 4) {\n            return a;\n          }\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
 
-    const review = await DevtoolsAPI.reviewContent(doc);
-    assert.ok(review?.['raw-score'], 'Review should have a raw-score');
+    const cleanDoc = createTestFile('nested.cpp', cleanContent);
+    const cleanReview = await DevtoolsAPI.reviewContent(cleanDoc);
+    const oldScore = cleanReview?.['raw-score'];
+    assert.ok(oldScore, 'Clean review should have a raw-score');
 
-    const deltaResult = {
-      'score-change': -2.0,
-      'file-level-findings': [],
-      'function-level-findings': [{
-        function: {
-          name: 'complex',
-          range: {
-            'start-line': 1,
-            'start-column': 1,
-            'end-line': 14,
-            'end-column': 2
-          }
-        },
-        'change-details': [{
-          category: 'Deep, Nested Complexity',
-          'change-type': ChangeType.Degraded,
-          description: 'Nested complexity increased to depth = 6',
-          line: 2
-        }]
-      }]
-    };
+    const complexDoc = createTestFile('nested.cpp', complexContent);
+    const complexReview = await DevtoolsAPI.reviewContent(complexDoc);
+    const newScore = complexReview?.['raw-score'];
+    assert.ok(newScore, 'Complex review should have a raw-score');
 
-    const result = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const deltaResult = await DevtoolsAPI.delta(complexDoc, false, oldScore, newScore);
 
     assertNoAnalysisError();
+
+    assert.ok(deltaResult, 'Delta should return a result');
+    assert.ok(deltaResult['function-level-findings'].length > 0, 'Delta should have function-level findings');
+
+    const result = await DevtoolsAPI.fnsToRefactorFromDelta(complexDoc, deltaResult);
+
+    assertNoAnalysisError();
+
+    assert.deepStrictEqual(result, [
+      {
+        name: 'complex',
+        body: 'int complex(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          if (a > 4) {\n            return a;\n          }\n        }\n      }\n    }\n  }\n  return 0;\n}',
+        range: {
+          'start-line': 1,
+          'start-column': 1,
+          'end-line': 14,
+          'end-column': 2
+        },
+        'file-type': 'cpp',
+        'refactoring-targets': [
+          {
+            category: 'Deep, Nested Complexity',
+            line: 1
+          }
+        ],
+        vscodeRange: new vscode.Range(0, 0, 13, 1),
+        'nippy-b64': 'TlBZAHAFagRuYW1laQdjb21wbGV4agRib2R5EAC/aW50IGNvbXBsZXgoaW50IGEpIHsKICBpZiAoYSA+IDApIHsKICAgIGlmIChhID4gMSkgewogICAgICBpZiAoYSA+IDIpIHsKICAgICAgICBpZiAoYSA+IDMpIHsKICAgICAgICAgIGlmIChhID4gNCkgewogICAgICAgICAgICByZXR1cm4gYTsKICAgICAgICAgIH0KICAgICAgICB9CiAgICAgIH0KICAgIH0KICB9CiAgcmV0dXJuIDA7Cn1qCWZpbGUtdHlwZWkDY3BwagVyYW5nZXAEagpzdGFydC1saW5lKgAAAAFqCGVuZC1saW5lKgAAAA5qDHN0YXJ0LWNvbHVtbmQBagplbmQtY29sdW1uZAJqE3JlZmFjdG9yaW5nLXRhcmdldHNuAXACaghjYXRlZ29yeWkXRGVlcCwgTmVzdGVkIENvbXBsZXhpdHlqBGxpbmUqAAAAAQ=='
+      }
+    ]);
 
     assert.ok(result, 'Result should not be undefined');
     assert.ok(result.length > 0, 'Should find at least one refactorable function');
