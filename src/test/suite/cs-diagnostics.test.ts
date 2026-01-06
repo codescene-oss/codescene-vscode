@@ -1,20 +1,18 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as vscode from 'vscode';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
 import Reviewer, { ReviewOpts } from '../../review/reviewer';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { MockDiagnosticCollection } from '../mocks/mock-diagnostic-collection';
 import { DevtoolsAPI } from '../../devtools-api';
-import { ArtifactInfo } from '../../artifact-info';
-import { ensureCompatibleBinary } from '../../download';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
+import { createTestDir, ensureBinary } from '../integration_helper';
 
 suite('CsDiagnostics Integration Test Suite', () => {
-  const testDir = path.join(os.homedir(), '.codescene-test-data', 'test-cs-diagnostics');
+  const testDir = createTestDir('test-cs-diagnostics');
   let mockCollection: MockDiagnosticCollection;
   let originalCollection: vscode.DiagnosticCollection;
 
@@ -27,31 +25,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
 
     mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
 
-    const extensionPath = path.join(__dirname, '../../..');
-    const binaryPath = new ArtifactInfo(extensionPath).absoluteBinaryPath;
-
-    if (!fs.existsSync(binaryPath)) {
-      console.log(`CLI binary not found at ${binaryPath}, attempting to download...`);
-      try {
-        await ensureCompatibleBinary(extensionPath);
-        console.log(`CLI binary downloaded successfully to ${binaryPath}`);
-      } catch (error) {
-        throw new Error(
-          `CLI binary not found and download failed. ` +
-          `Expected binary at: ${binaryPath}. ` +
-          `Error: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-
-    if (!fs.existsSync(binaryPath)) {
-      throw new Error(
-        `CLI binary still not found after download attempt. ` +
-        `Expected at: ${binaryPath}. ` +
-        `Please ensure the binary is available for platform: ${process.platform}-${process.arch}`
-      );
-    }
-
+    const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
     DevtoolsAPI.init(binaryPath, mockContext);

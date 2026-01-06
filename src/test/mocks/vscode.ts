@@ -81,3 +81,19 @@ export namespace Uri {
     };
   }
 }
+
+export namespace workspace {
+  export function onDidChangeConfiguration(listener: (e: any) => any): Disposable {
+    return { dispose: () => {} };
+  }
+}
+
+export namespace commands {
+  export function registerCommand(command: string, callback: (...args: any[]) => any): Disposable {
+    return { dispose: () => {} };
+  }
+
+  export async function executeCommand(command: string, ...args: any[]): Promise<any> {
+    return undefined;
+  }
+}
