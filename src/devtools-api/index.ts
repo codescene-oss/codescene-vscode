@@ -281,7 +281,7 @@ export class DevtoolsAPI {
    * If no preflight json is available, ACE is considered disabled. No functions will
    * be presented as refactorable by early return here.
    */
-  private static async fnsToRefactor(document: TextDocument, args: string[]) {
+  static async fnsToRefactor(document: TextDocument, args: string[]) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const fp = fileParts(document);
