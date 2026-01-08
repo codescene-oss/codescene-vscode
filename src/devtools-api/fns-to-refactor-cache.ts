@@ -17,7 +17,7 @@ class FnsToRefactorCache {
     document: vscode.TextDocument,
     codeSmell: CodeSmell
   ): Promise<FnToRefactor | undefined> {
-    const result = await (DevtoolsAPI as any).fnsToRefactor(document, ['--code-smells', JSON.stringify([codeSmell])]);
+    const result = await DevtoolsAPI.fnsToRefactor(document, { 'code-smells': [codeSmell] });
     return result?.[0];
   }
 

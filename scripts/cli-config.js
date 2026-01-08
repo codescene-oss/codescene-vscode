@@ -6,7 +6,7 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = 'f4041f7aa0afe699bb67f01bf296b539fca27cfb';
+const requiredDevtoolsVersion = 'b98bdcaf4ac46597a73113d6fca6635d3f3393a5';
 
 const artifacts = {
   darwin: {
@@ -26,4 +26,3 @@ module.exports = {
   requiredDevtoolsVersion,
   artifacts,
 };
-

@@ -98,13 +98,18 @@ export class DevtoolsAPI {
       return;
     }
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
+
+    const payload = {
+      'path': fp.fileName,
+      'file-content': document.getText(),
+      ...(cachePath ? { 'cache-path': cachePath } : {}),
+    };
+
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', '--file-name', fp.fileName].concat(
-        cachePath ? ['--cache-path', cachePath] : []
-      ),
+      args: ['run-command', 'review'],
       taskId: taskId('review', document),
       execOptions: { cwd: fp.documentDirectory },
-      input: document.getText(),
+      input: JSON.stringify(payload),
     };
 
     DevtoolsAPI.startAnalysisEvent(document.fileName);
@@ -136,10 +141,16 @@ export class DevtoolsAPI {
 
     const path = `${baselineCommit}:./${fp.fileName}`;
 
+    const payload = {
+      'path': path,
+      ...(cachePath ? { 'cache-path': cachePath } : {}),
+    };
+
     const binaryOpts = {
-      args: ['review', '--output-format', 'json', path].concat(cachePath ? ['--cache-path', cachePath] : []),
+      args: ['run-command', 'review'],
       taskId: taskId('review-base', document),
       execOptions: { cwd: fp.documentDirectory },
+      input: JSON.stringify(payload),
     };
 
     DevtoolsAPI.startAnalysisEvent(document.fileName);
@@ -196,17 +207,21 @@ export class DevtoolsAPI {
     DevtoolsAPI.startAnalysisEvent(document.fileName, true);
     try {
       const result = await DevtoolsAPI.instance.runBinary({
-        args: ['delta', '--output-format', 'json'],
+        args: ['run-command', 'delta'],
         input: inputJsonString,
         taskId: taskId(DELTA_TASK_ID_PREFIX, document),
         execOptions: { cwd: fp.documentDirectory },
       });
       let deltaResult;
-      if (result.stdout !== '') {
-        // stdout === '' means there were no changes detected - return undefined to indicate this
-        deltaResult = safeJsonParse(result.stdout) as Delta;
-        await addRefactorableFunctionsToDeltaResult(document, deltaResult);
-        logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
+      if (result.stdout && result.stdout.trim() !== '') {
+        const parsedResult = safeJsonParse(result.stdout) as Delta | null;
+        if (parsedResult) {
+          deltaResult = parsedResult;
+          await addRefactorableFunctionsToDeltaResult(document, deltaResult);
+          logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
+        } else {
+          logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
+        }
       } else {
         logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
       }
@@ -246,10 +261,13 @@ export class DevtoolsAPI {
    * @returns preflightResponse
    */
   static async preflight() {
-    const args = ['refactor', 'preflight'];
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
     try {
-      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({ args, execOptions: { cwd: getWorkspaceCwd() } });
+      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({
+        args: ['run-command', 'preflight'],
+        input: JSON.stringify({}),
+        execOptions: { cwd: getWorkspaceCwd() }
+      });
       DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
@@ -274,14 +292,14 @@ export class DevtoolsAPI {
   }
 
   static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
-    return this.fnsToRefactor(document, ['--delta-result', JSON.stringify(delta)]);
+    return this.fnsToRefactor(document, { 'delta-result': delta });
   }
 
   /**
    * If no preflight json is available, ACE is considered disabled. No functions will
    * be presented as refactorable by early return here.
    */
-  static async fnsToRefactor(document: TextDocument, args: string[]) {
+  static async fnsToRefactor(document: TextDocument, args: { 'delta-result': Delta } | { 'code-smells': [CodeSmell] }) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const fp = fileParts(document);
@@ -289,20 +307,20 @@ export class DevtoolsAPI {
       return;
     }
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
-    const baseArgs = [
-      'refactor',
-      'fns-to-refactor',
-      '--file-name',
-      fp.fileName,
-      '--preflight',
-      DevtoolsAPI.instance.preflightJson!, // aceEnabled() implies preflightJson is defined
-    ];
+
+    const payload = {
+      'file-name': fp.fileName,
+      'file-content': document.getText(),
+      'preflight': JSON.parse(DevtoolsAPI.instance.preflightJson!), // aceEnabled() implies preflightJson is defined
+      ...(cachePath ? { 'cache-path': cachePath } : {}),
+      ...args,
+    };
+
+    const baseArgs = ['run-command', 'fns-to-refactor'];
+
     const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs.concat(
-        args,
-        cachePath ? ['--cache-path', cachePath] : []
-      ),
-      input: document.getText(),
+      args: baseArgs,
+      input: JSON.stringify(payload),
       execOptions: { cwd: fp.documentDirectory },
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
@@ -317,21 +335,22 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
-  private static buildRefactoringArgs(fnToRefactor: FnToRefactor, skipCache: boolean, token: string): string[] {
-    const args = ['refactor', 'post'];
+  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string) {
+    const payload: Record<string, any> = {
+      'token': token,
+    };
 
     if (fnToRefactor['nippy-b64']) {
-      // If available, use the newer, more recommended API which isn't to encoding errors
-      args.push('--fn-to-refactor-nippy-b64', fnToRefactor['nippy-b64']);
+      payload['fn-to-refactor-nippy-b64'] = fnToRefactor['nippy-b64'];
     } else {
-      args.push('--fn-to-refactor', JSON.stringify(fnToRefactor));
+      payload['fn-to-refactor'] = fnToRefactor;
     }
 
-    if (skipCache) args.push('--skip-cache');
+    if (skipCache) {
+      payload['skip-cache'] = true;
+    }
 
-    args.push('--token', token);
-
-    return args;
+    return payload;
   }
 
   /**
@@ -352,7 +371,7 @@ export class DevtoolsAPI {
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
-      const args = DevtoolsAPI.buildRefactoringArgs(fnToRefactor, skipCache, token);
+      const payload = DevtoolsAPI.buildRefactoringPayload(fnToRefactor, skipCache, token);
 
       logOutputChannel.info(
         `Refactor requested for ${logIdString(fnToRefactor)}${
@@ -364,7 +383,8 @@ skipCache === true ? ' (retry)' : ''
         throw new Error('Invalid file parts: document directory is missing or does not exist');
       }
       const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
-        args,
+        args: ['run-command', 'refactor'],
+        input: JSON.stringify(payload),
         execOptions: { signal, cwd: fp.documentDirectory },
         taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
       });
@@ -394,9 +414,10 @@ skipCache === true ? ' (retry)' : ''
   }
 
   static postTelemetry(event: TelemetryEvent) {
-    const jsonEvent = JSON.stringify(event);
+    const payload = { event };
     return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({
-      args: ['telemetry', '--event', jsonEvent],
+      args: ['run-command', 'telemetry'],
+      input: JSON.stringify(payload),
       execOptions: { cwd: getWorkspaceCwd() },
       taskId: TELEMETRY_POST_TASK_ID
     });
