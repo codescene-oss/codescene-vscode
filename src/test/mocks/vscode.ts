@@ -58,6 +58,7 @@ export interface ExtensionContext {
   logUri: Uri;
   extensionRuntime?: any;
   extension: Extension<any>;
+  languageModelAccessInformation: any;
 }
 
 export namespace Uri {

@@ -22,6 +22,7 @@ export class TestTextDocument implements vscode.TextDocument {
   get isClosed() { return false; }
   get eol() { return vscode.EndOfLine.LF; }
   get lineCount() { return this._content.split('\n').length; }
+  get encoding() { return 'utf8'; }
 
   lineAt(line: number | vscode.Position): vscode.TextLine {
     const lineNumber = typeof line === 'number' ? line : line.line;
