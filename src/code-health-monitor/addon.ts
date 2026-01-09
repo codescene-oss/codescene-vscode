@@ -3,8 +3,8 @@ import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
 import { register as registerHomeView } from './home/home-view';
-import { acquireGitApi, getBranchCreationCommit, getDefaultCommit, getRepoRootPath, updateGitState } from '../git-utils';
-import { Baseline, CsExtensionState } from '../cs-extension-state';
+import { acquireGitApi, getMergeBaseCommit, getRepoRootPath, updateGitState } from '../git-utils';
+import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
@@ -83,35 +83,16 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
   context.subscriptions.push(...ALL_DISPOSABLES);
 }
 
-const baselineHandlers: Record<Baseline, (repo: Repository) => Promise<string>> = {
-  [Baseline.head]: getHeadCommit,
-  [Baseline.default]: getDefaultCommit,
-  [Baseline.branchCreation]: getBranchCreationCommit,
-};
-
 export function getRepo(fileUri: Uri): Repository | null {
   if (!gitApi || !CsExtensionState.baseline) return null;
 
   return gitApi!.getRepository(fileUri);
 }
 
-/**
- * Determines the appropriate baseline commit for a given file according to the active baseline strategy.
- *
- * This commit serves as the reference point for calculating delta results in a baseline review.
- * If no suitable commit is found, the comparison defaults to a perfect score (10.0).
- *
- * The strategy options are:
- * - Head: compares with the most recent commit (HEAD).
- * - Default: compares with the HEAD commit if on the default branch; otherwise, compares with the branch creation point.
- * - BranchCreation: compares with the commit where the current branch was created.
- */
 export async function getBaselineCommit(fileUri: Uri): Promise<string | undefined> {
   const repo = getRepo(fileUri);
   if (!repo) return;
-
-  const handler = baselineHandlers[Baseline.default]; //CS-5597: was baselineHandlers[CsExtensionState.baseline]
-  return await handler(repo);
+  return await getMergeBaseCommit(repo);
 }
 
 /**

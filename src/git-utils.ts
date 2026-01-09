@@ -49,50 +49,6 @@ export function getWorkspacePath(workspaceFolder: vscode.WorkspaceFolder): strin
   return path.normalize(fsPath);
 }
 
-/**
- * Retrieves the commit hash where the current branch was created from, by checking
- * the git reflog.
- *
- * If the current branch is main, defaults to comparing to perfect score (10.0).
- */
-export async function getBranchCreationCommit(repo: Repository) {
-  const currentBranch = repo.state.HEAD?.name;
-  const repoPath = getRepoRootPath(repo);
-  if (!currentBranch || !repoPath) return '';
-
-  if (await isMainBranch(currentBranch, repoPath)) return '';
-
-  try {
-    const { stdout: reflog, stderr, exitCode } = await gitExecutor.execute(
-      { command: 'git', args: ['reflog', currentBranch, '--no-abbrev'], taskId: GIT_TASK_ID },
-      { cwd: repoPath }
-    );
-
-    if (exitCode !== 0) {
-      if (exitCode === "ENOENT") {
-        markGitAsUnavailable();
-      }
-      logOutputChannel.error(`Could not get branch creation point for file ${repoPath} (exit code ${exitCode}): ${stderr}`);
-      return '';
-    }
-
-    const creationKeyword = 'created from';
-
-    const creationLine = reflog
-      .split('\n')
-      .reverse()
-      .find((line) => line.toLowerCase().includes(creationKeyword));
-
-    return creationLine?.split(' ')?.[0] ?? '';
-  } catch (err) {
-    if (isEnoentError(err)) {
-      markGitAsUnavailable();
-    }
-    logOutputChannel.error(`Could not get branch creation point for file ${repoPath}: ${err}`);
-    return '';
-  }
-}
-
 const mainBranchCandidatesCache = new Map<string, string[]>();
 
 /**
@@ -146,35 +102,6 @@ export async function isMainBranch(currentBranch: string | undefined, repoPath: 
 }
 
 /**
- * Determines the default comparison point for a file based on the current Git branch context.
- *
- * Default behavior:
- * - If on the main branch, the comparison point is the HEAD commit.
- * - If on a non-main branch, the comparison point is the branch creation commit.
- * - If the branch cannot be determined, returns empty string.
- *
- * @param repo The repository to get the default commit for
- * @returns The commit hash or empty string if not available
- */
-export async function getDefaultCommit(repo: Repository): Promise<string> {
-  const headName = repo.state.HEAD?.name;
-  if (!headName) {
-    return '';
-  }
-
-  const repoPath = getRepoRootPath(repo);
-  const isMain = await isMainBranch(headName, repoPath);
-
-  if (isMain) {
-    // On main branch, use HEAD commit
-    return repo.state.HEAD?.commit || '';
-  } else {
-    // On feature branch, use branch creation commit
-    return await getBranchCreationCommit(repo);
-  }
-}
-
-/**
  * Determines the merge-base commit.
  *
  * If we're on the main branch, returns the HEAD commit.
@@ -225,21 +152,6 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   }
 
   return '';
-}
-
-/**
- * Retrieves the latest commit hashes from the repository.
- */
-export async function getLatestCommits(repo: Repository, amount: number = 2) {
-  const repoPath = getRepoRootPath(repo);
-  try {
-    const result = await repo.log({ maxEntries: amount });
-
-    return result.map((res) => res.hash);
-  } catch (err) {
-    logOutputChannel.error(`Unable to get latest ${amount} commits for ${repoPath}: ${err}`);
-    return [];
-  }
 }
 
 export interface GitStateChange {
