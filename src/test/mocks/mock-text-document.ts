@@ -22,6 +22,7 @@ export class MockTextDocument implements vscode.TextDocument {
   get isClosed() { return false; }
   get eol() { return 1; }
   get lineCount() { return 0; }
+  get encoding() { return 'utf8'; }
 
   lineAt(): vscode.TextLine { throw new Error('not implemented'); }
   offsetAt(): number { throw new Error('not implemented'); }
