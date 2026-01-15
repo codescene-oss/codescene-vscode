@@ -2,8 +2,19 @@ import vscode from 'vscode';
 import { RefactoringRequest } from '../refactoring/request';
 
 /* eslint-disable @typescript-eslint/naming-convention */
+
+export interface CheckRulesResponse {
+  result: string;
+  failed: boolean;
+  'parsing-errors': any[];
+}
+
+export interface CodeHealthRulesTemplateResponse {
+  template: string;
+}
+
 export interface CodeHealthRulesResult {
-  rulesMsg: string;
+  rulesMsg?: string;
   errorMsg?: string;
 }
 

@@ -57,17 +57,6 @@ suite('Check Rules Test Suite', () => {
     restoreDefaultWorkspaceFolders();
   });
 
-  test('checkRules returns result with no custom rules', async function() {
-    this.timeout(10000);
-
-    const testFile = await createTestFile('test.cpp', 'int main() { return 0; }\n');
-    const result = await checkRules(testFile);
-
-    assert.ok(result, 'Result should exist');
-    assert.ok(typeof result.rulesMsg === 'string', 'rulesMsg should be a string');
-    assert.ok(result.rulesMsg.includes('No matching rule found'), 'Should indicate no matching rule');
-  });
-
   test('checkRules returns result for file with custom rules', async function() {
     this.timeout(10000);
 
@@ -132,21 +121,6 @@ suite('Check Rules Test Suite', () => {
     assert.ok(result.rulesMsg.includes('Matching code health rule path: **/*.cpp'), 'Should match cpp-specific path pattern');
   });
 
-  test('checkRules returns errorMsg when rules file is invalid', async function() {
-    this.timeout(10000);
-
-    await createRulesFile('{ invalid json');
-
-    const testFile = await createTestFile('test.cpp', 'int main() { return 0; }\n');
-    const result = await checkRules(testFile);
-
-    assert.ok(result, 'Result should exist');
-    assert.ok(typeof result.rulesMsg === 'string', 'rulesMsg should be a string');
-    assert.ok(result.errorMsg !== undefined, 'errorMsg should be present for invalid rules');
-    assert.ok(result.errorMsg.includes('Problem in ruleset:'), 'Should indicate problem in ruleset');
-    assert.ok(result.errorMsg.includes('Failed to parse the code health rule set'), 'Should mention parsing failure');
-  });
-
   test('checkRules result structure is valid', async function() {
     this.timeout(10000);
 
@@ -162,5 +136,31 @@ suite('Check Rules Test Suite', () => {
     if (result.errorMsg !== undefined) {
       assert.ok(typeof result.errorMsg === 'string', 'errorMsg should be a string if present');
     }
+  });
+
+  test('checkRules with no matching rule returns result without errorMsg', async function() {
+    this.timeout(10000);
+
+    const noMatchFile = await createTestFile('no-match.cpp', 'int main() { return 0; }\n');
+    const noMatchResult = await checkRules(noMatchFile);
+
+    assert.ok(noMatchResult, 'Result should exist');
+    assert.ok(typeof noMatchResult.rulesMsg === 'string', 'rulesMsg should be a string');
+    assert.ok(noMatchResult.rulesMsg.includes('No matching rule found'), 'Should indicate no match');
+    assert.strictEqual(noMatchResult.errorMsg, undefined, 'Should NOT have errorMsg for no-match case');
+  });
+
+  test('checkRules with parsing errors returns both rulesMsg and errorMsg', async function() {
+    this.timeout(10000);
+
+    await createRulesFile('{ "invalid": json }');
+    const parseErrorFile = await createTestFile('parse-error.cpp', 'int main() { return 0; }\n');
+    const parseErrorResult = await checkRules(parseErrorFile);
+
+    assert.ok(parseErrorResult, 'Result should exist');
+    assert.ok(typeof parseErrorResult.rulesMsg === 'string', 'rulesMsg should be a string');
+    assert.ok(parseErrorResult.errorMsg !== undefined, 'errorMsg should be present for parsing errors');
+    assert.ok(parseErrorResult.errorMsg.includes('Problem in ruleset:'), 'errorMsg should mention ruleset problem');
+    assert.ok(parseErrorResult.errorMsg.includes('Failed to parse the code health rule set'), 'errorMsg should mention parsing failure');
   });
 });
