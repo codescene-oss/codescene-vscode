@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid';
 import {
   AuthenticationProvider,
   AuthenticationProviderAuthenticationSessionsChangeEvent,
-  AuthenticationProviderSessionOptions,
+  AuthenticationGetSessionOptions,
   AuthenticationSession,
   CancellationTokenSource,
   Disposable,
@@ -55,7 +55,7 @@ export class CsAuthenticationProvider implements AuthenticationProvider, Disposa
     return this.sessionChangeEmitter.event;
   }
 
-  public async getSessions(scopes?: readonly string[], options?: AuthenticationProviderSessionOptions): Promise<AuthenticationSession[]> {
+  public async getSessions(scopes?: readonly string[], options?: AuthenticationGetSessionOptions): Promise<AuthenticationSession[]> {
     const allSessions = await this.context.secrets.get(SESSIONS_STORAGE_KEY);
 
     if (allSessions) {
