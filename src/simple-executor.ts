@@ -6,6 +6,34 @@ import { Stats } from './executor-stats';
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
 
+export function parseJsonInput(input: string): any {
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
+}
+
+export function objectToArray(obj: any): any[] {
+  if (Array.isArray(obj)) {
+    return obj;
+  }
+  if (typeof obj === 'object' && obj !== null) {
+    const { 'file-content': _, ...rest } = obj;
+    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, value]);
+  }
+  return [];
+}
+
+export function mergeJsonIntoArgs(args: string[], input: string): string[] {
+  const parsed = parseJsonInput(input);
+  if (!parsed || (typeof parsed !== 'object')) {
+    return args;
+  }
+  const arrayToMerge = objectToArray(parsed);
+  return [...args, ...arrayToMerge.map((v) => typeof v === 'string' ? v : JSON.stringify(v))];
+}
+
 export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
     if (childProcess.stdin) {
@@ -26,9 +54,10 @@ export class SimpleExecutor implements Executor {
   }
 
   execute(command: Command, options: ExecOptions & { cwd: string }, input?: string) {
-    const logName = [command.command, ...command.args].join(' ');
-    const trimmedArgs = command.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
-    const logCommand = [command.command, ...trimmedArgs].join(' ');
+    const mergedArgsForLogging = input ? mergeJsonIntoArgs(command.args, input) : command.args;
+    const logName = [command.command, ...mergedArgsForLogging].join(' ');
+    const trimmedArgsForLogging = mergedArgsForLogging.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
+    const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
     const allOptions = { maxBuffer: MAX_BUFFER, ...options };
 
     if (command.command === 'git') { // These can be frequently executed, so demote their log level
