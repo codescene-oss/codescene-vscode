@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.26.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.25.0...v0.26.0) (2026-01-19)
+
+
+### Features
+
+* use `run-command` in remaining commands ([#280](https://github.com/codescene-oss/codescene-vscode/issues/280)) ([80ec511](https://github.com/codescene-oss/codescene-vscode/commit/80ec5111440b4796d6ce51042f3af09c4542cb73))
+* use newer CLI API ([#276](https://github.com/codescene-oss/codescene-vscode/issues/276)) ([262cd4c](https://github.com/codescene-oss/codescene-vscode/commit/262cd4cdcfc203fa692e4215dd193ca32548b5b1))
+
 ## [0.25.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.24.2...v0.25.0) (2025-12-30)
 
 
