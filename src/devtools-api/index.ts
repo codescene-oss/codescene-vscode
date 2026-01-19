@@ -1,6 +1,6 @@
 import { CodeSmell, Review } from '../devtools-api/review-model';
 import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
-import { AceRequestEvent, CodeHealthRulesResult } from './model';
+import { AceRequestEvent, CheckRulesResponse, CodeHealthRulesResult, CodeHealthRulesTemplateResponse } from './model';
 import {
   FnToRefactor,
   PreFlightResponse,
@@ -51,19 +51,54 @@ export class DevtoolsAPI {
    * Executes the command for creating a code health rules template.
    */
   static async codeHealthRulesTemplate() {
-    const result = await DevtoolsAPI.instance.runBinary({ args: ['code-health-rules-template'], execOptions: { cwd: getWorkspaceCwd() } });
-    return result.stdout;
+    const result = await DevtoolsAPI.instance.runBinary({
+      args: ['run-command', 'code-health-rules-template'],
+      input: JSON.stringify({}),
+      execOptions: { cwd: getWorkspaceCwd() }
+    });
+    const response = safeJsonParse(result.stdout, { command: 'code-health-rules-template' }) as CodeHealthRulesTemplateResponse;
+    return response.template;
   }
 
   /**
    * Executes the command for checking code health rule match against file
    */
   static async checkRules(rootPath: string, filePath: string) {
+    const payload = {
+      'path': filePath,
+    };
+
     const { stdout, stderr } = await DevtoolsAPI.instance.runBinary({
-      args: ['check-rules', filePath],
+      args: ['run-command', 'check-rules'],
+      input: JSON.stringify(payload),
       execOptions: { cwd: rootPath },
     });
-    return { rulesMsg: stdout, errorMsg: stderr !== '' ? stderr : undefined } as CodeHealthRulesResult;
+
+    try {
+      const { result, 'parsing-errors': parsingErrors, failed } = safeJsonParse(stdout, { command: 'check-rules', args: payload }) as CheckRulesResponse;
+
+      if (failed) {
+        if (parsingErrors && parsingErrors.length > 0) {
+          const errorMessages = parsingErrors.map((err: any) => {
+            return err.message;
+          }).join('\n');
+          const report = `Problem in ruleset:\n${errorMessages}\nFailed to parse the code health rule set`;
+          return {
+            rulesMsg: result,
+            errorMsg: report,
+          } as CodeHealthRulesResult;
+        }
+
+        return {
+          rulesMsg: result,
+        } as CodeHealthRulesResult;
+      }
+
+      return { rulesMsg: result } as CodeHealthRulesResult;
+    } catch (error) {
+      return { errorMsg: stderr } as CodeHealthRulesResult;
+    }
+
   }
 
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
@@ -424,11 +459,14 @@ skipCache === true ? ' (retry)' : ''
   }
 
   static async getDeviceId() {
-    return (await DevtoolsAPI.instance.runBinary({
-      args: ['telemetry', '--device-id'],
+    const result = await DevtoolsAPI.instance.runBinary({
+      args: ['run-command', 'telemetry'],
+      input: JSON.stringify({"device-id": true}),
       execOptions: { cwd: getWorkspaceCwd() },
       taskId: TELEMETRY_DEVICE_ID_TASK_ID
-    })).stdout;
+    });
+    const json = safeJsonParse(result.stdout, { command: 'telemetry', args: { 'device-id': true } });
+    return json['device-id'];
   }
 
   private static shouldHandleOfflineBehavior(e: unknown): boolean {

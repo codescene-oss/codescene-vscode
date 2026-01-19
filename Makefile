@@ -26,7 +26,7 @@ watch:
 
 pretest:
 	rm -rf out/
-	npm run pretest
+	chronic npm run pretest
 
 test: pretest
 	npm run test

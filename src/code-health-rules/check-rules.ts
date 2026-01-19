@@ -17,7 +17,7 @@ export async function checkCodeHealthRules() {
       void window.showErrorMessage(errorMsg);
       return;
     }
-    const msgParts = rulesMsg
+    const msgParts = rulesMsg!
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line !== '');
