@@ -20,6 +20,12 @@ export function createMockExtensionContext(testDir: string): vscode.ExtensionCon
     globalStoragePath: testDir,
     logPath: testDir,
     extensionMode: 3,
-    languageModelAccessInformation: {} as any
+    languageModelAccessInformation: {} as any,
+    environmentVariableCollection: {} as any,
+    asAbsolutePath: (relativePath: string) => path.join(extensionPath, relativePath),
+    storageUri: vscode.Uri.file(testDir),
+    globalStorageUri: vscode.Uri.file(testDir),
+    logUri: vscode.Uri.file(testDir),
+    extension: {} as any
   } as vscode.ExtensionContext;
 }
