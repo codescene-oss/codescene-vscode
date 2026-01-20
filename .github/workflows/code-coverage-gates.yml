@@ -55,6 +55,6 @@ jobs:
       - uses: ./.github/actions/check-coverage
         if: always()
         with:
-          access-token: ${{ secrets.CS_API_TOKEN }}
+          access-token: ${{ secrets.CODESCENE_CODE_COVERAGE_API_TOKEN }}
           project-url: "https://api.codescene.io/v2/projects/36131"
           coverage-files: "**/coverage/lcov.info"
