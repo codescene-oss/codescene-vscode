@@ -31,7 +31,7 @@ jobs:
       uses: ./.github/actions/upload-coverage
       if: always()
       with:
-        cs-token:  ${{ secrets.CS_API_TOKEN }}
+        cs-token:  ${{ secrets.CODESCENE_CODE_COVERAGE_API_TOKEN }}
         format: lcov
         metric: function-coverage
         file: coverage/lcov.info
@@ -40,7 +40,7 @@ jobs:
       uses: ./.github/actions/upload-coverage
       if: always()
       with:
-        cs-token:  ${{ secrets.CS_API_TOKEN }}
+        cs-token:  ${{ secrets.CODESCENE_CODE_COVERAGE_API_TOKEN }}
         format: lcov
         metric: branch-coverage
         file: coverage/lcov.info
@@ -55,7 +55,7 @@ jobs:
         fetch-depth: 0
     - name: Trigger codescene-vscode project analysis
       env:
-        CS_TOKEN:  ${{ secrets.CS_API_TOKEN }}
+        CS_TOKEN:  ${{ secrets.CODESCENE_CODE_COVERAGE_API_TOKEN }}
         CS_PROJECT_ID:  36131
       run: |
         curl --fail -X POST -H "Authorization: Bearer $CS_TOKEN" https://api.codescene.io/v2/projects/${CS_PROJECT_ID}/run-analysis
