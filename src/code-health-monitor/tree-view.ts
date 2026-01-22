@@ -33,10 +33,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
       this.view,
       vscode.commands.registerCommand('codescene.codeHealthMonitor.revealAutoRefactorings', () =>
         this.revealAutoRefactorings()
-      ),
-      vscode.commands.registerCommand('codescene.codeHealthMonitorSelectBaseline', async () => {
-        void this.treeDataProvider.selectBaseline();
-      }),
+                                     ),
       DevtoolsAPI.onDidDeltaAnalysisComplete((e: DeltaAnalysisEvent) => {
         if (e.updateMonitor) {
           this.treeDataProvider.syncTree(e);

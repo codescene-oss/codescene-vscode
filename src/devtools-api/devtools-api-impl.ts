@@ -25,9 +25,10 @@ import { DevtoolsError } from './devtools-error';
 import { CreditsInfoError } from './credits-info-error';
 import { AbortError } from './abort-error';
 
-function presentCommand(obj: Task | Command): string {
+function presentCommand(obj: Task | Command, cwd: string): string {
   const trimmedObj = {
     ...obj,
+    cwd: cwd,
     args: obj.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg)),
   };
   return JSON.stringify(trimmedObj);
@@ -73,7 +74,7 @@ export class DevtoolsAPIImpl {
         taskId,
         ignoreError: true,
       };
-      logOutputChannel.info("Running task: " + presentCommand(task));
+      logOutputChannel.info("Running task: " + presentCommand(task, execOptions.cwd));
       // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
       // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
 
@@ -96,7 +97,7 @@ export class DevtoolsAPIImpl {
         args,
         ignoreError: true,
       };
-      logOutputChannel.info("Running command: " + presentCommand(command));
+      logOutputChannel.info("Running command: " + presentCommand(command, execOptions.cwd));
       result = await this.simpleExecutor.execute(command, execOptions, input);
     }
 
