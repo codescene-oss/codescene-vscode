@@ -48,11 +48,11 @@
     "commands": [
       {
         "command": "codescene.createRulesTemplate",
-        "title": "CodeScene: Create Rules Template"
+        "title": "CodeScene: create Code Health Rules from template"
       },
       {
         "command": "codescene.checkRules",
-        "title": "CodeScene: Check code health rule match for selected file",
+        "title": "CodeScene: check Code Health Rules match for selected file",
         "when": "codescene.asyncActivationFinished"
       },
       {
@@ -62,23 +62,23 @@
       },
       {
         "command": "codescene.openCodeHealthDocs",
-        "title": "CodeScene: Open Code Health Documentation"
+        "title": "CodeScene: open Code Health documentation"
       },
       {
         "command": "codescene.toggleReviewCodeLenses",
-        "title": "CodeScene: Toggle Review CodeLenses"
+        "title": "CodeScene: toggle Review CodeLenses"
       },
       {
         "command": "codescene.showLogOutput",
-        "title": "CodeScene: Show output log"
+        "title": "CodeScene: show output logs"
       },
       {
         "command": "codescene.printDevtoolsApiStats",
-        "title": "CodeScene: Print Devtools API stats"
+        "title": "CodeScene: print Devtools API stats"
       },
       {
         "command": "codescene.copyDeviceId",
-        "title": "CodeScene: Copy Device ID"
+        "title": "CodeScene: copy Device ID"
       }
     ],
     "viewsContainers": {
@@ -117,7 +117,7 @@
     "viewsWelcome": [
       {
         "view": "codescene.codeHealthMonitorView",
-        "contents": "The Code Health Monitor view compares the current state of your code against the selected baseline and presents any introduced code smells."
+        "contents": "The Code Health Monitor view compares the current state of your code and presents any introduced code smells."
       }
     ],
     "menus": {
