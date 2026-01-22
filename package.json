@@ -77,11 +77,6 @@
         "title": "CodeScene: Print Devtools API stats"
       },
       {
-        "command": "codescene.codeHealthMonitorSelectBaseline",
-        "title": "Select monitor baseline...",
-        "icon": "$(list-tree)"
-      },
-      {
         "command": "codescene.copyDeviceId",
         "title": "CodeScene: Copy Device ID"
       }
@@ -131,11 +126,6 @@
           "command": "codescene.codeHealthMonitorHelp",
           "when": "view === codescene.codeHealthMonitorView",
           "group": "navigation@2"
-        },
-        {
-          "command": "codescene.codeHealthMonitorSelectBaseline",
-          "when": "view === codescene.codeHealthMonitorView",
-          "group": "navigation@§"
         }
       ],
       "commandPalette": []
