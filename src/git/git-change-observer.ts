@@ -90,7 +90,7 @@ export class GitChangeObserver {
       // because we use `getChangedFilesVsBaseline` as the computation basis, which uses `git diff` and `git status`,
       // which inherently honor gitignore.
 
-      if (event.type === 'delete') {
+      if (event.type === 'delete' || !this.isFileInChangedList(event.uri.fsPath, changedFiles, workspaceFolder)) {
         await this.handleFileDelete(event.uri, changedFiles, workspaceFolder);
       } else {
         await this.handleFileChange(event.uri, changedFiles, workspaceFolder);

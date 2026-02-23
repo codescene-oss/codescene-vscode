@@ -54,16 +54,16 @@ suite('GitChangeObserver Test Suite', () => {
   const assertFileInChangedList = (changedFiles: string[], filename: string, shouldExist: boolean = true) => {
     const exists = changedFiles.some(f => f.endsWith(filename));
     assert.strictEqual(exists, shouldExist,
-                       shouldExist ? `Should include ${filename}` : `Should not include ${filename}`);
+      shouldExist ? `Should include ${filename}` : `Should not include ${filename}`);
   };
 
   const assertFileInTracker = (filePath: string, shouldExist: boolean = true) => {
     const tracker = getTracker();
     assert.strictEqual(tracker.has(filePath), shouldExist,
-                       shouldExist ? 'File should be in tracker' : 'File should not be in tracker');
+      shouldExist ? 'File should be in tracker' : 'File should not be in tracker');
   };
 
-  setup(async function() {
+  setup(async function () {
     this.timeout(20000);
 
     if (fs.existsSync(testRepoPath)) {
@@ -271,6 +271,29 @@ suite('GitChangeObserver Test Suite', () => {
     assertFileInTracker(committedFile, false);
   });
 
+  test('change event removes tracked file when no longer changed', async function () {
+    this.timeout(20000);
+    const filePath = createFile('stale-change.ts', 'export const stale = 1;');
+
+    // Track the file while uncommitted.
+    await triggerFileChange(filePath);
+    assertFileInTracker(filePath);
+
+    // Make file clean in git status so it disappears from changedFiles.
+    execGit('git add stale-change.ts');
+    execGit('git commit -m "Make stale-change.ts clean"');
+
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    assertFileInChangedList(changedFiles, 'stale-change.ts', false);
+
+    const observer = getObserverInternals();
+    observer.eventQueue.push({ type: 'change', uri: Uri.file(filePath) });
+
+    await observer.processQueuedEvents();
+
+    assertFileInTracker(filePath, false);
+  });
+
   test('getChangedFilesVsBaseline handles files with whitespace in names', async function () {
     this.timeout(20000);
     createFile('my file.ts', 'console.log("has spaces");');
@@ -338,8 +361,8 @@ suite('GitChangeObserver Test Suite', () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const observer = getObserverInternals();
-    observer.eventQueue.push({type: 'create', uri: Uri.file(file1)});
-    observer.eventQueue.push({type: 'create', uri: Uri.file(file2)});
+    observer.eventQueue.push({ type: 'create', uri: Uri.file(file1) });
+    observer.eventQueue.push({ type: 'create', uri: Uri.file(file2) });
 
     assert.strictEqual(observer.eventQueue.length, 2, 'Events should get queued');
     assertFileInTracker(file1, false);
@@ -367,13 +390,13 @@ suite('GitChangeObserver Test Suite', () => {
 
     let getChangedFilesCallCount = 0;
     const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
-    gitChangeObserver.getChangedFilesVsBaseline = async function(workspaceFolder) {
+    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder) {
       getChangedFilesCallCount++;
       return originalGetChangedFiles(workspaceFolder);
     };
 
     for (const file of files) {
-      observer.eventQueue.push({type: 'create', uri: Uri.file(file)});
+      observer.eventQueue.push({ type: 'create', uri: Uri.file(file) });
     }
 
     assert.strictEqual(getChangedFilesCallCount, 0, "getChangedFilesVsBaseline doesn't get called until the batch gets processed");
@@ -393,7 +416,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     let getChangedFilesCallCount = 0;
     const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
-    gitChangeObserver.getChangedFilesVsBaseline = async function(workspaceFolder) {
+    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder) {
       getChangedFilesCallCount++;
       return originalGetChangedFiles(workspaceFolder);
     };
