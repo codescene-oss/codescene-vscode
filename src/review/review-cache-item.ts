@@ -25,6 +25,15 @@ export class ReviewCacheItem {
    * Triggers a delta analysis using the raw scores. The analyser will trigger an event on completion
    */
   async runDeltaAnalysis({ skipMonitorUpdate }: { skipMonitorUpdate: boolean }) {
+    // Check if file still exists before running delta analysis to avoid race condition
+    // where file is deleted while delta analysis is in progress
+    try {
+      await vscode.workspace.fs.stat(this.document.uri);
+    } catch {
+      // File doesn't exist, return early to prevent caching delta for deleted file
+      return;
+    }
+
     const oldScore = await this.baselineScore;
     const newScore = await this.review.rawScore;
     this.delta = await DevtoolsAPI.delta(this.document, !skipMonitorUpdate, oldScore, newScore);
