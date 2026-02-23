@@ -294,6 +294,44 @@ suite('GitChangeObserver Test Suite', () => {
     assertFileInTracker(filePath, false);
   });
 
+  test('integration: file modification and revert cycle updates Code Health Monitor', async function () {
+    this.timeout(20000);
+
+    // 1. Setup: Create and commit a healthy file
+    const fileName = 'healthy-file.ts';
+    const originalContent = 'export function hello() { return "world"; }';
+    const filePath = commitFile(fileName, originalContent, 'Add healthy file');
+
+    // 2. Verify file is not in changed list (healthy state)
+    let changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    assertFileInChangedList(changedFiles, fileName, false);
+
+    // 3. Modify file at filesystem level (simulating outside process)
+    const modifiedContent = 'export function hello() { return "modified"; }';
+    fs.writeFileSync(filePath, modifiedContent);
+
+    // 4. Trigger change detection and verify file appears in Code Health Monitor
+    await triggerFileChange(filePath);
+    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    assertFileInChangedList(changedFiles, fileName, true);
+    assertFileInTracker(filePath, true);
+
+    // 5. Undo modification by reverting to original content
+    fs.writeFileSync(filePath, originalContent);
+
+    // 6. Verify file is no longer in changed list after revert
+    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    assertFileInChangedList(changedFiles, fileName, false);
+
+    // 7. Queue change event and process it to trigger cleanup
+    const observer = getObserverInternals();
+    observer.eventQueue.push({ type: 'change', uri: Uri.file(filePath) });
+    await observer.processQueuedEvents();
+
+    // 8. Verify file removed from internal tracker
+    assertFileInTracker(filePath, false);
+  });
+
   test('getChangedFilesVsBaseline handles files with whitespace in names', async function () {
     this.timeout(20000);
     createFile('my file.ts', 'console.log("has spaces");');
