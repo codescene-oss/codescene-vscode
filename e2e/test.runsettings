@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Disable parallel test execution at the runner level -->
+    <MaxCpuCount>1</MaxCpuCount>
+  </RunConfiguration>
+  <NUnit>
+    <!-- Disable parallel execution within NUnit -->
+    <NumberOfTestWorkers>1</NumberOfTestWorkers>
+  </NUnit>
+</RunSettings>

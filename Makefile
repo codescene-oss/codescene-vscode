@@ -31,6 +31,9 @@ pretest:
 test: pretest
 	npm run test
 
+test-e2e:
+	dotnet test e2e/csharp.csproj	
+
 # Runs just one test.
 # Example: make test1 TEST='GitChangeObserver Test Suite'
 test1: pretest

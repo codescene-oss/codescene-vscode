@@ -1,0 +1,36 @@
+# Test environment configuration for the VS Code Playwright harness.
+#
+# This file is the shared baseline.
+# Optionally create a local override file named "local.yml" (ignored by git).
+
+vscode:
+  # Root folder of extracted VS Code ZIP (contains Code.exe)
+  installdir: .vscode-test/VSCode-win32-x64
+
+  # Where VS Code should look for extensions during tests
+  extensionsdir: .vscode-test/extensions
+
+  # Folder to open as the VS Code workspace (relative to project root).
+  # In CI (e.g. GitHub Actions) set env var VSCODE_TEST_WORKSPACE_PATH instead, e.g. to ${{ github.workspace }}.
+  workspacepath: test-data\csharp
+
+  cdpreadytimeout: 30000
+  timeout:
+    short: 10000
+
+  window:
+    x: 0
+    y: 0
+    width: 1400
+    height: 1200
+
+extension:
+  # Path to the .vsix to install before tests (relative to project root), or filename under extensionsdir.
+  # The harness runs Code --install-extension so the extension is loaded in the test run.
+  name: .vscode-test/extensions/codescene.codescene-vscode-0.26.1@win32-x64.vsix
+
+  # Optional: extension identifier (publisher.name)
+  id: codescene.codescene-vscode
+
+  # Optional: secret token (override in local.yml)
+  authToken: ""
