@@ -43,3 +43,84 @@ jobs:
     - run: npm test
       env:
         CI: true
+
+  build-vsix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: './.github/actions/setup'
+
+      - name: Set PRERELEASE version
+        run: |
+          current_version=$(jq -r '.version' package.json)
+          short_sha=$(git rev-parse --short HEAD)
+          jq --arg new_version "${current_version}-PRERELEASE-${short_sha}" '.version = $new_version' package.json > tmp.json
+          mv tmp.json package.json
+
+      - name: Install vsce
+        run: npm install --global @vscode/vsce
+
+      - name: Package VSIX (win32-x64)
+        run: node ./scripts/package-platform.js win32 x64
+        env:
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-vsix
+          path: codescene-vscode-*-win32-x64.vsix
+
+  e2e:
+    name: E2E tests
+    runs-on: windows-latest
+    needs: build-vsix
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-vsix
+
+      - name: Locate VSIX
+        id: vsix
+        run: |
+          $f = Get-ChildItem -Path . -Filter 'codescene-vscode-*-win32-x64.vsix' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $f) { throw 'No VSIX found' }
+          echo "path=$($f.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install E2E environment
+        run: pwsh -File ./install-e2e.ps1 -VsixPath '${{ steps.vsix.outputs.path }}'
+
+      - name: Restore E2E project
+        run: dotnet restore e2e/csharp.csproj
+
+      - name: Build E2E project
+        run: dotnet build e2e/csharp.csproj -c Release --no-restore
+
+      - name: Install Playwright browsers
+        run: pwsh -File e2e/bin/Release/net10.0/playwright.ps1 install
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright
+
+      - name: Run E2E tests
+        run: dotnet test e2e/csharp.csproj -c Release --no-build --logger "trx;LogFileName=e2e-results.trx" --results-directory TestResults
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: E2E test results
+          path: TestResults/*.trx
+          reporter: dotnet-trx
+          fail-on-error: false
