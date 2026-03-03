@@ -32,5 +32,5 @@ extension:
   # Optional: extension identifier (publisher.name)
   id: codescene.codescene-vscode
 
-  # Optional: secret token (override in local.yml)
+  # Optional: secret token (override in local.yml). In CI set env var CS_ACCESS_TOKEN.
   authToken: ""

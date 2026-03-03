@@ -125,6 +125,7 @@ jobs:
         run: dotnet test e2e/csharp.csproj -c Release --no-build --logger "trx;LogFileName=e2e-results.trx" --results-directory TestResults
         env:
           VSCODE_TEST_EXTENSION_VSIX_PATH: ${{ steps.e2evsix.outputs.path }}
+          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
 
       - name: Publish test results
         uses: dorny/test-reporter@v1

@@ -131,6 +131,9 @@ public sealed class ExtensionConfig
     [YamlMember(Alias = "id")]
     public string? Id { get; set; }
 
+    /// <summary>
+    /// CodeScene API token. Overridden by environment variable CS_ACCESS_TOKEN (e.g. in CI).
+    /// </summary>
     [YamlMember(Alias = "authToken")]
     public string? AuthToken { get; set; }
 

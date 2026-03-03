@@ -31,6 +31,10 @@ public static class TestEnvironmentConfigLoader
         if (!string.IsNullOrWhiteSpace(extensionPathEnv))
             config.Extension.Name = Path.GetFullPath(extensionPathEnv);
 
+        var authTokenEnv = Environment.GetEnvironmentVariable("CS_ACCESS_TOKEN");
+        if (!string.IsNullOrWhiteSpace(authTokenEnv))
+            config.Extension.AuthToken = authTokenEnv;
+
         return config;
     }
 
