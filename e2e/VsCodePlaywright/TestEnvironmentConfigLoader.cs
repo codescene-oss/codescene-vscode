@@ -26,6 +26,11 @@ public static class TestEnvironmentConfigLoader
         }
 
         NormalizePaths(projectRoot, config);
+
+        var extensionPathEnv = Environment.GetEnvironmentVariable("VSCODE_TEST_EXTENSION_VSIX_PATH");
+        if (!string.IsNullOrWhiteSpace(extensionPathEnv))
+            config.Extension.Name = Path.GetFullPath(extensionPathEnv);
+
         return config;
     }
 

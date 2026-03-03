@@ -26,7 +26,7 @@ vscode:
 
 extension:
   # Path to the .vsix to install before tests (relative to project root), or filename under extensionsdir.
-  # The harness runs Code --install-extension so the extension is loaded in the test run.
+  # In CI set env var VSCODE_TEST_EXTENSION_VSIX_PATH to the absolute path of the built VSIX.
   name: .vscode-test/extensions/codescene.codescene-vscode-0.26.1@win32-x64.vsix
 
   # Optional: extension identifier (publisher.name)

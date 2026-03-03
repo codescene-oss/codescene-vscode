@@ -122,6 +122,9 @@ public sealed class WindowConfig
 
 public sealed class ExtensionConfig
 {
+    /// <summary>
+    /// Path to the .vsix file. Overridden by environment variable VSCODE_TEST_EXTENSION_VSIX_PATH (e.g. in CI).
+    /// </summary>
     [YamlMember(Alias = "name")]
     public string? Name { get; set; }
 
