@@ -45,6 +45,7 @@ jobs:
         CI: true
 
   build-vsix:
+    name: build vsix (E2E tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,7 +76,7 @@ jobs:
           path: codescene-vscode-*-win32-x64.vsix
 
   e2e:
-    name: E2E tests
+    name: E2E tests (windows-latest)
     runs-on: windows-latest
     needs: build-vsix
     steps:

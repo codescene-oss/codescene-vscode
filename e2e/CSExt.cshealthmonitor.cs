@@ -12,7 +12,7 @@ public class CSExtHealthMonitorTests : VsCodeTestBase
 
         var activitybar = new VsCodeActivitybar(Page!);
         await activitybar.Find("Id");
-        await activitybar.Click("Codescene");
+        await activitybar.Click("Codescene", timeoutMs: 30_000);
 
         var cshealthmonitor = new CSHealthMonitor(Page!);
         cshealthmonitor.SwitchToPage();

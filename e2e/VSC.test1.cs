@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using csharp.VsCodePlaywright;
 
@@ -9,7 +9,11 @@ public class VSCodeTests : VsCodeTestBase
     [Test]
     public async Task VSCodeTitleCheck()
     {
-        var title = await Page!.TitleAsync();
+        string title = string.Empty;
+        await Utils.RetryCondition(
+            async () => { title = await Page!.TitleAsync(); },
+            () => !string.IsNullOrWhiteSpace(title) && title.Contains("Visual Studio Code", StringComparison.Ordinal),
+            timeoutMs: 15_000);
         Assert.That(title, Does.Contain("Visual Studio Code"));
     }
 
