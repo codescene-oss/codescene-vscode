@@ -39,7 +39,7 @@ pretest-e2e:
 
 # Add "CLEAN=1" to force re-download of VS Code and extension.
 test-e2e: pretest-e2e
-	dotnet test e2e/csharp.csproj	
+	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
 
 # Runs just one test.
 # Example: make test1 TEST='GitChangeObserver Test Suite'

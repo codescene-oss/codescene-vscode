@@ -200,7 +200,7 @@ PublishScripts/
 **/[Pp]ackages/*
 
 # Local test overrides (may contain secrets)
-local.yml
+appsettings.Development.json
 # except build/, which is used as an MSBuild target.
 !**/[Pp]ackages/build/
 # Uncomment if necessary however generally it will be regenerated when needed
@@ -407,5 +407,5 @@ FodyWeavers.xsd
 .vscode-test/
 allure-report/
 report/
-local.yml
+appsettings.Development.json
 *.vsix

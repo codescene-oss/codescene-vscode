@@ -183,15 +183,15 @@ public abstract class VsCodeTestBase
             extensionsDir = Path.GetFullPath(Path.Combine(projectRoot, extensionsDir));
 
         PortableRoot = installDir;
-        Logger.Information("VS Code InstallDir (yaml): {InstallDir}", installDir);
+        Logger.Information("VS Code InstallDir (config): {InstallDir}", installDir);
         Logger.Information("VS Code ExtensionsDir (resolved): {ExtensionsDir}", extensionsDir);
         Logger.Information(
-            "VS Code Window (yaml): x={X} y={Y} width={Width} height={Height}",
+            "VS Code Window (config): x={X} y={Y} width={Width} height={Height}",
             envConfig.Vscode.Window.X,
             envConfig.Vscode.Window.Y,
             envConfig.Vscode.Window.Width,
             envConfig.Vscode.Window.Height);
-        Logger.Information("VS Code CDP Ready Timeout (yaml, ms): {TimeoutMs}", envConfig.Vscode.CdpReadyTimeoutMs);
+        Logger.Information("VS Code CDP Ready Timeout (config, ms): {TimeoutMs}", envConfig.Vscode.CdpReadyTimeoutMs);
 
         WorkspacePath = ResolveWorkspacePath(projectRoot, envConfig);
         Directory.CreateDirectory(WorkspacePath);

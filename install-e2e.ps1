@@ -82,4 +82,4 @@ else {
     Write-Host "      Done. Installed to $vscodeDir" -ForegroundColor Gray
 }
 Write-Host ""
-Write-Host "e2e environment ready. Run: dotnet test e2e/csharp.csproj" -ForegroundColor Green
+Write-Host "e2e environment ready. Run: dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj" -ForegroundColor Green

@@ -111,10 +111,10 @@ jobs:
           echo "path=$($f.FullName)" >> $env:GITHUB_OUTPUT
 
       - name: Restore E2E project
-        run: dotnet restore e2e/csharp.csproj
+        run: dotnet restore e2e/Codescene.E2E.Playwright.Tests.csproj
 
       - name: Build E2E project
-        run: dotnet build e2e/csharp.csproj -c Release --no-restore
+        run: dotnet build e2e/Codescene.E2E.Playwright.Tests.csproj -c Release --no-restore
 
       - name: Install Playwright browsers
         run: pwsh -File e2e/bin/Release/net10.0/playwright.ps1 install
@@ -122,7 +122,7 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\.playwright
 
       - name: Run E2E tests
-        run: dotnet test e2e/csharp.csproj -c Release --no-build --logger "trx;LogFileName=e2e-results.trx" --results-directory TestResults
+        run: dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj -c Release --no-build --logger "trx;LogFileName=e2e-results.trx" --results-directory TestResults
         env:
           VSCODE_TEST_EXTENSION_VSIX_PATH: ${{ steps.e2evsix.outputs.path }}
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}

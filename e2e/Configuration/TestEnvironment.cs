@@ -3,7 +3,7 @@ using System;
 namespace csharp.VsCodePlaywright;
 
 /// <summary>
-/// Process-wide test environment settings loaded from vscodetest.yml (+ optional local.yml overrides).
+/// Process-wide test environment settings loaded from appsettings.json (+ optional appsettings.Development.json and env overrides).
 /// </summary>
 public static class TestEnvironment
 {

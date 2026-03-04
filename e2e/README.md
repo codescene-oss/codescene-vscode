@@ -10,23 +10,21 @@ This project starts a VS Code (portable ZIP) instance, attaches Playwright via t
 
 ## Configure
 
-### YAML environment config
+### appsettings
 
-Test environment settings are loaded from:
+Test environment settings use .NET configuration (appsettings.json + optional appsettings.Development.json):
 
-- `vscodetest.yml` (baseline, committed)
-- `local.yml` (optional override, ignored by git)
+- `appsettings.json` (baseline, committed)
+- `appsettings.Development.json` (optional override, ignored by git). Copy `appsettings.Development.json.example` to get started.
 
-`local.yml` overrides only the keys it specifies.
+`appsettings.Development.json` overrides only the keys it specifies. Environment variables override both (e.g. `VSCODE_TEST_EXTENSION_VSIX_PATH`, `CS_ACCESS_TOKEN`, `VSCODE_TEST_WORKSPACE_PATH`).
 
 Schema (high-level):
 
-- `vscode.installdir`
-- `vscode.extensionsdir`
-- `vscode.cdpreadytimeout`
-- `vscode.timeout.short`
-- `vscode.window.{x,y,width,height}`
-- `extension.{name,id,authToken}`
+- `Vscode.InstallDir`, `Vscode.ExtensionsDir`, `Vscode.WorkspacePath`
+- `Vscode.CdpReadyTimeoutMs`, `Vscode.Timeout.ShortMs`
+- `Vscode.Window.{X,Y,Width,Height}`
+- `Extension.Name`, `Extension.Id`, `Extension.AuthToken`
 
 ### VS Code portable install
 
@@ -36,16 +34,15 @@ The tests expect an **extracted VS Code ZIP** under:
 
 This path is resolved relative to the project folder containing the `.csproj`.
 
-
 ### VS Code window size/position
 
 The test harness enforces a deterministic VS Code window location/size during setup.
 
-- Configured in [VsCodeTestBase.cs](VsCodeTestBase.cs) inside `Setup()` via `sessionOptions.WindowX/WindowY/WindowWidth/WindowHeight`.
+- Configured in [VsCodeTestBase.cs](Tests/VsCodeTestBase.cs) inside `Setup()` via `sessionOptions.WindowX/WindowY/WindowWidth/WindowHeight`.
 
 Mechanisms used (in order):
 
-- Renderer JS: [VsCodePlaywright/VsCodeDriver.cs](VsCodePlaywright/VsCodeDriver.cs) calls `window.moveTo(x,y)` + `window.resizeTo(w,h)` inside the VS Code renderer page.
+- Renderer JS: [Playwright/VsCodeDriver.cs](Playwright/VsCodeDriver.cs) calls `window.moveTo(x,y)` + `window.resizeTo(w,h)` inside the VS Code renderer page.
 - CDP fallback: if the renderer path is blocked/ignored, it falls back to `Browser.getWindowForTarget` + `Browser.setWindowBounds`.
 
 Important behavioral constraints:
@@ -55,13 +52,12 @@ Important behavioral constraints:
 - Multi-monitor coordinates are global screen coordinates; negative values can be valid depending on monitor arrangement.
 - Some Linux/Wayland environments may restrict programmatic window positioning.
 
-
 ### VS Code extensions (local)
 
 The test harness starts VS Code with a persistent extensions directory so you can deploy a VSIX once and have tests pick it up:
 
 - Extensions directory: `.vscode-test/extensions`
-- Tests start VS Code with `--extensions-dir` pointing at that folder (see [VsCodeTestBase.cs](VsCodeTestBase.cs)).
+- Tests start VS Code with `--extensions-dir` pointing at that folder (see [VsCodeTestBase.cs](Tests/VsCodeTestBase.cs)).
 
 The harness also isolates VS Code app data via `VSCODE_APPDATA` (see below) so the test instance does not use the host user's
 `%APPDATA%\Code` (including `%APPDATA%\Code\extensions`).
@@ -99,24 +95,23 @@ POSIX shell equivalent:
 The harness starts VS Code with a **fresh temporary user profile directory** per test run:
 
 - VS Code argument: `--user-data-dir="..."`
-- Variable name in code: `userDataDir` in [VsCodePlaywright/VsCodeDriver.cs](VsCodePlaywright/VsCodeDriver.cs)
+- Variable name in code: `userDataDir` in [Playwright/VsCodeDriver.cs](Playwright/VsCodeDriver.cs)
 
 Why this exists:
 
 - **Isolation / repeatability:** avoids inheriting random state from your real VS Code profile.
-- **Deterministic configuration:** the harness can write `User/settings.json` in that directory *before VS Code starts*.
+- **Deterministic configuration:** the harness can write `User/settings.json` in that directory _before VS Code starts_.
 - **Cleanup:** the directory is created under `%TEMP%` and deleted at the end of the session.
 
-This is also how extension configuration is injected without UI automation. If `extension.authToken` is set in YAML, the test harness writes it into VS Code user settings as:
+This is also how extension configuration is injected without UI automation. If `Extension.AuthToken` is set in appsettings (or env `CS_ACCESS_TOKEN`), the test harness writes it into VS Code user settings as:
 
 - `codescene.authToken` (in the test profile’s `User/settings.json`)
 
 Note: CDP is great for window/page automation, but it is not a supported way to call extension-host VS Code APIs directly. Pre-seeding settings is the stable approach for tests.
 
-
 ### VS Code app data (`VSCODE_APPDATA`)
 
-In addition to the Chromium/Electron profile (`--user-data-dir`), VS Code maintains its own *app data root* under the user's roaming profile
+In addition to the Chromium/Electron profile (`--user-data-dir`), VS Code maintains its own _app data root_ under the user's roaming profile
 (on Windows this is typically `%APPDATA%\Code`).
 
 To prevent tests from reading/writing the developer machine's VS Code state, the harness sets the `VSCODE_APPDATA` environment variable for the
@@ -127,7 +122,6 @@ Effects:
 - VS Code will not use the host user's `%APPDATA%\Code`.
 - Extensions/state/settings that normally live under that tree won't leak into the test run.
 - The directory is created under `%TEMP%` and deleted at the end of the session.
-
 
 ## Install Playwright browsers (one-time)
 
@@ -158,9 +152,9 @@ This project is configured to produce Allure results into:
 
 Allure reporting is enabled through a few “hooks” in the code:
 
-- **Adapter hook (NUnit):** the base class [VsCodeTestBase.cs](VsCodeTestBase.cs) is annotated with `[AllureNUnit]`. Because all test fixtures inherit from this base class, Allure is enabled for the whole suite.
-- **Results directory:** [allureConfig.json](allureConfig.json) configures `allure.directory` (where Allure NUnit writes `*-result.json` files). The config file is copied to the test output folder by [csharp.csproj](csharp.csproj) so the adapter can find it at runtime.
-- **Attachments (screenshots):** on test failure, teardown captures a VS Code screenshot and saves it to `report/screenshots/`, then attaches the PNG to the current Allure test result via `AllureApi.AddAttachment(...)` in [VsCodePlaywright/Utils.cs](VsCodePlaywright/Utils.cs).
+- **Adapter hook (NUnit):** the base class [VsCodeTestBase.cs](Tests/VsCodeTestBase.cs) is annotated with `[AllureNUnit]`. Because all test fixtures inherit from this base class, Allure is enabled for the whole suite.
+- **Results directory:** [allureConfig.json](allureConfig.json) configures `allure.directory` (where Allure NUnit writes `*-result.json` files). The config file is copied to the test output folder by [Codescene.E2E.Playwright.Tests.csproj](Codescene.E2E.Playwright.Tests.csproj) so the adapter can find it at runtime.
+- **Attachments (screenshots):** on test failure, teardown captures a VS Code screenshot and saves it to `report/screenshots/`, then attaches the PNG to the current Allure test result via `AllureApi.AddAttachment(...)` in [Utils/Utils.cs](Utils/Utils.cs).
 
 ### 1) Install Allure CLI (Windows)
 
@@ -214,8 +208,8 @@ Tip: `allure serve .\report\allure-results` builds + opens a temporary report.
 
 ## Code
 
-- Helper library: `VsCodePlaywright/`
-- NUnit test: `VSC.test1.cs`
+- Helper library: `Playwright/`, `Configuration/`, `Utils/`
+- NUnit tests: `Tests/`
 
 ## Debug
 

@@ -1,7 +1,6 @@
 using System;
 using System.IO;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
+using Microsoft.Extensions.Configuration;
 
 namespace csharp.VsCodePlaywright;
 
@@ -12,43 +11,27 @@ public static class TestEnvironmentConfigLoader
         if (string.IsNullOrWhiteSpace(projectRoot))
             throw new ArgumentException("Project root must be provided.", nameof(projectRoot));
 
-        var basePath = Path.Combine(projectRoot, "vscodetest.yml");
-        var localPath = Path.Combine(projectRoot, "local.yml");
+        var config = new ConfigurationBuilder()
+            .SetBasePath(projectRoot)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
 
-        var config = File.Exists(basePath)
-            ? LoadFile(basePath)
-            : new TestEnvironmentConfig();
+        var envConfig = new TestEnvironmentConfig();
+        config.Bind(envConfig);
 
-        if (File.Exists(localPath))
-        {
-            var local = LoadFile(localPath);
-            config.ApplyOverrides(local);
-        }
-
-        NormalizePaths(projectRoot, config);
+        NormalizePaths(projectRoot, envConfig);
 
         var extensionPathEnv = Environment.GetEnvironmentVariable("VSCODE_TEST_EXTENSION_VSIX_PATH");
         if (!string.IsNullOrWhiteSpace(extensionPathEnv))
-            config.Extension.Name = Path.GetFullPath(extensionPathEnv);
+            envConfig.Extension.Name = Path.GetFullPath(extensionPathEnv);
 
         var authTokenEnv = Environment.GetEnvironmentVariable("CS_ACCESS_TOKEN");
         if (!string.IsNullOrWhiteSpace(authTokenEnv))
-            config.Extension.AuthToken = authTokenEnv;
+            envConfig.Extension.AuthToken = authTokenEnv;
 
-        return config;
-    }
-
-    private static TestEnvironmentConfig LoadFile(string path)
-    {
-        var yaml = File.ReadAllText(path);
-
-        var deserializer = new DeserializerBuilder()
-            .WithNamingConvention(NullNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
-            .Build();
-
-        var cfg = deserializer.Deserialize<TestEnvironmentConfig>(yaml);
-        return cfg ?? new TestEnvironmentConfig();
+        return envConfig;
     }
 
     private static void NormalizePaths(string projectRoot, TestEnvironmentConfig cfg)
