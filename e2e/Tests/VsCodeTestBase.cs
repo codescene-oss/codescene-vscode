@@ -2,6 +2,7 @@ using System.Text.Json;
 using Allure.NUnit;
 using Codescene.E2E.Playwright.Tests.Configuration;
 using Codescene.E2E.Playwright.Tests.Playwright;
+using Codescene.E2E.Playwright.Tests.Utils;
 using Microsoft.Playwright;
 using NUnit.Framework.Interfaces;
 using Serilog;
@@ -15,6 +16,7 @@ public abstract class VsCodeTestBase
 
     private static int _loggingInitialized;
 
+    protected TestWorkspace? Workspace { get; private set; }
     protected string PortableRoot { get; private set; } = DefaultPortableRoot;
     protected string WorkspacePath { get; private set; } = string.Empty;
     protected string WorkspaceSessionFilePath { get; private set; } = string.Empty;
@@ -51,7 +53,7 @@ public abstract class VsCodeTestBase
 
     private static string FindProjectRootDirectory()
     {
-        return Utils.FindProjectRootDirectory();
+        return FileUtils.FindProjectRootDirectory();
     }
 
     private static string? ResolveExtensionVsixPath(string projectRoot, TestEnvironmentConfig envConfig)
@@ -76,19 +78,7 @@ public abstract class VsCodeTestBase
         return null;
     }
 
-    protected virtual string ResolveWorkspacePath(string projectRoot, TestEnvironmentConfig envConfig)
-    {
-        var env = Environment.GetEnvironmentVariable("VSCODE_TEST_WORKSPACE_PATH");
-        if (!string.IsNullOrWhiteSpace(env))
-            return Path.GetFullPath(env);
-
-        if (!string.IsNullOrWhiteSpace(envConfig.Vscode.WorkspacePath))
-            return envConfig.Vscode.WorkspacePath;
-
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "FlaUI.WebDriver", "src", "FlaUI.WebDriver");
-    }
+    protected virtual Task SetupWorkspace(TestWorkspace workspace) => Task.CompletedTask;
 
     private static void LogChatVisibilitySettingsFromJson(ILogger logger, string label, string settingsJsonPath)
     {
@@ -155,61 +145,96 @@ public abstract class VsCodeTestBase
     public async Task Setup()
     {
         Logger = Log.Logger.ForContext("Test", TestContext.CurrentContext.Test.FullName);
-        Logger.Information("=== Test setup start ===");
-        Logger.Information("WorkDirectory: {WorkDirectory}", TestContext.CurrentContext.WorkDirectory);
-        Logger.Information("CurrentDirectory: {CurrentDirectory}", Directory.GetCurrentDirectory());
-        Logger.Information("AppContext.BaseDirectory: {BaseDirectory}", AppContext.BaseDirectory);
-        Logger.Information("ELECTRON_RUN_AS_NODE (parent): {Value}", Environment.GetEnvironmentVariable("ELECTRON_RUN_AS_NODE"));
-
+        LogSetupStart();
         var projectRoot = FindProjectRootDirectory();
         Logger.Information("ProjectRoot: {ProjectRoot}", projectRoot);
 
         var envConfig = TestEnvironmentConfigLoader.LoadFromProjectRoot(projectRoot);
         TestEnvironment.Initialize(envConfig);
 
+        var (installDir, extensionsDir) = ResolveInstallPaths(projectRoot, envConfig);
+        PortableRoot = installDir;
+        LogResolvedPaths(installDir, extensionsDir, envConfig);
+
+        await CreateWorkspaceAsync();
+        LogWorkspaceSettings();
+        EnsurePortableExists();
+
+        var sessionOptions = BuildSessionOptions(projectRoot, envConfig, extensionsDir);
+        Session = await VsCodeDriver.StartAndConnectAsync(sessionOptions);
+        LogSessionAfterStart();
+        Assert.That(Session.Process.HasExited, Is.False, "VS Code process should be running.");
+
+        Page = await VsCodeDriver.GetFirstPageAsync(Session.Browser, sessionOptions.CdpReadyTimeout);
+        await LogRendererRuntimeAsync();
+        await SetWindowBoundsAsync(sessionOptions);
+        Assert.That(Session, Is.Not.Null);
+        Assert.That(Page, Is.Not.Null);
+
+        Logger.Information("Connected to VS Code. CdpPort={CdpPort} Url={Url}", Session.CdpPort, Page.Url);
+        Logger.Information("VS Code UI layout snapshot: {Snapshot}", await VsCodeDriver.GetUiLayoutSnapshotAsync(Page));
+        Logger.Information("=== Test setup complete ===");
+    }
+
+    private void LogSetupStart()
+    {
+        Logger.Information("=== Test setup start ===");
+        Logger.Information("WorkDirectory: {WorkDirectory}", TestContext.CurrentContext.WorkDirectory);
+        Logger.Information("CurrentDirectory: {CurrentDirectory}", Directory.GetCurrentDirectory());
+        Logger.Information("AppContext.BaseDirectory: {BaseDirectory}", AppContext.BaseDirectory);
+        Logger.Information("ELECTRON_RUN_AS_NODE (parent): {Value}", Environment.GetEnvironmentVariable("ELECTRON_RUN_AS_NODE"));
+    }
+
+    private static (string installDir, string? extensionsDir) ResolveInstallPaths(string projectRoot, TestEnvironmentConfig envConfig)
+    {
         var installDir = envConfig.Vscode.InstallDir;
-        if (string.IsNullOrWhiteSpace(installDir))
-            installDir = Path.GetFullPath(Path.Combine(projectRoot, DefaultPortableRoot));
-        else if (!Path.IsPathRooted(installDir))
-            installDir = Path.GetFullPath(Path.Combine(projectRoot, installDir));
+        installDir = string.IsNullOrWhiteSpace(installDir)
+            ? Path.GetFullPath(Path.Combine(projectRoot, DefaultPortableRoot))
+            : Path.IsPathRooted(installDir) ? installDir : Path.GetFullPath(Path.Combine(projectRoot, installDir));
 
         var extensionsDir = envConfig.Vscode.ExtensionsDir;
         if (!string.IsNullOrWhiteSpace(extensionsDir) && !Path.IsPathRooted(extensionsDir))
             extensionsDir = Path.GetFullPath(Path.Combine(projectRoot, extensionsDir));
+        return (installDir, extensionsDir);
+    }
 
-        PortableRoot = installDir;
+    private void LogResolvedPaths(string installDir, string? extensionsDir, TestEnvironmentConfig envConfig)
+    {
         Logger.Information("VS Code InstallDir (config): {InstallDir}", installDir);
         Logger.Information("VS Code ExtensionsDir (resolved): {ExtensionsDir}", extensionsDir);
         Logger.Information(
             "VS Code Window (config): x={X} y={Y} width={Width} height={Height}",
-            envConfig.Vscode.Window.X,
-            envConfig.Vscode.Window.Y,
-            envConfig.Vscode.Window.Width,
-            envConfig.Vscode.Window.Height);
+            envConfig.Vscode.Window.X, envConfig.Vscode.Window.Y,
+            envConfig.Vscode.Window.Width, envConfig.Vscode.Window.Height);
         Logger.Information("VS Code CDP Ready Timeout (config, ms): {TimeoutMs}", envConfig.Vscode.CdpReadyTimeoutMs);
+    }
 
-        WorkspacePath = ResolveWorkspacePath(projectRoot, envConfig);
-        Directory.CreateDirectory(WorkspacePath);
+    private async Task CreateWorkspaceAsync()
+    {
+        Workspace = new TestWorkspace();
+        await SetupWorkspace(Workspace);
+        WorkspacePath = Workspace.RootPath;
         Logger.Information("WorkspacePath: {WorkspacePath}", WorkspacePath);
+    }
 
-        // Diagnostics: workspace settings can override user settings.
-        LogChatVisibilitySettingsFromJson(
-            Logger,
-            label: "Workspace",
-            settingsJsonPath: Path.Combine(WorkspacePath, ".vscode", "settings.json"));
+    private void LogWorkspaceSettings()
+    {
+        LogChatVisibilitySettingsFromJson(Logger, "Workspace", Path.Combine(WorkspacePath, ".vscode", "settings.json"));
+    }
 
-        if (!File.Exists(Path.Combine(PortableRoot, "Code.exe")) &&
-            !File.Exists(Path.Combine(PortableRoot, "Code - Insiders.exe")))
-        {
-            Assert.Ignore(
-                "VS Code portable not found. Expected Code.exe under: " + PortableRoot +
-                ". Set VSCODE_PORTABLE_ROOT if your VS Code ZIP is elsewhere (or ensure relative paths are relative to the project root)."
-            );
-        }
+    private void EnsurePortableExists()
+    {
+        if (File.Exists(Path.Combine(PortableRoot, "Code.exe")) || File.Exists(Path.Combine(PortableRoot, "Code - Insiders.exe")))
+            return;
+        Assert.Ignore(
+            "VS Code portable not found. Expected Code.exe under: " + PortableRoot +
+            ". Set VSCODE_PORTABLE_ROOT if your VS Code ZIP is elsewhere (or ensure relative paths are relative to the project root).");
+    }
 
+    private VsCodeSessionOptions BuildSessionOptions(string projectRoot, TestEnvironmentConfig envConfig, string? extensionsDir)
+    {
         var installVsixPath = ResolveExtensionVsixPath(projectRoot, envConfig);
-
-        var sessionOptions = new VsCodeSessionOptions
+        var options = new VsCodeSessionOptions
         {
             PortableRoot = PortableRoot,
             WorkspacePath = WorkspacePath,
@@ -222,96 +247,52 @@ public abstract class VsCodeTestBase
             WindowWidth = envConfig.Vscode.Window.Width ?? 1400,
             WindowHeight = envConfig.Vscode.Window.Height ?? 1200
         };
-
-        // Extension loading is controlled by --extensions-dir (ExtensionsDir in config).
-
-        if (!string.IsNullOrWhiteSpace(envConfig.Extension.AuthToken))
+        if (string.IsNullOrWhiteSpace(envConfig.Extension.AuthToken))
+            return options;
+        return options with
         {
-            sessionOptions = sessionOptions with
-            {
-                UserSettings = new Dictionary<string, string>
-                {
-                    // CodeScene VS Code extension reads its auth token from this setting.
-                    ["codescene.authToken"] = envConfig.Extension.AuthToken
-                }
-            };
-        }
+            UserSettings = new Dictionary<string, string> { ["codescene.authToken"] = envConfig.Extension.AuthToken }
+        };
+    }
 
-        Session = await VsCodeDriver.StartAndConnectAsync(sessionOptions);
-
-        Logger.Information("VS Code launched: {Exe} {Args}", Session.LaunchedExecutablePath, Session.LaunchedArguments);
+    private void LogSessionAfterStart()
+    {
+        Logger.Information("VS Code launched: {Exe} {Args}", Session!.LaunchedExecutablePath, Session.LaunchedArguments);
         Logger.Information("VS Code process: Id={Pid}", Session.Process.Id);
-        try
-        {
-            Logger.Information("VS Code main module: {Path}", Session.Process.MainModule?.FileName ?? "<null>");
-        }
-        catch (Exception ex)
-        {
-            Logger.Information(ex, "VS Code main module path unavailable");
-        }
-
+        try { Logger.Information("VS Code main module: {Path}", Session.Process.MainModule?.FileName ?? "<null>"); }
+        catch (Exception ex) { Logger.Information(ex, "VS Code main module path unavailable"); }
         Logger.Information(
             "VS Code isolation: --user-data-dir={UserDataDir} --extensions-dir={ExtensionsDir} VSCODE_APPDATA={AppDataDir}",
-            Session.UserDataDir,
-            Session.ExtensionsDir,
-            string.IsNullOrWhiteSpace(Session.AppDataDir) ? "<unset>" : Session.AppDataDir);
+            Session.UserDataDir, Session.ExtensionsDir, string.IsNullOrWhiteSpace(Session.AppDataDir) ? "<unset>" : Session.AppDataDir);
+        LogChatVisibilitySettingsFromJson(Logger, "User", Path.Combine(Session.UserDataDir, "User", "settings.json"));
+    }
 
-        // Diagnostics: confirm the temp user profile settings that control Chat visibility.
-        LogChatVisibilitySettingsFromJson(
-            Logger,
-            label: "User",
-            settingsJsonPath: Path.Combine(Session.UserDataDir, "User", "settings.json"));
-
-        Assert.That(Session.Process.HasExited, Is.False, "VS Code process should be running.");
-        Page = await VsCodeDriver.GetFirstPageAsync(Session.Browser, sessionOptions.CdpReadyTimeout);
-
-                try
-                {
-                        var runtimeInfo = await Page.EvaluateAsync<string>(
-                                """
-                                () => {
-                                    const p = (typeof process !== 'undefined') ? process : undefined;
-                                    const env = p?.env || {};
-                                    return JSON.stringify({
-                                        execPath: p?.execPath,
-                                        argv: p?.argv,
-                                        env: {
-                                            VSCODE_APPDATA: env.VSCODE_APPDATA,
-                                            APPDATA: env.APPDATA,
-                                            USERPROFILE: env.USERPROFILE,
-                                        }
-                                    });
-                                }
-                                """);
-
-                        Logger.Information("VS Code renderer runtime: {RuntimeInfo}", runtimeInfo);
-                }
-                catch (Exception ex)
-                {
-                        Logger.Information(ex, "Failed to query VS Code renderer runtime info");
-                }
-
+    private async Task LogRendererRuntimeAsync()
+    {
         try
         {
-            await VsCodeDriver.SetWindowBoundsAsync(
-                Page,
-                x: sessionOptions.WindowX,
-                y: sessionOptions.WindowY,
-                width: sessionOptions.WindowWidth,
-                height: sessionOptions.WindowHeight);
+            var runtimeInfo = await Page!.EvaluateAsync<string>("""
+                () => {
+                    const p = (typeof process !== 'undefined') ? process : undefined;
+                    const env = p?.env || {};
+                    return JSON.stringify({ execPath: p?.execPath, argv: p?.argv, env: { VSCODE_APPDATA: env.VSCODE_APPDATA, APPDATA: env.APPDATA, USERPROFILE: env.USERPROFILE } });
+                }
+                """);
+            Logger.Information("VS Code renderer runtime: {RuntimeInfo}", runtimeInfo);
+        }
+        catch (Exception ex) { Logger.Information(ex, "Failed to query VS Code renderer runtime info"); }
+    }
+
+    private async Task SetWindowBoundsAsync(VsCodeSessionOptions sessionOptions)
+    {
+        try
+        {
+            await VsCodeDriver.SetWindowBoundsAsync(Page!, sessionOptions.WindowX, sessionOptions.WindowY, sessionOptions.WindowWidth, sessionOptions.WindowHeight);
         }
         catch (NotSupportedException ex)
         {
             Logger.Warning(ex, "Window positioning/sizing is not supported by this CDP endpoint; continuing without enforcing bounds.");
         }
-
-        Assert.That(Session, Is.Not.Null);
-        Assert.That(Page, Is.Not.Null);
-
-        Logger.Information("Connected to VS Code. CdpPort={CdpPort} Url={Url}", Session.CdpPort, Page.Url);
-
-        Logger.Information("VS Code UI layout snapshot: {Snapshot}", await VsCodeDriver.GetUiLayoutSnapshotAsync(Page));
-        Logger.Information("=== Test setup complete ===");
     }
 
     [TearDown]
@@ -321,7 +302,7 @@ public abstract class VsCodeTestBase
 
         if (TestContext.CurrentContext.Result.Outcome.Status == TestStatus.Failed)
         {
-            await Utils.TryCaptureFailureScreenshotAsync(
+            await VSCodeUtils.TryCaptureFailureScreenshotAsync(
                 page: Page,
                 testFullName: TestContext.CurrentContext.Test.FullName,
                 logger: Logger,
@@ -334,6 +315,12 @@ public abstract class VsCodeTestBase
             await Session.DisposeAsync();
             Session = null;
             Page = null;
+        }
+
+        if (Workspace != null)
+        {
+            Workspace.Dispose();
+            Workspace = null;
         }
         Logger.Information("=== Test teardown complete ===");
     }

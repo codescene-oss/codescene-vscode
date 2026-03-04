@@ -14,8 +14,7 @@ public sealed class VsCodeEditor : BasePO
             // Editor area container (Monaco).
             ["Id"] = ".editor-container .monaco-editor",
 
-            // Active editor tab for ParameterCountExampleTab.cs.
-            ["ParameterCountExampleTab"] = "role=tab[name=/ParameterCountExample\\.cs/i]",
+            ["Tab"] = "role=tab[name=/DYNAMIC_CONTENT/i]",
 
             // Find widget elements.
             ["FindInput"] = "//textarea[@class='input']",

@@ -12,7 +12,7 @@ public sealed class VsCodeActivitybar : BasePO
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Id"] = "[id='workbench.parts.activitybar']",
-            ["Codescene"] = "[id='workbench.parts.activitybar'] a.action-label.codicon.codicon-cs-logo[aria-label='CodeScene']",
+            ["Codescene"] = "[id='workbench.parts.activitybar'] a.action-label.codicon.codicon-cs-logo[aria-label^='CodeScene']",
         };
 
     protected override IReadOnlyDictionary<string, string> Locators => LocatorMap;

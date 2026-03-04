@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text;
+using Codescene.E2E.Playwright.Tests.Playwright.PageObjects;
 using Microsoft.Playwright;
 
 namespace Codescene.E2E.Playwright.Tests.Playwright;

@@ -21,8 +21,8 @@ public sealed class CSHealthMonitor : BasePO
             ["Id"] = "//iframe[contains(@class, 'webview') and contains(@src, 'vscode-app')]",
 
             ["noCodeImpact"] = "//b[contains(text(), 'No code health impact')]",
+            ["codeSmell"] = "//div[contains(@role,'monitor-file-card') and contains(@aria-label, 'DYNAMIC_CONTENT')]"
         };
 
     protected override IReadOnlyDictionary<string, string> Locators => LocatorMap;
-
 }

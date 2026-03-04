@@ -14,8 +14,7 @@ public sealed class VsCodeExplorer : BasePO
             // Explorer container. This is a reasonably stable class for the Explorer tree.
             ["Id"] = ".explorer-folders-view",
 
-            // File item for .cs in the Explorer tree.
-            ["File"] = "role=treeitem[name=/DYNAMIC_CONTENT\\.cs/i]"
+            ["File"] = "role=treeitem[name=/DYNAMIC_CONTENT/i]"
         };
 
     protected override IReadOnlyDictionary<string, string> Locators => LocatorMap;

@@ -17,11 +17,11 @@ Test environment settings use .NET configuration (appsettings.json + optional ap
 - `appsettings.json` (baseline, committed)
 - `appsettings.Development.json` (optional override, ignored by git). Copy `appsettings.Development.json.example` to get started.
 
-`appsettings.Development.json` overrides only the keys it specifies. Environment variables override both (e.g. `VSCODE_TEST_EXTENSION_VSIX_PATH`, `CS_ACCESS_TOKEN`, `VSCODE_TEST_WORKSPACE_PATH`).
+`appsettings.Development.json` overrides only the keys it specifies. Environment variables override both (e.g. `VSCODE_TEST_EXTENSION_VSIX_PATH`, `CS_ACCESS_TOKEN`).
 
 Schema (high-level):
 
-- `Vscode.InstallDir`, `Vscode.ExtensionsDir`, `Vscode.WorkspacePath`
+- `Vscode.InstallDir`, `Vscode.ExtensionsDir`
 - `Vscode.CdpReadyTimeoutMs`, `Vscode.Timeout.ShortMs`
 - `Vscode.Window.{X,Y,Width,Height}`
 - `Extension.Name`, `Extension.Id`, `Extension.AuthToken`
@@ -154,7 +154,7 @@ Allure reporting is enabled through a few “hooks” in the code:
 
 - **Adapter hook (NUnit):** the base class [VsCodeTestBase.cs](Tests/VsCodeTestBase.cs) is annotated with `[AllureNUnit]`. Because all test fixtures inherit from this base class, Allure is enabled for the whole suite.
 - **Results directory:** [allureConfig.json](allureConfig.json) configures `allure.directory` (where Allure NUnit writes `*-result.json` files). The config file is copied to the test output folder by [Codescene.E2E.Playwright.Tests.csproj](Codescene.E2E.Playwright.Tests.csproj) so the adapter can find it at runtime.
-- **Attachments (screenshots):** on test failure, teardown captures a VS Code screenshot and saves it to `report/screenshots/`, then attaches the PNG to the current Allure test result via `AllureApi.AddAttachment(...)` in [Utils/Utils.cs](Utils/Utils.cs).
+- **Attachments (screenshots):** on test failure, teardown captures a VS Code screenshot and saves it to `report/screenshots/`, then attaches the PNG to the current Allure test result via `AllureApi.AddAttachment(...)` in [Utils/VSCodeUtils.cs](Utils/VSCodeUtils.cs).
 
 ### 1) Install Allure CLI (Windows)
 
@@ -206,15 +206,43 @@ npx -y allure-commandline generate .\report\allure-results -o .\report\allure-ht
 
 Tip: `allure serve .\report\allure-results` builds + opens a temporary report.
 
+## Test workspace (per-test files and git)
+
+Each test runs with an isolated workspace. The base class creates a temporary directory per test and opens it in VS Code. No static test data is committed; tests create their own files and folders.
+
+Override `SetupWorkspace(TestWorkspace workspace)` in your test class to populate the workspace:
+
+```csharp
+protected override Task SetupWorkspace(TestWorkspace workspace)
+{
+    workspace.AddFile("Example.cs", "public class Example { }");
+    workspace.AddFile("src/Other.cs", "namespace MyApp { }");
+    return Task.CompletedTask;
+}
+```
+
+To test git-aware behaviour (e.g. CodeScene observing the repo), initialise a git repo in the workspace:
+
+```csharp
+protected override Task SetupWorkspace(TestWorkspace workspace)
+{
+    workspace.AddFile("Program.cs", "Console.WriteLine(\"Hello\");");
+    workspace.InitGitRepo("Initial commit");
+    return Task.CompletedTask;
+}
+```
+
+`TestWorkspace` is in `Playwright/TestWorkspace.cs`. The temp directory is disposed after the test. PageObject locators support dynamic file names via the `[matches: FileName]` pattern (e.g. `"File [matches: Example.cs]"`, `"Tab [matches: Example.cs]"` in Explorer and Editor).
+
 ## Code
 
-- Helper library: `Playwright/`, `Configuration/`, `Utils/`
+- Helper library: `Playwright/`, `Configuration/`, `Utils/` (FileUtils, VSCodeUtils)
 - NUnit tests: `Tests/`
 
 ## Debug
 
-Att a debug breakpoint, it's possible to
+At a debug breakpoint, it's possible to
 
 ```
-Utils.DumpVsCodeDom(Page, "breakpoint", Logger, includeFrames: true, includeMhtmlSnapshot: true), run-all-threads
+VSCodeUtils.DumpVsCodeDom(Page, "breakpoint", Logger, includeFrames: true, includeMhtmlSnapshot: true), run-all-threads
 ```

@@ -55,10 +55,14 @@ public abstract class BasePO
     public async Task<ILocator> Find(string logicalName, float timeoutMs = -1)
     {
         if (string.IsNullOrWhiteSpace(logicalName)) throw new ArgumentException("Logical name is required.", nameof(logicalName));
-
-        timeoutMs = NormalizeTimeout(timeoutMs);
         var selector = ResolveSelector(logicalName);
         var locator = CreateLocator(selector);
+        return await Find(locator, timeoutMs);
+    }
+
+    public static async Task<ILocator> Find(ILocator locator, float timeoutMs = -1)
+    {
+        timeoutMs = NormalizeTimeout(timeoutMs);
         await locator.WaitForAsync(new LocatorWaitForOptions { Timeout = timeoutMs });
         return locator;
     }
@@ -67,7 +71,7 @@ public abstract class BasePO
     {
         timeoutMs = NormalizeTimeout(timeoutMs);
         var locator = await Find(logicalName, timeoutMs);
-        await locator.ClickAsync(new LocatorClickOptions { Timeout = timeoutMs });
+        await locator.ClickAsync(new LocatorClickOptions { Timeout = timeoutMs, Force = true });
     }
 
     public Task WaitForAsync(string logicalName)
