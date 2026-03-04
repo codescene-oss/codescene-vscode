@@ -7,7 +7,7 @@ namespace csharp;
 public class VSCodeTests : VsCodeTestBase
 {
     [Test]
-    public async Task VSCodeTitleCheck()
+    public async Task VSCode_ShouldOpenWindow()
     {
         string title = string.Empty;
         await Utils.RetryCondition(
@@ -18,7 +18,7 @@ public class VSCodeTests : VsCodeTestBase
     }
 
     [Test]
-    public async Task VSCodeOpenFile()
+    public async Task VSCode_OpenFile_ShouldBeActive()
     {
         var workbench = new VsCodeWorkbench(Page!);
         await workbench.Find("Id");

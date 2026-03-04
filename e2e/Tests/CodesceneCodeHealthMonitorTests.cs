@@ -2,10 +2,10 @@ using csharp.VsCodePlaywright;
 
 namespace csharp;
 
-public class CSExtHealthMonitorTests : VsCodeTestBase
+public class CodesceneCodeHealthMonitorTests : VsCodeTestBase
 {
     [Test]
-    public async Task CSExtTest1()
+    public async Task CodeHealthMonitor_ShouldShowNoCodeSmell()
     {
         var workbench = new VsCodeWorkbench(Page!);
         await workbench.Find("Id");

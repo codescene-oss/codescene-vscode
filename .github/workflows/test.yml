@@ -127,6 +127,27 @@ jobs:
           VSCODE_TEST_EXTENSION_VSIX_PATH: ${{ steps.e2evsix.outputs.path }}
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
 
+      - name: Setup Node (Allure CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Allure report
+        if: always()
+        run: |
+          $results = "e2e\bin\Release\net10.0\allure-results"
+          if (Test-Path $results) {
+            npx -y allure-commandline@2 generate $results -o allure-report --clean --single-file
+          }
+
+      - name: Upload Allure report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report
+          path: allure-report/
+          if-no-files-found: ignore
+
       - name: Publish test results
         uses: dorny/test-reporter@v1
         if: always()
