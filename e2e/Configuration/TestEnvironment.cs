@@ -1,6 +1,4 @@
-using System;
-
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Configuration;
 
 /// <summary>
 /// Process-wide test environment settings loaded from appsettings.json (+ optional appsettings.Development.json and env overrides).

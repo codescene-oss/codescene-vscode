@@ -1,9 +1,7 @@
-using System;
 using System.Diagnostics;
-using System.IO;
 using Microsoft.Playwright;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Playwright;
 
 public sealed class VsCodeSession : IAsyncDisposable
 {

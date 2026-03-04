@@ -1,4 +1,4 @@
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Configuration;
 
 public sealed class TestEnvironmentConfig
 {

@@ -1,6 +1,4 @@
-using csharp.VsCodePlaywright;
-
-namespace csharp;
+namespace Codescene.E2E.Playwright.Tests.Tests;
 
 public class CodesceneCodeHealthMonitorTests : VsCodeTestBase
 {

@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Playwright;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Playwright.PageObjects;
 
 public sealed class VsCodeEditor : BasePO
 {

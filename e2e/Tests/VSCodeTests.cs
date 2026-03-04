@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
-using csharp.VsCodePlaywright;
-
-namespace csharp;
+namespace Codescene.E2E.Playwright.Tests.Tests;
 
 public class VSCodeTests : VsCodeTestBase
 {

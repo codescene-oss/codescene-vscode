@@ -1,9 +1,6 @@
-using System.IO;
-using NUnit.Framework;
-
 [assembly: NonParallelizable]
 
-namespace csharp;
+namespace Codescene.E2E.Playwright.Tests;
 
 [SetUpFixture]
 public static class AllureSetup

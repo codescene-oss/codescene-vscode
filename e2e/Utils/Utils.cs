@@ -1,16 +1,12 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Allure.Net.Commons;
+using Codescene.E2E.Playwright.Tests.Playwright;
 using Microsoft.Playwright;
 using Serilog;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Utils;
 
 public static class Utils
 {

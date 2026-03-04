@@ -1,17 +1,11 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Playwright;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Playwright;
 
 public static class VsCodeDriver
 {

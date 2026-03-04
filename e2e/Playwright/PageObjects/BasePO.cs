@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Codescene.E2E.Playwright.Tests.Configuration;
 using Microsoft.Playwright;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Playwright.PageObjects;
 
 public abstract class BasePO
 {

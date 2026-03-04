@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Playwright;
 
 public sealed record VsCodeSessionOptions
 {

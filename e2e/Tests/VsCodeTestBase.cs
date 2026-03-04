@@ -1,17 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using Allure.NUnit;
-using csharp.VsCodePlaywright;
+using Codescene.E2E.Playwright.Tests.Configuration;
+using Codescene.E2E.Playwright.Tests.Playwright;
 using Microsoft.Playwright;
 using NUnit.Framework.Interfaces;
 using Serilog;
 
-namespace csharp;
+namespace Codescene.E2E.Playwright.Tests.Tests;
 
 [AllureNUnit]
 public abstract class VsCodeTestBase

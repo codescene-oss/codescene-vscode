@@ -1,8 +1,6 @@
-using System;
-using System.IO;
 using Microsoft.Extensions.Configuration;
 
-namespace csharp.VsCodePlaywright;
+namespace Codescene.E2E.Playwright.Tests.Configuration;
 
 public static class TestEnvironmentConfigLoader
 {
