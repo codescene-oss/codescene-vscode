@@ -5,50 +5,40 @@ namespace Codescene.E2E.Playwright.Tests.Playwright;
 
 public sealed class VsCodeSession : IAsyncDisposable
 {
-    private readonly bool _deleteUserDataDir;
-    private readonly bool _deleteExtensionsDir;
-    private readonly bool _deleteAppDataDir;
+    private readonly SessionDirectories _dirs;
 
-    internal VsCodeSession(
-        Process process,
-        int cdpPort,
-        string launchedExecutablePath,
-        string launchedArguments,
-        string userDataDir,
-        string extensionsDir,
-        string appDataDir,
-        bool deleteUserDataDir,
-        bool deleteExtensionsDir,
-        bool deleteAppDataDir,
-        string workspacePath,
-        IPlaywright playwright,
-        IBrowser browser)
+    internal VsCodeSession(Process process, SessionDirectories dirs, IPlaywright playwright, IBrowser browser)
     {
         Process = process;
-        CdpPort = cdpPort;
-        LaunchedExecutablePath = launchedExecutablePath;
-        LaunchedArguments = launchedArguments;
-        UserDataDir = userDataDir;
-        ExtensionsDir = extensionsDir;
-        AppDataDir = appDataDir;
-        _deleteUserDataDir = deleteUserDataDir;
-        _deleteExtensionsDir = deleteExtensionsDir;
-        _deleteAppDataDir = deleteAppDataDir;
-        WorkspacePath = workspacePath;
+        _dirs = dirs;
         Playwright = playwright;
         Browser = browser;
     }
 
+    internal sealed record SessionDirectories(
+        int CdpPort,
+        string LaunchedExecutablePath,
+        string LaunchedArguments,
+        string UserDataDir,
+        string ExtensionsDir,
+        string AppDataDir,
+        string WorkspacePath,
+        bool DeleteUserDataDir,
+        bool DeleteExtensionsDir,
+        bool DeleteAppDataDir);
+
+    private bool _deleteUserDataDir => _dirs.DeleteUserDataDir;
+    private bool _deleteExtensionsDir => _dirs.DeleteExtensionsDir;
+    private bool _deleteAppDataDir => _dirs.DeleteAppDataDir;
+
     public Process Process { get; }
-    public int CdpPort { get; }
-
-    public string LaunchedExecutablePath { get; }
-    public string LaunchedArguments { get; }
-
-    public string UserDataDir { get; }
-    public string ExtensionsDir { get; }
-    public string AppDataDir { get; }
-    public string WorkspacePath { get; }
+    public int CdpPort => _dirs.CdpPort;
+    public string LaunchedExecutablePath => _dirs.LaunchedExecutablePath;
+    public string LaunchedArguments => _dirs.LaunchedArguments;
+    public string UserDataDir => _dirs.UserDataDir;
+    public string ExtensionsDir => _dirs.ExtensionsDir;
+    public string AppDataDir => _dirs.AppDataDir;
+    public string WorkspacePath => _dirs.WorkspacePath;
 
     public IPlaywright Playwright { get; }
     public IBrowser Browser { get; }

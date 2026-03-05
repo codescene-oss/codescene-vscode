@@ -21,59 +21,8 @@ public static class VsCodeDriver
 
         var codeExe = FindVsCodeExe(options.PortableRoot);
         var cdpPort = GetFreeTcpPort();
-
-        // IMPORTANT:
-        // VS Code derives its default user-data directory as: %APPDATA%\<ProductName> (e.g. Code, Code - Insiders).
-        // If we set VSCODE_APPDATA but seed settings into a different --user-data-dir, we can end up writing the *wrong*
-        // User\settings.json. To keep things deterministic, when IsolateAppData is enabled we create a temp APPDATA root
-        // and set userDataDir to the derived <root>\<ProductName>.
-        var appDataDir = string.Empty;
-        var deleteAppDataDir = false;
-
-        var userDataDir = string.Empty;
-        var deleteUserDataDir = true;
-
-        var extensionsDir = string.Empty;
-        var deleteExtensionsDir = true;
-
-        if (!string.IsNullOrWhiteSpace(options.ExtensionsDir))
-        {
-            extensionsDir = Path.IsPathRooted(options.ExtensionsDir)
-                ? options.ExtensionsDir
-                : Path.GetFullPath(options.ExtensionsDir);
-            deleteExtensionsDir = false;
-        }
-        else
-        {
-            extensionsDir = Path.Combine(Path.GetTempPath(), "pw-vscode-ext-" + Guid.NewGuid().ToString("N"));
-            deleteExtensionsDir = true;
-        }
-
-        if (options.IsolateAppData)
-        {
-            appDataDir = Path.Combine(Path.GetTempPath(), "pw-vscode-appdata-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(appDataDir);
-            deleteAppDataDir = true;
-
-            var productDirName = Path.GetFileNameWithoutExtension(codeExe).Contains("Insiders", StringComparison.OrdinalIgnoreCase)
-                ? "Code - Insiders"
-                : "Code";
-
-            userDataDir = Path.Combine(appDataDir, productDirName);
-            Directory.CreateDirectory(userDataDir);
-
-            // We'll delete the isolated APPDATA root; no need to delete the nested userDataDir separately.
-            deleteUserDataDir = false;
-        }
-        else
-        {
-            appDataDir = string.Empty;
-            deleteAppDataDir = false;
-
-            userDataDir = Path.Combine(Path.GetTempPath(), "pw-vscode-userdata-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(userDataDir);
-            deleteUserDataDir = true;
-        }
+        var (userDataDir, extensionsDir, appDataDir, deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir) =
+            ResolveSessionDirectories(codeExe, options);
 
         Directory.CreateDirectory(extensionsDir);
 
@@ -132,18 +81,8 @@ public static class VsCodeDriver
             TryMakeUserSettingsReadOnly(userDataDir);
         }
 
-        if (!string.IsNullOrWhiteSpace(options.InstallExtensionVsixPath) && File.Exists(options.InstallExtensionVsixPath))
-        {
-            // Skip installation if extension is already installed
-            var extensionInstalled = Directory.Exists(extensionsDir) &&
-                Directory.GetDirectories(extensionsDir).Any(d =>
-                    Path.GetFileName(d).StartsWith("codescene.", StringComparison.OrdinalIgnoreCase));
-
-            if (!extensionInstalled)
-            {
-                InstallExtensionFromVsix(extensionsDir, options.InstallExtensionVsixPath);
-            }
-        }
+        if (ShouldInstallExtension(options.InstallExtensionVsixPath, extensionsDir))
+            InstallExtensionFromVsix(extensionsDir, options.InstallExtensionVsixPath!);
 
         var workspace = options.WorkspacePath;
         if (string.IsNullOrWhiteSpace(workspace))
@@ -225,20 +164,10 @@ public static class VsCodeDriver
             var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
             var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{cdpPort}");
 
-            return new VsCodeSession(
-                vscode,
-                cdpPort,
-                codeExe,
-                args,
-                userDataDir,
-                extensionsDir,
-                appDataDir,
-                deleteUserDataDir,
-                deleteExtensionsDir,
-                deleteAppDataDir,
-                workspace,
-                playwright,
-                browser);
+            var dirs = new VsCodeSession.SessionDirectories(
+                cdpPort, codeExe, args, userDataDir, extensionsDir, appDataDir, workspace,
+                deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
+            return new VsCodeSession(vscode, dirs, playwright, browser);
         }
         catch
         {
@@ -463,46 +392,42 @@ public static class VsCodeDriver
         {
             var userDir = Path.Combine(userDataDir, "User");
             Directory.CreateDirectory(userDir);
-
             var settingsPath = Path.Combine(userDir, "settings.json");
-            var settings = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-            if (File.Exists(settingsPath))
-            {
-                var existing = File.ReadAllText(settingsPath);
-                if (!string.IsNullOrWhiteSpace(existing))
-                {
-                    using var doc = JsonDocument.Parse(existing);
-                    if (doc.RootElement.ValueKind == JsonValueKind.Object)
-                    {
-                        foreach (var prop in doc.RootElement.EnumerateObject())
-                        {
-                            settings[prop.Name] = prop.Value.ValueKind switch
-                            {
-                                JsonValueKind.String => prop.Value.GetString(),
-                                JsonValueKind.Number => prop.Value.TryGetInt64(out var l) ? l : prop.Value.GetDouble(),
-                                JsonValueKind.True => true,
-                                JsonValueKind.False => false,
-                                JsonValueKind.Null => null,
-                                _ => prop.Value.Clone()
-                            };
-                        }
-                    }
-                }
-            }
-
+            var settings = LoadExistingSettings(settingsPath);
             settings[settingKey] = settingValue;
-
-            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(settingsPath, json);
         }
         catch
         {
-            // Best-effort only. If this fails, the caller can still enforce bounds via other mechanisms.
+            // Best-effort only.
         }
+    }
+
+    private static System.Collections.Generic.Dictionary<string, object?> LoadExistingSettings(string settingsPath)
+    {
+        var settings = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(settingsPath))
+            return settings;
+        var existing = File.ReadAllText(settingsPath);
+        if (string.IsNullOrWhiteSpace(existing))
+            return settings;
+        using var doc = JsonDocument.Parse(existing);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            return settings;
+        foreach (var prop in doc.RootElement.EnumerateObject())
+        {
+            settings[prop.Name] = prop.Value.ValueKind switch
+            {
+                JsonValueKind.String => prop.Value.GetString(),
+                JsonValueKind.Number => prop.Value.TryGetInt64(out var l) ? l : prop.Value.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                _ => prop.Value.Clone()
+            };
+        }
+        return settings;
     }
 
     private static void TryMakeFileReadOnly(string filePath)
@@ -553,6 +478,57 @@ public static class VsCodeDriver
             return found;
 
         throw new FileNotFoundException($"Could not find Code.exe under: {portableRoot}");
+    }
+
+    private static (string userDataDir, string extensionsDir, string appDataDir, bool deleteUserDataDir, bool deleteExtensionsDir, bool deleteAppDataDir) ResolveSessionDirectories(string codeExe, VsCodeSessionOptions options)
+    {
+        string extensionsDir;
+        bool deleteExtensionsDir;
+        if (!string.IsNullOrWhiteSpace(options.ExtensionsDir))
+        {
+            extensionsDir = Path.IsPathRooted(options.ExtensionsDir) ? options.ExtensionsDir : Path.GetFullPath(options.ExtensionsDir);
+            deleteExtensionsDir = false;
+        }
+        else
+        {
+            extensionsDir = Path.Combine(Path.GetTempPath(), "pw-vscode-ext-" + Guid.NewGuid().ToString("N"));
+            deleteExtensionsDir = true;
+        }
+
+        string userDataDir;
+        string appDataDir;
+        bool deleteUserDataDir;
+        bool deleteAppDataDir;
+        if (options.IsolateAppData)
+        {
+            appDataDir = Path.Combine(Path.GetTempPath(), "pw-vscode-appdata-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(appDataDir);
+            deleteAppDataDir = true;
+            var productDirName = Path.GetFileNameWithoutExtension(codeExe).Contains("Insiders", StringComparison.OrdinalIgnoreCase) ? "Code - Insiders" : "Code";
+            userDataDir = Path.Combine(appDataDir, productDirName);
+            Directory.CreateDirectory(userDataDir);
+            deleteUserDataDir = false;
+        }
+        else
+        {
+            appDataDir = string.Empty;
+            deleteAppDataDir = false;
+            userDataDir = Path.Combine(Path.GetTempPath(), "pw-vscode-userdata-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(userDataDir);
+            deleteUserDataDir = true;
+        }
+
+        return (userDataDir, extensionsDir, appDataDir, deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
+    }
+
+    private static bool ShouldInstallExtension(string? vsixPath, string extensionsDir)
+    {
+        if (string.IsNullOrWhiteSpace(vsixPath) || !File.Exists(vsixPath))
+            return false;
+        if (!Directory.Exists(extensionsDir))
+            return true;
+        return !Directory.GetDirectories(extensionsDir).Any(d =>
+            Path.GetFileName(d).StartsWith("codescene.", StringComparison.OrdinalIgnoreCase));
     }
 
     public static int GetFreeTcpPort()
@@ -633,38 +609,45 @@ public static class VsCodeDriver
 
         while (DateTime.UtcNow - start < timeout)
         {
-            foreach (var context in browser.Contexts)
-            {
-                foreach (var page in context.Pages)
-                {
-                    // Filter out common non-workbench pages.
-                    var url = page.Url ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(url) ||
-                        url.Equals("about:blank", StringComparison.OrdinalIgnoreCase) ||
-                        url.StartsWith("chrome-error://", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    // Prefer a page that already has a meaningful title.
-                    try
-                    {
-                        var title = await page.TitleAsync();
-                        if (!string.IsNullOrWhiteSpace(title))
-                            return page;
-                    }
-                    catch
-                    {
-                        // Ignore transient page errors and keep scanning.
-                    }
-
-                    // If title isn't ready yet but URL looks real, keep it as a candidate.
-                    return page;
-                }
-            }
-
+            var page = await TryGetWorkbenchPageAsync(browser);
+            if (page != null)
+                return page;
             await Task.Delay(100);
         }
 
         throw new TimeoutException("Timed out waiting for a Playwright page after CDP attach.");
+    }
+
+    private static bool IsWorkbenchPageUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (url.Equals("about:blank", StringComparison.OrdinalIgnoreCase)) return false;
+        if (url.StartsWith("chrome-error://", StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
+    }
+
+    private static async Task<IPage?> TryGetWorkbenchPageAsync(IBrowser browser)
+    {
+        foreach (var context in browser.Contexts)
+        {
+            foreach (var page in context.Pages)
+            {
+                if (!IsWorkbenchPageUrl(page.Url))
+                    continue;
+                try
+                {
+                    var title = await page.TitleAsync();
+                    if (!string.IsNullOrWhiteSpace(title))
+                        return page;
+                }
+                catch
+                {
+                    // Ignore transient page errors.
+                }
+                return page;
+            }
+        }
+        return null;
     }
 
     /// <summary>
@@ -680,161 +663,71 @@ public static class VsCodeDriver
         if (page is null) throw new ArgumentNullException(nameof(page));
 
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(10);
+        await page.Locator(".monaco-workbench").WaitForAsync(new LocatorWaitForOptions { Timeout = (float)effectiveTimeout.TotalMilliseconds });
 
-        // Wait until the workbench exists.
-        await page.Locator(".monaco-workbench").WaitForAsync(new LocatorWaitForOptions
-        {
-            Timeout = (float)effectiveTimeout.TotalMilliseconds
-        });
+        try { await page.Locator(".monaco-workbench").ClickAsync(new LocatorClickOptions { Timeout = (float)effectiveTimeout.TotalMilliseconds, Force = true }); }
+        catch { }
 
-        // Ensure the VS Code window is focused so keyboard shortcuts and palette input land correctly.
-        try
-        {
-            await page.Locator(".monaco-workbench").ClickAsync(new LocatorClickOptions
-            {
-                Timeout = (float)effectiveTimeout.TotalMilliseconds,
-                Force = true
-            });
-        }
-        catch
-        {
-            // ignore
-        }
+        await DismissModalsAndCloseEditorsAsync(page, effectiveTimeout);
+        await HidePanelAndSecondarySidebarAsync(page);
+        await FocusExplorerAsync(page, effectiveTimeout);
 
-        // Dismiss any modal/popover.
+        await page.WaitForTimeoutAsync(150);
+    }
+
+    private static async Task DismissModalsAndCloseEditorsAsync(IPage page, TimeSpan timeout)
+    {
         for (var i = 0; i < 3; i++)
         {
-            try { await page.Keyboard.PressAsync("Escape"); } catch { /* ignore */ }
+            try { await page.Keyboard.PressAsync("Escape"); } catch { }
             await page.WaitForTimeoutAsync(100);
         }
-
-        // Close any startup editors (Welcome/Release Notes/etc.).
-        // Default keybinding is a chord: Ctrl+K, then Ctrl+W.
-        try
-        {
-            await page.Keyboard.PressAsync("Control+K");
-            await page.WaitForTimeoutAsync(100);
-            await page.Keyboard.PressAsync("Control+W");
-        }
-        catch
-        {
-            // ignore if keybinding differs
-        }
-
-        // Stronger close: use the Command Palette to close all editors.
-        // This avoids relying on keybinding chords being honored.
-        await TryRunCommandPaletteCommandAsync(page, "File: Close All Editors", effectiveTimeout);
-
-        // Extra safety: close the active editor a few times.
-        // This helps if a startup view (or any other editor) survived the close-all chord.
-        // Default close editor is Ctrl+F4.
+        try { await page.Keyboard.PressAsync("Control+K"); await page.WaitForTimeoutAsync(100); await page.Keyboard.PressAsync("Control+W"); } catch { }
+        await TryRunCommandPaletteCommandAsync(page, "File: Close All Editors", timeout);
         for (var i = 0; i < 6; i++)
         {
-            try { await page.Keyboard.PressAsync("Control+F4"); } catch { /* ignore */ }
+            try { await page.Keyboard.PressAsync("Control+F4"); } catch { }
             await page.WaitForTimeoutAsync(100);
         }
+    }
 
-        // If the bottom panel is visible, hide it (keeps terminals/problems/etc out of the way).
-        // Default toggle is Ctrl+J.
+    private static async Task HidePanelAndSecondarySidebarAsync(IPage page)
+    {
         try
         {
             var panel = page.Locator("[id='workbench.parts.panel']");
-            if (await panel.IsVisibleAsync())
-            {
-                try { await page.Keyboard.PressAsync("Control+J"); } catch { /* ignore */ }
-            }
+            if (await panel.IsVisibleAsync()) try { await page.Keyboard.PressAsync("Control+J"); } catch { }
         }
-        catch
-        {
-            // ignore
-        }
-
-        // If the Secondary Side Bar is visible (often used for auxiliary views), close it
-        // to get a consistent baseline layout. Default toggle is Ctrl+Alt+B on Windows.
+        catch { }
         try
         {
             var secondary = page.Locator("[id='workbench.parts.secondarySidebar']");
-            if (await secondary.IsVisibleAsync())
-            {
-                try
-                {
-                    await page.Keyboard.PressAsync("Control+Alt+B");
-                }
-                catch
-                {
-                    // ignore
-                }
-            }
+            if (await secondary.IsVisibleAsync()) try { await page.Keyboard.PressAsync("Control+Alt+B"); } catch { }
         }
-        catch
-        {
-            // ignore if selector changes between VS Code versions
-        }
+        catch { }
+    }
 
-        // Focus Explorer for a stable baseline (default: Ctrl+Shift+E).
-        try
-        {
-            await page.Keyboard.PressAsync("Control+Shift+E");
-        }
-        catch
-        {
-            // As a last resort, try clicking the Explorer tab by role.
-            try
-            {
-                var wb = new VsCodeWorkbench(page);
-                await wb.Click("Explorer", timeoutMs: (float)effectiveTimeout.TotalMilliseconds);
-            }
-            catch
-            {
-                // ignore
-            }
-        }
+    private static async Task FocusExplorerAsync(IPage page, TimeSpan timeout)
+    {
+        try { await page.Keyboard.PressAsync("Control+Shift+E"); }
+        catch { try { var wb = new VsCodeWorkbench(page); await wb.Click("Explorer", timeoutMs: (float)timeout.TotalMilliseconds); } catch { } }
 
-        // Stronger focus: use Command Palette to show Explorer (ensures correct view container).
-        await TryRunCommandPaletteCommandAsync(page, "View: Show Explorer", effectiveTimeout);
+        await TryRunCommandPaletteCommandAsync(page, "View: Show Explorer", timeout);
 
-        // Ensure the primary sidebar is visible (Explorer lives there).
-        // Default toggle is Ctrl+B.
         try
         {
             var sidebar = page.Locator("[id='workbench.parts.sidebar']");
             for (var i = 0; i < 2; i++)
             {
-                if (await sidebar.IsVisibleAsync())
-                    break;
-
-                try { await page.Keyboard.PressAsync("Control+B"); } catch { /* ignore */ }
+                if (await sidebar.IsVisibleAsync()) break;
+                try { await page.Keyboard.PressAsync("Control+B"); } catch { }
                 await page.WaitForTimeoutAsync(150);
             }
         }
-        catch
-        {
-            // ignore
-        }
+        catch { }
 
-        // Prefer clicking Explorer in the activity bar (more reliable than shortcuts if keybindings differ).
-        try
-        {
-            var wb = new VsCodeWorkbench(page);
-            await wb.Click("Explorer", timeoutMs: (float)effectiveTimeout.TotalMilliseconds);
-        }
-        catch
-        {
-            // ignore
-        }
-
-        // Wait until Explorer view content is present; this makes "Explorer is active" deterministic.
-        try
-        {
-            var explorer = new VsCodeExplorer(page);
-            await explorer.WaitForAsync("Id", timeoutMs: (float)effectiveTimeout.TotalMilliseconds);
-        }
-        catch
-        {
-            // ignore
-        }
-
-        await page.WaitForTimeoutAsync(150);
+        try { var wb = new VsCodeWorkbench(page); await wb.Click("Explorer", timeoutMs: (float)timeout.TotalMilliseconds); } catch { }
+        try { var explorer = new VsCodeExplorer(page); await explorer.WaitForAsync("Id", timeoutMs: (float)timeout.TotalMilliseconds); } catch { }
     }
 
     private static async Task TryRunCommandPaletteCommandAsync(IPage page, string commandText, TimeSpan timeout)
@@ -919,64 +812,59 @@ public static class VsCodeDriver
 
     private static void InstallExtensionFromVsix(string extensionsDir, string vsixPath)
     {
-        // Extract the vsix directly - it's a zip file containing the extension.
-        // This is faster and more reliable than running Code.exe --install-extension.
         try
         {
-            // Parse extension ID and version from vsix filename
-            // Expected format: publisher.name-version@platform.vsix or publisher.name-version.vsix
             var vsixFileName = Path.GetFileNameWithoutExtension(vsixPath);
             if (vsixFileName.Contains('@'))
-                vsixFileName = vsixFileName.Substring(0, vsixFileName.IndexOf('@'));
+                vsixFileName = vsixFileName[..vsixFileName.IndexOf('@')];
 
-            // Extract to extensionsDir with the correct folder name
             var targetDir = Path.Combine(extensionsDir, vsixFileName);
-
             if (Directory.Exists(targetDir))
-            {
-                // Already extracted
                 return;
-            }
 
             Directory.CreateDirectory(targetDir);
-
-            // Extract the vsix (it's a zip file)
             System.IO.Compression.ZipFile.ExtractToDirectory(vsixPath, targetDir);
-
-            // VS Code expects the extension files in the root, but vsix has them under "extension/"
-            var extensionSubdir = Path.Combine(targetDir, "extension");
-            if (Directory.Exists(extensionSubdir))
-            {
-                // Move contents from extension/ to the root
-                foreach (var file in Directory.GetFiles(extensionSubdir))
-                {
-                    var destFile = Path.Combine(targetDir, Path.GetFileName(file));
-                    if (!File.Exists(destFile))
-                        File.Move(file, destFile);
-                }
-                foreach (var dir in Directory.GetDirectories(extensionSubdir))
-                {
-                    var destDir = Path.Combine(targetDir, Path.GetFileName(dir));
-                    if (!Directory.Exists(destDir))
-                        Directory.Move(dir, destDir);
-                }
-                TryDeleteDir(extensionSubdir);
-            }
-
-            // Remove vsix metadata files that VS Code doesn't need
-            var contentTypesXml = Path.Combine(targetDir, "[Content_Types].xml");
-            if (File.Exists(contentTypesXml))
-                File.Delete(contentTypesXml);
-
-            // Remove any .obsolete marker that might prevent VS Code from loading the extension
-            var obsoleteFile = Path.Combine(extensionsDir, ".obsolete");
-            if (File.Exists(obsoleteFile))
-                File.Delete(obsoleteFile);
+            MoveExtensionFilesToRoot(targetDir);
+            CleanupVsixArtifacts(targetDir, extensionsDir);
         }
         catch
         {
-            // Best-effort extraction - if it fails, VS Code will run without the extension
+            // Best-effort extraction.
         }
+    }
+
+    private static void MoveExtensionFilesToRoot(string targetDir)
+    {
+        var extensionSubdir = Path.Combine(targetDir, "extension");
+        if (!Directory.Exists(extensionSubdir))
+            return;
+        foreach (var file in Directory.GetFiles(extensionSubdir))
+            MoveIfNotExists(file, Path.Combine(targetDir, Path.GetFileName(file)), isFile: true);
+        foreach (var dir in Directory.GetDirectories(extensionSubdir))
+            MoveIfNotExists(dir, Path.Combine(targetDir, Path.GetFileName(dir)), isFile: false);
+        TryDeleteDir(extensionSubdir);
+    }
+
+    private static void MoveIfNotExists(string source, string dest, bool isFile)
+    {
+        if (isFile)
+        {
+            if (!File.Exists(dest)) File.Move(source, dest);
+        }
+        else if (!Directory.Exists(dest))
+        {
+            Directory.Move(source, dest);
+        }
+    }
+
+    private static void CleanupVsixArtifacts(string targetDir, string extensionsDir)
+    {
+        var contentTypesXml = Path.Combine(targetDir, "[Content_Types].xml");
+        if (File.Exists(contentTypesXml))
+            File.Delete(contentTypesXml);
+        var obsoleteFile = Path.Combine(extensionsDir, ".obsolete");
+        if (File.Exists(obsoleteFile))
+            File.Delete(obsoleteFile);
     }
 
     private static string BuildArgs(

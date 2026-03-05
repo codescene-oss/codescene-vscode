@@ -72,12 +72,8 @@ public static class VSCodeUtils
         ILogger logger,
         bool includeFrames = true,
         bool includeMhtmlSnapshot = true,
-        bool attachToAllure = false)
-    {
-        return Task.Run(() => DumpVsCodeDomAsync(page, label, logger, includeFrames, includeMhtmlSnapshot, attachToAllure))
-            .GetAwaiter()
-            .GetResult();
-    }
+        bool attachToAllure = false) =>
+        RunSync(() => DumpVsCodeDomAsync(page, label, logger, includeFrames, includeMhtmlSnapshot, attachToAllure));
 
     public static void TryDumpVsCodeDom(
         IPage? page,
@@ -85,12 +81,14 @@ public static class VSCodeUtils
         ILogger logger,
         bool includeFrames = true,
         bool includeMhtmlSnapshot = true,
-        bool attachToAllure = false)
-    {
-        Task.Run(() => TryDumpVsCodeDomAsync(page, label, logger, includeFrames, includeMhtmlSnapshot, attachToAllure))
-            .GetAwaiter()
-            .GetResult();
-    }
+        bool attachToAllure = false) =>
+        RunSync(() => TryDumpVsCodeDomAsync(page, label, logger, includeFrames, includeMhtmlSnapshot, attachToAllure));
+
+    private static T RunSync<T>(Func<Task<T>> asyncFunc) =>
+        Task.Run(asyncFunc).GetAwaiter().GetResult();
+
+    private static void RunSync(Func<Task> asyncFunc) =>
+        Task.Run(asyncFunc).GetAwaiter().GetResult();
 
     public static async Task<string> DumpVsCodeDomAsync(
         IPage page,
@@ -119,62 +117,71 @@ public static class VSCodeUtils
             ["includeMhtmlSnapshot"] = includeMhtmlSnapshot
         };
 
+        await WriteMainHtmlAsync(page, runDir, attachToAllure);
+        if (includeFrames)
+            meta["frames"] = await WriteFramesAsync(page, runDir, attachToAllure);
+        if (includeMhtmlSnapshot)
+            await WriteMhtmlSnapshotAsync(page, runDir, meta, logger, attachToAllure);
+
+        var metaPath = Path.Combine(runDir, "meta.json");
+        await File.WriteAllTextAsync(metaPath, JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+        return runDir;
+    }
+
+    private static async Task WriteMainHtmlAsync(IPage page, string runDir, bool attachToAllure)
+    {
         var mainHtmlPath = Path.Combine(runDir, "main.html");
         var mainHtml = await page.EvaluateAsync<string>("() => document.documentElement ? document.documentElement.outerHTML : ''");
         await File.WriteAllTextAsync(mainHtmlPath, mainHtml ?? string.Empty, Encoding.UTF8);
         if (attachToAllure)
             TryAttachToAllure("VS Code DOM (main)", "text/html", mainHtmlPath);
+    }
 
-        if (includeFrames)
+    private static async Task<List<Dictionary<string, object?>>> WriteFramesAsync(IPage page, string runDir, bool attachToAllure)
+    {
+        var framesDir = Path.Combine(runDir, "frames");
+        Directory.CreateDirectory(framesDir);
+        var framesMeta = new List<Dictionary<string, object?>>();
+        var frames = page.Frames;
+        for (var i = 0; i < frames.Count; i++)
         {
-            var framesDir = Path.Combine(runDir, "frames");
-            Directory.CreateDirectory(framesDir);
-            var framesMeta = new List<Dictionary<string, object?>>();
-            var frames = page.Frames;
-            for (var i = 0; i < frames.Count; i++)
+            var frame = frames[i];
+            string html;
+            try { html = await frame.ContentAsync(); }
+            catch (Exception ex) { html = "<!-- Failed to read frame content: " + ex.Message + " -->"; }
+            var hint = !string.IsNullOrWhiteSpace(frame.Name) ? frame.Name : frame.Url ?? "frame";
+            var frameFile = FileUtils.SanitizeFileName($"frame_{i:00}_{hint}.html", maxLength: 160);
+            var framePath = Path.Combine(framesDir, frameFile);
+            await File.WriteAllTextAsync(framePath, html ?? string.Empty, Encoding.UTF8);
+            framesMeta.Add(new Dictionary<string, object?>
             {
-                var frame = frames[i];
-                string html;
-                try { html = await frame.ContentAsync(); }
-                catch (Exception ex) { html = "<!-- Failed to read frame content: " + ex.Message + " -->"; }
-                var hint = !string.IsNullOrWhiteSpace(frame.Name) ? frame.Name : frame.Url ?? "frame";
-                var frameFile = FileUtils.SanitizeFileName($"frame_{i:00}_{hint}.html", maxLength: 160);
-                var framePath = Path.Combine(framesDir, frameFile);
-                await File.WriteAllTextAsync(framePath, html ?? string.Empty, Encoding.UTF8);
-                framesMeta.Add(new Dictionary<string, object?>
-                {
-                    ["index"] = i,
-                    ["name"] = frame.Name,
-                    ["url"] = frame.Url,
-                    ["file"] = Path.GetFileName(framePath)
-                });
-                if (attachToAllure)
-                    TryAttachToAllure($"VS Code DOM (frame {i:00})", "text/html", framePath);
-            }
-            meta["frames"] = framesMeta;
+                ["index"] = i,
+                ["name"] = frame.Name,
+                ["url"] = frame.Url,
+                ["file"] = Path.GetFileName(framePath)
+            });
+            if (attachToAllure)
+                TryAttachToAllure($"VS Code DOM (frame {i:00})", "text/html", framePath);
         }
+        return framesMeta;
+    }
 
-        if (includeMhtmlSnapshot)
+    private static async Task WriteMhtmlSnapshotAsync(IPage page, string runDir, Dictionary<string, object?> meta, ILogger logger, bool attachToAllure)
+    {
+        var mhtmlPath = Path.Combine(runDir, "snapshot.mhtml");
+        try
         {
-            var mhtmlPath = Path.Combine(runDir, "snapshot.mhtml");
-            try
-            {
-                var mhtml = await CaptureMhtmlSnapshotViaCdpAsync(page);
-                await File.WriteAllTextAsync(mhtmlPath, mhtml ?? string.Empty, Encoding.UTF8);
-                meta["mhtml"] = Path.GetFileName(mhtmlPath);
-                if (attachToAllure)
-                    TryAttachToAllure("VS Code DOM snapshot (MHTML)", "multipart/related", mhtmlPath);
-            }
-            catch (Exception ex)
-            {
-                logger.Warning(ex, "Failed to capture MHTML snapshot via CDP.");
-                meta["mhtmlError"] = ex.Message;
-            }
+            var mhtml = await CaptureMhtmlSnapshotViaCdpAsync(page);
+            await File.WriteAllTextAsync(mhtmlPath, mhtml ?? string.Empty, Encoding.UTF8);
+            meta["mhtml"] = Path.GetFileName(mhtmlPath);
+            if (attachToAllure)
+                TryAttachToAllure("VS Code DOM snapshot (MHTML)", "multipart/related", mhtmlPath);
         }
-
-        var metaPath = Path.Combine(runDir, "meta.json");
-        await File.WriteAllTextAsync(metaPath, JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
-        return runDir;
+        catch (Exception ex)
+        {
+            logger.Warning(ex, "Failed to capture MHTML snapshot via CDP.");
+            meta["mhtmlError"] = ex.Message;
+        }
     }
 
     private static async Task<string?> CaptureMhtmlSnapshotViaCdpAsync(IPage page)
@@ -211,15 +218,38 @@ public static class VSCodeUtils
         if (timeoutMs <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
         if (retryDelayMs < 0) throw new ArgumentOutOfRangeException(nameof(retryDelayMs));
 
+        var (success, lastError) = await RetryLoopAsync(action, stopCondition, timeoutMs, retryDelayMs);
+        if (success)
+            return;
+        var msg = $"Retry timed out after {timeoutMs}ms." + (lastError != null ? " Last error: " + lastError.Message : string.Empty);
+        throw new TimeoutException(msg);
+    }
+
+    private static async Task<(bool success, Exception? lastError)> RetryLoopAsync(Func<Task> action, Func<bool> stopCondition, int timeoutMs, int retryDelayMs)
+    {
         var sw = Stopwatch.StartNew();
         Exception? lastError = null;
         while (sw.ElapsedMilliseconds < timeoutMs)
         {
-            try { await action(); lastError = null; }
-            catch (Exception ex) { lastError = ex; }
-            if (stopCondition()) return;
-            if (retryDelayMs > 0) await Task.Delay(retryDelayMs);
+            lastError = await RunAndCaptureAsync(action);
+            if (stopCondition())
+                return (true, null);
+            if (retryDelayMs > 0)
+                await Task.Delay(retryDelayMs);
         }
-        throw new TimeoutException($"Retry timed out after {timeoutMs}ms." + (lastError != null ? " Last error: " + lastError.Message : string.Empty));
+        return (false, lastError);
+    }
+
+    private static async Task<Exception?> RunAndCaptureAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex;
+        }
     }
 }
