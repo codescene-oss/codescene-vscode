@@ -1,14 +1,12 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Text.Json;
 using System.Text;
-using Codescene.E2E.Playwright.Tests.Playwright.PageObjects;
 using Microsoft.Playwright;
 
 namespace Codescene.E2E.Playwright.Tests.Playwright;
 
-public static class VsCodeDriver
+public static partial class VsCodeDriver
 {
     /// <summary>
     /// Starts VS Code with remote debugging enabled and attaches Playwright over CDP.
@@ -25,84 +23,46 @@ public static class VsCodeDriver
             ResolveSessionDirectories(codeExe, options);
 
         Directory.CreateDirectory(extensionsDir);
-
-        // Ensure VS Code does not start maximized/fullscreen by default, otherwise window.moveTo/resizeTo
-        // and some CDP window management calls may be ignored/overridden by the OS/window manager.
-        EnsureVsCodeUserSetting(userDataDir, "window.newWindowDimensions", "default");
-
-        // Make the spawned instance deterministic and avoid inheriting signed-in user state.
-        // In particular, Settings Sync can pull in layout/settings that make the UI start in Chat, etc.
-        if (options.DisableSettingsSync)
-        {
-            EnsureVsCodeUserSetting(userDataDir, "settingsSync.enabled", false);
-            EnsureVsCodeUserSetting(userDataDir, "window.restoreWindows", "none");
-            EnsureVsCodeUserSetting(userDataDir, "workbench.editor.restoreViewState", false);
-            EnsureVsCodeUserSetting(userDataDir, "workbench.startupEditor", "none");
-            EnsureVsCodeUserSetting(userDataDir, "workbench.welcomePage.enabled", false);
-            EnsureVsCodeUserSetting(userDataDir, "workbench.welcomePage.walkthroughs.openOnInstall", false);
-            EnsureVsCodeUserSetting(userDataDir, "update.showReleaseNotes", false);
-            EnsureVsCodeUserSetting(userDataDir, "workbench.activityBar.visible", true);
-            EnsureVsCodeUserSetting(userDataDir, "workbench.sideBar.location", "left");
-            // "Show View by Default" for Chat/Copilot toggles this setting. Keep it hidden for deterministic startup.
-            EnsureVsCodeUserSetting(userDataDir, "workbench.secondarySideBar.defaultVisibility", "hidden");
-
-            // Chat/Copilot UI determinism: prefer *settings-only* suppression over post-start UI automation.
-            // These keys exist in recent VS Code builds; unknown keys are ignored by VS Code.
-            EnsureVsCodeUserSetting(userDataDir, "chat.restoreLastPanelSession", false);
-            EnsureVsCodeUserSetting(userDataDir, "chat.viewWelcome.enabled", false);
-            EnsureVsCodeUserSetting(userDataDir, "chat.commandCenter.enabled", false);
-            EnsureVsCodeUserSetting(userDataDir, "chat.viewTitle.enabled", false);
-            EnsureVsCodeUserSetting(userDataDir, "chat.disableAIFeatures", true);
-
-            EnsureVsCodeUserSetting(userDataDir, "workbench.enableExperiments", false);
-            EnsureVsCodeUserSetting(userDataDir, "telemetry.telemetryLevel", "off");
-            EnsureVsCodeUserSetting(userDataDir, "workbench.tips.enabled", false);
-        }
-
-        if (options.UserSettings is not null)
-        {
-            foreach (var kvp in options.UserSettings)
-            {
-                if (!string.IsNullOrWhiteSpace(kvp.Key) && kvp.Value is not null)
-                    EnsureVsCodeUserSetting(userDataDir, kvp.Key, kvp.Value);
-            }
-        }
-
-        if (options.LockUserSettingsJson)
-        {
-            TryMakeFileReadOnly(Path.Combine(userDataDir, "User", "settings.json"));
-        }
-
-        // Defensive: some extensions/first-run flows may try to persist UI preferences back into user settings.
-        // Mark the seeded settings as read-only to keep test startup deterministic.
-        // NOTE: This causes VS Code to show a blocking "Unable to write" dialog, so keep it disabled.
-        if (options.DisableSettingsSync)
-        {
-            TryMakeUserSettingsReadOnly(userDataDir);
-        }
+        SeedUserSettings(userDataDir, options);
 
         if (ShouldInstallExtension(options.InstallExtensionVsixPath, extensionsDir))
             InstallExtensionFromVsix(extensionsDir, options.InstallExtensionVsixPath!);
 
-        var workspace = options.WorkspacePath;
-        if (string.IsNullOrWhiteSpace(workspace))
+        var workspace = ResolveWorkspace(options.WorkspacePath);
+        var args = BuildArgs(cdpPort, userDataDir, extensionsDir, workspace, options.DisableWorkspaceTrust,
+            options.WindowX, options.WindowY, options.WindowWidth, options.WindowHeight, options.AdditionalArgs);
+
+        var psi = CreateProcessStartInfo(codeExe, args, options, appDataDir);
+        var vscode = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start VS Code.");
+        var outputBuffer = new BoundedLogBuffer(maxLines: 200);
+        AttachOutputCapture(vscode, outputBuffer);
+
+        try
         {
-            workspace = Path.Combine(Path.GetTempPath(), "pw-vscode-workspace-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(workspace);
+            return await ConnectPlaywrightAsync(vscode, cdpPort, options.CdpReadyTimeout, outputBuffer,
+                codeExe, args, userDataDir, extensionsDir, appDataDir, workspace,
+                deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
         }
+        catch
+        {
+            CleanupFailedSession(vscode, userDataDir, extensionsDir, appDataDir,
+                deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
+            throw;
+        }
+    }
 
-        var args = BuildArgs(
-            cdpPort,
-            userDataDir,
-            extensionsDir,
-            workspace,
-            options.DisableWorkspaceTrust,
-            options.WindowX,
-            options.WindowY,
-            options.WindowWidth,
-            options.WindowHeight,
-            options.AdditionalArgs);
+    private static string ResolveWorkspace(string? workspacePath)
+    {
+        if (!string.IsNullOrWhiteSpace(workspacePath))
+            return workspacePath;
 
+        var workspace = Path.Combine(Path.GetTempPath(), "pw-vscode-workspace-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(workspace);
+        return workspace;
+    }
+
+    private static ProcessStartInfo CreateProcessStartInfo(string codeExe, string args, VsCodeSessionOptions options, string appDataDir)
+    {
         var psi = new ProcessStartInfo
         {
             FileName = codeExe,
@@ -113,24 +73,20 @@ public static class VsCodeDriver
             WorkingDirectory = options.PortableRoot
         };
 
-        // If this env var is set, Electron runs as Node and will reject Chromium/VS Code flags as "bad option".
         psi.Environment.Remove("ELECTRON_RUN_AS_NODE");
-
-        // Defensive: a few environment variables can force VS Code to use a particular
-        // profile / extensions location even when we pass --user-data-dir/--extensions-dir.
         psi.Environment.Remove("VSCODE_PORTABLE");
         psi.Environment.Remove("VSCODE_APPDATA");
         psi.Environment.Remove("VSCODE_USER_DATA_DIR");
         psi.Environment.Remove("VSCODE_EXTENSIONS");
 
-        // Hard isolation: ensure VS Code does not touch the host user's %APPDATA%\Code.
-        // VSCODE_APPDATA controls where VS Code stores its app data root.
         if (options.IsolateAppData && !string.IsNullOrWhiteSpace(appDataDir))
             psi.Environment["VSCODE_APPDATA"] = appDataDir;
 
-        var vscode = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start VS Code.");
-        var outputBuffer = new BoundedLogBuffer(maxLines: 200);
+        return psi;
+    }
 
+    private static void AttachOutputCapture(Process vscode, BoundedLogBuffer outputBuffer)
+    {
         try
         {
             vscode.OutputDataReceived += (_, e) =>
@@ -138,13 +94,11 @@ public static class VsCodeDriver
                 if (!string.IsNullOrWhiteSpace(e.Data))
                     outputBuffer.Add("[stdout] " + e.Data);
             };
-
             vscode.ErrorDataReceived += (_, e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
                     outputBuffer.Add("[stderr] " + e.Data);
             };
-
             vscode.BeginOutputReadLine();
             vscode.BeginErrorReadLine();
         }
@@ -152,46 +106,40 @@ public static class VsCodeDriver
         {
             // If async read setup fails, keep going; we can still try HTTP polling.
         }
+    }
 
-        try
-        {
-            await WaitForCdpReadyAsync(
-                process: vscode,
-                url: $"http://127.0.0.1:{cdpPort}/json/version",
-                timeout: options.CdpReadyTimeout,
-                getLogs: () => outputBuffer.ToString());
+    private static async Task<VsCodeSession> ConnectPlaywrightAsync(
+        Process vscode, int cdpPort, TimeSpan cdpReadyTimeout, BoundedLogBuffer outputBuffer,
+        string codeExe, string args, string userDataDir, string extensionsDir, string appDataDir, string workspace,
+        bool deleteUserDataDir, bool deleteExtensionsDir, bool deleteAppDataDir)
+    {
+        await WaitForCdpReadyAsync(
+            process: vscode,
+            url: $"http://127.0.0.1:{cdpPort}/json/version",
+            timeout: cdpReadyTimeout,
+            getLogs: () => outputBuffer.ToString());
 
-            var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-            var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{cdpPort}");
+        var playwright = await Microsoft.Playwright.Playwright.CreateAsync();
+        var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{cdpPort}");
 
-            var dirs = new VsCodeSession.SessionDirectories(
-                cdpPort, codeExe, args, userDataDir, extensionsDir, appDataDir, workspace,
-                deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
-            return new VsCodeSession(vscode, dirs, playwright, browser);
-        }
-        catch
-        {
-            try
-            {
-                if (!vscode.HasExited)
-                    vscode.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-                // ignore
-            }
+        var dirs = new VsCodeSession.SessionDirectories(
+            cdpPort, codeExe, args, userDataDir, extensionsDir, appDataDir, workspace,
+            deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
+        return new VsCodeSession(vscode, dirs, playwright, browser);
+    }
 
-            if (deleteUserDataDir)
-                TryDeleteDir(userDataDir);
+    private static void CleanupFailedSession(
+        Process vscode, string userDataDir, string extensionsDir, string appDataDir,
+        bool deleteUserDataDir, bool deleteExtensionsDir, bool deleteAppDataDir)
+    {
+        try { if (!vscode.HasExited) vscode.Kill(entireProcessTree: true); } catch { }
 
-            if (deleteExtensionsDir)
-                TryDeleteDir(extensionsDir);
-
-            if (deleteAppDataDir && !string.IsNullOrWhiteSpace(appDataDir))
-                TryDeleteDir(appDataDir);
-
-            throw;
-        }
+        if (deleteUserDataDir)
+            TryDeleteDir(userDataDir);
+        if (deleteExtensionsDir)
+            TryDeleteDir(extensionsDir);
+        if (deleteAppDataDir && !string.IsNullOrWhiteSpace(appDataDir))
+            TryDeleteDir(appDataDir);
     }
 
     /// <summary>
@@ -255,57 +203,63 @@ public static class VsCodeDriver
         if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width), "Width must be > 0.");
         if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height), "Height must be > 0.");
 
-        // Important: Page-scoped CDP sessions often cannot call Browser.* methods.
-        // Use a browser-level CDP session and pass the page's targetId.
-        var browser = page.Context.Browser;
-        if (browser is null)
-            throw new InvalidOperationException("No Browser instance is associated with this page/context.");
+        var browser = page.Context.Browser
+            ?? throw new InvalidOperationException("No Browser instance is associated with this page/context.");
 
-        var pageSession = await page.Context.NewCDPSessionAsync(page);
-        var targetInfoResp = await pageSession.SendAsync("Target.getTargetInfo");
-        if (targetInfoResp is null)
-            throw new InvalidOperationException("CDP did not return Target.getTargetInfo result.");
-
-        var targetId = targetInfoResp.Value.GetProperty("targetInfo").GetProperty("targetId").GetString();
-        if (string.IsNullOrWhiteSpace(targetId))
-            throw new InvalidOperationException("Could not determine CDP targetId for page.");
-
+        var targetId = await GetCdpTargetIdAsync(page);
         var browserSession = await browser.NewBrowserCDPSessionAsync();
 
         try
         {
-            var windowForTarget = await browserSession.SendAsync(
-                "Browser.getWindowForTarget",
-                new System.Collections.Generic.Dictionary<string, object> { ["targetId"] = targetId });
-
-            if (windowForTarget is null)
-                throw new InvalidOperationException("CDP did not return Browser.getWindowForTarget result.");
-
-            var windowId = windowForTarget.Value.GetProperty("windowId").GetInt32();
-
-            var args = new System.Collections.Generic.Dictionary<string, object>
-            {
-                ["windowId"] = windowId,
-                ["bounds"] = new System.Collections.Generic.Dictionary<string, object>
-                {
-                    ["left"] = x,
-                    ["top"] = y,
-                    ["width"] = width,
-                    ["height"] = height,
-                    ["windowState"] = "normal"
-                }
-            };
-
-            await browserSession.SendAsync("Browser.setWindowBounds", args);
+            var windowId = await GetCdpWindowIdAsync(browserSession, targetId);
+            await SetCdpWindowBoundsAsync(browserSession, windowId, x, y, width, height);
         }
         catch (PlaywrightException ex) when (ex.Message.Contains("wasn't found", StringComparison.OrdinalIgnoreCase))
         {
-            // Some CDP endpoints (or older Chromium builds) don't expose Browser window management.
-            // Don't fail the whole test run; callers can still run with default OS window placement.
             throw new NotSupportedException(
                 "This VS Code/Chromium CDP endpoint does not support window management (Browser.getWindowForTarget / Browser.setWindowBounds).",
                 ex);
         }
+    }
+
+    private static async Task<string> GetCdpTargetIdAsync(IPage page)
+    {
+        var pageSession = await page.Context.NewCDPSessionAsync(page);
+        var targetInfoResp = await pageSession.SendAsync("Target.getTargetInfo")
+            ?? throw new InvalidOperationException("CDP did not return Target.getTargetInfo result.");
+
+        var targetId = targetInfoResp.GetProperty("targetInfo").GetProperty("targetId").GetString();
+        if (string.IsNullOrWhiteSpace(targetId))
+            throw new InvalidOperationException("Could not determine CDP targetId for page.");
+        return targetId;
+    }
+
+    private static async Task<int> GetCdpWindowIdAsync(ICDPSession browserSession, string targetId)
+    {
+        var windowForTarget = await browserSession.SendAsync(
+            "Browser.getWindowForTarget",
+            new Dictionary<string, object> { ["targetId"] = targetId })
+            ?? throw new InvalidOperationException("CDP did not return Browser.getWindowForTarget result.");
+
+        return windowForTarget.GetProperty("windowId").GetInt32();
+    }
+
+    private static async Task SetCdpWindowBoundsAsync(ICDPSession browserSession, int windowId, int x, int y, int width, int height)
+    {
+        var args = new Dictionary<string, object>
+        {
+            ["windowId"] = windowId,
+            ["bounds"] = new Dictionary<string, object>
+            {
+                ["left"] = x,
+                ["top"] = y,
+                ["width"] = width,
+                ["height"] = height,
+                ["windowState"] = "normal"
+            }
+        };
+
+        await browserSession.SendAsync("Browser.setWindowBounds", args);
     }
 
     /// <summary>
@@ -381,90 +335,6 @@ public static class VsCodeDriver
         }
     }
 
-    private static void EnsureVsCodeUserSetting(string userDataDir, string settingKey, string settingValue)
-    {
-        EnsureVsCodeUserSetting(userDataDir, settingKey, (object?)settingValue);
-    }
-
-    private static void EnsureVsCodeUserSetting(string userDataDir, string settingKey, object? settingValue)
-    {
-        try
-        {
-            var userDir = Path.Combine(userDataDir, "User");
-            Directory.CreateDirectory(userDir);
-            var settingsPath = Path.Combine(userDir, "settings.json");
-            var settings = LoadExistingSettings(settingsPath);
-            settings[settingKey] = settingValue;
-            var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(settingsPath, json);
-        }
-        catch
-        {
-            // Best-effort only.
-        }
-    }
-
-    private static System.Collections.Generic.Dictionary<string, object?> LoadExistingSettings(string settingsPath)
-    {
-        var settings = new System.Collections.Generic.Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(settingsPath))
-            return settings;
-        var existing = File.ReadAllText(settingsPath);
-        if (string.IsNullOrWhiteSpace(existing))
-            return settings;
-        using var doc = JsonDocument.Parse(existing);
-        if (doc.RootElement.ValueKind != JsonValueKind.Object)
-            return settings;
-        foreach (var prop in doc.RootElement.EnumerateObject())
-        {
-            settings[prop.Name] = prop.Value.ValueKind switch
-            {
-                JsonValueKind.String => prop.Value.GetString(),
-                JsonValueKind.Number => prop.Value.TryGetInt64(out var l) ? l : prop.Value.GetDouble(),
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.Null => null,
-                _ => prop.Value.Clone()
-            };
-        }
-        return settings;
-    }
-
-    private static void TryMakeFileReadOnly(string filePath)
-    {
-        try
-        {
-            if (!File.Exists(filePath))
-                return;
-
-            var attrs = File.GetAttributes(filePath);
-            if ((attrs & FileAttributes.ReadOnly) != FileAttributes.ReadOnly)
-                File.SetAttributes(filePath, attrs | FileAttributes.ReadOnly);
-        }
-        catch
-        {
-            // Best-effort only.
-        }
-    }
-
-    private static void TryMakeUserSettingsReadOnly(string userDataDir)
-    {
-        try
-        {
-            var settingsPath = Path.Combine(userDataDir, "User", "settings.json");
-            if (!File.Exists(settingsPath))
-                return;
-
-            var attrs = File.GetAttributes(settingsPath);
-            if ((attrs & FileAttributes.ReadOnly) == 0)
-                File.SetAttributes(settingsPath, attrs | FileAttributes.ReadOnly);
-        }
-        catch
-        {
-            // Best-effort only.
-        }
-    }
-
     public static string FindVsCodeExe(string portableRoot)
     {
         var candidates = new[]
@@ -519,16 +389,6 @@ public static class VsCodeDriver
         }
 
         return (userDataDir, extensionsDir, appDataDir, deleteUserDataDir, deleteExtensionsDir, deleteAppDataDir);
-    }
-
-    private static bool ShouldInstallExtension(string? vsixPath, string extensionsDir)
-    {
-        if (string.IsNullOrWhiteSpace(vsixPath) || !File.Exists(vsixPath))
-            return false;
-        if (!Directory.Exists(extensionsDir))
-            return true;
-        return !Directory.GetDirectories(extensionsDir).Any(d =>
-            Path.GetFileName(d).StartsWith("codescene.", StringComparison.OrdinalIgnoreCase));
     }
 
     public static int GetFreeTcpPort()
@@ -648,223 +508,6 @@ public static class VsCodeDriver
             }
         }
         return null;
-    }
-
-    /// <summary>
-    /// Best-effort stabilization for fresh profiles:
-    /// - Dismisses transient first-run UI (e.g. walkthrough popups) by sending Escape.
-    /// - Closes any startup editors (e.g. Welcome/Release Notes) via default close-all chord.
-    /// - Focuses the Explorer view to get a consistent baseline layout.
-    ///
-    /// This intentionally avoids any Copilot/extension-specific behavior.
-    /// </summary>
-    public static async Task StabilizeFirstRunUiAsync(IPage page, TimeSpan? timeout = null)
-    {
-        if (page is null) throw new ArgumentNullException(nameof(page));
-
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(10);
-        await page.Locator(".monaco-workbench").WaitForAsync(new LocatorWaitForOptions { Timeout = (float)effectiveTimeout.TotalMilliseconds });
-
-        try { await page.Locator(".monaco-workbench").ClickAsync(new LocatorClickOptions { Timeout = (float)effectiveTimeout.TotalMilliseconds, Force = true }); }
-        catch { }
-
-        await DismissModalsAndCloseEditorsAsync(page, effectiveTimeout);
-        await HidePanelAndSecondarySidebarAsync(page);
-        await FocusExplorerAsync(page, effectiveTimeout);
-
-        await page.WaitForTimeoutAsync(150);
-    }
-
-    private static async Task DismissModalsAndCloseEditorsAsync(IPage page, TimeSpan timeout)
-    {
-        for (var i = 0; i < 3; i++)
-        {
-            try { await page.Keyboard.PressAsync("Escape"); } catch { }
-            await page.WaitForTimeoutAsync(100);
-        }
-        try { await page.Keyboard.PressAsync("Control+K"); await page.WaitForTimeoutAsync(100); await page.Keyboard.PressAsync("Control+W"); } catch { }
-        await TryRunCommandPaletteCommandAsync(page, "File: Close All Editors", timeout);
-        for (var i = 0; i < 6; i++)
-        {
-            try { await page.Keyboard.PressAsync("Control+F4"); } catch { }
-            await page.WaitForTimeoutAsync(100);
-        }
-    }
-
-    private static async Task HidePanelAndSecondarySidebarAsync(IPage page)
-    {
-        try
-        {
-            var panel = page.Locator("[id='workbench.parts.panel']");
-            if (await panel.IsVisibleAsync()) try { await page.Keyboard.PressAsync("Control+J"); } catch { }
-        }
-        catch { }
-        try
-        {
-            var secondary = page.Locator("[id='workbench.parts.secondarySidebar']");
-            if (await secondary.IsVisibleAsync()) try { await page.Keyboard.PressAsync("Control+Alt+B"); } catch { }
-        }
-        catch { }
-    }
-
-    private static async Task FocusExplorerAsync(IPage page, TimeSpan timeout)
-    {
-        try { await page.Keyboard.PressAsync("Control+Shift+E"); }
-        catch { try { var wb = new VsCodeWorkbench(page); await wb.Click("Explorer", timeoutMs: (float)timeout.TotalMilliseconds); } catch { } }
-
-        await TryRunCommandPaletteCommandAsync(page, "View: Show Explorer", timeout);
-
-        try
-        {
-            var sidebar = page.Locator("[id='workbench.parts.sidebar']");
-            for (var i = 0; i < 2; i++)
-            {
-                if (await sidebar.IsVisibleAsync()) break;
-                try { await page.Keyboard.PressAsync("Control+B"); } catch { }
-                await page.WaitForTimeoutAsync(150);
-            }
-        }
-        catch { }
-
-        try { var wb = new VsCodeWorkbench(page); await wb.Click("Explorer", timeoutMs: (float)timeout.TotalMilliseconds); } catch { }
-        try { var explorer = new VsCodeExplorer(page); await explorer.WaitForAsync("Id", timeoutMs: (float)timeout.TotalMilliseconds); } catch { }
-    }
-
-    private static async Task TryRunCommandPaletteCommandAsync(IPage page, string commandText, TimeSpan timeout)
-    {
-        try
-        {
-            await page.Keyboard.PressAsync("Control+Shift+P");
-            await page.WaitForTimeoutAsync(200);
-
-            // Clear anything that might already be in the input.
-            try { await page.Keyboard.PressAsync("Control+A"); } catch { /* ignore */ }
-            try { await page.Keyboard.PressAsync("Backspace"); } catch { /* ignore */ }
-
-            await page.Keyboard.TypeAsync(commandText, new KeyboardTypeOptions { Delay = 10 });
-            await page.WaitForTimeoutAsync(100);
-            await page.Keyboard.PressAsync("Enter");
-
-            // Give VS Code time to apply the command.
-            await page.WaitForTimeoutAsync(350);
-
-            // Dismiss palette if it stayed open.
-            try { await page.Keyboard.PressAsync("Escape"); } catch { /* ignore */ }
-        }
-        catch
-        {
-            // Best-effort; avoid failing the whole test on UI automation differences.
-        }
-    }
-
-    /// <summary>
-    /// Returns a small layout snapshot string useful for debugging UI determinism.
-    /// Best-effort only; selectors may vary across VS Code versions.
-    /// </summary>
-    public static async Task<string> GetUiLayoutSnapshotAsync(IPage page)
-    {
-        if (page is null) throw new ArgumentNullException(nameof(page));
-
-        try
-        {
-            var script =
-                "() => {\n" +
-                "  const q = (sel) => document.querySelector(sel);\n" +
-                "  const byId = (id) => q(\"[id='\" + id + \"']\");\n" +
-                "  const isVisible = (el) => {\n" +
-                "    if (!el) return false;\n" +
-                "    const r = el.getBoundingClientRect();\n" +
-                "    const s = getComputedStyle(el);\n" +
-                "    return !!(r.width && r.height) && s.visibility !== 'hidden' && s.display !== 'none';\n" +
-                "  };\n" +
-                "  const countVisibleByAriaLabel = (re) => {\n" +
-                "    try {\n" +
-                "      const els = Array.from(document.querySelectorAll('[aria-label]'));\n" +
-                "      return els.filter(e => re.test(e.getAttribute('aria-label') || '') && isVisible(e)).length;\n" +
-                "    } catch { return 0; }\n" +
-                "  };\n" +
-                "\n" +
-                "  const activeEl = q(\"[id='workbench.parts.activitybar'] .action-item.checked\");\n" +
-                "  const activeActivity = ((activeEl && (activeEl.getAttribute('aria-label') || activeEl.textContent)) || '<unknown>').trim();\n" +
-                "\n" +
-                "  const sidebarVisible = isVisible(byId('workbench.parts.sidebar'));\n" +
-                "  const secondaryVisible = isVisible(byId('workbench.parts.secondarySidebar'));\n" +
-                "  const panelVisible = isVisible(byId('workbench.parts.panel'));\n" +
-                "  const explorerVisible = isVisible(q('.explorer-folders-view'));\n" +
-                "  const chatLabelVisibleCount = countVisibleByAriaLabel(/chat/i);\n" +
-                "\n" +
-                "  return 'activeActivity=' + activeActivity +" +
-                "    '; sidebar=' + sidebarVisible +" +
-                "    '; secondarySidebar=' + secondaryVisible +" +
-                "    '; panel=' + panelVisible +" +
-                "    '; explorer=' + explorerVisible +" +
-                "    '; chatAriaVisible=' + chatLabelVisibleCount;\n" +
-                "}";
-
-            var snapshot = await page.EvaluateAsync<string>(script);
-            return snapshot ?? "<no snapshot>";
-        }
-        catch
-        {
-            return "<snapshot failed>";
-        }
-    }
-
-    private static void InstallExtensionFromVsix(string extensionsDir, string vsixPath)
-    {
-        try
-        {
-            var vsixFileName = Path.GetFileNameWithoutExtension(vsixPath);
-            if (vsixFileName.Contains('@'))
-                vsixFileName = vsixFileName[..vsixFileName.IndexOf('@')];
-
-            var targetDir = Path.Combine(extensionsDir, vsixFileName);
-            if (Directory.Exists(targetDir))
-                return;
-
-            Directory.CreateDirectory(targetDir);
-            System.IO.Compression.ZipFile.ExtractToDirectory(vsixPath, targetDir);
-            MoveExtensionFilesToRoot(targetDir);
-            CleanupVsixArtifacts(targetDir, extensionsDir);
-        }
-        catch
-        {
-            // Best-effort extraction.
-        }
-    }
-
-    private static void MoveExtensionFilesToRoot(string targetDir)
-    {
-        var extensionSubdir = Path.Combine(targetDir, "extension");
-        if (!Directory.Exists(extensionSubdir))
-            return;
-        foreach (var file in Directory.GetFiles(extensionSubdir))
-            MoveIfNotExists(file, Path.Combine(targetDir, Path.GetFileName(file)), isFile: true);
-        foreach (var dir in Directory.GetDirectories(extensionSubdir))
-            MoveIfNotExists(dir, Path.Combine(targetDir, Path.GetFileName(dir)), isFile: false);
-        TryDeleteDir(extensionSubdir);
-    }
-
-    private static void MoveIfNotExists(string source, string dest, bool isFile)
-    {
-        if (isFile)
-        {
-            if (!File.Exists(dest)) File.Move(source, dest);
-        }
-        else if (!Directory.Exists(dest))
-        {
-            Directory.Move(source, dest);
-        }
-    }
-
-    private static void CleanupVsixArtifacts(string targetDir, string extensionsDir)
-    {
-        var contentTypesXml = Path.Combine(targetDir, "[Content_Types].xml");
-        if (File.Exists(contentTypesXml))
-            File.Delete(contentTypesXml);
-        var obsoleteFile = Path.Combine(extensionsDir, ".obsolete");
-        if (File.Exists(obsoleteFile))
-            File.Delete(obsoleteFile);
     }
 
     private static string BuildArgs(
