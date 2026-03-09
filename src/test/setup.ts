@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 import Module from 'module';
 import * as fs from 'fs';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
@@ -122,10 +123,49 @@ const vscodeStub = {
       has: () => false,
       dispose: () => {},
     }),
+    registerCodeActionsProvider: () => ({
+      dispose: () => {}
+    }),
   },
   Diagnostic: DiagnosticStub,
   EventEmitter: EventEmitterStub,
   Range: RangeStub,
+  Position: class Position {
+    constructor(public line: number, public character: number) {}
+  },
+  Selection: class Selection {
+    constructor(public anchor: any, public active: any) {
+      this.start = anchor;
+      this.end = active;
+    }
+    start: any;
+    end: any;
+  },
+  WorkspaceEdit: class WorkspaceEdit {
+    private changes = new Map<string, any[]>();
+    insert(uri: any, position: any, newText: string): void {
+      const key = uri.toString();
+      if (!this.changes.has(key)) {
+        this.changes.set(key, []);
+      }
+      this.changes.get(key)!.push({ position, newText });
+    }
+    get(uri: any): any[] {
+      return this.changes.get(uri.toString()) || [];
+    }
+  },
+  CodeAction: class CodeAction {
+    title: string;
+    kind?: string;
+    diagnostics?: any[];
+    edit?: any;
+    command?: any;
+    disabled?: any;
+    constructor(title: string, kind?: string) {
+      this.title = title;
+      this.kind = kind;
+    }
+  },
   DiagnosticSeverity: {
     Error: 0,
     Warning: 1,
@@ -134,6 +174,16 @@ const vscodeStub = {
   },
   ThemeColor: class ThemeColor {
     constructor(public id: string) {}
+  },
+  CodeActionKind: {
+    QuickFix: 'quickfix',
+    Refactor: 'refactor',
+    RefactorExtract: 'refactor.extract',
+    RefactorInline: 'refactor.inline',
+    RefactorRewrite: 'refactor.rewrite',
+    Source: 'source',
+    SourceOrganizeImports: 'source.organizeImports',
+    Empty: '',
   },
   Uri: {
     parse: (value: string) => ({
