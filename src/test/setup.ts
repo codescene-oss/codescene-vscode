@@ -1,9 +1,13 @@
-/* eslint-disable max-classes-per-file */
 import Module from 'module';
 import * as fs from 'fs';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
+import { PositionStub } from './stubs/position-stub';
+import { SelectionStub } from './stubs/selection-stub';
+import { WorkspaceEditStub } from './stubs/workspace-edit-stub';
+import { CodeActionStub } from './stubs/code-action-stub';
+import { ThemeColorStub } from './stubs/theme-color-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
@@ -130,51 +134,17 @@ const vscodeStub = {
   Diagnostic: DiagnosticStub,
   EventEmitter: EventEmitterStub,
   Range: RangeStub,
-  Position: class Position {
-    constructor(public line: number, public character: number) {}
-  },
-  Selection: class Selection {
-    constructor(public anchor: any, public active: any) {
-      this.start = anchor;
-      this.end = active;
-    }
-    start: any;
-    end: any;
-  },
-  WorkspaceEdit: class WorkspaceEdit {
-    private changes = new Map<string, any[]>();
-    insert(uri: any, position: any, newText: string): void {
-      const key = uri.toString();
-      if (!this.changes.has(key)) {
-        this.changes.set(key, []);
-      }
-      this.changes.get(key)!.push({ position, newText });
-    }
-    get(uri: any): any[] {
-      return this.changes.get(uri.toString()) || [];
-    }
-  },
-  CodeAction: class CodeAction {
-    title: string;
-    kind?: string;
-    diagnostics?: any[];
-    edit?: any;
-    command?: any;
-    disabled?: any;
-    constructor(title: string, kind?: string) {
-      this.title = title;
-      this.kind = kind;
-    }
-  },
+  Position: PositionStub,
+  Selection: SelectionStub,
+  WorkspaceEdit: WorkspaceEditStub,
+  CodeAction: CodeActionStub,
   DiagnosticSeverity: {
     Error: 0,
     Warning: 1,
     Information: 2,
     Hint: 3,
   },
-  ThemeColor: class ThemeColor {
-    constructor(public id: string) {}
-  },
+  ThemeColor: ThemeColorStub,
   CodeActionKind: {
     QuickFix: 'quickfix',
     Refactor: 'refactor',
