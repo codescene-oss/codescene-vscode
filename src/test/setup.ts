@@ -3,6 +3,11 @@ import * as fs from 'fs';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
+import { PositionStub } from './stubs/position-stub';
+import { SelectionStub } from './stubs/selection-stub';
+import { WorkspaceEditStub } from './stubs/workspace-edit-stub';
+import { CodeActionStub } from './stubs/code-action-stub';
+import { ThemeColorStub } from './stubs/theme-color-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
@@ -122,18 +127,33 @@ const vscodeStub = {
       has: () => false,
       dispose: () => {},
     }),
+    registerCodeActionsProvider: () => ({
+      dispose: () => {}
+    }),
   },
   Diagnostic: DiagnosticStub,
   EventEmitter: EventEmitterStub,
   Range: RangeStub,
+  Position: PositionStub,
+  Selection: SelectionStub,
+  WorkspaceEdit: WorkspaceEditStub,
+  CodeAction: CodeActionStub,
   DiagnosticSeverity: {
     Error: 0,
     Warning: 1,
     Information: 2,
     Hint: 3,
   },
-  ThemeColor: class ThemeColor {
-    constructor(public id: string) {}
+  ThemeColor: ThemeColorStub,
+  CodeActionKind: {
+    QuickFix: 'quickfix',
+    Refactor: 'refactor',
+    RefactorExtract: 'refactor.extract',
+    RefactorInline: 'refactor.inline',
+    RefactorRewrite: 'refactor.rewrite',
+    Source: 'source',
+    SourceOrganizeImports: 'source.organizeImports',
+    Empty: '',
   },
   Uri: {
     parse: (value: string) => ({
