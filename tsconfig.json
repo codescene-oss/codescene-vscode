@@ -1,4 +1,5 @@
 {
+  "exclude": ["e2e"],
   "compilerOptions": {
     "module": "commonjs",
     "target": "ES2020",

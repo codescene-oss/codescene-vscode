@@ -1,6 +1,24 @@
 {
   "rule_sets": [
     {
+      "matching_content_path": "e2e/**/*.cs",
+      "matching_content_path_doc": "Specify a glob pattern relative to this repo root. **/* means all code, **/*.js means just JavaScript, test/** means all code in a top-level test folder.",
+      "rules": [
+        {
+          "name": "String Heavy Function Arguments",
+          "weight": 0.0
+        },
+        {
+          "name": "Excess Number of Function Arguments",
+          "weight": 0.0
+        },
+        {
+          "name": "Primitive Obsession",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
       "matching_content_path": "src/test/**/*.ts",
       "matching_content_path_doc": "All test files - relaxed rules for test code",
       "rules": [

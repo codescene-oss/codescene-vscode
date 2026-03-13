@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest updatedocs
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs
 
 .DEFAULT_GOAL := build
 
@@ -30,6 +30,16 @@ pretest:
 
 test: pretest
 	npm run test
+
+E2E_CLEAN := $(if $(CLEAN),-Clean,)
+
+# Requires PowerShell 7.0 or higher.
+pretest-e2e:
+	pwsh install-e2e.ps1 $(E2E_CLEAN)
+
+# Add "CLEAN=1" to force re-download of VS Code and extension.
+test-e2e: pretest-e2e
+	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
 
 # Runs just one test.
 # Example: make test1 TEST='GitChangeObserver Test Suite'
