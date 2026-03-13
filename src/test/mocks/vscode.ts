@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 
 import { MockTextDocument } from './mock-text-document';
+import { Position } from './position';
+import { Range } from './range';
+import { Selection } from './selection';
+import { WorkspaceEdit } from './workspace-edit';
+import { CodeAction } from './code-action';
+import { MockEditor } from './mock-editor';
 
 export async function openTextDocument(options: { content: string; language: string }) {
   return new MockTextDocument(options.content, options.language);
@@ -11,6 +17,22 @@ export enum DiagnosticSeverity {
   Warning = 1,
   Information = 2,
   Hint = 3,
+}
+
+export enum EndOfLine {
+  LF = 1,
+  CRLF = 2,
+}
+
+export interface CancellationToken {
+  isCancellationRequested: boolean;
+  onCancellationRequested: any;
+}
+
+export interface CodeActionContext {
+  diagnostics: any[];
+  only?: string;
+  triggerKind?: number;
 }
 
 export interface Uri {
@@ -89,12 +111,56 @@ export namespace workspace {
   }
 }
 
+export { Position, Range, Selection, WorkspaceEdit, CodeAction, MockEditor };
+
+export namespace CodeActionKind {
+  export const QuickFix = 'quickfix';
+  export const Refactor = 'refactor';
+  export const RefactorExtract = 'refactor.extract';
+  export const RefactorInline = 'refactor.inline';
+  export const RefactorRewrite = 'refactor.rewrite';
+  export const Source = 'source';
+  export const SourceOrganizeImports = 'source.organizeImports';
+  export const Empty = '';
+}
+
+export const executedCommands: { command: string; args: any[] }[] = [];
+
+export function resetExecutedCommands() {
+  executedCommands.length = 0;
+}
+
 export namespace commands {
-  export function registerCommand(command: string, callback: (...args: any[]) => any): Disposable {
-    return { dispose: () => {} };
+  const registeredCommands = new Map<string, (...args: any[]) => any>();
+
+  export function registerCommand(
+    command: string,
+    callback: (...args: any[]) => any
+  ): Disposable {
+    registeredCommands.set(command, callback);
+    return {
+      dispose: () => registeredCommands.delete(command)
+    };
   }
 
   export async function executeCommand(command: string, ...args: any[]): Promise<any> {
+    executedCommands.push({ command, args });
+
+    const handler = registeredCommands.get(command);
+    if (handler) {
+      return await handler(...args);
+    }
     return undefined;
+  }
+}
+
+export namespace window {
+  let _activeTextEditor: MockEditor | undefined;
+
+  export let activeTextEditor: MockEditor | undefined;
+
+  export function setActiveEditor(editor: MockEditor | undefined) {
+    _activeTextEditor = editor;
+    activeTextEditor = editor;
   }
 }

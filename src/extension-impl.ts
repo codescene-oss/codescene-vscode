@@ -52,6 +52,27 @@ let DISPOSABLES: vscode.Disposable[] = [];
 const codeHealthFileVersion = new Map<string, number>();
 
 let savedFilesTrackerInstance: SavedFilesTracker;
+let openFilesObserverInstance: OpenFilesObserver | undefined;
+
+const onCodeHealthFileVersionChange = debounce(() => {
+  if (!openFilesObserverInstance) {
+    return;
+  }
+
+  // Re-review all currently visible files since code health rules have changed
+  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
+  visibleFiles.forEach((filePath) => {
+    const fileUri = vscode.Uri.file(filePath);
+    void vscode.workspace.openTextDocument(fileUri).then(
+      (document) => {
+        CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+      },
+      (e) => {
+        logOutputChannel.warn(`Failed to re-review file after rules change: ${filePath}`, e);
+      }
+    );
+  });
+}, 350);
 
 export function getCodeHealthFileVersions(): Map<string, number> {
   return codeHealthFileVersion;
@@ -64,6 +85,7 @@ async function initializeCodeHealthFileVersions() {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       codeHealthFileVersion.set(document.fileName, document.version);
+      onCodeHealthFileVersionChange();
     } catch (e) {
       logOutputChannel.warn(`Failed to open code-health-rules.json: ${uri.fsPath}`, e);
     }
@@ -208,16 +230,16 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   }
 
   // Observe open file events and trigger reviews
-  const openFilesObserver = new OpenFilesObserver(context);
-  openFilesObserver.start();
-  DISPOSABLES.push(openFilesObserver);
-  context.subscriptions.push(openFilesObserver);
+  openFilesObserverInstance = new OpenFilesObserver(context);
+  openFilesObserverInstance.start();
+  DISPOSABLES.push(openFilesObserverInstance);
+  context.subscriptions.push(openFilesObserverInstance);
 
   // Watch for discrete Git file changes (create, modify, delete)
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
   if (gitApi) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserver);
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserverInstance);
     gitChangeObserver.start();
     DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);
@@ -253,6 +275,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       codeHealthFileVersion.set(document.fileName, document.version);
+      onCodeHealthFileVersionChange();
     } catch (e) {
       logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
     }
@@ -262,6 +285,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       codeHealthFileVersion.set(document.fileName, document.version);
+      onCodeHealthFileVersionChange();
     } catch (e) {
       logOutputChannel.warn(`Failed to add code-health-rules.json version: ${uri.fsPath}`, e);
     }
@@ -269,6 +293,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   rulesFileWatcher.onDidDelete((uri: vscode.Uri) => {
     codeHealthFileVersion.delete(uri.fsPath);
+    onCodeHealthFileVersionChange();
   });
 
   DISPOSABLES.push(rulesFileWatcher);

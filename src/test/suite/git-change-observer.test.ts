@@ -1,11 +1,17 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { Uri, Disposable, ExtensionContext } from '../mocks/vscode';
 import { GitChangeObserver } from '../../git/git-change-observer';
 import { MockExecutor } from '../mocks/mock-executor';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { getWorkspaceFolder } from '../../utils';
+import Reviewer from '../../review/reviewer';
+import { ReviewCacheItem } from '../../review/review-cache-item';
+import { CsReview } from '../../review/cs-review';
+import { DevtoolsAPI } from '../../devtools-api';
+import { TestTextDocument } from '../mocks/test-text-document';
 
 suite('GitChangeObserver Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-observer');
@@ -473,5 +479,103 @@ suite('GitChangeObserver Test Suite', () => {
 
     // After dispose, the interval should be cleared
     assert.strictEqual(observer.scheduledExecutor.intervalHandle, null, 'Interval should be cleared after dispose');
+  });
+
+  test('should not cache delta for file deleted during review', async function () {
+    this.timeout(20000);
+
+    // Initialize Reviewer if not already initialized
+    if (!Reviewer.instance) {
+      Reviewer.init(
+        mockContext,
+        async () => undefined,
+        () => new Map()
+      );
+    }
+
+    // Setup: Create and commit a file to establish baseline
+    const fileName = 'race-condition-test.ts';
+    const originalContent = 'export function test() { return "original"; }';
+    const filePath = commitFile(fileName, originalContent, 'Add test file');
+
+    // Modify the file to trigger a review
+    const modifiedContent = 'export function test() { return "modified"; }';
+    fs.writeFileSync(filePath, modifiedContent);
+
+    gitChangeObserver.start();
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Directly test the ReviewCacheItem.runDeltaAnalysis with file deletion
+    // Create a mock document and review for the file that will be deleted
+    const document = new TestTextDocument(filePath, modifiedContent, 'typescript') as any as vscode.TextDocument;
+    const mockReview: any = {
+      score: 8.5,
+      'raw-score': 'base64encodeddata',
+      'file-level-code-smells': [],
+      'function-level-code-smells': []
+    };
+    const review = new CsReview(document, Promise.resolve(mockReview));
+
+    // Track if file check happens and when delta is called
+    let fileCheckStarted = false;
+    let fileCheckResolve: (() => void) | undefined;
+    let proceedWithStatResolve: (() => void) | undefined;
+
+    const fileCheckPromise = new Promise<void>(resolve => {
+      fileCheckResolve = resolve;
+    });
+    const proceedWithStatPromise = new Promise<void>(resolve => {
+      proceedWithStatResolve = resolve;
+    });
+
+    const originalStat = vscode.workspace.fs.stat;
+    vscode.workspace.fs.stat = async (uri: any) => {
+      fileCheckStarted = true;
+      // Signal that file check started
+      fileCheckResolve?.();
+      // Block here until test explicitly tells us to proceed
+      await proceedWithStatPromise;
+      // Now call original stat (file may have been deleted by test)
+      return originalStat.call(vscode.workspace.fs, uri);
+    };
+
+    let deltaCalled = false;
+    const originalDelta = DevtoolsAPI.delta;
+    DevtoolsAPI.delta = async (doc: any, updateMonitor: any, oldScore: any, newScore: any) => {
+      deltaCalled = true;
+      return originalDelta.call(DevtoolsAPI, doc, updateMonitor, oldScore, newScore);
+    };
+
+    try {
+      // Create ReviewCacheItem and start delta analysis
+      const cacheItem = new ReviewCacheItem(document, review);
+      const deltaPromise = cacheItem.runDeltaAnalysis({ skipMonitorUpdate: false });
+
+      // Wait for file check to start (with timeout)
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('File check was never called - the bugfix may be missing')), 1000);
+      });
+      await Promise.race([fileCheckPromise, timeoutPromise]);
+      assert.strictEqual(fileCheckStarted, true, 'File check should have started');
+
+      // At this point, the spy is blocked waiting for us to signal.
+      // The file check has started but not completed - perfect time to delete the file.
+      // This precisely simulates the race: file exists when check starts, deleted before check completes.
+      fs.unlinkSync(filePath);
+
+      // Now tell the spy to proceed with calling originalStat (which will fail)
+      proceedWithStatResolve?.();
+
+      // Wait for delta analysis to complete
+      await deltaPromise;
+
+      // Verify delta was NOT called (file was deleted)
+      assert.strictEqual(deltaCalled, false, 'DevtoolsAPI.delta should not be called for deleted file');
+      assert.strictEqual(cacheItem.delta, undefined, 'Delta should not be set for deleted file');
+    } finally {
+      // Restore original functions
+      vscode.workspace.fs.stat = originalStat;
+      DevtoolsAPI.delta = originalDelta;
+    }
   });
 });

@@ -40,4 +40,27 @@ export class RangeStub {
 
     return new RangeStub(startLine, startChar, endLine, endChar);
   }
+
+  contains(positionOrRange: any): boolean {
+    if (this.isPosition(positionOrRange)) {
+      return this.containsPosition(positionOrRange);
+    } else {
+      return this.containsRange(positionOrRange);
+    }
+  }
+
+  private isPosition(positionOrRange: any): boolean {
+    return positionOrRange.line !== undefined && positionOrRange.character !== undefined;
+  }
+
+  private containsPosition(pos: any): boolean {
+    return pos.line >= this.start.line &&
+           pos.line <= this.end.line &&
+           (pos.line !== this.start.line || pos.character >= this.start.character) &&
+           (pos.line !== this.end.line || pos.character <= this.end.character);
+  }
+
+  private containsRange(range: any): boolean {
+    return this.contains(range.start) && this.contains(range.end);
+  }
 }
