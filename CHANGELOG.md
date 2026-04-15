@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.1...v0.26.2) (2026-04-15)
+
+
+### Features
+
+* immediately re-review open files after a code-health-rules.json change ([1bdf6e1](https://github.com/codescene-oss/codescene-vscode/commit/1bdf6e1415693add538cfb405ece3df2e714680f))
+* offer Quick Fix action to disable the given finding inline ([215f3f7](https://github.com/codescene-oss/codescene-vscode/commit/215f3f78f4013f54af1537dd3f0f6e079451e7fa))
+* remove baseline-related commands ([a8137b5](https://github.com/codescene-oss/codescene-vscode/commit/a8137b5c05a900391362ba1d0cd701ca08bbe4e1))
+* reword some commands ([f4fdb74](https://github.com/codescene-oss/codescene-vscode/commit/f4fdb7410c199caee5024bdbb100b3a04dd83d8b))
+
+
+### Bug fixes
+
+* expand `possibleMainBranches` ([1400324](https://github.com/codescene-oss/codescene-vscode/commit/1400324233a428e9ff6d27e148108b6929f99ee4))
+* race condition in delta cache for deleted files ([b310eb2](https://github.com/codescene-oss/codescene-vscode/commit/b310eb2dcc219891862a231685c5270b2894735d))
+* revert code smell bugfix ([fcd15d4](https://github.com/codescene-oss/codescene-vscode/commit/fcd15d46196b4157659c75637a65ad0124cd221e))
+
 ### [0.26.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.0...v0.26.1) (2026-01-19)
 
 ## [0.26.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.25.0...v0.26.0) (2026-01-19)
