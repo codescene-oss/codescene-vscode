@@ -60,7 +60,7 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
     return cached;
   }
 
-  const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev'];
+  const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev', 'development'];
 
   try {
     const { stdout, stderr, exitCode } = await gitExecutor.execute(
@@ -92,7 +92,7 @@ export async function getMainBranchCandidates(repoPath: string): Promise<string[
 /**
  * Determines if the given branch could be the default branch.
  *
- * Checks against locally present main branch names (main, master, develop, trunk, dev).
+ * Checks against locally present main branch names (main, master, develop, trunk, dev, development).
  */
 export async function isMainBranch(currentBranch: string | undefined, repoPath: string): Promise<boolean> {
   if (!currentBranch) return false;
