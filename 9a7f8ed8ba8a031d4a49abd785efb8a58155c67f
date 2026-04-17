@@ -1,0 +1,47 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "9a7f8ed8ba8a031d4a49abd785efb8a58155c67f",
+  "prompts": {
+    "1522a3cb75d6a36f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "229149d5-ba65-49d9-b8df-f9770d0026d5",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Martin Säfsten",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "178b7b334f2cc085": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ffd36044-be5e-462a-9a06-5baa608c7438",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Martin Säfsten",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "63e4582ca9cd7794": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "26d2543d-cbb7-4dbe-baea-a009943d7ac6",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Martin Säfsten",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
