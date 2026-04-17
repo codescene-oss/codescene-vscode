@@ -14,9 +14,6 @@
   "engines": {
     "vscode": "^1.75.1"
   },
-  "enabledApiProposals": [
-    "findFiles2"
-  ],
   "categories": [
     "Programming Languages",
     "Linters"

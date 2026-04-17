@@ -78,25 +78,8 @@ export function getCodeHealthFileVersions(): Map<string, number> {
   return codeHealthFileVersion;
 }
 
-async function findFilesWithIgnoreSupport(
-  pattern: vscode.GlobPattern
-): Promise<vscode.Uri[]> {
-  if (typeof (vscode.workspace as any).findFiles2 === 'function') {
-    logOutputChannel.info('Using findFiles2 with useIgnoreFiles support');
-    return (vscode.workspace as any).findFiles2(
-      [pattern],
-      {
-        useIgnoreFiles: { local: true, global: true }
-      }
-    );
-  }
-
-  logOutputChannel.info('Using fallback findFiles (findFiles2 not available)');
-  return vscode.workspace.findFiles(pattern);
-}
-
 async function initializeCodeHealthFileVersions() {
-  const rulesFiles = await findFilesWithIgnoreSupport('**/.codescene/code-health-rules.json');
+  const rulesFiles = await vscode.workspace.findFiles('**/.codescene/code-health-rules.json');
 
   for (const uri of rulesFiles) {
     try {
