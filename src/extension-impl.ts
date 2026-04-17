@@ -85,7 +85,6 @@ async function initializeCodeHealthFileVersions() {
     try {
       const document = await vscode.workspace.openTextDocument(uri);
       codeHealthFileVersion.set(document.fileName, document.version);
-      onCodeHealthFileVersionChange();
     } catch (e) {
       logOutputChannel.warn(`Failed to open code-health-rules.json: ${uri.fsPath}`, e);
     }
