@@ -14,7 +14,6 @@ export class AbortingSingleTaskExecutor implements Executor {
 
   async execute(command: Task, options: ExecOptions = {}, input?: string) {
     const taskId = command.taskId;
-
     // Check if there's an item with the same taskId running already
     const runningProcess = this.runningCommands.get(taskId);
     if (runningProcess) {

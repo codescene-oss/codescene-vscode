@@ -2,7 +2,10 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
+import { Uri } from 'vscode';
 import { DevtoolsAPI } from '../../devtools-api';
+import { getMergeBaseCommit } from '../../git-utils';
+import { Branch, Repository, RepositoryState, RepositoryUIState } from '../../../types/git';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { createTestDir, ensureBinary } from '../integration_helper';
@@ -181,6 +184,70 @@ suite('Review Baseline Test Suite', () => {
       'function-level-code-smells': [],
       score: 9.09
     });
+  });
+
+  test('getMergeBaseCommit resolves to develop tip for feature stacked on develop over main, and reviewBaseline uses it', async function() {
+    this.timeout(20000);
+
+    function createMockRepository(rootPath: string, branchName: string, commitSha: string): Repository {
+      const head: Branch = { type: 0, name: branchName, commit: commitSha };
+      return {
+        rootUri: Uri.file(rootPath),
+        state: {
+          HEAD: head,
+          refs: [],
+          remotes: [],
+          submodules: [],
+          rebaseCommit: undefined,
+          mergeChanges: [],
+          indexChanges: [],
+          workingTreeChanges: [],
+          untrackedChanges: [],
+          onDidChange: (() => {}) as any,
+        } as RepositoryState,
+        ui: {} as RepositoryUIState,
+        inputBox: {} as any,
+        onDidCommit: (() => {}) as any,
+      } as Repository;
+    }
+
+    const mainContent = 'int foo() { return 1; }\n';
+    const filePath = path.join(testDir, 'stacked.cpp');
+    fs.writeFileSync(filePath, mainContent);
+    execSync('git add stacked.cpp', { cwd: testDir });
+    execSync('git commit -m "main commit"', { cwd: testDir });
+    execSync('git branch -M main', { cwd: testDir, stdio: 'pipe' });
+    const mainSha = execSync('git rev-parse HEAD', { cwd: testDir }).toString().trim();
+
+    const developContent = 'int foo() { return 2; }\n';
+    execSync('git checkout -b develop', { cwd: testDir, stdio: 'pipe' });
+    fs.writeFileSync(filePath, developContent);
+    execSync('git add stacked.cpp', { cwd: testDir });
+    execSync('git commit -m "develop commit"', { cwd: testDir });
+    const developSha = execSync('git rev-parse HEAD', { cwd: testDir }).toString().trim();
+
+    const featureContent = 'int foo() { return 3; }\n';
+    execSync('git checkout -b feature/test-suppression2', { cwd: testDir, stdio: 'pipe' });
+    fs.writeFileSync(filePath, featureContent);
+    execSync('git add stacked.cpp', { cwd: testDir });
+    execSync('git commit -m "feature commit"', { cwd: testDir });
+    const featureSha = execSync('git rev-parse HEAD', { cwd: testDir }).toString().trim();
+
+    const repo = createMockRepository(testDir, 'feature/test-suppression2', featureSha);
+    const baselineSha = await getMergeBaseCommit(repo);
+
+    assert.strictEqual(
+      baselineSha,
+      developSha,
+      `Baseline should resolve to develop tip. Expected: ${developSha}, Got: ${baselineSha} (main was: ${mainSha})`
+    );
+    assert.notStrictEqual(baselineSha, mainSha, 'Baseline must not be the older main commit');
+
+    const doc = new TestTextDocument(filePath, featureContent, 'cpp');
+    const result = await DevtoolsAPI.reviewBaseline(baselineSha, doc);
+
+    assert.ok(result, 'reviewBaseline should produce a review against the develop baseline');
+    assert.strictEqual(result!.score, 10);
   });
 
   test('reviewBaseline returns function-level code smells for complex function', async function() {

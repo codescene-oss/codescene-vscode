@@ -123,35 +123,97 @@ export async function getMergeBaseCommit(repo: Repository): Promise<string> {
   }
 
   const localMainBranches = await getMainBranchCandidates(repoPath);
-  for (const mainBranch of localMainBranches) {
-    try {
-      const { stdout: mergeBase, stderr, exitCode } = await gitExecutor.execute(
-        { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
-        { cwd: repoPath }
-      );
+  const candidateCommits = await collectMergeBaseCandidates(currentBranch, localMainBranches, repoPath);
 
-      if (exitCode !== 0) {
-        if (exitCode === "ENOENT") {
-          markGitAsUnavailable();
-        }
-        logOutputChannel.error(`Could not get merge-base for ${currentBranch} and ${mainBranch} (exit code ${exitCode}): ${stderr}`);
-        continue;
-      }
+  return pickBaselineFromCandidates(candidateCommits, repoPath);
+}
 
-      const commit = mergeBase.trim();
-      if (commit) {
-        return commit;
-      }
-    } catch (err) {
-      if (isEnoentError(err)) {
-        markGitAsUnavailable();
-      }
-      logOutputChannel.error(`${err}`);
-      continue;
+function pickBaselineFromCandidates(candidateCommits: string[], repoPath: string): Promise<string> | string {
+  if (candidateCommits.length === 0) return '';
+  if (candidateCommits.length === 1) return candidateCommits[0];
+  return selectClosestMergeBase(candidateCommits, repoPath);
+}
+
+async function mergeBaseWith(currentBranch: string, mainBranch: string, repoPath: string): Promise<string | undefined> {
+  try {
+    const { stdout: mergeBase, stderr, exitCode } = await gitExecutor.execute(
+      { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
+      { cwd: repoPath }
+    );
+
+    if (exitCode !== 0) {
+      if (exitCode === "ENOENT") markGitAsUnavailable();
+      logOutputChannel.error(`Could not get merge-base for ${currentBranch} and ${mainBranch} (exit code ${exitCode}): ${stderr}`);
+      return undefined;
+    }
+
+    return mergeBase.trim() || undefined;
+  } catch (err) {
+    if (isEnoentError(err)) markGitAsUnavailable();
+    logOutputChannel.error(`${err}`);
+    return undefined;
+  }
+}
+
+async function collectMergeBaseCandidates(currentBranch: string, mainBranches: string[], repoPath: string): Promise<string[]> {
+  const candidates: string[] = [];
+  for (const mainBranch of mainBranches) {
+    const commit = await mergeBaseWith(currentBranch, mainBranch, repoPath);
+    if (commit && !candidates.includes(commit)) {
+      candidates.push(commit);
     }
   }
+  return candidates;
+}
 
-  return '';
+async function isAncestor(ancestor: string, descendant: string, repoPath: string): Promise<boolean | undefined> {
+  try {
+    const { exitCode } = await gitExecutor.execute(
+      { command: 'git', args: ['merge-base', '--is-ancestor', ancestor, descendant], taskId: GIT_TASK_ID, ignoreError: true },
+      { cwd: repoPath }
+    );
+
+    if (exitCode === "ENOENT") {
+      markGitAsUnavailable();
+      return undefined;
+    }
+
+    return exitCode === 0;
+  } catch (err) {
+    if (isEnoentError(err)) {
+      markGitAsUnavailable();
+    }
+    logOutputChannel.error(`${err}`);
+    return undefined;
+  }
+}
+
+async function isDescendantOfAll(candidate: string, candidates: string[], repoPath: string): Promise<boolean | undefined> {
+  for (const other of candidates) {
+    if (candidate === other) continue;
+
+    const result = await isAncestor(other, candidate, repoPath);
+    if (result === undefined) return undefined;
+    if (!result) return false;
+  }
+  return true;
+}
+
+/**
+ * Given multiple merge-base candidates, returns the one closest to HEAD.
+ *
+ * The closest merge-base is the descendant of all other candidates, i.e. the
+ * commit where every other candidate is an ancestor. Falls back to the first
+ * candidate if the selection cannot be resolved.
+ */
+async function selectClosestMergeBase(candidateCommits: string[], repoPath: string): Promise<string> {
+  for (const candidate of candidateCommits) {
+    const descendantOfAll = await isDescendantOfAll(candidate, candidateCommits, repoPath);
+    if (descendantOfAll === undefined) return candidateCommits[0];
+    if (descendantOfAll) return candidate;
+  }
+
+  return candidateCommits[0];
 }
 
 export interface GitStateChange {

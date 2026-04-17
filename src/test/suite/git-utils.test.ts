@@ -208,7 +208,7 @@ suite('Git Utils Test Suite', () => {
       );
     });
 
-    test('returns first successful merge-base when multiple main branches exist', async () => {
+    test('returns closest merge-base when multiple main-like branches share the same base', async () => {
       const mainCommitSha = createBranchWithCommit('main');
 
       createBranch('master');
@@ -222,7 +222,27 @@ suite('Git Utils Test Suite', () => {
       assert.strictEqual(
         result,
         mainCommitSha,
-        `Should return first successful merge-base. Expected: ${mainCommitSha}, Got: ${result}`
+        `Should return closest merge-base. Expected: ${mainCommitSha}, Got: ${result}`
+      );
+    });
+
+    test('returns closest merge-base when feature is stacked on develop over main', async () => {
+      const mainCommitSha = createBranchWithCommit('main');
+
+      createBranch('develop');
+      commitFile('develop.ts', 'export const onDevelop = true;', 'Commit on develop');
+      const developCommitSha = getHeadCommit();
+
+      createBranch('feature/test-suppression2');
+      commitFile('feature.ts', 'export const feature = true;', 'Commit on feature');
+      const featureCommitSha = getHeadCommit();
+
+      const result = await testMergeBase('feature/test-suppression2', featureCommitSha);
+
+      assert.strictEqual(
+        result,
+        developCommitSha,
+        `Should return develop tip (closest merge-base), not main. Expected: ${developCommitSha}, Got: ${result} (main was: ${mainCommitSha})`
       );
     });
 
