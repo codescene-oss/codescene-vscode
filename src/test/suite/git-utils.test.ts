@@ -3,7 +3,9 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Uri } from 'vscode';
-import { getMergeBaseCommit } from '../../git-utils';
+import { getMergeBaseCommit, gitExecutor } from '../../git-utils';
+import { isGitAvailable, resetGitAvailability } from '../../git/git-detection';
+import { ExecResult } from '../../executor';
 import { Repository, RepositoryState, Branch, RepositoryUIState } from '../../../types/git';
 
 suite('Git Utils Test Suite', () => {
@@ -270,6 +272,128 @@ suite('Git Utils Test Suite', () => {
         '',
         'Should return empty string when no main branch candidates exist'
       );
+    });
+
+    test('returns first candidate when merge commit produces sibling merge-bases', async () => {
+      const mainInitialSha = createBranchWithCommit('main');
+
+      createBranch('develop');
+      commitFile('develop.ts', 'export const onDevelop = true;', 'develop commit');
+      const developSha = getHeadCommit();
+
+      switchBranch('main');
+      commitFile('main2.ts', 'export const onMain = true;', 'main second commit');
+      const mainAdvancedSha = getHeadCommit();
+
+      createBranch('feature-merge');
+      commitFile('feature.ts', 'export const feature = true;', 'feature commit');
+
+      execSync('git merge --no-ff develop -m "merge develop into feature"', { cwd: testRepoPath, stdio: 'pipe' });
+      const featureMergeSha = getHeadCommit();
+
+      const result = await testMergeBase('feature-merge', featureMergeSha);
+
+      assert.strictEqual(
+        result,
+        mainAdvancedSha,
+        `Should fall back to first candidate when no merge-base descends from all others. Expected: ${mainAdvancedSha}, Got: ${result} (develop was: ${developSha}, main initial was: ${mainInitialSha})`
+      );
+      assert.notStrictEqual(result, developSha, 'Must not be the develop-side merge-base');
+    });
+
+    suite('executor stub based error paths', () => {
+      let restoreExecutor: (() => void) | undefined;
+
+      function stubGitExecutor(responder: (args: string[]) => Promise<ExecResult> | ExecResult): () => void {
+        const executor = gitExecutor as unknown as { execute: (...a: any[]) => any };
+        const original = executor.execute.bind(gitExecutor);
+        executor.execute = async (command: any) => responder(command.args);
+        return () => {
+          executor.execute = original;
+        };
+      }
+
+      teardown(() => {
+        if (restoreExecutor) {
+          restoreExecutor();
+          restoreExecutor = undefined;
+        }
+        resetGitAvailability();
+      });
+
+      test('mergeBaseWith handles ENOENT exit code', async () => {
+        restoreExecutor = stubGitExecutor((args) => {
+          if (args[0] === 'branch') {
+            return { stdout: 'feature\nmain', stderr: '', exitCode: 0, duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[1] !== '--is-ancestor') {
+            return { stdout: '', stderr: 'spawn ENOENT', exitCode: 'ENOENT', duration: 0 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0, duration: 0 };
+        });
+
+        const repo = createMockRepository(testRepoPath, 'feature', 'deadbeef');
+        const result = await getMergeBaseCommit(repo);
+
+        assert.strictEqual(result, '', 'Should return empty when merge-base yields ENOENT');
+        assert.strictEqual(isGitAvailable(), false, 'Should mark git as unavailable on ENOENT');
+      });
+
+      test('isAncestor handles ENOENT exit code and falls back to first candidate', async () => {
+        const sha1 = 'a'.repeat(40);
+        const sha2 = 'b'.repeat(40);
+
+        restoreExecutor = stubGitExecutor((args) => {
+          if (args[0] === 'branch') {
+            return { stdout: 'feature\nmain\ndevelop', stderr: '', exitCode: 0, duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[1] === '--is-ancestor') {
+            return { stdout: '', stderr: 'spawn ENOENT', exitCode: 'ENOENT', duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[2] === 'main') {
+            return { stdout: sha1, stderr: '', exitCode: 0, duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[2] === 'develop') {
+            return { stdout: sha2, stderr: '', exitCode: 0, duration: 0 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0, duration: 0 };
+        });
+
+        const repo = createMockRepository(testRepoPath, 'feature', 'deadbeef');
+        const result = await getMergeBaseCommit(repo);
+
+        assert.strictEqual(result, sha1, 'Should fall back to first candidate when is-ancestor ENOENTs');
+        assert.strictEqual(isGitAvailable(), false, 'Should mark git as unavailable on ENOENT');
+      });
+
+      test('isAncestor handles thrown ENOENT error and falls back to first candidate', async () => {
+        const sha1 = 'a'.repeat(40);
+        const sha2 = 'b'.repeat(40);
+
+        restoreExecutor = stubGitExecutor((args) => {
+          if (args[0] === 'branch') {
+            return { stdout: 'feature\nmain\ndevelop', stderr: '', exitCode: 0, duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[1] === '--is-ancestor') {
+            const err: any = new Error('spawn ENOENT');
+            err.code = 'ENOENT';
+            throw err;
+          }
+          if (args[0] === 'merge-base' && args[2] === 'main') {
+            return { stdout: sha1, stderr: '', exitCode: 0, duration: 0 };
+          }
+          if (args[0] === 'merge-base' && args[2] === 'develop') {
+            return { stdout: sha2, stderr: '', exitCode: 0, duration: 0 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0, duration: 0 };
+        });
+
+        const repo = createMockRepository(testRepoPath, 'feature', 'deadbeef');
+        const result = await getMergeBaseCommit(repo);
+
+        assert.strictEqual(result, sha1, 'Should fall back to first candidate when is-ancestor throws');
+        assert.strictEqual(isGitAvailable(), false, 'Should mark git as unavailable when caught error is ENOENT');
+      });
     });
   });
 });
