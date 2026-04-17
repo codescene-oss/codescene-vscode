@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.3...v0.26.4) (2026-04-17)
+
+
+### Bug fixes
+
+* undo usage of `findFiles2` ([2a6744a](https://github.com/codescene-oss/codescene-vscode/commit/2a6744a043f5eb0ad59ee09a03c5bd8b19bf0eda))
+
 ### [0.26.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.2...v0.26.3) (2026-04-17)
 
 
