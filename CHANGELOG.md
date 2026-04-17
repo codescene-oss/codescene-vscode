@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.26.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.2...v0.26.3) (2026-04-17)
+
+
+### Bug fixes
+
+* introduce `findFilesWithIgnoreSupport` ([f162e4d](https://github.com/codescene-oss/codescene-vscode/commit/f162e4d19e446fb27b2aef25d4dd729fcde0b575))
+* remove redundant, possibly problematic `onCodeHealthFileVersionChange()` call ([2df150a](https://github.com/codescene-oss/codescene-vscode/commit/2df150a25086e79cc789385069740d04ddd685cb))
+
 ### [0.26.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.1...v0.26.2) (2026-04-15)
 
 
