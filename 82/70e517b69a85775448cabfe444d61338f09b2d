@@ -1,0 +1,474 @@
+scripts/cli-config.js
+  h_0bea9e1dd5ef0d 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "8270e517b69a85775448cabfe444d61338f09b2d",
+  "prompts": {
+    "b63ab2f27af48bef": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e09c24d6-1d0b-41a6-8cc1-7a58615bdd14",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Martin Säfsten",
+      "messages": [
+        {
+          "type": "user",
+          "text": "I got this bug report. Can you plan for a fix?\n\nReport context\nAfter accepting Auto-Refactor, for some files and in some situations, two file windows are opened. Please check the attached screen recording.\n\nIt doesn't happen for all files, but one trick to reproduce is to click two times on Show diff.\nProblem\nHow to reproduce the bug\nOpen Visual Studio Code.\nEnsure the CodeScene extension is installed and enabled.\nOpen a file and make a change to trigger the analysis.\nClick the CodeScene tab to open the Code Health Monitor.\nClose the file.\nSince the file is still visible in the Code Health Monitor, click on the function you want to refactor.\nClick Auto-Refactor.\nWhen the ACE window opens, click Show Diff.\nClick Accept Auto-Refactor.\n \nExpected Result:\nRefactoring is applied, and the ACE window is closed. The only thing visible should be the file itself with the applied changes.\n \nActual Result:\nRefactoring is applied, and the ACE window is closed, but the file window duplicates, and the Show diff window is not closed too."
+        },
+        {
+          "type": "assistant",
+          "text": " I need to dive into the codebase to understand how the Auto-Refactor feature works and identify where the bug is occurring."
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "Auto-Refactor|auto-refactor|autoRefactor"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "Show [Dd]iff|showDiff|show-diff"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "output_mode": "files_with_matches",
+            "pattern": "Accept|accept.*[Rr]efactor"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\utils.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " Looking at the `applyRefactoringCmd` function in the commands file, I can see where the issue is—it's retrieving the editor for the document and preparing to show it with the refactoring applied.\n\nThe problem is that when the user closes the original file and then accepts the auto-refactor from the diff view, `targetEditor` can't find a visible editor for that document anymore, so `viewColumn` ends up undefined. This causes `showTextDocument` to open the file in an unexpected location, potentially creating duplicate windows. Plus, the diff tab that was opened for \"Show Diff\" never gets closed, leaving both the diff and the newly opened file visible.\n\nThe fix needs to handle two things: close any existing diff tabs when applying the refactoring, and either find a sensible column to reuse or fall back to a default behavior when the original editor isn't visible."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\codescene-tab\\webview\\ace\\cwf-webview-ace-panel.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I'm piecing together the reproduction steps: the user has a file open with analysis running, closes it, then clicks a function in Code Health Monitor which may or may not reopen the file. When they trigger Auto-Refactor and click Show Diff, the command attempts to open diff tabs by calling `showTextDocument` on the original code, but the thinking cuts off before explaining what happens next.\n\nLooking at the apply refactoring logic, if there's no visible editor for the document, `targetEditor` returns undefined, so `viewColumn` becomes undefined too. When `showTextDocument` receives undefined for `viewColumn`, it defaults to the active editor group—which could be the ACE panel or diff view—potentially opening the original file in an unexpected location. The diff tabs also aren't cleaned up during apply, so they linger. There's also a race condition where clicking \"Show Diff\" twice could trigger `closeExistingDiffTabs` asynchronously while the first diff is still being set up, possibly creating duplicate diffs.\n\nThe fix involves closing diff tabs in the apply command, determining the viewColumn more reliably (maybe storing it from the original request or defaulting to `ViewColumn.One`), and ensuring the original document opens in the correct column regardless of what's currently active."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\request.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-C": 2,
+            "output_mode": "content",
+            "pattern": "CS-5755|CS-\\d+"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I'm identifying the bug now—when a user closes the original file and then opens Show Diff, the `targetEditor` function can't find a visible editor for that document, so it returns undefined. This causes `showTextDocument` to be called with an undefined `viewColumn`, which leads VS Code to open the file in an unexpected location.\n\nThe core issue is that the diff tabs remain open after applying the refactoring, and they're positioned in a column that interferes with where the original file gets reopened. I'm considering two approaches: either store the original `viewColumn` when creating the RefactoringRequest and reuse it consistently, or close the diff tabs first during apply and explicitly use `ViewColumn.One` as a fallback when no editor is found. The second approach seems cleaner since it ensures the file opens in the expected main editor area regardless of what happened to the diff tabs. The issue is that when the diff tab opens with `preview: false`, it creates a new tab instead of replacing the existing one, so both the diff and the original document end up in column 1. The fix needs to close diff tabs in the apply command and ensure the document opens in the correct column—either falling back to column one or wherever the diff was displayed. When Show Diff gets clicked twice in quick succession, the second click closes the first diff tab and opens a new temporary document, which can lead to duplicate file windows when the refactoring is applied. The core issue is that diff tabs aren't being closed when applying the refactoring, so combined with the viewColumn logic defaulting to the first available column when undefined, the file and diff end up in different columns and both stay visible. My fix is to close any existing diff tabs first in the apply command, then show the document with a more robust column selection—either using the target editor's column if available, or defaulting to column one. Double-clicking creates duplicates because closing the diff tabs can collapse a column, causing the next document to open in a different location than expected."
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "-A": 3,
+            "-B": 1,
+            "output_mode": "content",
+            "pattern": "tmp-diff|TabInputTextDiff"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I'm working through the logic for handling the diff tabs and document display. The key is to always close any existing temporary diff tabs when applying changes, then compute the view column robustly by checking if the target editor already has a column assigned, otherwise defaulting to the first column."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\codescene-tab\\webview\\ace\\acknowledgement\\cwf-webview-ace-acknowledgement-panel.ts",
+            "limit": 50
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "I have enough context to create the plan."
+        },
+        {
+          "type": "tool_use",
+          "name": "CreatePlan",
+          "input": {
+            "name": "Fix duplicate file window after accept",
+            "overview": "Fix the Auto-Refactor accept flow so it closes the leftover Show Diff tabs and shows the refactored file in a single, predictable editor column, even when the original document was closed before applying.",
+            "plan": "## Root cause\n\nIn [src/refactoring/commands.ts](src/refactoring/commands.ts), `applyRefactoringCmd` does two things that combine to reproduce the bug:\n\n```54:72:src/refactoring/commands.ts\n  private async applyRefactoringCmd(refactoring: RefactoringRequest) {\n    const {\n      document,\n      fnToRefactor: { vscodeRange },\n    } = refactoring;\n\n    return refactoring.promise.then(async (response) => {\n      const editor = targetEditor(document);\n      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn });\n      ...\n```\n\n1. It never closes the `tmp-diff` tabs opened by `showDiffForRefactoringCmd`, so the Show Diff view stays visible after Accept.\n2. When the original file was closed before accepting, `targetEditor(document)` returns `undefined`, so `viewColumn` becomes `undefined`. VS Code then opens the document in whatever group is currently active (typically the column where the diff lives, or a new group), which produces a second, duplicate-looking file tab next to the still-open diff. Clicking Show Diff twice makes this more reliable because the intermediate close-and-reopen shuffles which group is active when Accept finally runs.\n\n`closeExistingDiffTabs` already exists but is only called from `showDiffForRefactoringCmd`.\n\n## Fix\n\nOnly touch [src/refactoring/commands.ts](src/refactoring/commands.ts):\n\n- Close the Show Diff tabs before showing the document in `applyRefactoringCmd`, reusing the existing `closeExistingDiffTabs` helper (with the same try/catch + `reportError` pattern as `showDiffForRefactoringCmd`).\n- After closing diff tabs, pick a stable view column: prefer `targetEditor(document)?.viewColumn`, and fall back to `ViewColumn.One` when no editor for the document is visible. This matches the normal layout (editor in column 1, ACE panel `ViewColumn.Beside` in column 2) and prevents the refactored file from appearing in a different group than before.\n- Leave `showDiffForRefactoringCmd` unchanged; its existing `closeExistingDiffTabs` call already protects against repeated Show Diff clicks opening stacked diff panes.\n\nResulting flow for accept:\n\n```mermaid\nsequenceDiagram\n  participant UI as ACE panel\n  participant Cmd as applyRefactoringCmd\n  participant VSC as VS Code tabs\n  UI->>Cmd: apply\n  Cmd->>VSC: closeExistingDiffTabs (tmp-diff)\n  Cmd->>VSC: showTextDocument(document, col=targetEditor ?? ViewColumn.One)\n  Cmd->>VSC: applyEdit + selectCode + formatSelection\n  UI->>UI: dispose ACE panel\n```\n\n## Validation\n\nAfter the change, run CodeScene MCP `code_health_review` on [src/refactoring/commands.ts](src/refactoring/commands.ts) per user rule, and manually verify the reported repro:\n\n1. Open a file, edit to trigger analysis.\n2. Close the file.\n3. From the Code Health Monitor, click the function, then Auto-Refactor.\n4. Click Show Diff twice.\n5. Click Accept Auto-Refactor and confirm only the refactored file is visible (no leftover diff tab, no duplicate file tab).",
+            "todos": [
+              {
+                "content": "In src/refactoring/commands.ts applyRefactoringCmd: call closeExistingDiffTabs before showTextDocument, and fall back to ViewColumn.One when targetEditor is undefined",
+                "id": "fix-apply-cmd"
+              },
+              {
+                "content": "Run CodeScene code_health_review on src/refactoring/commands.ts after the edit",
+                "id": "validate-codescene"
+              }
+            ]
+          }
+        },
+        {
+          "type": "user",
+          "text": "I am able to reproduce it sometimes. Can we start with adding some debug logging, and I try to reproduce it, and we can confirm the cause first, and then fix?"
+        },
+        {
+          "type": "assistant",
+          "text": " The user wants to add debug logging first to understand what's happening before attempting a fix, so I should update the plan to focus on instrumentation and investigation. I'm thinking through what logging would be most useful—tracking when the command runs, which tabs are open beforehand, what the target editor lookup returns, and its view column position.\n\nFor `applyRefactoringCmd`, I need to log the entry point, the target editor result and its column, all existing tabs across groups with their details, the active editor state, and what happens after showing the document. In `closeExistingDiffTabs`, I should log which tabs it actually finds and closes. I'll use the existing `logOutputChannel` to add these traces throughout, then update the plan file to reflect this logging-first approach."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Users\\marti\\.cursor\\plans\\fix_duplicate_file_window_after_accept_24fb62ec.plan.md"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "file_path": "c:\\Users\\marti\\.cursor\\plans\\fix_duplicate_file_window_after_accept_24fb62ec.plan.md"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Plan updated. New flow:\n\n1. Add temporary `[refactor-debug]` logs in [src/refactoring/commands.ts](src/refactoring/commands.ts) around `showDiffForRefactoringCmd`, `closeExistingDiffTabs`, and `applyRefactoringCmd` - dumping all tabs (kind, label, viewColumn, schemes), `activeTextEditor`, and `targetEditor(document)?.viewColumn`.\n2. You reproduce and share the CodeScene output channel lines.\n3. We confirm whether the `apply:enter` snapshot shows leftover `tmp-diff` tabs and an undefined `viewColumn`, matching the hypothesis.\n4. Apply the fix (close diff tabs in `applyRefactoringCmd`, fall back to `ViewColumn.One`), remove temp logs, run CodeScene review.\n\nWant me to proceed to execute step 1 (add the logging), or adjust what we log first?"
+        },
+        {
+          "type": "user",
+          "text": "lets start"
+        },
+        {
+          "type": "tool_use",
+          "name": "SwitchMode",
+          "input": {
+            "explanation": "Starting execution of step 1: add temporary debug logging.",
+            "target_mode_id": "agent"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I'm adding debug logging to the refactoring commands file by creating a helper function to track tab state and instrumenting the key command handlers to log their execution flow."
+        },
+        {
+          "type": "tool_use",
+          "name": "StrReplace",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Now let me verify the edit compiles (no linter errors) and check the result:"
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Let me run a quick TypeScript check to ensure the added code compiles:\n\n Let me run a quick typecheck to make sure everything compiles, then I'll add the logging the user needs to reproduce the issue."
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "block_until_ms": 90000,
+            "command": "npx tsc --noEmit",
+            "description": "Typecheck the project"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Compiles cleanly. Per your user rule, running CodeScene review on the modified file:"
+        },
+        {
+          "type": "tool_use",
+          "name": "CallMcpTool",
+          "input": {
+            "arguments": {
+              "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+            },
+            "server": "user-codescene",
+            "toolName": "code_health_review"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Code Health score is 10.0, no issues.\n\nDebug logging is in place. To capture the repro:\n\n1. Launch the Extension Development Host (F5) or install the built extension.\n2. Open the CodeScene output channel and set its log level to Debug (gear icon in the Output panel -> set \"CodeScene\" log level to Debug).\n3. Follow the repro steps from the bug report (close file, Monitor -> Auto-Refactor, Show Diff twice, Accept).\n4. Copy the `[refactor-debug]` lines and share them here.\n\nWhat the logs will show at each stage:\n- `showDiff:enter` / `showDiff:resolved-viewColumn` / `showDiff:after-diff` - whether `targetEditor` resolves to a column at diff time and what tabs exist.\n- `closeExistingDiffTabs count=...` - how many `tmp-diff` tabs get closed on the second Show Diff click.\n- `apply:enter` / `apply:resolved-viewColumn` / `apply:after-show` / `apply:after-edit` - whether leftover diff tabs are present at Accept, whether `viewColumn` is undefined, and whether the file ends up in a new column.\n\nPing me with the captured output when you have it."
+        },
+        {
+          "type": "user",
+          "text": "where can I see this debug log?"
+        },
+        {
+          "type": "assistant",
+          "text": " The user wants to know where to find the debug log output, so I need to check how the debug output channel is configured to understand where those logs actually appear."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\log.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "It's a VS Code `LogOutputChannel` named \"CodeScene Log\". To see the debug lines:\n\n1. Open the Output panel: View -> Output (or Ctrl+Shift+U).\n2. In the dropdown on the right of the Output panel, select **CodeScene Log**.\n3. Click the gear icon (top-right of Output panel) and set the log level to **Debug** (or Trace). By default it's Info, which hides `logOutputChannel.debug(...)` lines.\n   - Alternatively: Command Palette -> \"Developer: Set Log Level...\" -> pick \"CodeScene Log\" -> Debug.\n4. Reproduce the bug. Lines will appear prefixed with `[refactor-debug]`.\n\nTip: right-click in the output panel -> \"Copy All\" to grab everything."
+        },
+        {
+          "type": "user",
+          "text": "2026-04-20 09:30:28.757 [debug] [refactor-debug] showDiff:enter activeViewColumn=undefined activeUri=undefined docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=true targetEditorViewColumn=1 tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":true,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":true}]\n2026-04-20 09:30:28.758 [debug] [refactor-debug] closeExistingDiffTabs count=0 viewColumns=[]\n2026-04-20 09:30:28.777 [debug] [refactor-debug] showDiff:resolved-viewColumn editor=true viewColumn=1\n2026-04-20 09:30:29.317 [debug] [refactor-debug] showDiff:after-diff activeViewColumn=undefined activeUri=tmp-diff:Refactoring?public%20void%20ProcessDirectory%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20GetDataFiles%28path%29%3B%0A%20%20%20%20var%20content%20%3D%20ReadFilesContent%28files%29%3B%0A%20%20%20%20WriteContentToFile%28content%2C%20%22data.csv%22%29%3B%0A%7D%0A%0Aprivate%20List%3Cstring%3E%20GetDataFiles%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20new%20List%3Cstring%3E%28%29%3B%0A%20%20%20%20var%20directory%20%3D%20new%20DirectoryInfo%28path%29%3B%0A%0A%20%20%20%20foreach%20%28FileInfo%20fileInfo%20in%20directory.GetFiles%28%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20if%20%28Re********atch%28fileInfo.Name%2C%20%40%22%5Edata%5Cd%2B%5C.csv%24%22%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20files.Add%28fileInfo.FullName%29%3B%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20files%3B%0A%7D%0A%0Aprivate%20string%20ReadFilesContent%28List%3Cstring%3E%20files%29%0A%7B%0A%20%20%20%20var%20sb%20%3D%20new%20StringBuilder%28%29%3B%0A%20%20%20%20foreach%20%28string%20filePath%20in%20files%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20using%20%28var%20reader%20%3D%20new%20StreamReader%28filePath%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20string%20line%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20while%20%28%28line%20%3D%20reader.ReadLine%28%29%29%20%21%3D%20null%29%0A%20%20%20%20%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20sb.Append%28line%29%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20sb.ToString%28%29%3B%0A%7D%0A%0Aprivate%20void%20WriteContentToFile%28string%20content%2C%20string%20outputPath%29%0A%7B%0A%20%20%20%20using%20%28var%20writer%20%3D%20new%20StreamWriter%28outputPath%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20writer.Write%28content%29%3B%0A%20%20%20%20%7D%0A%7D docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=false targetEditorViewColumn=undefined tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":true}]\n2026-04-20 09:30:34.136 [debug] [refactor-debug] showDiff:enter activeViewColumn=undefined activeUri=tmp-diff:Refactoring?public%20void%20ProcessDirectory%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20GetDataFiles%28path%29%3B%0A%20%20%20%20var%20content%20%3D%20ReadFilesContent%28files%29%3B%0A%20%20%20%20WriteContentToFile%28content%2C%20%22data.csv%22%29%3B%0A%7D%0A%0Aprivate%20List%3Cstring%3E%20GetDataFiles%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20new%20List%3Cstring%3E%28%29%3B%0A%20%20%20%20var%20directory%20%3D%20new%20DirectoryInfo%28path%29%3B%0A%0A%20%20%20%20foreach%20%28FileInfo%20fileInfo%20in%20directory.GetFiles%28%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20if%20%28Re********atch%28fileInfo.Name%2C%20%40%22%5Edata%5Cd%2B%5C.csv%24%22%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20files.Add%28fileInfo.FullName%29%3B%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20files%3B%0A%7D%0A%0Aprivate%20string%20ReadFilesContent%28List%3Cstring%3E%20files%29%0A%7B%0A%20%20%20%20var%20sb%20%3D%20new%20StringBuilder%28%29%3B%0A%20%20%20%20foreach%20%28string%20filePath%20in%20files%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20using%20%28var%20reader%20%3D%20new%20StreamReader%28filePath%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20string%20line%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20while%20%28%28line%20%3D%20reader.ReadLine%28%29%29%20%21%3D%20null%29%0A%20%20%20%20%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20sb.Append%28line%29%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20sb.ToString%28%29%3B%0A%7D%0A%0Aprivate%20void%20WriteContentToFile%28string%20content%2C%20string%20outputPath%29%0A%7B%0A%20%20%20%20using%20%28var%20writer%20%3D%20new%20StreamWriter%28outputPath%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20writer.Write%28content%29%3B%0A%20%20%20%20%7D%0A%7D docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=false targetEditorViewColumn=undefined tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":true}]\n2026-04-20 09:30:34.136 [debug] [refactor-debug] closeExistingDiffTabs count=1 viewColumns=[{\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1}]\n2026-04-20 09:30:34.229 [debug] [refactor-debug] showDiff:resolved-viewColumn editor=true viewColumn=1\n2026-04-20 09:30:34.685 [debug] [refactor-debug] showDiff:after-diff activeViewColumn=undefined activeUri=tmp-diff:Refactoring?public%20void%20ProcessDirectory%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20GetDataFiles%28path%29%3B%0A%20%20%20%20var%20content%20%3D%20ReadFilesContent%28files%29%3B%0A%20%20%20%20WriteContentToFile%28content%2C%20%22data.csv%22%29%3B%0A%7D%0A%0Aprivate%20List%3Cstring%3E%20GetDataFiles%28string%20path%29%0A%7B%0A%20%20%20%20var%20files%20%3D%20new%20List%3Cstring%3E%28%29%3B%0A%20%20%20%20var%20directory%20%3D%20new%20DirectoryInfo%28path%29%3B%0A%0A%20%20%20%20foreach%20%28FileInfo%20fileInfo%20in%20directory.GetFiles%28%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20if%20%28Re********atch%28fileInfo.Name%2C%20%40%22%5Edata%5Cd%2B%5C.csv%24%22%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20files.Add%28fileInfo.FullName%29%3B%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20files%3B%0A%7D%0A%0Aprivate%20string%20ReadFilesContent%28List%3Cstring%3E%20files%29%0A%7B%0A%20%20%20%20var%20sb%20%3D%20new%20StringBuilder%28%29%3B%0A%20%20%20%20foreach%20%28string%20filePath%20in%20files%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20using%20%28var%20reader%20%3D%20new%20StreamReader%28filePath%29%29%0A%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20string%20line%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20while%20%28%28line%20%3D%20reader.ReadLine%28%29%29%20%21%3D%20null%29%0A%20%20%20%20%20%20%20%20%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20sb.Append%28line%29%3B%0A%20%20%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%0A%0A%20%20%20%20return%20sb.ToString%28%29%3B%0A%7D%0A%0Aprivate%20void%20WriteContentToFile%28string%20content%2C%20string%20outputPath%29%0A%7B%0A%20%20%20%20using%20%28var%20writer%20%3D%20new%20StreamWriter%28outputPath%29%29%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%20%20writer.Write%28content%29%3B%0A%20%20%20%20%7D%0A%7D docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=false targetEditorViewColumn=undefined tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":true}]\n2026-04-20 09:30:39.972 [debug] [refactor-debug] apply:enter activeViewColumn=undefined activeUri=undefined docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=false targetEditorViewColumn=undefined tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":true}]\n2026-04-20 09:30:39.972 [debug] [refactor-debug] apply:resolved-viewColumn editor=false viewColumn=undefined\n2026-04-20 09:30:40.021 [debug] [refactor-debug] apply:after-show activeViewColumn=2 activeUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=true targetEditorViewColumn=2 tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":false},{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":2,\"isActive\":true,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"}]\n2026-04-20 09:30:40.532 [debug] [refactor-debug] apply:after-edit activeViewColumn=2 activeUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docUri=file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs docVisible=true targetEditorViewColumn=2 tabs=[{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":1,\"isActive\":false,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"},{\"kind\":\"diff\",\"label\":\"Original ↔ Refactoring\",\"viewColumn\":1,\"isActive\":true,\"originalScheme\":\"tmp-diff\",\"modifiedScheme\":\"tmp-diff\"},{\"kind\":\"webview\",\"label\":\"CodeScene ACE\",\"viewColumn\":2,\"isActive\":false},{\"kind\":\"text\",\"label\":\"DeepNestedComplexity.cs\",\"viewColumn\":2,\"isActive\":true,\"uri\":\"file:///c%3A/Git/vs-testing/CSharp/DeepNestedComplexity.cs\"}]"
+        },
+        {
+          "type": "assistant",
+          "text": "Logs confirm the hypothesis exactly.\n\n**What happened at apply time:**\n\n```\napply:enter\n  tabs:\n    - text \"DeepNestedComplexity.cs\" viewColumn=1, isActive=false\n    - diff \"Original ↔ Refactoring\" viewColumn=1, isActive=true (tmp-diff)\n    - webview \"CodeScene ACE\"        viewColumn=2, isActive=true\n  targetEditorViewColumn=undefined    <-- diff covers the file in col 1, file has no visible editor\n  docVisible=false\n\napply:resolved-viewColumn editor=false viewColumn=undefined\n\napply:after-show\n  activeViewColumn=2                   <-- showTextDocument(uri, {viewColumn: undefined}) opened in active group (col 2, ACE)\n  tabs now include BOTH:\n    - text \"DeepNestedComplexity.cs\" viewColumn=1 (original)\n    - diff \"Original ↔ Refactoring\" viewColumn=1 (leftover)\n    - text \"DeepNestedComplexity.cs\" viewColumn=2 (NEW duplicate)\n```\n\nSo:\n1. Diff tabs are never closed on apply -> Show Diff window stays visible.\n2. `targetEditor(document)` returns `undefined` because the diff hides the file in col 1, so `viewColumn` passes as `undefined`, which makes `showTextDocument` create a second text tab in col 2 next to the ACE panel.\n\nInteresting bonus from logs: in the 2nd `showDiff`, after `closeExistingDiffTabs` ran, `targetEditor` then resolved to column 1 again. So closing the diff first is enough to make `targetEditor` work correctly.\n\nGoing to apply the fix now: close diff tabs first in `applyRefactoringCmd`, resolve viewColumn from the existing tab if `targetEditor` is still undefined, and remove the debug logging.\n\n The logs confirm what I suspected—at the point where `showDiff` is triggered, there's only one text tab (`DeepNestedComplexity.cs`) in the first column marked as active, the ACE webview sits in column 2, and the target editor correctly resolves to column 1. The document itself wasn't closed, just hidden from view.\n\nWhen the first diff opens, it stacks into the same column as the text file, making the diff the active tab while the original file's tab remains underneath. This causes `docVisible` to flip to false since the text editor is no longer in focus. On the second `showDiff` call, the target editor column becomes undefined because the file isn't visible anymore, but VS Code helpfully re-activates the text tab once the diff is closed. The pattern repeats—diff opens in column 1, text tab stays stacked below it. By the time we reach `apply:enter`, we're back to the same state: text tab in column 1 but inactive, diff tab active on top of it, and the target editor column undefined since the document isn't currently visible.\n\nWhen `showTextDocument` is called with an undefined `viewColumn`, it opens in whatever the globally active group is—which turns out to be the ACE webview in column 2, not column 1 where the original file lives. This creates a duplicate text tab in column 2 instead of reusing the one that's still sitting in column 1. The real issue is that the diff tab never gets closed after accept, so the original text tab loses its active status and becomes invisible to `targetEditor`. The fix is to close those leftover diff tabs first before trying to show the text document.\n\nI should find the existing tab for the document's URI in the tab groups, note which column it's in, then close the diff tabs and explicitly show the document in that same column—or fall back to column 1 if needed. This way we're guaranteed to reuse the existing tab instead of creating a duplicate. Now I'll implement this fix and clean up the debug logging."
+        },
+        {
+          "type": "tool_use",
+          "name": "StrReplace",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Now add the `ViewColumn` import and the `findDocumentTabViewColumn` helper:"
+        },
+        {
+          "type": "tool_use",
+          "name": "StrReplace",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "StrReplace",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I need to remove that placeholder ticket reference and clean up the comments to avoid mentioning the prompt conversation, while keeping the explanation of intent intact."
+        },
+        {
+          "type": "tool_use",
+          "name": "StrReplace",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Now typecheck and run CodeScene review:"
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "block_until_ms": 60000,
+            "command": "npx tsc --noEmit",
+            "description": "Typecheck after fix"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "CallMcpTool",
+          "input": {
+            "arguments": {
+              "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts"
+            },
+            "server": "user-codescene",
+            "toolName": "code_health_review"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Typecheck passes. CodeScene score: 10.0, no issues.\n\n**Summary of the fix** in [src/refactoring/commands.ts](src/refactoring/commands.ts):\n\n1. `applyRefactoringCmd` now calls `closeExistingDiffTabs()` before `showTextDocument`, which clears the leftover Show Diff tabs.\n2. View column is resolved via `targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One`, so even if no editor is currently visible (diff covering it, or file closed), we reuse the column of the existing file tab instead of falling through to the active (ACE) group.\n3. Added `findDocumentTabViewColumn` helper that scans `vscode.window.tabGroups` for a matching `TabInputText`.\n4. Applied the same robust `viewColumn` resolution in `showDiffForRefactoringCmd` so the diff reliably opens over the file tab instead of beside the ACE panel in edge cases.\n5. Removed all temporary `[refactor-debug]` logging.\n\nPlease re-run the repro (close file -> Monitor -> Auto-Refactor -> Show Diff twice -> Accept) and confirm: only the refactored file should remain visible, no diff tab, no duplicate file tab."
+        },
+        {
+          "type": "user",
+          "text": "commit push and create PR"
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "command": "git status",
+            "description": "Check git status"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "command": "git diff",
+            "description": "Check diff"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "command": "git log -5 --oneline",
+            "description": "Check recent commit style"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I'm noticing the diff removed the `CsDiagnostics` import, but I didn't intentionally remove it in my edits—let me verify whether it's actually unused or if this was an unintended auto-removal."
+        },
+        {
+          "type": "tool_use",
+          "name": "Read",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts",
+            "limit": 15
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Grep",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\src\\refactoring\\commands.ts",
+            "pattern": "CsDiagnostics"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "Unused `CsDiagnostics` import was already removed. Branch is `fix/cs-5753/...` so the ticket is CS-5753.\n\n The unused CsDiagnostics import got cleaned up by the IDE, which is fine since nothing was referencing it. I'll follow the conventional commit format with \"fix: ...\" for the commit message, and the branch name indicates this is for ticket CS-5753 addressing the duplicate windows refactor."
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "command": "git add src/refactoring/commands.ts && git commit -m \"$(cat <<'EOF'\nfix: prevent duplicate file window after accepting Auto-Refactor (CS-5753)\n\nWhen a Show Diff tab covers the document in its original view column,\ntargetEditor() returns undefined so showTextDocument opens a new tab in\nthe active (ACE) group instead of reusing the file's column. The leftover\ndiff tab was also never closed on accept.\n\n- applyRefactoringCmd now closes tmp-diff tabs before showing the document\n- Resolve view column from the existing text tab when no editor is visible,\n  with ViewColumn.One as final fallback\n- Apply the same robust view column resolution in showDiffForRefactoringCmd\nEOF\n)\"",
+            "description": "Commit the fix"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "PowerShell doesn't support heredoc. Let me use multiple `-m` flags:\n\n PowerShell doesn't have heredoc syntax, so I'll need to write the message to a temporary file or use multiple message flags instead."
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "command": "git add src/refactoring/commands.ts; git commit -m \"fix: prevent duplicate file window after accepting Auto-Refactor (CS-5753)\" -m \"When a Show Diff tab covers the document in its original view column, targetEditor() returns undefined so showTextDocument opens a new tab in the active (ACE) group instead of reusing the file's column. The leftover diff tab was also never closed on accept.\" -m \"- applyRefactoringCmd now closes tmp-diff tabs before showing the document`n- Resolve view column from the existing text tab when no editor is visible, with ViewColumn.One as final fallback`n- Apply the same robust view column resolution in showDiffForRefactoringCmd\"",
+            "description": "Commit the fix"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "block_until_ms": 60000,
+            "command": "git push -u origin HEAD",
+            "description": "Push branch to origin"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "block_until_ms": 60000,
+            "command": "gh pr create --title \"fix: prevent duplicate file window after accepting Auto-Refactor (CS-5753)\" --body \"## Summary`n`nFixes CS-5753. After accepting Auto-Refactor, the Show Diff tab remained open and the refactored file sometimes appeared in a new, duplicate editor tab alongside the ACE panel.`n`n### Root cause (confirmed via debug logs)`n`nWhen a ```tmp-diff``` tab covers the document in its original view column:`n- ```targetEditor(document)``` returns ```undefined``` because the document isn't visible in any editor.`n- ```showTextDocument(uri, { viewColumn: undefined })``` falls back to the globally active group (the ACE webview column), creating a duplicate file tab there.`n- ```applyRefactoringCmd``` also never closed the ```tmp-diff``` tabs, so the Show Diff view stayed visible after accept.`n`n### Changes (```src/refactoring/commands.ts```)`n`n- ```applyRefactoringCmd``` now closes existing ```tmp-diff``` tabs before showing the document.`n- New ```findDocumentTabViewColumn``` helper locates the view column of the document's existing text tab even when that tab isn't active in its group.`n- View column resolution in both ```applyRefactoringCmd``` and ```showDiffForRefactoringCmd``` now uses: ```targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One```.`n`n## Test plan`n`n- [ ] Open a file, edit to trigger analysis.`n- [ ] Close the file.`n- [ ] From the Code Health Monitor, click the function, then Auto-Refactor.`n- [ ] Click Show Diff twice.`n- [ ] Click Accept Auto-Refactor.`n- [ ] Expect only the refactored file visible: no leftover diff tab, no duplicate file tab.`n- [ ] Single Show Diff click still opens the diff in the file's column (not on top of the ACE panel).`n- [ ] CodeScene ```code_health_review``` on ```src/refactoring/commands.ts``` returns score 10.0.\"",
+            "description": "Create pull request"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": " I need to work around PowerShell's handling of triple backticks by writing the content to a temporary file first instead of passing it directly."
+        },
+        {
+          "type": "tool_use",
+          "name": "Write",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\.pr-body.tmp.md"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Shell",
+          "input": {
+            "block_until_ms": 60000,
+            "command": "gh pr create --title \"fix: prevent duplicate file window after accepting Auto-Refactor (CS-5753)\" --body-file .pr-body.tmp.md",
+            "description": "Create pull request with body file"
+          }
+        },
+        {
+          "type": "tool_use",
+          "name": "Delete",
+          "input": {
+            "file_path": "c:\\Git\\codescene-vscode\\.pr-body.tmp.md"
+          }
+        },
+        {
+          "type": "assistant",
+          "text": "PR created: https://github.com/codescene-oss/codescene-vscode/pull/303\n\n- Committed to `fix/cs-5753/refactor-duplicate-windows` as `a74deed`\n- Pushed to origin\n- PR #303 opened with summary and test plan"
+        },
+        {
+          "type": "user",
+          "text": "So we had a thought. If you were to have other diff windows open while refactoring, they would be unintentionally closed aswell when applying the refactoring, correct?"
+        },
+        {
+          "type": "assistant",
+          "text": "No, we're safe. `closeExistingDiffTabs` filters to diffs where one side uses the `tmp-diff` scheme:\n\n```98:110:src/refactoring/commands.ts\n  private async closeExistingDiffTabs() {\n    const tabsToClose = vscode.window.tabGroups.all\n      .flatMap((group) => group.tabs)\n      .filter(\n        (tab) =>\n          tab.input instanceof vscode.TabInputTextDiff &&\n          (tab.input.original.scheme === 'tmp-diff' || tab.input.modified.scheme === 'tmp-diff')\n      );\n```\n\nThe `tmp-diff` scheme is ours exclusively, registered in [src/refactoring/utils.ts](src/refactoring/utils.ts):\n\n```67:88:src/refactoring/utils.ts\nexport function createTmpDiffUriScheme() {\n  const uriQueryContentProvider = new (class implements vscode.TextDocumentContentProvider {\n    provideTextDocumentContent(uri: vscode.Uri): string {\n      return uri.query;\n    }\n  })();\n  return vscode.workspace.registerTextDocumentContentProvider('tmp-diff', uriQueryContentProvider);\n}\n...\nexport async function createTempDocument(name: string, code: CodeWithLangId) {\n  const tmpUri = Uri.from({ scheme: 'tmp-diff', path: name, query: code.content });\n```\n\nOther diff tabs the user might have open (git diffs, regular file diffs, git-compare, etc.) use schemes like `file`, `git`, `gitlens`, `vscode-scm`, etc., and won't match the filter. Only the Show Diff tabs opened by the refactoring flow (both sides are `tmp-diff`) are closed.\n\n I'm checking how `closeExistingDiffTabs` works—it specifically targets diffs where one side uses the `tmp-diff` scheme, which is what CodeScene's refactoring feature creates.\n\nSince user-opened diffs use standard schemes like `file://` or `git:`, they won't be affected by this filter. Let me verify this by searching for where the `tmp-diff` scheme is actually used."
+        }
+      ],
+      "total_additions": 28,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_0bea9e1dd5ef0d": {
+      "author": "Martin Säfsten"
+    }
+  }
+}
