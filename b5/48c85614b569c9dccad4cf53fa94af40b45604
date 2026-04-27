@@ -1,0 +1,27 @@
+src/test/suite/telemetry-integration.test.ts
+  0bd915a44a2fa5fd 40,57,74,93
+src/telemetry.ts
+  0bd915a44a2fa5fd 149
+src/devtools-api/telemetry-model.ts
+  0bd915a44a2fa5fd 7-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b548c85614b569c9dccad4cf53fa94af40b45604",
+  "prompts": {
+    "0bd915a44a2fa5fd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0ab8ab1a-2def-477c-b663-11ee5a07b6a0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Martin Säfsten",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 0,
+      "accepted_lines": 340,
+      "overriden_lines": 0
+    }
+  }
+}
