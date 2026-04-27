@@ -5,6 +5,10 @@ export interface TelemetryEvent {
    */
   'editor-type': string;
   /**
+   * Version of editor, for example 1.112.0.
+   */
+  'editor-version'?: string;
+  /**
    * Name of event, this should be unique for each tracked function.
    */
   'event-name': string;

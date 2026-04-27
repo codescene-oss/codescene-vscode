@@ -37,6 +37,7 @@ suite('Telemetry Integration Test Suite', () => {
 
     const event: TelemetryEvent = {
       'editor-type': 'VSCode',
+      'editor-version': '1.112.0',
       'event-name': 'test-event',
       'extension-version': '1.0.0'
     };
@@ -53,6 +54,7 @@ suite('Telemetry Integration Test Suite', () => {
 
     const event: TelemetryEvent = {
       'editor-type': 'VSCode',
+      'editor-version': '1.112.0',
       'event-name': 'test-event-with-user',
       'extension-version': '1.0.0',
       'user-id': 'test-user-123'
@@ -69,6 +71,7 @@ suite('Telemetry Integration Test Suite', () => {
 
     const event: TelemetryEvent = {
       'editor-type': 'VSCode',
+      'editor-version': '1.112.0',
       'event-name': 'custom-props-event',
       'extension-version': '1.0.0',
       'custom-prop-1': 'value1',
@@ -87,6 +90,7 @@ suite('Telemetry Integration Test Suite', () => {
 
     const event: TelemetryEvent = {
       'editor-type': 'VSCode',
+      'editor-version': '1.112.0',
       'event-name': 'comprehensive-event',
       'extension-version': '2.5.0',
       internal: false,
