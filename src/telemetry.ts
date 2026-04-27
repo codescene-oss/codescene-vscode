@@ -146,6 +146,7 @@ export default class Telemetry {
       'event-time': new Date().toISOString(),
       'event-name': eventName,
       'editor-type': 'vscode',
+      'editor-version': vscode.version,
       'extension-version': this.extension.packageJSON.version,
       'process-platform': process.platform,
       'process-arch': process.arch,
