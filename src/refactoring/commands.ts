@@ -1,7 +1,6 @@
-import vscode, { WorkspaceEdit } from 'vscode';
+import vscode, { ViewColumn, WorkspaceEdit } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
-import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
@@ -10,6 +9,21 @@ import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webvie
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 import { logOutputChannel } from '../log';
 import { CodeSmell } from '../devtools-api/review-model';
+
+/**
+ * Locate the view column of an existing tab for the given document, even when the document
+ * is not the active tab in its group (e.g. when a diff tab is on top of it).
+ */
+function findDocumentTabViewColumn(document: vscode.TextDocument): ViewColumn | undefined {
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === document.uri.toString()) {
+        return group.viewColumn;
+      }
+    }
+  }
+  return undefined;
+}
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
@@ -58,8 +72,15 @@ export class CsRefactoringCommands implements vscode.Disposable {
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
-      const editor = targetEditor(document);
-      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn: editor?.viewColumn });
+      // Close any lingering Show Diff tabs.
+      try {
+        await this.closeExistingDiffTabs();
+      } catch (e) {
+        reportError({ e, context: 'Error closing diff tabs' });
+      }
+
+      const viewColumn = targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One;
+      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn });
       const workSpaceEdit = new WorkspaceEdit();
       workSpaceEdit.replace(document.uri, vscodeRange, response.code);
       await vscode.workspace.applyEdit(workSpaceEdit);
@@ -114,8 +135,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
     // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
     // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
-    const editor = targetEditor(document);
-    await vscode.window.showTextDocument(originalCodeTmpDoc, editor?.viewColumn, false);
+    const viewColumn = targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One;
+    await vscode.window.showTextDocument(originalCodeTmpDoc, viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
 
     Telemetry.logUsage('refactor/diff-shown', refactoring.eventData);
