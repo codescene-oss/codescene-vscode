@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.27.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.5...v0.27.0) (2026-05-12)
+
+
+### Features
+
+* add editor-version to telemetry payload ([#305](https://github.com/codescene-oss/codescene-vscode/issues/305)) ([72f5e43](https://github.com/codescene-oss/codescene-vscode/commit/72f5e43846393003ec542c88c737b2a363479063))
+
+
+### Bug fixes
+
+* prevent duplicate file window after accepting auto-refactor ([#303](https://github.com/codescene-oss/codescene-vscode/issues/303)) ([f9dd208](https://github.com/codescene-oss/codescene-vscode/commit/f9dd208eb77b76a373770ff7e84a025579ef9be9))
+
 ### [0.26.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.4...v0.26.5) (2026-04-22)
 
 ### [0.26.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.3...v0.26.4) (2026-04-17)
