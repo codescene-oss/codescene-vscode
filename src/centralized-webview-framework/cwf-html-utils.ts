@@ -71,7 +71,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-foreground-${opacity}: color-mix(in srgb, var(--vscode-foreground) ${opacity}%, transparent);`
+            `--cs-theme-foreground-${opacity}: color-mix(in srgb, var(--vscode-foreground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
 
@@ -86,7 +86,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-foreground-${opacity}: color-mix(in srgb, var(--vscode-button-foreground) ${opacity}%, transparent);`
+            `--cs-theme-button-foreground-${opacity}: color-mix(in srgb, var(--vscode-button-foreground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
 
@@ -94,7 +94,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-background-${opacity}: color-mix(in srgb, var(--vscode-button-background) ${opacity}%, transparent);`
+            `--cs-theme-button-background-${opacity}: color-mix(in srgb, var(--vscode-button-background) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
       --cs-theme-button-secondaryForeground: var(--vscode-button-secondaryForeground);
@@ -103,7 +103,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-secondaryBackground-${opacity}: color-mix(in srgb, var(--vscode-button-secondaryBackground) ${opacity}%, transparent);`
+            `--cs-theme-button-secondaryBackground-${opacity}: color-mix(in srgb, var(--vscode-button-secondaryBackground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
     }
