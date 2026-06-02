@@ -14,13 +14,16 @@ export function parseJsonInput(input: string): any {
   }
 }
 
+const SENSITIVE_KEYS = new Set(['token', 'accessToken', 'Authorization']);
+
 export function objectToArray(obj: any): any[] {
   if (Array.isArray(obj)) {
     return obj;
   }
   if (typeof obj === 'object' && obj !== null) {
     const { 'file-content': _, ...rest } = obj;
-    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, value]);
+    
+    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, SENSITIVE_KEYS.has(key) ? '[REDACTED]' : value]);
   }
   return [];
 }
