@@ -27,6 +27,9 @@ suite('SimpleExecutor Test Suite', () => {
       assert.deepStrictEqual(objectToArray([]), []);
       assert.deepStrictEqual(objectToArray({ 'file-content': 'ignored', key: 'value' }), ["'key'", 'value']);
       assert.deepStrictEqual(objectToArray({ 'file-content': 'ignored' }), []);
+      assert.deepStrictEqual(objectToArray({ 'token': 'secret-bearer-token', key: 'value' }), ["'token'", '[REDACTED]', "'key'", 'value']);
+      assert.deepStrictEqual(objectToArray({ 'accessToken': 'secret', key: 'value' }), ["'accessToken'", '[REDACTED]', "'key'", 'value']);
+      assert.deepStrictEqual(objectToArray({ 'Authorization': 'Bearer xyz', key: 'value' }), ["'Authorization'", '[REDACTED]', "'key'", 'value']);
     });
   });
 
