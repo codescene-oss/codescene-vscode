@@ -40,6 +40,10 @@ jobs:
     - name: Configure Git
       run: git config --global advice.defaultBranchName false
 
+    - run: npm run pretest
+      env:
+        CI: true
+
     - run: npm test
       env:
         CI: true

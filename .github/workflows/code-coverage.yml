@@ -22,6 +22,11 @@ jobs:
     - name: Configure Git
       run: git config --global advice.defaultBranchName false
 
+    - name: Pretest
+      run: npm run pretest
+      env:
+        CI: true
+
     - name: Generate code coverage
       run: npm run test:coverage
       env:
