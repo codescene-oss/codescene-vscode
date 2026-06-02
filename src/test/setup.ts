@@ -178,6 +178,20 @@ const vscodeStub = {
       toString: () => path,
       toJSON: () => ({ scheme: 'file', path }),
     }),
+    joinPath: (base: any, ...segments: string[]) => {
+      const joined = [base.toString(), ...segments].join('/');
+      return {
+        scheme: 'file',
+        authority: '',
+        path: joined,
+        query: '',
+        fragment: '',
+        fsPath: joined,
+        with: () => ({}),
+        toString: () => joined,
+        toJSON: () => ({ scheme: 'file', path: joined }),
+      };
+    },
   },
 };
 

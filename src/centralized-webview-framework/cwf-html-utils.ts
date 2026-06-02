@@ -1,6 +1,6 @@
 import { Webview } from 'vscode';
 import { IdeContextType } from './types';
-import { getUri } from '../webview-utils';
+import { getUri, nonce } from '../webview-utils';
 import { FeatureFlags } from './types/cwf-feature';
 export const ideType = 'VSCode';
 
@@ -71,7 +71,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-foreground-${opacity}: color-mix(in srgb, var(--vscode-foreground) ${opacity}%, transparent);`
+            `--cs-theme-foreground-${opacity}: color-mix(in srgb, var(--vscode-foreground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
 
@@ -86,7 +86,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-foreground-${opacity}: color-mix(in srgb, var(--vscode-button-foreground) ${opacity}%, transparent);`
+            `--cs-theme-button-foreground-${opacity}: color-mix(in srgb, var(--vscode-button-foreground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
 
@@ -94,7 +94,7 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-background-${opacity}: color-mix(in srgb, var(--vscode-button-background) ${opacity}%, transparent);`
+            `--cs-theme-button-background-${opacity}: color-mix(in srgb, var(--vscode-button-background) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
       --cs-theme-button-secondaryForeground: var(--vscode-button-secondaryForeground);
@@ -103,45 +103,50 @@ export const ideStylesVars = `
       ${Object.keys(opacityHexLookup)
         .map(
           (opacity) =>
-            `--cs-theme-button-secondaryBackground-${opacity}: color-mix(in srgb, var(--vscode-button-secondaryBackground) ${opacity}%, transparent);`
+            `--cs-theme-button-secondaryBackground-${opacity}: color-mix(in srgb, var(--vscode-button-secondaryBackground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
     }
   </style>
 `;
 
-export const initialDataContextScriptTag = (ideContext: IdeContextType) => /*html*/ `
-  <script>
+function safeJsonStringify(obj: unknown): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+}
+
+export const initialDataContextScriptTag = (ideContext: IdeContextType, scriptNonce: string) => /*html*/ `
+  <script nonce="${scriptNonce}">
     function setContext() {
-      window.ideContext = ${JSON.stringify(ideContext)}
+      window.ideContext = ${safeJsonStringify(ideContext)}
     }
     setContext();
   </script>
 `;
 
-export const generateContextScriptTag = (ideContext: IdeContextType) => {
+export const generateContextScriptTag = (ideContext: IdeContextType, scriptNonce: string) => {
   return `
-  <script>
+  <script nonce="${scriptNonce}">
     function setContext() {
-      window.ideContext = ${JSON.stringify(ideContext)}
+      window.ideContext = ${safeJsonStringify(ideContext)}
     }
     setContext();
   </script>`;
 };
 
-export const getCsp = (webview: Webview) => [
+export const getCsp = (webview: Webview, scriptNonce: string) => [
   `default-src 'none';`,
-  `script-src ${webview.cspSource} 'unsafe-eval' 'unsafe-inline' https://* `,
-  `style-src ${webview.cspSource} 'self' 'unsafe-inline' https://*`,
-  `img-src ${webview.cspSource} 'self' data: 'unsafe-inline' https://*`,
+  `script-src ${webview.cspSource} 'nonce-${scriptNonce}'`,
+  `style-src ${webview.cspSource} 'unsafe-inline'`,
+  `img-src ${webview.cspSource} data:`,
   `font-src ${webview.cspSource}`,
-  `connect-src https://*`,
+  `connect-src ${webview.cspSource}`,
 ];
 
 export function initBaseContent(webView: Webview, initialIdeContext: IdeContextType) {
+  const scriptNonce = nonce();
   const scriptUri = getUri(webView, 'cs-cwf', 'assets', 'index.js');
   const stylesUri = getUri(webView, 'cs-cwf', 'assets', 'index.css');
-  const csp = getCsp(webView);
+  const csp = getCsp(webView, scriptNonce);
 
   // The full html with all previous varaibles included
   return /*html*/ `<!DOCTYPE html>
@@ -153,11 +158,11 @@ export function initBaseContent(webView: Webview, initialIdeContext: IdeContextT
       <link rel="stylesheet" type="text/css" href="${stylesUri}">
       <title>VSCode React Webview</title>
       ${ideStylesVars}
-      ${initialDataContextScriptTag(initialIdeContext)}
+      ${initialDataContextScriptTag(initialIdeContext, scriptNonce)}
     </head>
     <body>
       <div id="root"></div>
-      <script type="module" src="${scriptUri}"></script>
+      <script type="module" nonce="${scriptNonce}" src="${scriptUri}"></script>
     </body>
   </html>`;
 }
