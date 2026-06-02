@@ -110,10 +110,14 @@ export const ideStylesVars = `
   </style>
 `;
 
+function safeJsonStringify(obj: unknown): string {
+  return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+}
+
 export const initialDataContextScriptTag = (ideContext: IdeContextType, scriptNonce: string) => /*html*/ `
   <script nonce="${scriptNonce}">
     function setContext() {
-      window.ideContext = ${JSON.stringify(ideContext)}
+      window.ideContext = ${safeJsonStringify(ideContext)}
     }
     setContext();
   </script>
@@ -123,7 +127,7 @@ export const generateContextScriptTag = (ideContext: IdeContextType, scriptNonce
   return `
   <script nonce="${scriptNonce}">
     function setContext() {
-      window.ideContext = ${JSON.stringify(ideContext)}
+      window.ideContext = ${safeJsonStringify(ideContext)}
     }
     setContext();
   </script>`;
