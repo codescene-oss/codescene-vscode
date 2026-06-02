@@ -16,14 +16,17 @@ export function parseJsonInput(input: string): any {
 
 const SENSITIVE_KEYS = new Set(['token', 'accessToken', 'Authorization']);
 
+function maybeRedactValue(key: string, value: any): any {
+  return SENSITIVE_KEYS.has(key) ? '[REDACTED]' : value;
+}
+
 export function objectToArray(obj: any): any[] {
   if (Array.isArray(obj)) {
     return obj;
   }
   if (typeof obj === 'object' && obj !== null) {
     const { 'file-content': _, ...rest } = obj;
-    
-    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, SENSITIVE_KEYS.has(key) ? '[REDACTED]' : value]);
+    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, maybeRedactValue(key, value)]);
   }
   return [];
 }
