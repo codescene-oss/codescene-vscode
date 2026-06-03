@@ -5,6 +5,8 @@ import {
   activate as activateCHMonitor,
   deactivate as deactivateAddon,
   getBaselineCommit,
+  refreshMergeBaseBaselines,
+  runGitChangeLister,
 } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
@@ -32,7 +34,8 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
+import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
+import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
@@ -69,6 +72,35 @@ const onCodeHealthFileVersionChange = debounce(() => {
       },
       (e) => {
         logOutputChannel.warn(`Failed to re-review file after rules change: ${filePath}`, e);
+      }
+    );
+  });
+}, 350);
+
+const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
+  const gitRoot = gitRootFromCodesceneConfigUri(uri);
+  if (gitRoot) {
+    clearMainBranchCandidatesCache(gitRoot);
+  } else {
+    clearMainBranchCandidatesCache();
+  }
+
+  refreshMergeBaseBaselines();
+  void runGitChangeLister();
+
+  if (!openFilesObserverInstance) {
+    return;
+  }
+
+  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
+  visibleFiles.forEach((filePath) => {
+    const fileUri = vscode.Uri.file(filePath);
+    void vscode.workspace.openTextDocument(fileUri).then(
+      (document) => {
+        CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+      },
+      (e) => {
+        logOutputChannel.warn(`Failed to re-review file after config change: ${filePath}`, e);
       }
     );
   });
@@ -297,6 +329,15 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   DISPOSABLES.push(rulesFileWatcher);
   context.subscriptions.push(rulesFileWatcher);
+
+  const configFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/config.json');
+
+  configFileWatcher.onDidChange((uri) => onCodesceneConfigChange(uri));
+  configFileWatcher.onDidCreate((uri) => onCodesceneConfigChange(uri));
+  configFileWatcher.onDidDelete((uri) => onCodesceneConfigChange(uri));
+
+  DISPOSABLES.push(configFileWatcher);
+  context.subscriptions.push(configFileWatcher);
 }
 
 /**

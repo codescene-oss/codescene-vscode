@@ -8,6 +8,8 @@ import { SelectionStub } from './stubs/selection-stub';
 import { WorkspaceEditStub } from './stubs/workspace-edit-stub';
 import { CodeActionStub } from './stubs/code-action-stub';
 import { ThemeColorStub } from './stubs/theme-color-stub';
+import { ThemeIconStub } from './stubs/theme-icon-stub';
+import { TreeItemStub } from './stubs/tree-item-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
@@ -38,7 +40,42 @@ export function restoreDefaultWorkspaceFolders() {
   vscodeStub.workspace.workspaceFolders = defaultWorkspaceFolders as any;
 }
 
+let mockGitRepositories: any[] = [];
+
+export function setMockGitRepositories(repos: any[]) {
+  mockGitRepositories = repos;
+}
+
+export function clearMockGitRepositories() {
+  mockGitRepositories = [];
+}
+
+function createMockGitApi() {
+  return {
+    repositories: mockGitRepositories,
+    getRepository: (uri: { fsPath?: string; path?: string }) => {
+      const fsPath = uri.fsPath || uri.path || '';
+      return mockGitRepositories.find((repo) => fsPath.startsWith(repo.rootUri.fsPath)) || null;
+    },
+  };
+}
+
 const vscodeStub = {
+  extensions: {
+    getExtension: (id: string) => {
+      if (id === 'vscode.git') {
+        return {
+          exports: {
+            getAPI: (version: number) => {
+              void version;
+              return createMockGitApi();
+            },
+          },
+        };
+      }
+      return undefined;
+    },
+  },
   window: {
     createOutputChannel: (name: string) => ({
       append: (text: string) => enableTestLogging && process.stdout.write(`[${name}] ${text}`),
@@ -57,13 +94,40 @@ const vscodeStub = {
     showErrorMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
     showInformationMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
     showWarningMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
+    registerWebviewViewProvider: (id: string, provider: any) => {
+      void id;
+      void provider;
+      return { dispose: () => {} };
+    },
+    createTreeView: (id: string, opts: any) => {
+      void id;
+      void opts;
+      return {
+      badge: undefined,
+      dispose: () => {},
+    };
+    },
+    createStatusBarItem: () => ({
+      text: '',
+      tooltip: '',
+      command: '',
+      backgroundColor: undefined,
+      show: () => {},
+      hide: () => {},
+      dispose: () => {},
+    }),
   },
+  StatusBarAlignment: { Left: 1, Right: 2 },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),
     executeCommand: () => Promise.resolve(),
   },
   workspace: {
     workspaceFolders: defaultWorkspaceFolders as any,
+    onDidChangeConfiguration: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
@@ -130,6 +194,9 @@ const vscodeStub = {
     registerCodeActionsProvider: () => ({
       dispose: () => {}
     }),
+    registerCodeLensProvider: () => ({
+      dispose: () => {}
+    }),
   },
   Diagnostic: DiagnosticStub,
   EventEmitter: EventEmitterStub,
@@ -145,6 +212,9 @@ const vscodeStub = {
     Hint: 3,
   },
   ThemeColor: ThemeColorStub,
+  TreeItem: TreeItemStub,
+  TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
+  ThemeIcon: ThemeIconStub,
   CodeActionKind: {
     QuickFix: 'quickfix',
     Refactor: 'refactor',
