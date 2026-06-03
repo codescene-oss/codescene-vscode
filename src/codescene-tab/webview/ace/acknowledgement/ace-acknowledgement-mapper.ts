@@ -18,11 +18,13 @@ export function getAceAcknowledgeData(request: RefactoringRequest): AceAcknowled
 }
 
 export function getAutoRefactorConfig(): AutoRefactorConfig {
-  const data = {
-    disabled: !getAuthToken(),
-    activated: CsExtensionState.acknowledgedAceUsage === true,
+  const hasToken = !!getAuthToken()?.trim();
+  const acknowledged = CsExtensionState.acknowledgedAceUsage === true;
+  const activated = !(!acknowledged && hasToken);
+
+  return {
+    disabled: !hasToken,
+    activated,
     visible: CsExtensionState.stateProperties.features.ace.state === 'enabled',
   };
-
-  return data;
 }
