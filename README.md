@@ -6,8 +6,6 @@
 
 CodeScene promotes **healthy, maintainable code** by providing clear, actionable insights and guidance on how to improve your codebase.
 
-With an add-on **Automatic Refactoring**, CodeScene can even automate parts of the improvement process—helping developers enhance code quality and maintainability faster and more accurately.
-
 By using CodeScene, developers can spend less time deciphering and refactoring code, and more time focusing on what truly matters: **solving problems and delivering value**.
 
 ## The CodeScene CodeHealth™ metric ##
@@ -25,34 +23,52 @@ The **Code Health Monitor** flags for drops in code health in real time and offe
 
 > **_NOTE:_** _The Code Health Monitor is currently available to all users for a limited time period. However, this capability will become accessible only to CodeScene customers in future_.
 
-## Automatic Refactoring in ACE ##
-[CodeScene ACE](https://codescene.io/docs/auto-refactor/index.html) helps you with the hardest part of software development: maintaining and improving existing code. While other AI tools focus on code generation, CodeScene ACE fixes technical debt and refactors code smells directly in your IDE. With fact-based metrics, ACE focuses on the impactful improvements you can do now to simplify your tasks. Maintain momentum, and let ACE handle the heavy lifting for you.
-
-<img style="margin: 10px 10px 10px 10px;" src="screenshots/auto-refactor-showcase.gif" width="1000">
-
-> **_NOTE:_** _CodeScene ACE is an AI-Powered service that is not accessible by default. All AI technology is hosted seperately, and can only be utilized by consent of your organisation. It must be explicitly activated in order to become available via the CodeScene IDE extension. If you are interested in purchasing ACE for your organisation or just want to conduct a trial, please contact [Sales](https://codescene.com/product/talk-to-sales)_.
-
 ## Overview of Available Features ##
 | Feature | Description | What it looks like |
 |---------|-------------|--------------------|
 | **Code Health Monitor*** | The Code Health Monitor continuously tracks changes in your code, highlighting any improvements or degradations you introduce. Each file displays both its previous and current Code Health score, along with a clear delta value showing the overall change. You can easily see the impact of your modifications at the file or function level, including the status of any associated Code Smells—whether you’ve introduced new ones or resolved existing issues. With this level of visibility, there’s no longer any excuse for allowing Code Health to decline in your codebase. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/monitor.png" alt="Monitor" width="2000px"/> |
-| **Automatic Refactoring**** | <div>CodeScene ACE enables automatic refactoring within the CodeScene IDE extension. Code Smells detected during code analysis can be flagged for automatic refactoring, and any changes identified by the Code Health Monitor that have refactoring potential are also considered. ACE selects the most suitable AI model for each task and validates the results to ensure that only relevant and high-quality refactorings are presented. Each suggested refactoring includes a confidence evaluation and highlights any potential concerns, giving developers clear guidance and control over improvements to their code.</div><p></p><div>These are the languages that ACE can refactor:</div><ul><li>Java</li><li>C#</li><li>C++</li><li>JavaScript</li><li>TypeScript</li><li>React additional support (works with JavaScript and TypeScript)</li></ul><div>ACE is currently capable to refactor a subset of Code Smells that may be detected:</div><ul><li>Complex Conditional</li><li>Bumpy Road Ahead</li><li>Complex Method</li><li>Deep, Nested Complexity</li><li>Large Method</li></ul> | <img style="margin: 10px 10px 10px 10px;" src="screenshots/ace.png" alt="ACE" width="2000px"/> |
 | **Inline Code Smell detection** | Code smells often lead to issues such as increased technical debt, more bugs, and reduced overall quality of the software. You can find detailed information for each code smell by either clicking the corresponding inline action notation in the editor, by examining the diagnostics (squigglies or in the Problems view), or by using the Quick Fix action menu (light bulb).| <img style="margin: 10px 10px 10px 10px;" src="screenshots/codesmells.png" alt="Code Smells" width="2000px"/> |
 | **Refactoring Guidance** | Our mission is to educate and raise awareness about Code Health and its impact on your efficiency as a developer. The CodeScene extension equips you with rich insights into Code Smells and provides clear, actionable guidance on how to address issues that may exist in your codebase. We include relevant examples that illustrate the essence of Code Smells, along with common patterns and practical solutions to help you write cleaner, more maintainable code. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/documentation.png" alt="Code Smell Documentation" width="2000px"/> |
 | **Problems View** | When a file is opened in the editor, it is instantly scanned for existing Code Health issues. All discovered issues are then listed in the IDE Problems View. This way you instantly get an overview of all opportunities a file has for improvements. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/problems.png" alt="Problem View" width="2000px"/> |
 | **Custom Code Health rules** | To customize the code analysis you can either use local [Code Comment Directives](https://codescene.io/docs/guides/technical/code-health.html#disable-local-smells-via-code-comment-directives) or create a `code-health-rules.json` file which applies to the entire project. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/custom_directive.png" alt="ACR" width="2000px"/> |
 
-For delta analysis against a specific baseline branch (for example `develop` in a Git-flow repo), add `.codescene/config.json` at the repository root:
+## Configuration ##
 
+You can add configuration files to the git repository to customize and control behavior in the Extension. They should be located in a `.codescene` folder, at the repository root. In addition, we also have a Settings page for personalized configuration of the extension.
+
+### code-health-rules.json ###
+
+Location: `.codescene/code-health-rules.json`
+
+You can find more documentation on its content [here](https://codescene.io/docs/guides/technical/code-health.html#customize-the-code-health-rules-via-json)
+
+### config.json ###
+
+Location: `.codescene/config.json`
+
+Example configuration:
 ```json
 {
   "baseline_branch": "develop"
 }
 ```
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| **baseline_branch** | String | origin/HEAD (default branch) | The name of the branch that the Code Health Monitor should compare against when running its delta analysis. If no origin/HEAD or config present, it will look for the nearest merge-base among common shared branches (main, master, develop etc)
 
-When this file is absent, the extension uses the remote default branch (`origin/HEAD`) if available, otherwise common branch names such as `main` and `master`.
+### Settings ###
 
+Location: `Code Health Monitor` > `Extension Settings`
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| **Enable Review Code Lenses** | Boolean | true | Enables/Disables showing Code Health Score and Code Smells in the active documents |
+| **Enable Auto Refactor** | Boolean | false | Enables/Disables ACE, CodeScenes automatic refactoring tool |
+| **Auth Token** | String | - | CodeScene PAT Token for authentication. Used for Automatic Refactoring in ACE |
+| **Enable Telemetry** | Boolean | true | Enable/Disable collecting anonymized telemetry for tracking usage and feature engagement. |
+
+### Debug logging ###
+
+CodeScene follows Visual Studio Codes Log level. To enable debug logging, in the command `Developer: Set Log Level...` to debug
 
 _* Available time-limited for non CodeScene customers._
-
-_** Paid add-on feature._
