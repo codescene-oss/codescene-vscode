@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.0...v0.27.1) (2026-06-03)
+
+
+### Features
+
+* improve baseline branch detection ([#312](https://github.com/codescene-oss/codescene-vscode/issues/312)) ([16acd53](https://github.com/codescene-oss/codescene-vscode/commit/16acd5339a55437a63a48f63d77d87fb7fe6d871))
+
+
+### Bug fixes
+
+* add missing commas in CSS variable definitions for theme styles (CS-11184) ([9ec930b](https://github.com/codescene-oss/codescene-vscode/commit/9ec930bc2588a916e35c114c1daea0cdb1880280))
+* add pretest step to code-coverage-gates workflow (CS-11184) ([054cc1c](https://github.com/codescene-oss/codescene-vscode/commit/054cc1c201327c1db6726b76d5a69f57e4411e78))
+* escape JSON in inline script tags to prevent script breakout (CS-11185) ([b8d8648](https://github.com/codescene-oss/codescene-vscode/commit/b8d8648b939f401e7c238af133b54cc4abac5369))
+* hide ACE ad in docs when no auth token ([#313](https://github.com/codescene-oss/codescene-vscode/issues/313)) ([ee390f7](https://github.com/codescene-oss/codescene-vscode/commit/ee390f7ab4b4e9e89c705fcd4fb59a8dee441422))
+* redact sensitive executor log args (CS-11183) ([74ca9a0](https://github.com/codescene-oss/codescene-vscode/commit/74ca9a0e8e851a2f591f35cbef1d68f10c28281e))
+* tighten CWF webview Content Security Policy (CS-11184) ([116cb80](https://github.com/codescene-oss/codescene-vscode/commit/116cb80c5c9227bf5dfee9b9ffaec59d16c45fdc))
+
 ## [0.27.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.26.5...v0.27.0) (2026-05-12)
 
 
