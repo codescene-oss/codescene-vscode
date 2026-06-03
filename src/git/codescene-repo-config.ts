@@ -8,6 +8,15 @@ interface CodesceneConfigModel {
   baseline_branch?: string;
 }
 
+/** Derives the git repository root from a `.codescene/*` file URI. */
+export function gitRootFromCodesceneConfigUri(uri: { fsPath: string }): string | undefined {
+  const codesceneDirPath = path.dirname(uri.fsPath);
+  if (path.basename(codesceneDirPath) !== CODE_SCENE_DIR) {
+    return undefined;
+  }
+  return path.dirname(codesceneDirPath);
+}
+
 /**
  * Reads optional baseline_branch from {gitRoot}/.codescene/config.json.
  */

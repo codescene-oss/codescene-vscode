@@ -35,8 +35,7 @@ import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
 import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
-import { CODE_SCENE_DIR } from './git/codescene-repo-config';
-import path from 'path';
+import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
@@ -78,16 +77,8 @@ const onCodeHealthFileVersionChange = debounce(() => {
   });
 }, 350);
 
-function gitRootFromCodesceneFileUri(uri: vscode.Uri): string | undefined {
-  const codesceneDirPath = path.dirname(uri.fsPath);
-  if (path.basename(codesceneDirPath) !== CODE_SCENE_DIR) {
-    return undefined;
-  }
-  return path.dirname(codesceneDirPath);
-}
-
 const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
-  const gitRoot = gitRootFromCodesceneFileUri(uri);
+  const gitRoot = gitRootFromCodesceneConfigUri(uri);
   if (gitRoot) {
     clearMainBranchCandidatesCache(gitRoot);
   } else {

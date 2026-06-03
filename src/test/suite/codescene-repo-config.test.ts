@@ -5,6 +5,7 @@ import {
   CODE_SCENE_DIR,
   CONFIG_FILE_NAME,
   getBaselineBranch,
+  gitRootFromCodesceneConfigUri,
 } from '../../git/codescene-repo-config';
 
 suite('Codescene Repo Config Test Suite', () => {
@@ -51,5 +52,17 @@ suite('Codescene Repo Config Test Suite', () => {
 
   test('getBaselineBranch when git root undefined returns undefined', () => {
     assert.strictEqual(getBaselineBranch(undefined), undefined);
+  });
+
+  test('gitRootFromCodesceneConfigUri returns repo root for config path', () => {
+    const configPath = path.join(gitRootPath, CODE_SCENE_DIR, CONFIG_FILE_NAME);
+    assert.strictEqual(gitRootFromCodesceneConfigUri({ fsPath: configPath }), gitRootPath);
+  });
+
+  test('gitRootFromCodesceneConfigUri returns undefined for non-codescene path', () => {
+    assert.strictEqual(
+      gitRootFromCodesceneConfigUri({ fsPath: path.join(gitRootPath, 'src', 'file.ts') }),
+      undefined
+    );
   });
 });

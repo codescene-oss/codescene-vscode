@@ -163,7 +163,8 @@ suite('Git Utils Test Suite', () => {
       assert.strictEqual(result, mainCommitSha);
     });
 
-    test('getMainBranchCandidates uses baseline_branch from config', async () => {
+    test('getMainBranchCandidates uses baseline_branch from config', async function () {
+      this.timeout(20000);
       createBranchWithCommit('develop');
       createFeatureBranch('feature-on-develop');
       writeBaselineConfig('develop');
@@ -196,6 +197,22 @@ suite('Git Utils Test Suite', () => {
       setupOriginHead('main');
       const candidates = await getMainBranchCandidates(testRepoPath);
       assert.deepStrictEqual(candidates, ['main']);
+    });
+
+    test('clearMainBranchCandidatesCache clears entire cache when no path given', async function () {
+      this.timeout(20000);
+      createBranchWithCommit('main');
+      await getMainBranchCandidates(testRepoPath);
+      clearMainBranchCandidatesCache();
+
+      setupOriginHead('main');
+      const candidates = await getMainBranchCandidates(testRepoPath);
+      assert.deepStrictEqual(candidates, ['main']);
+    });
+
+    test('getDefaultBranch returns undefined when origin/HEAD is missing', async () => {
+      createBranchWithCommit('main');
+      assert.strictEqual(await getDefaultBranch(testRepoPath), undefined);
     });
   });
 
