@@ -8,6 +8,8 @@ import { SelectionStub } from './stubs/selection-stub';
 import { WorkspaceEditStub } from './stubs/workspace-edit-stub';
 import { CodeActionStub } from './stubs/code-action-stub';
 import { ThemeColorStub } from './stubs/theme-color-stub';
+import { ThemeIconStub } from './stubs/theme-icon-stub';
+import { TreeItemStub } from './stubs/tree-item-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
@@ -210,6 +212,9 @@ const vscodeStub = {
     Hint: 3,
   },
   ThemeColor: ThemeColorStub,
+  TreeItem: TreeItemStub,
+  TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
+  ThemeIcon: ThemeIconStub,
   CodeActionKind: {
     QuickFix: 'quickfix',
     Refactor: 'refactor',

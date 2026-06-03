@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
 }
 
 export function getRepo(fileUri: Uri): Repository | null {
-  if (!gitApi || !CsExtensionState.baseline) return null;
+  if (!gitApi || !CsExtensionState.hasInstance) return null;
 
   return gitApi!.getRepository(fileUri);
 }
@@ -148,4 +148,5 @@ export function deactivate() {
   ALL_DISPOSABLES.forEach((disposable) => disposable.dispose());
   ALL_DISPOSABLES = [];
   gitChangeListerInstance = undefined;
+  gitApi = undefined;
 }

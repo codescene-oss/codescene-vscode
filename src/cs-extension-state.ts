@@ -87,6 +87,10 @@ export class CsExtensionState {
     CsExtensionState._instance = new CsExtensionState(context);
   }
 
+  static get hasInstance(): boolean {
+    return !!this._instance;
+  }
+
   static get acknowledgedAceUsage() {
     return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
   }
