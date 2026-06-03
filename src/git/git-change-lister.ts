@@ -111,7 +111,7 @@ export class GitChangeLister {
     if (!baseCommit) {
       const currentBranch = repo?.state.HEAD?.name;
       if (currentBranch){
-        const isMain = await isMainBranch(currentBranch, workspacePath);
+        const isMain = await isMainBranch(currentBranch, gitRootPath);
 
         if (!isMain) {
           logOutputChannel.warn('Could not determine merge-base commit');

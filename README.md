@@ -42,6 +42,16 @@ The **Code Health Monitor** flags for drops in code health in real time and offe
 | **Problems View** | When a file is opened in the editor, it is instantly scanned for existing Code Health issues. All discovered issues are then listed in the IDE Problems View. This way you instantly get an overview of all opportunities a file has for improvements. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/problems.png" alt="Problem View" width="2000px"/> |
 | **Custom Code Health rules** | To customize the code analysis you can either use local [Code Comment Directives](https://codescene.io/docs/guides/technical/code-health.html#disable-local-smells-via-code-comment-directives) or create a `code-health-rules.json` file which applies to the entire project. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/custom_directive.png" alt="ACR" width="2000px"/> |
 
+For delta analysis against a specific baseline branch (for example `develop` in a Git-flow repo), add `.codescene/config.json` at the repository root:
+
+```json
+{
+  "baseline_branch": "develop"
+}
+```
+
+When this file is absent, the extension uses the remote default branch (`origin/HEAD`) if available, otherwise common branch names such as `main` and `master`.
+
 
 _* Available time-limited for non CodeScene customers._
 

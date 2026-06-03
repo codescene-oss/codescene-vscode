@@ -3,7 +3,14 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Uri } from 'vscode';
-import { getMergeBaseCommit } from '../../git-utils';
+import {
+  clearMainBranchCandidatesCache,
+  getDefaultBranch,
+  getMainBranchCandidates,
+  getMergeBaseCommit,
+  isMainBranch,
+} from '../../git-utils';
+import { CODE_SCENE_DIR, CONFIG_FILE_NAME } from '../../git/codescene-repo-config';
 import { Repository, RepositoryState, Branch, RepositoryUIState } from '../../../types/git';
 
 suite('Git Utils Test Suite', () => {
@@ -116,6 +123,82 @@ suite('Git Utils Test Suite', () => {
     return await getMergeBaseCommit(repo);
   }
 
+  function setupOriginHead(defaultBranch: string): void {
+    const branchSha = execSync(`git rev-parse ${defaultBranch}`, { cwd: testRepoPath }).toString().trim();
+    execSync(`git update-ref refs/remotes/origin/${defaultBranch} ${branchSha}`, {
+      cwd: testRepoPath,
+      stdio: 'pipe',
+    });
+    execSync(`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/${defaultBranch}`, {
+      cwd: testRepoPath,
+      stdio: 'pipe',
+    });
+  }
+
+  function writeBaselineConfig(branch: string): void {
+    const codesceneDir = path.join(testRepoPath, CODE_SCENE_DIR);
+    fs.mkdirSync(codesceneDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(codesceneDir, CONFIG_FILE_NAME),
+      JSON.stringify({ baseline_branch: branch })
+    );
+    clearMainBranchCandidatesCache(testRepoPath);
+  }
+
+  suite('main branch detection', () => {
+    test('getMainBranchCandidates uses origin/HEAD when set', async function () {
+      this.timeout(20000);
+      const mainCommitSha = createBranchWithCommit('main');
+      createBranch('master');
+      commitFile('master.ts', 'export const master = true;', 'Commit on master');
+      switchBranch('main');
+      setupOriginHead('main');
+      clearMainBranchCandidatesCache(testRepoPath);
+
+      const candidates = await getMainBranchCandidates(testRepoPath);
+      assert.deepStrictEqual(candidates, ['main']);
+
+      const featureCommitSha = createFeatureBranch('feature-origin-main');
+      const result = await testMergeBase('feature-origin-main', featureCommitSha);
+      assert.strictEqual(result, mainCommitSha);
+    });
+
+    test('getMainBranchCandidates uses baseline_branch from config', async () => {
+      createBranchWithCommit('develop');
+      createFeatureBranch('feature-on-develop');
+      writeBaselineConfig('develop');
+
+      const candidates = await getMainBranchCandidates(testRepoPath);
+      assert.deepStrictEqual(candidates, ['develop']);
+      assert.strictEqual(await isMainBranch('develop', testRepoPath), true);
+      assert.strictEqual(await isMainBranch('main', testRepoPath), false);
+    });
+
+    test('config baseline_branch overrides origin/HEAD', async function () {
+      this.timeout(20000);
+      createBranchWithCommit('main');
+      createBranch('develop');
+      commitFile('develop.ts', 'export const d = true;', 'develop commit');
+      switchBranch('main');
+      setupOriginHead('main');
+      writeBaselineConfig('develop');
+
+      assert.strictEqual(await getDefaultBranch(testRepoPath), 'develop');
+      const candidates = await getMainBranchCandidates(testRepoPath);
+      assert.deepStrictEqual(candidates, ['develop']);
+    });
+
+    test('clearMainBranchCandidatesCache clears one repo', async function () {
+      this.timeout(20000);
+      createBranchWithCommit('main');
+      await getMainBranchCandidates(testRepoPath);
+      clearMainBranchCandidatesCache(testRepoPath);
+      setupOriginHead('main');
+      const candidates = await getMainBranchCandidates(testRepoPath);
+      assert.deepStrictEqual(candidates, ['main']);
+    });
+  });
+
   suite('getMergeBaseCommit', () => {
     test('returns empty string when currentBranch is undefined', async () => {
       commitFile('README.md', '# Test', 'Initial commit');
@@ -139,8 +222,8 @@ suite('Git Utils Test Suite', () => {
 
     test('returns HEAD commit when on main branch', async () => {
       commitFile('README.md', '# Test', 'Initial commit');
+      renameBranch('main');
       const commitSha = getHeadCommit();
-      createBranch('main');
 
       const result = await testMergeBase('main', commitSha);
 

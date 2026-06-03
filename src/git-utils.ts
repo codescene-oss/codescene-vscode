@@ -5,6 +5,7 @@ import { GitExtension, Repository } from '../types/git';
 import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
 import { logOutputChannel } from './log';
 import { markGitAsUnavailable } from './git/git-detection';
+import { getBaselineBranch } from './git/codescene-repo-config';
 
 export const GIT_TASK_ID = 'git';
 export const gitExecutor = new QueuedSingleTaskExecutor();
@@ -12,8 +13,16 @@ const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
 export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
 
+const POSSIBLE_MAIN_BRANCHES = ['main', 'master', 'develop', 'trunk', 'dev', 'development'];
+const ORIGIN_HEAD_REF = 'refs/remotes/origin/HEAD';
+const ORIGIN_REMOTE_PREFIX = 'refs/remotes/origin/';
+
 function isEnoentError(err: unknown): boolean {
   return (err as any)?.code === 'ENOENT';
+}
+
+function branchesEqual(a: string, b: string): boolean {
+  return a.localeCompare(b, undefined, { sensitivity: 'accent' }) === 0;
 }
 
 interface RepoState {
@@ -51,54 +60,105 @@ export function getWorkspacePath(workspaceFolder: vscode.WorkspaceFolder): strin
 
 const mainBranchCandidatesCache = new Map<string, string[]>();
 
+export function clearMainBranchCandidatesCache(gitRootPath?: string): void {
+  if (!gitRootPath) {
+    mainBranchCandidatesCache.clear();
+    return;
+  }
+  mainBranchCandidatesCache.delete(path.normalize(gitRootPath));
+}
+
 /**
- * Returns the branch names that look like the main branch AND do in fact exist.
+ * Resolves the repository default branch: config baseline_branch, then origin/HEAD, then undefined.
+ */
+export async function getDefaultBranch(repoPath: string): Promise<string | undefined> {
+  const normalizedPath = path.normalize(repoPath);
+
+  const configured = getBaselineBranch(normalizedPath);
+  if (configured) {
+    return configured;
+  }
+
+  try {
+    const { stdout, exitCode } = await gitExecutor.execute(
+      { command: 'git', args: ['symbolic-ref', ORIGIN_HEAD_REF], taskId: GIT_TASK_ID },
+      { cwd: normalizedPath }
+    );
+
+    if (exitCode !== 0) {
+      return undefined;
+    }
+
+    const target = stdout.trim();
+    if (target.startsWith(ORIGIN_REMOTE_PREFIX)) {
+      return target.substring(ORIGIN_REMOTE_PREFIX.length);
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Returns main branch candidates for merge-base selection.
+ * When a default branch is known, returns only that branch; otherwise static names present locally.
  */
 export async function getMainBranchCandidates(repoPath: string): Promise<string[]> {
-  const cached = mainBranchCandidatesCache.get(repoPath);
+  const normalizedPath = path.normalize(repoPath);
+  const cached = mainBranchCandidatesCache.get(normalizedPath);
   if (cached) {
     return cached;
   }
 
-  const possibleMainBranches = ['main', 'master', 'develop', 'trunk', 'dev', 'development'];
+  const defaultBranch = await getDefaultBranch(normalizedPath);
+  if (defaultBranch) {
+    const singleCandidate = [defaultBranch];
+    mainBranchCandidatesCache.set(normalizedPath, singleCandidate);
+    return singleCandidate;
+  }
 
   try {
     const { stdout, stderr, exitCode } = await gitExecutor.execute(
       { command: 'git', args: ['branch', '--list', '--format=%(refname:short)'], taskId: GIT_TASK_ID },
-      { cwd: repoPath }
+      { cwd: normalizedPath }
     );
 
     if (exitCode !== 0) {
       if (exitCode === "ENOENT") {
         markGitAsUnavailable();
       }
-      logOutputChannel.error(`Could not get local branches for ${repoPath} (exit code ${exitCode}): ${stderr}`);
+      logOutputChannel.error(`Could not get local branches for ${normalizedPath} (exit code ${exitCode}): ${stderr}`);
       return [];
     }
 
     const localBranches = stdout.split('\n').map(branch => branch.trim()).filter(Boolean);
-    const result = possibleMainBranches.filter(branch => localBranches.includes(branch));
-    mainBranchCandidatesCache.set(repoPath, result);
+    const result = POSSIBLE_MAIN_BRANCHES.filter(branch => localBranches.includes(branch));
+    mainBranchCandidatesCache.set(normalizedPath, result);
     return result;
   } catch (err) {
     if (isEnoentError(err)) {
       markGitAsUnavailable();
     }
-    logOutputChannel.error(`Could not get local branches for ${repoPath}: ${err}`);
+    logOutputChannel.error(`Could not get local branches for ${normalizedPath}: ${err}`);
     return [];
   }
 }
 
 /**
- * Determines if the given branch could be the default branch.
- *
- * Checks against locally present main branch names (main, master, develop, trunk, dev, development).
+ * Determines if the given branch is the repository default / main branch.
  */
 export async function isMainBranch(currentBranch: string | undefined, repoPath: string): Promise<boolean> {
   if (!currentBranch) return false;
 
-  const localMainBranches = await getMainBranchCandidates(repoPath);
-  return localMainBranches.includes(currentBranch);
+  const normalizedPath = path.normalize(repoPath);
+  const defaultBranch = await getDefaultBranch(normalizedPath);
+  if (defaultBranch) {
+    return branchesEqual(currentBranch, defaultBranch);
+  }
+
+  const localMainBranches = await getMainBranchCandidates(normalizedPath);
+  return localMainBranches.some((branch) => branchesEqual(branch, currentBranch));
 }
 
 /**
