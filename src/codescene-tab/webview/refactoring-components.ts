@@ -3,7 +3,7 @@ import { getEffectiveToken } from '../../devtools-api';
 import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent, markdownAsCollapsible } from './components';
-import { readRawMarkdownDocs } from './utils';
+import { escapeHtml, readRawMarkdownDocs } from './utils';
 
 export function refactoringSummary(confidence: Confidence) {
   const {
@@ -18,17 +18,17 @@ export function summaryHeader(level: number, levelClass: string, action: string)
   if (level >= 3) {
     return `<div class="refactoring-summary-header ${levelClass}">Refactoring improves Code Health</div>`;
   }
-  return `<div class="refactoring-summary-header ${levelClass}">${action}</div>`;
+  return `<div class="refactoring-summary-header ${levelClass}">${escapeHtml(action)}</div>`;
 }
 
 export function summaryDetails(level: number, actionDetails: string) {
   switch (true) {
     case level === -2:
-      return `<span>${actionDetails}</span>`;
+      return `<span>${escapeHtml(actionDetails)}</span>`;
     case level < 1:
       return '<span>The LLM failed to improve Code Health. The refactoring might still offer a structural step in the right direction - inspect and decide!</span>';
     default:
-      return level < 3 ? `<span>${actionDetails}</span>` : '';
+      return level < 3 ? `<span>${escapeHtml(actionDetails)}</span>` : '';
   }
 }
 
@@ -94,8 +94,8 @@ async function autoRefactorContent(response: RefactorResponse, code: CodeWithLan
           await codeContainerContent(
             { content: response.declarations, languageId: code.languageId },
             false,
-            'copy-declarations-to-clipboard-button'
-          )
+            'copy-declarations-to-clipboard-button',
+          ),
         )
       : '';
 
@@ -105,7 +105,7 @@ async function autoRefactorContent(response: RefactorResponse, code: CodeWithLan
         ${declarationsSection}
         ${collapsibleContent(
           'Refactored code',
-          await codeContainerContent(code, true, 'copy-code-to-clipboard-button')
+          await codeContainerContent(code, true, 'copy-code-to-clipboard-button'),
         )}
     `;
   return content;
@@ -117,7 +117,7 @@ function reasonsContent(response: RefactorResponse) {
     confidence: { 'review-header': reviewHeader, level },
   } = response;
 
-  const reasonListItems = reasons.map((reason) => `<li>${reason.summary}</li>`);
+  const reasonListItems = reasons.map((reason) => `<li>${escapeHtml(reason.summary)}</li>`);
   let reasonsText = reasonListItems.length > 0 ? `<ul>${reasonListItems.join('\n')}</ul>` : null;
 
   // ReviewHeader is optional in the API, but is always present for confidence > 1  (i.e. autoRefactorContent)
@@ -143,7 +143,7 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true, copyB
   // Use built in  markdown extension for rendering code
   const mdRenderedCode = await commands.executeCommand(
     'markdown.api.render',
-    '```' + code.languageId + '\n' + code.content + '\n```'
+    '```' + code.languageId + '\n' + code.content + '\n```',
   );
 
   const diffButton = showDiff
@@ -175,7 +175,7 @@ async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithL
     ${reasonsContent(response)}
     ${collapsibleContent(
       'Refactored code (unverified)',
-      await codeContainerContent(code, false, 'copy-code-to-clipboard-button')
+      await codeContainerContent(code, false, 'copy-code-to-clipboard-button'),
     )}
   `;
 }
