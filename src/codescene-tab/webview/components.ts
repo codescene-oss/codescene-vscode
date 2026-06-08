@@ -1,6 +1,7 @@
 import { basename } from 'path';
 import { commands, Position } from 'vscode';
 import { isDefined } from '../../utils';
+import { escapeHtml } from './utils';
 
 /**
  * Note - need to implement expanding collapsing toggle in each webview script,
@@ -20,7 +21,7 @@ export function collapsibleContent(title: string, containerContent?: string, isC
         data-cs-title="${classCompatibleTitle}" 
         class="${classCompatibleTitle}-header clickable">
       <span class="codicon codicon-chevron-down expand-indicator ${isCollapsed ? 'rotated' : ''}"></span>
-      ${title}
+      ${escapeHtml(title)}
     </h3>
     <div data-cs-type="collapsible-container" 
          data-cs-title="${classCompatibleTitle}" 
@@ -43,12 +44,12 @@ export function functionLocationContent({
 }) {
   const fnNameHtml = fnName
     ? `<span class="codicon codicon-symbol-method"></span>
-       <span class="${isStale ? 'strikeout' : ''}">${fnName}</span>`
+       <span class="${isStale ? 'strikeout' : ''}">${escapeHtml(fnName)}</span>`
     : '';
 
   return /*html*/ `
     <div id="function-location" class="flex-row">
-      <span class="codicon codicon-file"></span><span class="file-name">${basename(filePath)}</span>
+      <span class="codicon codicon-file"></span><span class="file-name">${escapeHtml(basename(filePath))}</span>
       ${fnNameHtml}
       <span class="line-no ${isStale ? 'strikeout' : ''}">
       ${position ? `[Ln ${position.line + 1}]` : ''}

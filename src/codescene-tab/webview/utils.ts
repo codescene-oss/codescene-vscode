@@ -5,6 +5,15 @@ import { CsExtensionState } from '../../cs-extension-state';
 import { categoryToDocsCode } from '../../documentation/commands';
 import { getUri, nonce } from '../../webview-utils';
 
+export function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export interface HtmlTemplateParams {
   title: string;
   bodyContent: string | string[];
@@ -29,7 +38,7 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
     cssTag(webView, ['assets', 'markdown-languages.css']),
     cssTag(webView, ['assets', 'highlight.css']),
     cssTag(webView, ['out', 'codescene-tab', 'webview', 'styles.css']),
-    cssTag(webView, ['out', 'codicons', 'codicon.css'], 'vscode-codicon-stylesheet') // NOTE - vscode-elements needs an id for the stylesheet tag ¯\_(ツ)_/¯
+    cssTag(webView, ['out', 'codicons', 'codicon.css'], 'vscode-codicon-stylesheet'), // NOTE - vscode-elements needs an id for the stylesheet tag ¯\_(ツ)_/¯
   );
 
   cssPaths?.forEach((path) => cssTags.push(cssTag(webView, path)));
@@ -47,8 +56,8 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
         <meta
           http-equiv="Content-Security-Policy"
           content="default-src 'none'; img-src data: ${webView.cspSource}; script-src ${webView.cspSource}; font-src ${
-    webView.cspSource
-  };
+            webView.cspSource
+          };
           style-src 'unsafe-inline' ${webView.cspSource};"
         />
         ${cssTags.join('\n')}
@@ -56,7 +65,7 @@ export function renderHtmlTemplate(webViewPanel: WebviewPanel, params: HtmlTempl
 
     <body>
         ${scriptTags.join('\n')}
-        <h2>${title}</h2>
+        <h2>${escapeHtml(title)}</h2>
         ${Array.isArray(bodyContent) ? bodyContent.join('\n') : bodyContent}
     </body>
 
