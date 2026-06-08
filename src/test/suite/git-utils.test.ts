@@ -9,6 +9,7 @@ import {
   getMainBranchCandidates,
   getMergeBaseCommit,
   isMainBranch,
+  isSafeRefName,
 } from '../../git-utils';
 import { CODE_SCENE_DIR, CONFIG_FILE_NAME } from '../../git/codescene-repo-config';
 import { Repository, RepositoryState, Branch, RepositoryUIState } from '../../../types/git';
@@ -350,6 +351,110 @@ suite('Git Utils Test Suite', () => {
         '',
         'Should return empty string when no main branch candidates exist'
       );
+    });
+
+    test('skips unsafe main branch candidate from baseline config', async () => {
+      createBranchWithCommit('main');
+      const featureCommitSha = createFeatureBranch('feature-unsafe-baseline');
+      writeBaselineConfig('--exec=evil');
+
+      const result = await testMergeBase('feature-unsafe-baseline', featureCommitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should skip unsafe main branch candidate and return empty string'
+      );
+    });
+  });
+
+  suite('isSafeRefName', () => {
+    test('returns empty string for option-like branch name (argv injection)', async () => {
+      createBranchWithCommit('main');
+      commitFile('feature.ts', 'export const f = true;', 'feature commit');
+      const commitSha = getHeadCommit();
+
+      const result = await testMergeBase('--upload-pack=evil', commitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should reject option-like branch names'
+      );
+    });
+
+    test('returns empty string for branch name with whitespace', async () => {
+      createBranchWithCommit('main');
+      const commitSha = getHeadCommit();
+
+      const result = await testMergeBase('branch with spaces', commitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should reject branch names with whitespace'
+      );
+    });
+
+    test('returns empty string for empty branch name', async () => {
+      createBranchWithCommit('main');
+      const commitSha = getHeadCommit();
+
+      const result = await testMergeBase('', commitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should reject empty branch names'
+      );
+    });
+
+      test('skips unsafe main branch candidate from baseline config', async () => {
+      createBranchWithCommit('main');
+      const featureCommitSha = createFeatureBranch('feature-unsafe-baseline');
+      writeBaselineConfig('--exec=evil');
+
+      const result = await testMergeBase('feature-unsafe-baseline', featureCommitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should skip unsafe main branch candidate and return empty string'
+      );
+    });
+
+    test('accepts valid branch names', () => {
+      assert.strictEqual(isSafeRefName('main'), true);
+      assert.strictEqual(isSafeRefName('master'), true);
+      assert.strictEqual(isSafeRefName('feature/my-feature'), true);
+      assert.strictEqual(isSafeRefName('bugfix-123'), true);
+      assert.strictEqual(isSafeRefName('release_1.2.0'), true);
+      assert.strictEqual(isSafeRefName('develop'), true);
+      assert.strictEqual(isSafeRefName('user/feature/branch'), true);
+    });
+
+    test('rejects option-like names (leading dash)', () => {
+      assert.strictEqual(isSafeRefName('--upload-pack=evil'), false);
+      assert.strictEqual(isSafeRefName('-n'), false);
+      assert.strictEqual(isSafeRefName('--exec=cmd'), false);
+    });
+
+    test('rejects empty or whitespace-only names', () => {
+      assert.strictEqual(isSafeRefName(''), false);
+      assert.strictEqual(isSafeRefName('   '), false);
+    });
+
+    test('rejects names with whitespace or control characters', () => {
+      assert.strictEqual(isSafeRefName('branch name'), false);
+      assert.strictEqual(isSafeRefName('branch\tname'), false);
+      assert.strictEqual(isSafeRefName('branch\nname'), false);
+    });
+
+    test('rejects names with special shell characters', () => {
+      assert.strictEqual(isSafeRefName('branch;echo'), false);
+      assert.strictEqual(isSafeRefName('branch|pipe'), false);
+      assert.strictEqual(isSafeRefName('branch$(cmd)'), false);
+      assert.strictEqual(isSafeRefName('branch`cmd`'), false);
     });
   });
 });
