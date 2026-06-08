@@ -352,6 +352,20 @@ suite('Git Utils Test Suite', () => {
         'Should return empty string when no main branch candidates exist'
       );
     });
+
+    test('skips unsafe main branch candidate from baseline config', async () => {
+      createBranchWithCommit('main');
+      const featureCommitSha = createFeatureBranch('feature-unsafe-baseline');
+      writeBaselineConfig('--exec=evil');
+
+      const result = await testMergeBase('feature-unsafe-baseline', featureCommitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should skip unsafe main branch candidate and return empty string'
+      );
+    });
   });
 
   suite('isSafeRefName', () => {
@@ -392,6 +406,20 @@ suite('Git Utils Test Suite', () => {
         result,
         '',
         'Should reject empty branch names'
+      );
+    });
+
+      test('skips unsafe main branch candidate from baseline config', async () => {
+      createBranchWithCommit('main');
+      const featureCommitSha = createFeatureBranch('feature-unsafe-baseline');
+      writeBaselineConfig('--exec=evil');
+
+      const result = await testMergeBase('feature-unsafe-baseline', featureCommitSha);
+
+      assert.strictEqual(
+        result,
+        '',
+        'Should skip unsafe main branch candidate and return empty string'
       );
     });
 
