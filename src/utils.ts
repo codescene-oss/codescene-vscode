@@ -171,10 +171,11 @@ export function safeJsonParse(input: string, context?: any) {
     return JSON.parse(input);
   } catch (e) {
     const contextStr = context ? `\nContext: ${JSON.stringify(context)}` : '';
+    const errorPosition = e instanceof SyntaxError ? e.message.match(/position (\d+)/)?.[1] : undefined;
     reportError({context: "JSON parsing failed",
                  e,
                  consoleOnly: true,
-                 extraData: {input, contextStr}});
+                 extraData: {inputLength: input.length, errorPosition, contextStr}});
     throw e;
   }
 }
