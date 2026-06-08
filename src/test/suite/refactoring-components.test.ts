@@ -1,9 +1,5 @@
 import * as assert from 'assert';
-import {
-  reasonsContent,
-  summaryDetails,
-  summaryHeader,
-} from '../../codescene-tab/webview/refactoring-components';
+import { reasonsContent, summaryDetails, summaryHeader } from '../../codescene-tab/webview/refactoring-components';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
 
 const code = 'function foo() {}\n';
@@ -88,4 +84,3 @@ suite('Refactor panel components Test Suite', () => {
     });
   });
 });
-

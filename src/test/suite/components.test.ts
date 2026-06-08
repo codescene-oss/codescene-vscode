@@ -1,8 +1,5 @@
 import * as assert from 'assert';
-import {
-  collapsibleContent,
-  functionLocationContent,
-} from '../../codescene-tab/webview/components';
+import { collapsibleContent, functionLocationContent } from '../../codescene-tab/webview/components';
 
 suite('Webview components HTML escaping', () => {
   suite('collapsibleContent', () => {
