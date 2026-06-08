@@ -46,9 +46,9 @@ suite('cwf-html-utils Test Suite', () => {
     assert.ok(html.includes('<!DOCTYPE html>'));
     assert.ok(html.includes('Content-Security-Policy'));
     assert.ok(html.includes("default-src 'none';"));
-    assert.ok(/nonce="[A-Za-z0-9]+"/.test(html));
+    assert.ok(/nonce="[A-Za-z0-9+/=]+"/.test(html));
     // Verify nonce is consistent across script tags
-    const nonces = html.match(/nonce="([A-Za-z0-9]+)"/g)!;
+    const nonces = html.match(/nonce="([A-Za-z0-9+/=]+)"/g)!;
     assert.ok(nonces.length >= 2);
     assert.strictEqual(nonces[0], nonces[1]);
   });
