@@ -1,9 +1,10 @@
+import { aceSuite } from '../ace-test-suite';
 import * as assert from 'assert';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 
-suite('AceAcknowledgementMapper Test Suite', () => {
+aceSuite('AceAcknowledgementMapper Test Suite', () => {
   let originalGetAuthToken: typeof configModule.getAuthToken;
 
   function mockToken(token: string) {

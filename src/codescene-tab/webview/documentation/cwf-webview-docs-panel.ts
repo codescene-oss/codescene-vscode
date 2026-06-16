@@ -7,6 +7,8 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
+import { ACE_ENABLED } from '../../../build-flags';
+import { getExtensionSettingsFilter } from '../../../extension-id';
 import { onDidChangeConfiguration } from '../../../configuration';
 
 export type CodeSceneTabPanelState = InteractiveDocsParams & {
@@ -45,10 +47,12 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.webViewPanelDisposable = this.webViewPanel.onDidDispose(() => this.dispose());
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
-    this.disposables.push(
-      CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
-      onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
-    );
+    if (ACE_ENABLED) {
+      this.disposables.push(
+        CsExtensionState.onAceStateChanged(() => this.refreshAceState()),
+        onDidChangeConfiguration('authToken', () => this.refreshAceState())
+      );
+    }
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.document === e;
@@ -98,10 +102,10 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
         try {
           await vscode.commands.executeCommand(
             'workbench.action.openWorkspaceSettings',
-            '@ext:codescene.codescene-vscode'
+            getExtensionSettingsFilter()
           );
         } catch {
-          await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+          await vscode.commands.executeCommand('workbench.action.openSettings', getExtensionSettingsFilter());
         }
       },
       'goto-function-location': () => {

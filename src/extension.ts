@@ -5,16 +5,15 @@ import { logOutputChannel } from './log';
 import * as path from 'path';
 import * as fs from 'fs';
 
-async function isLegacyVersion(): Promise<boolean> {
-  const extension = vscode.extensions.getExtension('codescene.codescene-vscode');
-  const currentVersion = extension?.packageJSON.version;
+async function isLegacyVersion(context: vscode.ExtensionContext): Promise<boolean> {
+  const currentVersion = context.extension.packageJSON.version;
   if (!currentVersion) {
     logOutputChannel.info('Could not determine extension version, allowing activation');
     return false;
   }
 
   // Check if this is a production build, by looking for the .cs-prod-build marker
-  const extensionPath = extension?.extensionPath;
+  const extensionPath = context.extension.extensionPath;
   if (extensionPath) {
     const markerPath = path.join(extensionPath, 'out', '.cs-prod-build');
     const isProdBuild = fs.existsSync(markerPath);
@@ -49,7 +48,7 @@ async function isLegacyVersion(): Promise<boolean> {
 let impl: typeof import('./extension-impl') | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
-  const isDeprecated = await isLegacyVersion();
+  const isDeprecated = await isLegacyVersion(context);
   if (isDeprecated) {
     void vscode.window.showWarningMessage(
       `The current CodeScene extension version is deprecated. Please update it to the latest version.`,

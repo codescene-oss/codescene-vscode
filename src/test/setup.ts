@@ -42,6 +42,78 @@ export function restoreDefaultWorkspaceFolders() {
 
 let mockGitRepositories: any[] = [];
 
+export type MockWebviewPanel = {
+  visible: boolean;
+  webview: {
+    onDidReceiveMessage: (
+      callback: (message: unknown) => void,
+      thisArg?: unknown
+    ) => { dispose: () => void };
+    postMessage: (message: unknown) => Promise<boolean>;
+    html: string;
+    cspSource: string;
+    asWebviewUri: (uri: { toString: () => string }) => string;
+  };
+  onDidDispose: (callback: () => void) => { dispose: () => void };
+  dispose: () => void;
+  reveal: (viewColumn?: unknown, preserveFocus?: boolean) => void;
+};
+
+let lastWebviewPanelMock: MockWebviewPanel | undefined;
+let messageHandler: ((message: unknown) => void) | undefined;
+let disposeHandler: (() => void) | undefined;
+const postMessageCalls: unknown[] = [];
+
+export function getLastWebviewPanelMock(): MockWebviewPanel | undefined {
+  return lastWebviewPanelMock;
+}
+
+export function getWebviewMessageHandler(): ((message: unknown) => void) | undefined {
+  return messageHandler;
+}
+
+export function getWebviewPostMessageCalls(): unknown[] {
+  return postMessageCalls;
+}
+
+export function resetWebviewPanelMocks() {
+  lastWebviewPanelMock = undefined;
+  messageHandler = undefined;
+  disposeHandler = undefined;
+  postMessageCalls.length = 0;
+}
+
+function createMockWebviewPanel(): MockWebviewPanel {
+  const panel: MockWebviewPanel = {
+    visible: false,
+    webview: {
+      onDidReceiveMessage: (callback: (message: unknown) => void, thisArg?: unknown) => {
+        messageHandler = thisArg ? callback.bind(thisArg) : callback;
+        return { dispose: () => {} };
+      },
+      postMessage: async (message: unknown) => {
+        postMessageCalls.push(message);
+        return true;
+      },
+      html: '',
+      cspSource: 'vscode-resource:',
+      asWebviewUri: (uri: { toString: () => string }) => uri.toString(),
+    },
+    onDidDispose: (callback: () => void) => {
+      disposeHandler = callback;
+      return { dispose: () => {} };
+    },
+    dispose: () => {
+      disposeHandler?.();
+    },
+    reveal: () => {
+      panel.visible = true;
+    },
+  };
+  lastWebviewPanelMock = panel;
+  return panel;
+}
+
 export function setMockGitRepositories(repos: any[]) {
   mockGitRepositories = repos;
 }
@@ -116,7 +188,9 @@ const vscodeStub = {
       hide: () => {},
       dispose: () => {},
     }),
+    createWebviewPanel: () => createMockWebviewPanel(),
   },
+  ViewColumn: { Beside: 2, Active: 1, One: 1, Two: 2, Three: 3 },
   StatusBarAlignment: { Left: 1, Right: 2 },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),
@@ -125,6 +199,10 @@ const vscodeStub = {
   workspace: {
     workspaceFolders: defaultWorkspaceFolders as any,
     onDidChangeConfiguration: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    onDidCloseTextDocument: (listener: any) => {
       void listener;
       return { dispose: () => {} };
     },
@@ -224,6 +302,9 @@ const vscodeStub = {
     Source: 'source',
     SourceOrganizeImports: 'source.organizeImports',
     Empty: '',
+  },
+  env: {
+    appName: 'Visual Studio Code',
   },
   Uri: {
     parse: (value: string) => ({

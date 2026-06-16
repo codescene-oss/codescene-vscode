@@ -28,7 +28,7 @@ jobs:
         CI: true
 
     - name: Generate code coverage
-      run: npm run test:coverage
+      run: npm run test:coverage:dual
       env:
         CI: true
 

@@ -1,4 +1,5 @@
 import vscode, { Disposable } from 'vscode';
+import { ACE_ENABLED } from './build-flags';
 import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
 import { getEffectiveToken } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
@@ -15,12 +16,14 @@ interface StatusBarOptions {
 export class CsStatusBar implements Disposable {
   private disposables: Disposable[] = [];
 
-  private readonly aceStatus: vscode.StatusBarItem;
+  private readonly aceStatus?: vscode.StatusBarItem;
   private readonly analysisStatus: vscode.StatusBarItem;
 
   constructor() {
-    this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
-    this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
+    if (ACE_ENABLED) {
+      this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
+      this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
+    }
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
       vscode.StatusBarAlignment.Left,
@@ -36,6 +39,9 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAceStatus(ace: CsFeature) {
+    if (!this.aceStatus) {
+      return;
+    }
     const item = this.aceStatus;
     const handler = this.aceStateHandlers[ace.state] || (() => {});
     handler(ace, item);

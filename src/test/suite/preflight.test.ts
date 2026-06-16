@@ -5,7 +5,9 @@ import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspac
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
-suite('Preflight Integration Test Suite', () => {
+import { aceSuite } from '../ace-test-suite';
+
+aceSuite('Preflight Integration Test Suite', () => {
   const testDir = createTestDir('test-preflight');
   let preflightStateChangeFired = false;
   let lastPreflightState: any;

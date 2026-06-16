@@ -10,17 +10,57 @@ jobs:
     strategy:
       matrix:
         include:
-          - platform: darwin
+          - variant: full
+            build_no_ace: false
+            vsix_prefix: codescene-vscode
+            platform: darwin
             arch: x64
-          - platform: darwin
+          - variant: full
+            build_no_ace: false
+            vsix_prefix: codescene-vscode
+            platform: darwin
             arch: arm64
-          - platform: linux
+          - variant: full
+            build_no_ace: false
+            vsix_prefix: codescene-vscode
+            platform: linux
             arch: x64
-          - platform: linux
+          - variant: full
+            build_no_ace: false
+            vsix_prefix: codescene-vscode
+            platform: linux
             arch: arm64
-          - platform: win32
+          - variant: full
+            build_no_ace: false
+            vsix_prefix: codescene-vscode
+            platform: win32
             arch: x64
-    name: 'Build ${{ matrix.platform }}-${{ matrix.arch }}'
+          - variant: noace
+            build_no_ace: true
+            vsix_prefix: codescene-vscode-noace
+            platform: darwin
+            arch: x64
+          - variant: noace
+            build_no_ace: true
+            vsix_prefix: codescene-vscode-noace
+            platform: darwin
+            arch: arm64
+          - variant: noace
+            build_no_ace: true
+            vsix_prefix: codescene-vscode-noace
+            platform: linux
+            arch: x64
+          - variant: noace
+            build_no_ace: true
+            vsix_prefix: codescene-vscode-noace
+            platform: linux
+            arch: arm64
+          - variant: noace
+            build_no_ace: true
+            vsix_prefix: codescene-vscode-noace
+            platform: win32
+            arch: x64
+    name: 'Build ${{ matrix.variant }} ${{ matrix.platform }}-${{ matrix.arch }}'
     runs-on: 'ubuntu-latest'
 
     steps:
@@ -36,12 +76,13 @@ jobs:
         run: node ./scripts/package-platform.js ${{ matrix.platform }} ${{ matrix.arch }}
         env:
           CI: true
+          BUILD_NO_ACE: ${{ matrix.build_no_ace }}
           GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
       # .cs-prod-build is expected for correct functioning of the extension, so we validate its presence:
       - name: Verify .cs-prod-build marker in VSIX
         run: |
-          VSIX_FILE=$(ls codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
+          VSIX_FILE=$(ls ${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
           unzip -l "$VSIX_FILE" | tee vsix-contents.txt
           if grep -q "\.cs-prod-build" vsix-contents.txt; then
             echo ".cs-prod-build marker found in VSIX"
@@ -51,11 +92,26 @@ jobs:
             exit 1
           fi
 
+      - name: Verify no-ACE settings absent from VSIX
+        if: matrix.variant == 'noace'
+        run: |
+          VSIX_FILE=$(ls ${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
+          unzip -p "$VSIX_FILE" extension/package.json > vsix-package.json
+          if jq -e '.contributes.configuration.properties | has("codescene.enableAutoRefactor")' vsix-package.json > /dev/null; then
+            echo "ACE setting codescene.enableAutoRefactor found in no-ACE VSIX package.json"
+            exit 1
+          fi
+          if jq -e '.contributes.configuration.properties | has("codescene.authToken")' vsix-package.json > /dev/null; then
+            echo "ACE setting codescene.authToken found in no-ACE VSIX package.json"
+            exit 1
+          fi
+          echo "No ACE settings in no-ACE VSIX package.json"
+
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
         with:
-          path: 'codescene-vscode-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
-          name: 'codescene-vscode-${{ matrix.platform }}-${{ matrix.arch }}'
+          path: '${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
+          name: '${{ matrix.vsix_prefix }}-${{ matrix.platform }}-${{ matrix.arch }}'
 
   release:
     name: 'Create Release'

@@ -6,7 +6,7 @@ on:
       publish_vscode_marketplace:
         type: boolean
         default: true
-        description: Publish to VS Code Marketplace
+        description: Publish full variant to VS Code Marketplace
       publish_open_vsx:
         type: boolean
         default: true
@@ -30,16 +30,24 @@ jobs:
       - name: Verify platform-specific VSIX files
         run: |
           set -euo pipefail
-          rm -f vsix-map.txt
+          rm -f vsix-map.txt noace-vsix-map.txt
           targets=("win32-x64" "darwin-x64" "darwin-arm64" "linux-x64" "linux-arm64")
           for target in "${targets[@]}"; do
-            file=$(find . -name "codescene-vscode-*-${target}.vsix" | head -1)
+            file=$(find . -name "codescene-vscode-*-${target}.vsix" ! -name "codescene-vscode-noace-*" | head -1)
             if [ -z "$file" ]; then
-              echo "❌ Missing VSIX for ${target}"
+              echo "❌ Missing full-variant VSIX for ${target}"
               exit 1
             fi
             echo "${target}=${file}" >> vsix-map.txt
-            echo "✅ Found ${file}"
+            echo "✅ Found full variant ${file}"
+
+            noace_file=$(find . -name "codescene-vscode-noace-*-${target}.vsix" | head -1)
+            if [ -z "$noace_file" ]; then
+              echo "❌ Missing no-ACE VSIX for ${target}"
+              exit 1
+            fi
+            echo "${target}=${noace_file}" >> noace-vsix-map.txt
+            echo "✅ Found no-ACE variant ${noace_file}"
           done
 
       - name: Install Node.js
@@ -47,7 +55,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Publish to VS Code Marketplace
+      - name: Publish full variant to VS Code Marketplace
         if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' }}
         run: |
           npm install -g vsce
@@ -65,6 +73,10 @@ jobs:
         run: |
           npm install -g ovsx
           while IFS='=' read -r target file; do
-            echo "🚀 Publishing ${file} to Open VSX (target=${target})"
+            echo "🚀 Publishing full variant ${file} to Open VSX (target=${target})"
             ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath "${file}"
           done < vsix-map.txt
+          while IFS='=' read -r target file; do
+            echo "🚀 Publishing no-ACE variant ${file} to Open VSX (target=${target})"
+            ovsx publish --pat ${{ secrets.OPEN_VSX_PUBLISHING_TOKEN }} --packagePath "${file}"
+          done < noace-vsix-map.txt

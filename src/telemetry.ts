@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import { getConfiguration } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
+import { getExtensionSettingsFilter } from './extension-id';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
@@ -169,7 +170,7 @@ export default class Telemetry {
       );
 
       if (selection === openSettings) {
-        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+        await vscode.commands.executeCommand('workbench.action.openSettings', getExtensionSettingsFilter());
       }
 
       // Mark that the first run notice has been shown

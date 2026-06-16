@@ -4,10 +4,16 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const buildNoAce = process.env.BUILD_NO_ACE === 'true';
+const esbuildDefine = {
+  'process.env.BUILD_NO_ACE': JSON.stringify(buildNoAce ? 'true' : 'false'),
+};
+
 const baseConfig = {
   bundle: true,
   minify: process.env.NODE_ENV === 'production',
   sourcemap: process.env.NODE_ENV !== 'production',
+  define: esbuildDefine,
 };
 
 function buildCounter(counterName) {
@@ -55,18 +61,24 @@ const extensionConfig = {
 };
 
 function webviewConfig(watch = false) {
+  const entryPoints = [
+    './src/code-health-monitor/details/webview-script.ts',
+    './src/control-center/webview-script.ts',
+    './src/codescene-tab/webview/script.ts',
+    './src/codescene-tab/webview/documentation-script.ts',
+  ];
+  if (!buildNoAce) {
+    entryPoints.push(
+      './src/codescene-tab/webview/ace-acknowledgement-script.ts',
+      './src/codescene-tab/webview/refactoring-script.ts'
+    );
+  }
+
   return {
     ...baseConfig,
     target: 'es2020',
     format: 'esm',
-    entryPoints: [
-      './src/code-health-monitor/details/webview-script.ts',
-      './src/control-center/webview-script.ts',
-      './src/codescene-tab/webview/script.ts',
-      './src/codescene-tab/webview/ace-acknowledgement-script.ts',
-      './src/codescene-tab/webview/refactoring-script.ts',
-      './src/codescene-tab/webview/documentation-script.ts',
-    ],
+    entryPoints,
     outdir: './out',
     plugins: [
       buildCounter('webview-scripts'),

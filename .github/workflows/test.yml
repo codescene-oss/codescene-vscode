@@ -48,6 +48,27 @@ jobs:
       env:
         CI: true
 
+  test-no-ace:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - uses: './.github/actions/setup'
+
+    - name: Configure Git
+      run: git config --global advice.defaultBranchName false
+
+    - run: npm run pretest
+      env:
+        CI: true
+        BUILD_NO_ACE: true
+
+    - run: npm test
+      env:
+        CI: true
+        BUILD_NO_ACE: true
+
   build-vsix:
     name: build vsix (E2E tests)
     runs-on: ubuntu-latest

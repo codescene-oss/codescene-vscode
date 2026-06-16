@@ -9,6 +9,7 @@ import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
 import { findOrOpenDocument, toDocsParamsRanged } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
+import { getExtensionSettingsFilter } from '../../extension-id';
 import { getMessageCategory } from './cwf-message-categories';
 import {
   CommitBaselineType,
@@ -104,10 +105,10 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
  */
 function handleOpenSettings() {
   Telemetry.logUsage('control-center/open-settings');
-  vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode').then(
+  vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', getExtensionSettingsFilter()).then(
     () => {},
     (err) => {
-      void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+      void vscode.commands.executeCommand('workbench.action.openSettings', getExtensionSettingsFilter());
     }
   );
 }
