@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.1...v0.27.2) (2026-06-16)
+
+
+### Bug fixes
+
+* add no-ACE extension variant for Open VSX ([a16ef23](https://github.com/codescene-oss/codescene-vscode/commit/a16ef23570a8fe8e34453e868dbcc6dd9b8ee4b9))
+* escape HTML in webview component interpolations (CS-11188) ([28c868d](https://github.com/codescene-oss/codescene-vscode/commit/28c868d7be183822bab8d9957ded5f46ebf03a2b))
+* redact sensitive input from safeJsonParse error telemetry (CS-11187) ([a587d75](https://github.com/codescene-oss/codescene-vscode/commit/a587d752a9948f876d9c237a4eb9eedac84044c4))
+* replace Math.random() nonce with crypto.randomBytes (CS-11189) ([60247c8](https://github.com/codescene-oss/codescene-vscode/commit/60247c8baaa5a07457296788c70884db7d93722c))
+* validate git refs before merge-base to prevent argv injection (CS-11190) ([c7d678d](https://github.com/codescene-oss/codescene-vscode/commit/c7d678d6c11f70bf277233ab327719ebb94f3225))
+
 ### [0.27.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.0...v0.27.1) (2026-06-03)
 
 
