@@ -15,6 +15,7 @@ import { basename, dirname } from 'path';
 import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
+import { ACE_ENABLED } from '../build-flags';
 import { getAuthToken } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
@@ -296,6 +297,9 @@ export class DevtoolsAPI {
    * @returns preflightResponse
    */
   static async preflight() {
+    if (!ACE_ENABLED) {
+      return;
+    }
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
     try {
       const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({
@@ -318,10 +322,16 @@ export class DevtoolsAPI {
   }
 
   static aceEnabled() {
+    if (!ACE_ENABLED) {
+      return false;
+    }
     return DevtoolsAPI.instance.preflightJson !== undefined;
   }
 
   static disableAce() {
+    if (!ACE_ENABLED) {
+      return;
+    }
     DevtoolsAPI.instance.preflightJson = undefined;
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
   }
@@ -397,54 +407,90 @@ export class DevtoolsAPI {
    * @returns refactoring response
    */
   static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
+    this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;
 
-    const token = getEffectiveToken();
-    if (!token) {
-      throw new MissingAuthTokenError();
-    }
+    const token = this.getAuthToken();
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
       const payload = DevtoolsAPI.buildRefactoringPayload(fnToRefactor, skipCache, token);
 
-      logOutputChannel.info(
-        `Refactor requested for ${logIdString(fnToRefactor)}${
-skipCache === true ? ' (retry)' : ''
-}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t) => t.category).join(', ')}]`
-      );
-      const fp = fileParts(document);
-      if (!validateFileParts('postRefactoring', fp, document)) {
-        throw new Error('Invalid file parts: document directory is missing or does not exist');
-      }
-      const response = await DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
-        args: ['run-command', 'refactor'],
-        input: JSON.stringify(payload),
-        execOptions: { signal, cwd: fp.documentDirectory },
-        taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
-      });
-      logOutputChannel.info(
-        `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${
-skipCache === true ? ' (retry)' : ''
-}`
-      );
+      this.logRefactorRequested(fnToRefactor, skipCache);
+
+      const fp = this.getValidatedFileParts(document);
+
+      const response = await this.executeRefactor(payload, signal, fp);
+
+      this.logRefactorDone(fnToRefactor, skipCache, response);
 
       DevtoolsAPI.handleBackOnline();
 
       return response;
     } catch (e) {
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        DevtoolsAPI.handleOfflineBehavior();
-      } else {
-        reportError({ context: 'Refactoring error', e, consoleOnly: true });
-        if (!(e instanceof AbortError)) {
-          DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
-        }
-      }
-
-      throw e; // Some general error reporting above, but pass along the error for further handling
+      this.handleRefactorError(e);
+      // Some general error reporting above, but pass along the error for further handling
+      throw e;
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
+    }
+  }
+
+  private static checkAceEnabled(): void {
+    if (!ACE_ENABLED) {
+      throw new Error('ACE is not available in this build');
+    }
+  }
+
+  private static getAuthToken(): string {
+    const token = getEffectiveToken();
+    if (!token) {
+      throw new MissingAuthTokenError();
+    }
+    return token;
+  }
+
+  private static logRefactorRequested(fnToRefactor: any, skipCache: boolean): void {
+    logOutputChannel.info(
+      `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t: any) => t.category).join(', ')}]`
+    );
+  }
+
+  private static getValidatedFileParts(document: any) {
+    const fp = fileParts(document);
+    if (!validateFileParts('postRefactoring', fp, document)) {
+      throw new Error('Invalid file parts: document directory is missing or does not exist');
+    }
+    return fp;
+  }
+
+  private static async executeRefactor(
+    payload: any,
+    signal: AbortSignal,
+    fp: { documentDirectory: string }
+  ): Promise<RefactorResponse> {
+    return DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
+      args: ['run-command', 'refactor'],
+      input: JSON.stringify(payload),
+      execOptions: { signal, cwd: fp.documentDirectory },
+      taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
+    });
+  }
+
+  private static logRefactorDone(fnToRefactor: any, skipCache: boolean, response: RefactorResponse): void {
+    logOutputChannel.info(
+      `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${skipCache === true ? ' (retry)' : ''}`
+    );
+  }
+
+  private static handleRefactorError(e: any): void {
+    if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
+      DevtoolsAPI.handleOfflineBehavior();
+    } else {
+      reportError({ context: 'Refactoring error', e, consoleOnly: true });
+      if (!(e instanceof AbortError)) {
+        DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
+      }
     }
   }
 
@@ -490,6 +536,9 @@ skipCache === true ? ' (retry)' : ''
    * - Fires a preflight event to update the ACE state to `offline`.
    */
   private static handleOfflineBehavior() {
+    if (!ACE_ENABLED) {
+      return;
+    }
     const { state: currentState } = CsExtensionState.stateProperties.features.ace;
 
     // Only show when transitioning to offline mode
@@ -512,6 +561,9 @@ skipCache === true ? ' (retry)' : ''
    * No action is taken if the ACE feature state is not `offline`.
    */
   private static handleBackOnline() {
+    if (!ACE_ENABLED) {
+      return;
+    }
     const { state: currentState } = CsExtensionState.stateProperties.features.ace;
     if (currentState === 'offline') {
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
