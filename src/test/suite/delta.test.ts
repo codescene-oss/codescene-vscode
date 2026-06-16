@@ -8,6 +8,8 @@ import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
+import { aceTest } from '../ace-test-suite';
+
 suite('Delta Integration Test Suite', () => {
   const testDir = createTestDir('test-delta');
   let deltaEventFired = false;
@@ -183,7 +185,7 @@ suite('Delta Integration Test Suite', () => {
     assert.strictEqual(deltaEventFired, false, 'Event should not fire when scores are identical');
   });
 
-  test('fnsToRefactor with code-smells path returns refactorable functions', async function() {
+  aceTest('fnsToRefactor with code-smells path returns refactorable functions', async function() {
     this.timeout(60000);
 
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';

@@ -13,7 +13,9 @@ import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
-suite('PostRefactoring Integration Test Suite', () => {
+import { aceSuite } from '../ace-test-suite';
+
+aceSuite('PostRefactoring Integration Test Suite', () => {
   const testDir = createTestDir('test-post-refactoring');
   const testToken = process.env.CODESCENE_TEST_TOKEN;
   let analysisError: Error | undefined;

@@ -1,4 +1,5 @@
 import vscode, { Uri } from 'vscode';
+import { ACE_ENABLED } from '../build-flags';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { issueToDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
@@ -64,7 +65,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
       arguments: [functionInfo.parent.document.uri],
     });
 
-    if (functionInfo.fnToRefactor) {
+    if (ACE_ENABLED && functionInfo.fnToRefactor) {
       codeLenses.push(requestAceLens, dismissAceLens);
     }
     let order = 1;

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { ACE_ENABLED } from '../build-flags';
 import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
@@ -74,6 +75,10 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     codeSmells: any[],
     actions: vscode.CodeAction[]
   ) {
+    if (!ACE_ENABLED) {
+      return;
+    }
+
     const authToken = getAuthToken();
     const fnsToRefactor = await Promise.all(
       codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))

@@ -13,6 +13,7 @@ import { DevtoolsAPI, getEffectiveToken } from '../devtools-api';
 import { CreditsInfoError } from '../devtools-api/credits-info-error';
 import { CreditsInfo } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
+import { getExtensionSettingsFilter } from '../extension-id';
 import Telemetry from '../telemetry';
 import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
@@ -80,12 +81,12 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
-          .executeCommand('workbench.action.openWorkspaceSettings', '@ext:codescene.codescene-vscode')
+          .executeCommand('workbench.action.openWorkspaceSettings', getExtensionSettingsFilter())
           .then(
             () => {},
             (err) => {
               logOutputChannel.info('Not inside a workspace, opening general/user settings instead.');
-              void vscode.commands.executeCommand('workbench.action.openSettings', '@ext:codescene.codescene-vscode');
+              void vscode.commands.executeCommand('workbench.action.openSettings', getExtensionSettingsFilter());
             }
           );
       },

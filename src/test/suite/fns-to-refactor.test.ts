@@ -9,7 +9,9 @@ import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { ChangeType } from '../../devtools-api/delta-model';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
-suite('FnsToRefactor Integration Test Suite', () => {
+import { aceSuite } from '../ace-test-suite';
+
+aceSuite('FnsToRefactor Integration Test Suite', () => {
   const testDir = createTestDir('test-fns-to-refactor');
   let analysisError: Error | undefined;
   let errorListener: vscode.Disposable;

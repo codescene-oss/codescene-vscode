@@ -8,6 +8,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { applyNoAceVariant, restoreVariantFiles, isNoAceBuild } = require('./apply-build-variant');
 
 const artifacts = {
   darwin: ['x64', 'arm64'],
@@ -62,6 +63,53 @@ function updateVscodeIgnore(targetPlatform, targetArch, originalContent) {
   return content; // Return original content for restoration
 }
 
+function restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgnore, originalPackageJson, originalReadme) {
+  console.log('\nRestoring .vscodeignore, package.json, and README...');
+  fs.writeFileSync(vscodeIgnorePath, originalVscodeIgnore);
+  restoreVariantFiles(projectRoot, originalPackageJson, originalReadme);
+}
+
+function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
+  const packageJsonPath = path.join(projectRoot, 'package.json');
+
+  if (buildNoAce) {
+    console.log('Applying no-ACE build variant...');
+    applyNoAceVariant(projectRoot);
+  }
+
+  console.log('Step 1: Bundling CLI binary...');
+  execSync(`node ./scripts/bundle-cli.js ${platform} ${arch}`, { stdio: 'inherit' });
+
+  console.log('\nStep 2: Cleaning up other platform binaries...');
+  cleanupOtherBinaries(platform, arch);
+
+  console.log('\nStep 3: Updating .vscodeignore...');
+  updateVscodeIgnore(platform, arch, originalVscodeIgnore);
+
+  console.log('\nStep 4: Updating docs and webview...');
+  const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
+  execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
+  execSync('npm run updatecwf', { stdio: 'inherit', env: tokenEnv });
+
+  console.log('\nStep 5: Building extension...');
+  execSync('npm run build', {
+    stdio: 'inherit',
+    env: { ...process.env, BUILD_NO_ACE: buildNoAce ? 'true' : 'false' },
+  });
+
+  console.log('\nStep 6: Packaging VSIX...');
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const target = `${platform}-${arch}`;
+  const vsixName = `${pkg.name}-${pkg.version}-${target}.vsix`;
+
+  execSync(`vsce package --target ${target} --no-yarn --out ${vsixName}`, {
+    stdio: 'inherit',
+    env: tokenEnv,
+  });
+
+  console.log(`\n✅ Successfully created: ${vsixName}`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   
@@ -86,51 +134,22 @@ async function main() {
   
   console.log(`📦 Packaging extension for ${platform}/${arch}...\n`);
   
-  const vscodeIgnorePath = path.join(__dirname, '..', '.vscodeignore');
+  const projectRoot = path.join(__dirname, '..');
+  const vscodeIgnorePath = path.join(projectRoot, '.vscodeignore');
+  const packageJsonPath = path.join(projectRoot, 'package.json');
+  const readmePath = path.join(projectRoot, 'README.md');
   const originalVscodeIgnore = fs.readFileSync(vscodeIgnorePath, 'utf8');
-  
+  const originalPackageJson = fs.readFileSync(packageJsonPath, 'utf8');
+  const originalReadme = fs.existsSync(readmePath) ? fs.readFileSync(readmePath, 'utf8') : undefined;
+  const buildNoAce = isNoAceBuild();
+
   try {
-    // Step 1: Bundle binary for this platform
-    console.log('Step 1: Bundling CLI binary...');
-    execSync(`node ./scripts/bundle-cli.js ${platform} ${arch}`, { stdio: 'inherit' });
-    
-    // Step 2: Clean up other binaries
-    console.log('\nStep 2: Cleaning up other platform binaries...');
-    cleanupOtherBinaries(platform, arch);
-    
-    // Step 3: Update .vscodeignore
-    console.log('\nStep 3: Updating .vscodeignore...');
-    updateVscodeIgnore(platform, arch, originalVscodeIgnore);
-    
-    // Step 4: Update docs and webview
-    console.log('\nStep 4: Updating docs and webview...');
-    execSync('npm run updatedocs', { stdio: 'inherit', env: { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' } });
-    execSync('npm run updatecwf', { stdio: 'inherit', env: { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' } });
-    
-    // Step 5: Build extension
-    console.log('\nStep 5: Building extension...');
-    execSync('npm run build', { stdio: 'inherit' });
-    
-    // Step 6: Package VSIX
-    console.log('\nStep 6: Packaging VSIX...');
-    const version = JSON.parse(fs.readFileSync('package.json', 'utf8')).version;
-    const target = `${platform}-${arch}`;
-    const vsixName = `codescene-vscode-${version}-${target}.vsix`;
-    
-    execSync(`vsce package --target ${target} --no-yarn --out ${vsixName}`, { 
-      stdio: 'inherit',
-      env: { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' }
-    });
-    
-    console.log(`\n✅ Successfully created: ${vsixName}`);
-    
+    packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore);
   } catch (error) {
     console.error('\n❌ Failed to package:', error.message);
     process.exit(1);
   } finally {
-    // Restore original .vscodeignore
-    console.log('\nRestoring .vscodeignore...');
-    fs.writeFileSync(vscodeIgnorePath, originalVscodeIgnore);
+    restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgnore, originalPackageJson, originalReadme);
   }
 }
 

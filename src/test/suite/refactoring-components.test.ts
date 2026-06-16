@@ -4,7 +4,9 @@ import { RefactorResponse } from '../../devtools-api/refactor-models';
 
 const code = 'function foo() {}\n';
 
-suite('Refactor panel components Test Suite', () => {
+import { aceSuite } from '../ace-test-suite';
+
+aceSuite('Refactor panel components Test Suite', () => {
   test('Expected reasons for full conf (4), with no reasons(-with-details)', async () => {
     const response: RefactorResponse = {
       code,

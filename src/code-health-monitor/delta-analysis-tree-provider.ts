@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { ACE_ENABLED } from '../build-flags';
 import { DeltaAnalysisEvent } from '../devtools-api';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
@@ -175,6 +176,9 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
   }
 
   private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
+    if (!ACE_ENABLED) {
+      return;
+    }
     const refactorings = refactoringsCount(filesWithIssues);
     if (refactorings === 0) {
       return;
