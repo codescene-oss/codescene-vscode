@@ -186,6 +186,7 @@
     "bundle-cli-test": "node ./scripts/bundle-cli-for-current-platform.js",
     "test": "mocha",
     "test:coverage": "c8 npm run test",
+    "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
     "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
     "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
     "release:minor": "standard-version --release-as minor",
