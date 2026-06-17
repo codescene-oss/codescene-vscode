@@ -15,7 +15,6 @@ import {
 } from './refactor-models';
 
 import { basename, dirname } from 'path';
-import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { getAuthToken } from '../configuration';
@@ -117,13 +116,7 @@ export class DevtoolsAPIImpl {
     cwd: string
   ): string {
     // IMPORTANT: keep stderr as part of the `msg`, so that network errors can be detected as such.
-    let cwdExists;
-    try {
-      cwdExists = existsSync(cwd);
-    } catch {
-      cwdExists = undefined;
-    }
-    const message = `devtools exit(${exitCode}) '${args.join(' ')}': ${errorMessage} - stdout: '${stdout}', stderr: '${stderr}', cwd: '${cwd} (exists: ${cwdExists})'`;
+    const message = `devtools exit(${exitCode}) '${args.join(' ')}': ${errorMessage} - stdout: '${stdout}', stderr: '${stderr}', cwd: '${cwd}'`;
     logOutputChannel.debug(message);
     return message;
   }
