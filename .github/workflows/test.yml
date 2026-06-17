@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Retrieve secret
         env:
-          SECRET_NAME: ${{ env.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }}
+          SECRET_NAME: 'VSCODE_MARKETPLACE_PUBLISHING_TOKEN'
         run: |
           vDB_PASSWORD="${{ secrets[env.SECRET_NAME] }}"
           echo "The database password retrieved dynamically is $vDB_PASSWORD"
