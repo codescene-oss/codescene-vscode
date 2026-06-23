@@ -1,10 +1,6 @@
 import vscode, { Disposable } from 'vscode';
-import { ACE_ENABLED } from './build-flags';
-import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { getEffectiveToken } from './devtools-api';
-import { CreditsInfoError } from './devtools-api/credits-info-error';
-import { isDefined, toUppercase } from './utils';
-import { onDidChangeConfiguration } from './configuration';
+import { AnalysisFeature, CsExtensionState } from './cs-extension-state';
+import { isDefined } from './utils';
 
 interface StatusBarOptions {
   text: string;
@@ -16,14 +12,9 @@ interface StatusBarOptions {
 export class CsStatusBar implements Disposable {
   private disposables: Disposable[] = [];
 
-  private readonly aceStatus?: vscode.StatusBarItem;
   private readonly analysisStatus: vscode.StatusBarItem;
 
   constructor() {
-    if (ACE_ENABLED) {
-      this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
-      this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
-    }
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
       vscode.StatusBarAlignment.Left,
@@ -32,19 +23,9 @@ export class CsStatusBar implements Disposable {
   }
 
   update() {
-    const { analysis, ace } = CsExtensionState.stateProperties.features;
+    const { analysis } = CsExtensionState.stateProperties.features;
 
-    this.updateAceStatus(ace);
     this.updateAnalysisStatus(analysis);
-  }
-
-  private updateAceStatus(ace: CsFeature) {
-    if (!this.aceStatus) {
-      return;
-    }
-    const item = this.aceStatus;
-    const handler = this.aceStateHandlers[ace.state] || (() => {});
-    handler(ace, item);
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
@@ -103,57 +84,6 @@ export class CsStatusBar implements Disposable {
     item.command = options.command;
     item.backgroundColor = options.background ? new vscode.ThemeColor(options.background) : undefined;
   }
-
-  /**
-   * Don't show errors related to credit outages
-   */
-  private reportableAceError(error?: Error) {
-    return isDefined(error) && !(error instanceof CreditsInfoError);
-  }
-
-  private aceStateHandlers: Record<string, (ace: CsFeature, item: vscode.StatusBarItem) => void> = {
-    error: (ace, item) => {
-      if (this.reportableAceError(ace.error)) {
-        this.setStatus(item, {
-          text: `$(error) ACE ${toUppercase(ace.state)}`,
-          tooltip: 'Retry ACE activation',
-          command: 'codescene.ace.setEnabled',
-          background: 'statusBarItem.errorBackground',
-        });
-      }
-    },
-    offline: (ace, item) => {
-      this.setStatus(item, {
-        text: `$(error) ACE ${toUppercase(ace.state)}`,
-        tooltip: 'Retry ACE activation',
-        command: 'codescene.ace.setEnabled',
-        background: 'statusBarItem.warningBackground',
-      });
-    },
-    disabled: (ace, item) => {
-      this.setStatus(item, {
-        text: `$(error) ACE ${toUppercase(ace.state)}`,
-        tooltip: 'Enable ACE in the extension settings',
-        command: 'codescene.ace.setEnabled',
-        background: 'statusBarItem.warningBackground',
-      });
-    },
-    loading: (ace, item) => {
-      this.setStatus(item, {
-        text: '$(loading~spin) ACE',
-        tooltip: 'Retrying ACE activation...',
-      });
-    },
-    enabled: (ace, item) => {
-      const hasToken = !!getEffectiveToken();
-      this.setStatus(item, {
-        text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
-        command: 'codescene.openSettingsAndFocusToken',
-        background: hasToken ? undefined : 'statusBarItem.warningBackground',
-        tooltip: hasToken ? 'CodeScene ACE is active' : 'Configure ACE auth token in extension Workspace settings',
-      });
-    },
-  };
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());

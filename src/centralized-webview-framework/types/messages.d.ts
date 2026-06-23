@@ -61,29 +61,7 @@ export type MessageToIDEType =
       messageType: 'show-onboarding';
     }
   | {
-      messageType: 'apply';
-    }
-  | {
       messageType: 'close';
-    }
-  | {
-      messageType: 'retry';
-    }
-  | {
-      messageType: 'reject';
-    }
-  | {
-      messageType: 'copyCode';
-      payload?: { code: string };
-    }
-  | {
-      messageType: 'acknowledged';
-    }
-  | {
-      messageType: 'retry';
-    }
-  | {
-      messageType: 'showDiff';
     }
   | {
       messageType: 'showLogoutput';

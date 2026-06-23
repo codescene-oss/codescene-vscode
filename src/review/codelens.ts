@@ -3,8 +3,6 @@ import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
-import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
-import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { isDefined } from '../utils';
@@ -33,7 +31,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       category: string;
       document: vscode.TextDocument;
       position: vscode.Position;
-      fnToRefactor: FnToRefactor | undefined; // can be null
       commandId: string;
     }
   >();
@@ -44,9 +41,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidReviewComplete(() => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidDeltaAnalysisComplete(() => this.changeCodeLensesEmitter.fire()),
-      vscode.workspace.onDidChangeTextDocument((event) => {
-        fnsToRefactorCache.invalidateForDocument(event.document);
-      }),
       vscode.workspace.onDidCloseTextDocument((document) => {
         this.cleanupCachesForDocument(document);
       })
@@ -68,8 +62,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       this.commandDisposables.delete(key);
       this.commandCache.delete(key);
     });
-
-    fnsToRefactorCache.cleanupForDocument(document);
   }
 
   dispose() {
@@ -139,8 +131,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
   private async openInteractiveDocsCommand(codeLens: CsCodeLens, document: vscode.TextDocument) {
     const { codeSmell, range, cacheKey } = codeLens;
 
-    const fnToRefactor = await fnsToRefactorCache.fnsToRefactor(document, codeSmell);
-
     let cached = this.commandCache.get(cacheKey);
 
     if (!cached) {
@@ -150,19 +140,19 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       const command = vscode.commands.registerCommand(commandId, async () => {
         const currentCached = this.commandCache.get(cacheKey);
         if (currentCached) {
-          // Get review result to extract function range info when fnToRefactor is not available
+          // Get review result to extract function range info
           const cacheItem = Reviewer.instance.reviewCache.get(currentCached.document, "any");
           let reviewResult: Review | undefined = undefined;
           if (cacheItem) {
             const reviewResultRaw = await cacheItem.review.reviewResult;
             reviewResult = reviewResultRaw && typeof reviewResultRaw === 'object' ? reviewResultRaw : undefined;
           }
-          
+
           const params = toDocsParamsRanged(
             currentCached.category,
             currentCached.document,
             codeSmell,
-            { fnToRefactor: currentCached.fnToRefactor, reviewResult }
+            { reviewResult }
           );
           void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', params, 'codelens (review)');
         }
@@ -174,7 +164,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
         category: codeSmell.category,
         document,
         position: range.start,
-        fnToRefactor,
         commandId,
       };
       this.commandCache.set(cacheKey, cached);
@@ -183,7 +172,6 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       cached.category = codeSmell.category;
       cached.document = document;
       cached.position = range.start;
-      cached.fnToRefactor = fnToRefactor;
     }
 
     const title = `$(warning) ${codeSmell.category}`;

@@ -32,11 +32,42 @@ export function convertCWFCommitBaselineToVSCode(commitBaselineString: CommitBas
  * @returns
  */
 export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDeltaData {
+  // Clone the delta to avoid mutating the original
+  const enrichedDelta = { ...event.deltaForFile };
+
+  // Enrich function-level-findings with computed codeSmell data for webview consumption
+  // The webview looks for finding['refactorable-fn'] to determine if Auto-Refactor button should render
+  if (enrichedDelta['function-level-findings'] && event.functionLevelIssues) {
+    enrichedDelta['function-level-findings'] = enrichedDelta['function-level-findings'].map((finding) => {
+      // Find the corresponding DeltaFunctionInfo with locally-computed codeSmell
+      const functionInfo = event.functionLevelIssues.find((fi) => fi.fnName === finding.function.name);
+
+      if (functionInfo?.codeSmell) {
+        // Inject refactorable-fn marker for webview to detect
+        return {
+          ...finding,
+          'refactorable-fn': {
+            name: finding.function.name || '',
+            body: '', // Not needed for agentic refactoring
+            'function-type': '', // Not needed for agentic refactoring
+            'file-type': '', // Not needed for agentic refactoring
+            range: finding.function.range || { 'start-line': 0, 'start-column': 0, 'end-line': 0, 'end-column': 0 },
+            'refactoring-targets': [{
+              category: functionInfo.codeSmell.category,
+              line: functionInfo.codeSmell['highlight-range']['start-line'],
+            }],
+          },
+        };
+      }
+      return finding;
+    });
+  }
+
   return {
     file: {
       fileName: event.document.fileName,
     },
-    delta: event.deltaForFile,
+    delta: enrichedDelta,
   };
 }
 
@@ -78,9 +109,20 @@ export function getFileAndFunctionFromState(
     fn: locatedFn
       ? {
           fnName: locatedFn?.fnName,
+          codeSmell: locatedFn.codeSmell
+            ? {
+                category: locatedFn.codeSmell.category,
+                details: locatedFn.codeSmell.details,
+                highlightRange: {
+                  startLine: locatedFn.codeSmell['highlight-range']['start-line'],
+                  startColumn: locatedFn.codeSmell['highlight-range']['start-column'],
+                  endLine: locatedFn.codeSmell['highlight-range']['end-line'],
+                  endColumn: locatedFn.codeSmell['highlight-range']['end-column'],
+                },
+              }
+            : undefined,
         }
       : undefined,
-    fnToRefactor: locatedFn?.fnToRefactor,
   };
 }
 

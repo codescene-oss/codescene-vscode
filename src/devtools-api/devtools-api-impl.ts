@@ -1,28 +1,21 @@
 import { ExecOptions } from 'child_process';
 import { Command, ExecResult, Task } from '../executor';
 import { SimpleExecutor } from '../simple-executor';
-import { AbortingSingleTaskExecutor } from '../aborting-single-task-executor';
+import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
 import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
-import { safeJsonParse, rangeStr, networkErrors } from '../utils';
+import { safeJsonParse, networkErrors } from '../utils';
 import { DevtoolsError as DevtoolsErrorModel } from './model';
-import {
-  CreditsInfoError as CreditsInfoErrorModel,
-  FnToRefactor,
-  ABORTING_SINGLE_EXECUTOR_TASK_IDS,
-  QUEUED_SINGLE_EXECUTOR_TASK_IDS,
-  DELTA_TASK_ID_PREFIX,
-} from './refactor-models';
 
-import { basename, dirname } from 'path';
-import vscode, { ExtensionContext, TextDocument } from 'vscode';
-import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
-import { getAuthToken } from '../configuration';
-import { CsExtensionState } from '../cs-extension-state';
+import vscode, { ExtensionContext } from 'vscode';
 import { logOutputChannel } from '../log';
 import { DevtoolsError } from './devtools-error';
-import { CreditsInfoError } from './credits-info-error';
 import { AbortError } from './abort-error';
 import { createCpuAwareConcurrencyExecutor, IsCpuTooBusyFn } from '../cpu-usage-based-executor';
+
+const TELEMETRY_POST_TASK_ID = 'telemetry-post';
+const TELEMETRY_DEVICE_ID_TASK_ID = 'telemetry-device-id';
+const QUEUED_SINGLE_EXECUTOR_TASK_IDS = [TELEMETRY_POST_TASK_ID, TELEMETRY_DEVICE_ID_TASK_ID];
+const DELTA_TASK_ID_PREFIX = 'delta';
 
 function presentCommand(obj: Task | Command, cwd: string): string {
   const trimmedObj = {
@@ -35,11 +28,13 @@ function presentCommand(obj: Task | Command, cwd: string): string {
 
 export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
-  public abortingSingleTaskExecutor: AbortingSingleTaskExecutor = new AbortingSingleTaskExecutor(this.simpleExecutor);
   public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
-  public concurrencyLimitingExecutor;
-  public concurrencyLimitingExecutorForDelta;
-  public preflightJson?: string;
+  public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
+    this.simpleExecutor
+  );
+  public concurrencyLimitingExecutorForDelta: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
+    this.simpleExecutor
+  );
   public networkError: boolean = false;
 
   constructor(public binaryPath: string, context: ExtensionContext, isCpuTooBusyFn?: IsCpuTooBusyFn) {
@@ -58,7 +53,7 @@ export class DevtoolsAPIImpl {
    *
    * @param opts Options for running the devtools binary
    * @returns stdout of the command
-   * @throws Error, DevtoolsError or CreditsInfoError depending on exit code
+   * @throws Error or DevtoolsError depending on exit code
    */
   async runBinary(opts: BinaryOpts) {
     const { args, execOptions, input, taskId } = opts;
@@ -72,8 +67,6 @@ export class DevtoolsAPIImpl {
         ignoreError: true,
       };
       logOutputChannel.info("Running task: " + presentCommand(task, execOptions.cwd));
-      // abortingSingleTaskExecutor used to be more broadly used, but now with parallelism and caching, it's better to favor concurrencyLimitingExecutor except for the
-      // `refactor` operation (or any other member of ABORTING_SINGLE_EXECUTOR_TASK_IDS) since it represents work that is potentially costly, backend-side.
 
       // QUEUED_SINGLE_EXECUTOR_TASK_IDS uses queuedSingleTaskExecutor which queues tasks instead of aborting them.
 
@@ -81,8 +74,6 @@ export class DevtoolsAPIImpl {
       // we ensure UI responsiveness in the Monitor even if the main concurrencyLimitingExecutor was fully utilized.
       if (taskId.startsWith(DELTA_TASK_ID_PREFIX)) {
         result = await this.concurrencyLimitingExecutorForDelta.execute(task, execOptions, input);
-      } else if (ABORTING_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
-        result = await this.abortingSingleTaskExecutor.execute(task, execOptions, input);
       } else if (QUEUED_SINGLE_EXECUTOR_TASK_IDS.includes(taskId)) {
         result = await this.queuedSingleTaskExecutor.execute(task, execOptions, input);
       } else {
@@ -137,15 +128,6 @@ export class DevtoolsAPIImpl {
         devtoolsError.message = devtoolsError.message?.trim() || "DevtoolsError";
         devtoolsError.message = this.fullErrorMessage(exitCode, args, devtoolsError.message, stdout, stderr, cwd);
         throw new DevtoolsError(devtoolsError);
-      case 11: // exit code for CreditInfoError
-        const creditsInfoError = safeJsonParse(stdout) as CreditsInfoErrorModel;
-        creditsInfoError.message = creditsInfoError.message?.trim() || "CreditsInfoError";
-        creditsInfoError.message = this.fullErrorMessage(exitCode, args, creditsInfoError.message, stdout, stderr, cwd);
-        throw new CreditsInfoError(
-          creditsInfoError.message,
-          creditsInfoError['credits-info'],
-          creditsInfoError['trace-id']
-        );
       case 'ABORT_ERR': // ABORT_ERR is triggered by AbortController usage
         const abortError = new AbortError();
         abortError.name = "AbortError";
@@ -183,43 +165,7 @@ export interface BinaryOpts {
 
   /*
     optional taskid for the invocation, ensuring only one task with the same id is running.
-    see AbortingSingleTaskExecutor, QueuedSingleTaskExecutor for details
+    see QueuedSingleTaskExecutor for details
   */
   taskId?: string;
-}
-
-type CmdId = 'review' | 'review-base' | 'delta';
-function taskId(cmdId: CmdId, document: TextDocument) {
-  return `${cmdId} ${document.fileName} v${document.version}`;
-}
-
-interface FileParts {
-  fileName: string;
-  documentDirectory: string;
-}
-function fileParts(document: vscode.TextDocument): FileParts {
-  const fileName = basename(document.fileName);
-
-  // Get the fsPath of the current document because we want to execute the
-  // 'cs review' command in the same directory as the current document
-  // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
-  const documentDirectory = dirname(document.fileName);
-  return { fileName, documentDirectory };
-}
-
-export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
-  return (<CodeSceneAuthenticationSession>x).url !== undefined;
-}
-
-export function getEffectiveToken(): string | undefined {
-  const configToken = getAuthToken();
-  const session = CsExtensionState.stateProperties.session;
-  const sessionToken = session && isCodeSceneSession(session) ? session.accessToken : undefined;
-
-  const token = configToken || sessionToken;
-  return token && token.trim() !== '' ? token : undefined;
-}
-
-export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
-  return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }

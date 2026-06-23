@@ -1,5 +1,4 @@
 import vscode from 'vscode';
-import { RefactoringRequest } from '../refactoring/request';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 
@@ -23,8 +22,3 @@ export interface DevtoolsError {
   [property: string]: any;
 }
 
-export type AceRequestEvent = {
-  document: vscode.TextDocument;
-  type: 'start' | 'end';
-  request: RefactoringRequest;
-};

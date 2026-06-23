@@ -1,17 +1,15 @@
-import { RefactorResponse } from './ace';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
 
 import { CommitBaselineType } from './messages';
 export type IdeTypes = 'VSCode';
 
-//View Props
 export type AutoRefactorConfig = {
   /** Should we show the refactor feature */
   visible: boolean;
   /** if we show the feature should the button be disabled */
   disabled?: boolean;
-  /** if user has approved the use of ACE (ACE acknowledgement) */
+  /** if user has approved the use of CodeScene Refactoring Agent */
   activated?: boolean;
 };
 
@@ -22,7 +20,7 @@ export type FileDeltaData = {
 
 export type Job = {
   file: FileMetaType;
-  type: 'deltaAnalysis' | 'autoRefactor';
+  type: 'deltaAnalysis';
   state: 'running' | 'queued';
 };
 
@@ -42,7 +40,7 @@ export interface HomeContextViewProps {
     fileDeltaData: FileDeltaData[];
     commitBaseline?: CommitBaselineType;
     autoRefactor?: AutoRefactorConfig;
-    /**jobs allows the UI to act on running och queued native jobs such as runnign deltaAnalysis or autoRefacotr */
+    /**jobs allows the UI to act on running or queued native jobs such as running deltaAnalysis */
     jobs?: Job[];
     user?: { name: string } | undefined | null;
   };
@@ -98,49 +96,10 @@ export interface DocsContextViewProps {
   };
 }
 
-export interface AceContextViewProps {
-  /**The IDE invoking th webview */
-  ideType: IdeTypes;
-  /**Enable premium UI elements */
-  pro?: boolean;
-  /**What view should be rendered */
-  view: 'ace';
-  /**devmode will display devtools and log state and messages in the browser console */
-  devmode?: boolean;
-  /** array of feature flags string */
-  featureFlags?: FeatureFlags[];
-  data: {
-    fileData: FileMetaType;
-    aceResultData?: RefactorResponse;
-    error?: string;
-    isStale: boolean;
-    loading: boolean;
-  };
-}
-
-export interface AceAcknowledgeContextViewProps {
-  /**The IDE invoking th webview */
-  ideType: IdeTypes;
-  /**Enable premium UI elements */
-  pro?: boolean;
-  /**What view should be rendered */
-  view: 'aceAcknowledge';
-  /**devmode will display devtools and log state and messages in the browser console */
-  devmode?: boolean;
-  /** array of feature flags string */
-  featureFlags?: FeatureFlags[];
-  data: {
-    fileData?: FileMetaType;
-    autoRefactor: AutoRefactorConfig;
-  };
-}
-
 export type WebViewPropsType =
   | HomeContextViewProps
   | LoginViewProps
-  | DocsContextViewProps
-  | AceContextViewProps
-  | AceAcknowledgeContextViewProps;
+  | DocsContextViewProps;
 
 export type IdeContextType = WebViewPropsType;
 

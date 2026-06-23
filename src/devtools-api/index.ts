@@ -1,36 +1,27 @@
-import { CodeSmell, Review } from '../devtools-api/review-model';
-import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
-import { AceRequestEvent, CheckRulesResponse, CodeHealthRulesResult, CodeHealthRulesTemplateResponse } from './model';
-import {
-  FnToRefactor,
-  PreFlightResponse,
-  RefactorResponse,
-  REFACTOR_TASK_ID,
-  TELEMETRY_POST_TASK_ID,
-  TELEMETRY_DEVICE_ID_TASK_ID,
-  DELTA_TASK_ID_PREFIX,
-} from './refactor-models';
+import { Review } from '../devtools-api/review-model';
+import { assertError, getWorkspaceCwd, safeJsonParse } from '../utils';
+import { CheckRulesResponse, CodeHealthRulesResult, CodeHealthRulesTemplateResponse } from './model';
 
 import { basename, dirname } from 'path';
 import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
-import { ACE_ENABLED } from '../build-flags';
 import { getAuthToken } from '../configuration';
-import { CsExtensionState, CsFeature } from '../cs-extension-state';
+import { CsExtensionState } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
-import { RefactoringRequest } from '../refactoring/request';
-import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
-import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
+import { jsonForScores } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
-import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
-import { DevtoolsError } from './devtools-error';
 import { AbortError } from './abort-error';
 import { IsCpuTooBusyFn } from '../cpu-usage-based-executor';
+import { DevtoolsError } from './devtools-error';
+
+const TELEMETRY_POST_TASK_ID = 'telemetry-post';
+const TELEMETRY_DEVICE_ID_TASK_ID = 'telemetry-device-id';
+const DELTA_TASK_ID_PREFIX = 'delta';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
@@ -260,7 +251,6 @@ export class DevtoolsAPI {
         const parsedResult = safeJsonParse(result.stdout) as Delta | null;
         if (parsedResult) {
           deltaResult = parsedResult;
-          await addRefactorableFunctionsToDeltaResult(document, deltaResult);
           logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
         } else {
           logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
@@ -277,227 +267,10 @@ export class DevtoolsAPI {
         if (error.stack) {
           logOutputChannel.error(`Stack trace: ${error.stack}`);
         }
-      }
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        DevtoolsAPI.handleOfflineBehavior();
-        return;
-      }
-
-      if (!(e instanceof AbortError)) {
         DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        reportError({ context: 'Refactoring (delta operation) failed', e });
       }
     } finally {
       DevtoolsAPI.endAnalysisEvent(document.fileName, true);
-    }
-  }
-
-  // Event emitters for devtools API callbacks
-  private static readonly preflightRequestEmitter = new vscode.EventEmitter<CsFeature>();
-  public static readonly onDidChangePreflightState = DevtoolsAPI.preflightRequestEmitter.event; // (successful preflight is synonymous with activation)
-
-  /**
-   * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
-   *
-   * Fires onDidChangePreflightState
-   *
-   * @returns preflightResponse
-   */
-  static async preflight() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
-    try {
-      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({
-        args: ['run-command', 'preflight'],
-        input: JSON.stringify({}),
-        execOptions: { cwd: getWorkspaceCwd() }
-      });
-      DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
-      return response;
-    } catch (e) {
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        DevtoolsAPI.handleOfflineBehavior();
-        return;
-      }
-
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error: assertError(e) });
-      reportError({ context: 'Unable to enable refactoring capabilities', e });
-    }
-  }
-
-  static aceEnabled() {
-    if (!ACE_ENABLED) {
-      return false;
-    }
-    return DevtoolsAPI.instance.preflightJson !== undefined;
-  }
-
-  static disableAce() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    DevtoolsAPI.instance.preflightJson = undefined;
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
-  }
-
-  static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
-    return this.fnsToRefactor(document, { 'delta-result': delta });
-  }
-
-  /**
-   * If no preflight json is available, ACE is considered disabled. No functions will
-   * be presented as refactorable by early return here.
-   */
-  static async fnsToRefactor(document: TextDocument, args: { 'delta-result': Delta } | { 'code-smells': [CodeSmell] }) {
-    if (!DevtoolsAPI.aceEnabled()) return;
-    logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
-    const fp = fileParts(document);
-    if (!validateFileParts('fnsToRefactor', fp, document)) {
-      return;
-    }
-    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
-
-    const payload = {
-      'file-name': fp.fileName,
-      'file-content': document.getText(),
-      'preflight': JSON.parse(DevtoolsAPI.instance.preflightJson!), // aceEnabled() implies preflightJson is defined
-      ...(cachePath ? { 'cache-path': cachePath } : {}),
-      ...args,
-    };
-
-    const baseArgs = ['run-command', 'fns-to-refactor'];
-
-    const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs,
-      input: JSON.stringify(payload),
-      execOptions: { cwd: fp.documentDirectory },
-    });
-    ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
-    logOutputChannel.debug(
-      `Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`
-    );
-    return ret;
-  }
-
-  private static readonly refactoringRequestEmitter = new vscode.EventEmitter<AceRequestEvent>();
-  public static readonly onDidRefactoringRequest = DevtoolsAPI.refactoringRequestEmitter.event;
-  private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
-  public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
-
-  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string) {
-    const payload: Record<string, any> = {
-      'token': token,
-    };
-
-    if (fnToRefactor['nippy-b64']) {
-      payload['fn-to-refactor-nippy-b64'] = fnToRefactor['nippy-b64'];
-    } else {
-      payload['fn-to-refactor'] = fnToRefactor;
-    }
-
-    if (skipCache) {
-      payload['skip-cache'] = true;
-    }
-
-    return payload;
-  }
-
-  /**
-   * Posts a refactoring using devtools binary
-   *
-   * Fires onDidRefactoringRequest and ondidRefactoringFail events
-   *
-   * @param request refactoring request
-   * @returns refactoring response
-   */
-  static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
-    this.checkAceEnabled();
-    const { document, fnToRefactor, skipCache, signal } = request;
-
-    const token = this.getAuthToken();
-
-    DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
-    try {
-      const payload = DevtoolsAPI.buildRefactoringPayload(fnToRefactor, skipCache, token);
-
-      this.logRefactorRequested(fnToRefactor, skipCache);
-
-      const fp = this.getValidatedFileParts(document);
-
-      const response = await this.executeRefactor(payload, signal, fp);
-
-      this.logRefactorDone(fnToRefactor, skipCache, response);
-
-      DevtoolsAPI.handleBackOnline();
-
-      return response;
-    } catch (e) {
-      this.handleRefactorError(e);
-      // Some general error reporting above, but pass along the error for further handling
-      throw e;
-    } finally {
-      DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
-    }
-  }
-
-  private static checkAceEnabled(): void {
-    if (!ACE_ENABLED) {
-      throw new Error('ACE is not available in this build');
-    }
-  }
-
-  private static getAuthToken(): string {
-    const token = getEffectiveToken();
-    if (!token) {
-      throw new MissingAuthTokenError();
-    }
-    return token;
-  }
-
-  private static logRefactorRequested(fnToRefactor: any, skipCache: boolean): void {
-    logOutputChannel.info(
-      `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t: any) => t.category).join(', ')}]`
-    );
-  }
-
-  private static getValidatedFileParts(document: any) {
-    const fp = fileParts(document);
-    if (!validateFileParts('postRefactoring', fp, document)) {
-      throw new Error('Invalid file parts: document directory is missing or does not exist');
-    }
-    return fp;
-  }
-
-  private static async executeRefactor(
-    payload: any,
-    signal: AbortSignal,
-    fp: { documentDirectory: string }
-  ): Promise<RefactorResponse> {
-    return DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
-      args: ['run-command', 'refactor'],
-      input: JSON.stringify(payload),
-      execOptions: { signal, cwd: fp.documentDirectory },
-      taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
-    });
-  }
-
-  private static logRefactorDone(fnToRefactor: any, skipCache: boolean, response: RefactorResponse): void {
-    logOutputChannel.info(
-      `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${skipCache === true ? ' (retry)' : ''}`
-    );
-  }
-
-  private static handleRefactorError(e: any): void {
-    if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-      DevtoolsAPI.handleOfflineBehavior();
-    } else {
-      reportError({ context: 'Refactoring error', e, consoleOnly: true });
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
-      }
     }
   }
 
@@ -522,71 +295,12 @@ export class DevtoolsAPI {
     return json['device-id'];
   }
 
-  private static shouldHandleOfflineBehavior(e: unknown): boolean {
-    const message = (e as Error).message;
-
-    if (message === networkErrors.javaConnectException) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Handles the transition of the ACE feature into offline mode.
-   *
-   * This method should be called when a network-related error is detected.
-   * It performs the following actions:
-   * - If not already offline, shows an information message to the user that the extension
-   *   is running in offline mode and some features may be unavailable.
-   * - Logs a warning in the output channel with additional context.
-   * - Fires a preflight event to update the ACE state to `offline`.
-   */
-  private static handleOfflineBehavior() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
-
-    // Only show when transitioning to offline mode
-    if (currentState !== 'offline') {
-      void vscode.window.showInformationMessage(
-        'CodeScene extension is running in offline mode. Some features may be unavailable.'
-      );
-    }
-
-    logOutputChannel.warn(
-      'CodeScene extension is running in offline mode. The requested action could not be completed. Please check your internet connection to restore full functionality.'
-    );
-
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'offline' });
-  }
-
-  /**
-   * Restores the ACE feature state when the extension comes back online.
-   * This method should be called after a successful request to the CodeScene backend.
-   * No action is taken if the ACE feature state is not `offline`.
-   */
-  private static handleBackOnline() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
-    if (currentState === 'offline') {
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
-      void vscode.window.showInformationMessage('CodeScene extension is back online.');
-    }
-  }
-
   static dispose() {
     try { DevtoolsAPI.instance?.concurrencyLimitingExecutor.dispose(); } catch {}
     try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
     try { DevtoolsAPI.deltaAnalysisEmitter.dispose(); } catch {}
-    try { DevtoolsAPI.preflightRequestEmitter.dispose(); } catch {}
-    try { DevtoolsAPI.refactoringRequestEmitter.dispose(); } catch {}
-    try { DevtoolsAPI.refactoringErrorEmitter.dispose(); } catch {}
   }
 }
 
@@ -638,10 +352,6 @@ export function getEffectiveToken(): string | undefined {
 
   const token = configToken || sessionToken;
   return token && token.trim() !== '' ? token : undefined;
-}
-
-export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
-  return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 
 

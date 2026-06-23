@@ -1,145 +1,115 @@
-import vscode, { ViewColumn, WorkspaceEdit } from 'vscode';
-import { CsExtensionState } from '../cs-extension-state';
-import { FnToRefactor } from '../devtools-api/refactor-models';
+import vscode from 'vscode';
 import Telemetry from '../telemetry';
-import { RefactoringRequest } from './request';
-import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
-import { reportError } from '../utils';
-import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webview-ace-panel';
-import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 import { logOutputChannel } from '../log';
 import { CodeSmell } from '../devtools-api/review-model';
-
-/**
- * Locate the view column of an existing tab for the given document, even when the document
- * is not the active tab in its group (e.g. when a diff tab is on top of it).
- */
-function findDocumentTabViewColumn(document: vscode.TextDocument): ViewColumn | undefined {
-  for (const group of vscode.window.tabGroups.all) {
-    for (const tab of group.tabs) {
-      if (tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === document.uri.toString()) {
-        return group.viewColumn;
-      }
-    }
-  }
-  return undefined;
-}
+import {
+  runRefactoringAgent,
+  getFileTimestamp,
+  showGitDiffView,
+  codeSmellToRefactoringParams,
+} from './refactoring-agent';
+import { CsExtensionState } from '../cs-extension-state';
 
 export class CsRefactoringCommands implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
 
-  constructor() {
+  constructor(private readonly context: vscode.ExtensionContext) {
     this.disposables.push(
       vscode.commands.registerCommand(
         'codescene.requestAndPresentRefactoring',
         this.requestAndPresentRefactoringCmd,
         this
-      ),
-      vscode.commands.registerCommand('codescene.applyRefactoring', this.applyRefactoringCmd, this),
-      vscode.commands.registerCommand('codescene.showDiffForRefactoring', this.showDiffForRefactoringCmd, this)
+      )
     );
   }
 
-  // @codescene(disable:"Excess Number of Function Arguments")
+  /**
+   * Main entry point for the refactoring command.
+   * Uses the new refactoring-agent binary to fix code health issues directly.
+   */
   private async requestAndPresentRefactoringCmd(
     document: vscode.TextDocument,
     source: string,
-    fnToRefactor?: FnToRefactor,
-    skipCache?: boolean,
     codeSmell?: CodeSmell
   ) {
-    const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
-    if (!toRefactor) {
-      logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
+    if (!codeSmell) {
+      logOutputChannel.error('Could not refactor. Code smell is undefined.');
+      void vscode.window.showErrorMessage('Cannot refactor: no code smell specified.');
       return;
     }
 
-    if (!CsExtensionState.acknowledgedAceUsage) {
-      Telemetry.logUsage('ace-info/presented', { source });
-      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(toRefactor, document, skipCache));
-      return;
-    }
+    const params = codeSmellToRefactoringParams(document, codeSmell);
 
-    const request = new RefactoringRequest(toRefactor, document, skipCache);
-    Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
-    CodeSceneCWFAceTabPanel.show(request);
-  }
+    Telemetry.logUsage('refactor/requested', {
+      source,
+      file: params.filePath,
+      line: params.line,
+      smell: params.smell,
+    });
 
-  private async applyRefactoringCmd(refactoring: RefactoringRequest) {
-    const {
-      document,
-      fnToRefactor: { vscodeRange },
-    } = refactoring;
+    // Show progress notification while the agent runs
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Refactoring: ${params.smell}`,
+        cancellable: true,
+      },
+      async (progress, cancellationToken) => {
+        progress.report({ message: 'Running refactoring agent...' });
 
-    return refactoring.promise.then(async (response) => {
-      // Close any lingering Show Diff tabs.
-      try {
-        await this.closeExistingDiffTabs();
-      } catch (e) {
-        reportError({ e, context: 'Error closing diff tabs' });
+        // Capture file timestamp before running the agent
+        const timestampBefore = await getFileTimestamp(params.filePath);
+
+        const result = await runRefactoringAgent(this.context, params, cancellationToken);
+
+        if (!result.success) {
+          if (result.error !== 'Refactoring was cancelled') {
+            void vscode.window.showErrorMessage(`Refactoring failed: ${result.error}`);
+            Telemetry.logUsage('refactor/failed', {
+              source,
+              file: params.filePath,
+              smell: params.smell,
+              error: result.error,
+            });
+          }
+          return;
+        }
+
+        // Capture file timestamp after running the agent
+        const timestampAfter = await getFileTimestamp(params.filePath);
+
+        // Check if the file was actually modified by comparing timestamps
+        const hasActualChanges =
+          timestampBefore !== null && timestampAfter !== null && timestampAfter > timestampBefore;
+
+        if (hasActualChanges) {
+          // Changes were made - show diff view
+          await showGitDiffView(params.filePath);
+          Telemetry.logUsage('refactor/completed', {
+            source,
+            file: params.filePath,
+            smell: params.smell,
+            hasChanges: true,
+          });
+
+          void vscode.window.showInformationMessage(
+            'Refactoring complete. Review the changes in the diff view.'
+          );
+        } else {
+          // No changes were made
+          Telemetry.logUsage('refactor/completed', {
+            source,
+            file: params.filePath,
+            smell: params.smell,
+            hasChanges: false,
+          });
+
+          void vscode.window.showInformationMessage(
+            'Refactoring completed but no changes were made to the file.'
+          );
+        }
       }
-
-      const viewColumn = targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One;
-      await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn });
-      const workSpaceEdit = new WorkspaceEdit();
-      workSpaceEdit.replace(document.uri, vscodeRange, response.code);
-      await vscode.workspace.applyEdit(workSpaceEdit);
-      // Select the replaced code in the editor, starting from the original position
-      await selectCode(document, response.code, vscodeRange.start);
-      await vscode.commands.executeCommand('editor.action.formatSelection');
-
-      Telemetry.logUsage('refactor/applied', refactoring.eventData);
-    });
-  }
-
-  private async closeExistingDiffTabs() {
-    const tabsToClose = vscode.window.tabGroups.all
-      .flatMap((group) => group.tabs)
-      .filter(
-        (tab) =>
-          tab.input instanceof vscode.TabInputTextDiff &&
-          (tab.input.original.scheme === 'tmp-diff' || tab.input.modified.scheme === 'tmp-diff')
-      );
-
-    for (const tab of tabsToClose) {
-      await vscode.window.tabGroups.close(tab);
-    }
-  }
-
-  private async showDiffForRefactoringCmd(refactoring: RefactoringRequest) {
-    // Close any existing diff tabs before opening a new one.
-    // This ensures that hitting the 'Show Diff' button can be clicked multiple times without creating new Diff panes (CS-5755).
-    // This is the best possible approach atm, since VS Code doesn't offer an API to focus on a specific tab (https://github.com/microsoft/vscode/issues/162446)
-    try {
-      await this.closeExistingDiffTabs();
-    } catch (e) {
-      reportError({e, context: "Error closing diff tabs"});
-    }
-    const {
-      document,
-      fnToRefactor: { vscodeRange },
-    } = refactoring;
-
-    const response = await refactoring.promise;
-    const decoratedCode = decorateCode(response, document.languageId);
-    // Create temporary virtual documents to use in the diff command. Just opening a new document with the new code
-    // imposes a save dialog on the user when closing the diff.
-    const originalCodeTmpDoc = await createTempDocument('Original', {
-      content: document.getText(vscodeRange),
-      languageId: document.languageId,
-    });
-    const refactoringTmpDoc = await createTempDocument('Refactoring', {
-      content: decoratedCode,
-      languageId: document.languageId,
-    });
-
-    // Use showTextDocument using the tmp doc and the target editor view column to set that editor active.
-    // The diff command will then open in that same viewColumn, and not on top of the ACE panel.
-    const viewColumn = targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One;
-    await vscode.window.showTextDocument(originalCodeTmpDoc, viewColumn, false);
-    await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
-
-    Telemetry.logUsage('refactor/diff-shown', refactoring.eventData);
+    );
   }
 
   dispose() {

@@ -4,7 +4,7 @@ import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
 import { isDefined } from './utils';
 
-export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error' | 'offline';
+export type FeatureState = 'loading' | 'enabled' | 'disabled' | 'error';
 
 /**
  * state - indicates the state of the feature
@@ -28,7 +28,6 @@ type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
   analysis: AnalysisFeature;
-  ace: CsFeature;
 }
 
 export interface CsStateProperties {
@@ -36,7 +35,6 @@ export interface CsStateProperties {
   features: CsFeatures;
 }
 
-const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
 const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
@@ -56,14 +54,10 @@ export class CsExtensionState {
   private sessionChangedEmitter = new vscode.EventEmitter<void>();
   readonly onSessionChanged = this.sessionChangedEmitter.event;
 
-  private aceStateChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onAceStateChanged = this.aceStateChangedEmitter.event;
-
   constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
       features: {
         analysis: { state: 'loading' },
-        ace: { state: 'loading' },
       },
     };
     this.extensionUri = context.extensionUri;
@@ -78,7 +72,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
+    this.context.globalState.setKeysForSync([baselineKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -89,14 +83,6 @@ export class CsExtensionState {
 
   static get hasInstance(): boolean {
     return !!this._instance;
-  }
-
-  static get acknowledgedAceUsage() {
-    return this._instance.context.globalState.get<boolean>(acknowledgedAceUsageKey);
-  }
-
-  static async setAcknowledgedAceUsage(value?: boolean) {
-    await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
   }
 
   static get baseline(): Baseline {
@@ -136,27 +122,11 @@ export class CsExtensionState {
       DevtoolsAPI.onDidAnalysisStateChange(CsExtensionState._instance.handleAnalysisEvent),
       DevtoolsAPI.onDidAnalysisFail(CsExtensionState._instance.handleAnalysisError)
     );
-    context.subscriptions.push(
-      DevtoolsAPI.onDidRefactoringFail((error) => {
-        CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error });
-      }),
-      DevtoolsAPI.onDidRefactoringRequest(async (evt) => {
-        if (evt.type === 'end') {
-          try {
-            await evt.request.promise;
-            // Reset error state when a request succeeds again
-            CsExtensionState.setACEState({ ...CsExtensionState.stateProperties.features.ace, error: undefined });
-          } catch (error) {}
-        }
-      })
-    );
   }
 
   static clearErrors() {
     CsExtensionState.stateProperties.features.analysis.error = undefined;
     CsExtensionState.stateProperties.features.analysis.state = 'enabled';
-    CsExtensionState.stateProperties.features.ace.error = undefined;
-    CsExtensionState.stateProperties.features.ace.state = 'enabled';
     CsExtensionState._instance.updateStatusViews();
   }
 
@@ -185,7 +155,6 @@ export class CsExtensionState {
     CsExtensionState._instance.stateProperties.session = session;
     this._instance.sessionChangedEmitter.fire();
     if (!signedIn) {
-      // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
     }
 
@@ -200,26 +169,12 @@ export class CsExtensionState {
     return this._instance.onSessionChanged;
   }
 
-  static get onAceStateChanged() {
-    return this._instance.onAceStateChanged;
-  }
-
   static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
       analysis: { state: featureState({ state, error }), error, analysisState },
     };
     CsExtensionState._instance.updateStatusViews();
-  }
-
-  static setACEState({ state, error }: CsFeature) {
-    CsExtensionState.stateProperties.features = {
-      ...CsExtensionState.stateProperties.features,
-      ace: { state: featureState({ state, error }), error },
-    };
-
-    CsExtensionState._instance.updateStatusViews();
-    CsExtensionState._instance.aceStateChangedEmitter.fire();
   }
 }
 

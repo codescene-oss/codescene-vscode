@@ -10,7 +10,6 @@ import {
   getWebviewPostMessageCalls,
   resetWebviewPanelMocks,
 } from '../setup';
-import { aceSuite } from '../ace-test-suite';
 import { initExtensionId } from '../../extension-id';
 
 function resetDocsPanel() {
@@ -61,22 +60,6 @@ suite('CodeSceneCWFDocsTabPanel Test Suite', () => {
     panel.state = createDocsParams();
   }
 
-  aceSuite('ACE state listeners', () => {
-    test('refreshAceState posts update when ACE state changes', async () => {
-      primeDocsPanel();
-      getWebviewPostMessageCalls().length = 0;
-
-      (CsExtensionState as any)._instance.aceStateChangedEmitter.fire();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      assert.ok(
-        getWebviewPostMessageCalls().some(
-          (msg: any) => msg?.messageType === 'update-renderer'
-        ),
-        'Expected update-renderer postMessage after ACE state change'
-      );
-    });
-  });
 
   test('open-settings uses workspace settings when available', async () => {
     vscode.commands.executeCommand = ((command: string, ...args: unknown[]) => {

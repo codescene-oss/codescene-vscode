@@ -142,13 +142,13 @@
         "codescene.enableAutoRefactor": {
           "type": "boolean",
           "default": true,
-          "description": "Enable CodeScene ACE",
+          "description": "Enable CodeScene Refactoring Agent",
           "order": 15
         },
         "codescene.authToken": {
           "type": "string",
           "default": "",
-          "description": "Authentication token for CodeScene ACE. Has priority over the Sign In with CodeScene command.",
+          "description": "Authentication token for CodeScene Refactoring Agent.",
           "order": 19.5
         },
         "codescene.enableTelemetry": {

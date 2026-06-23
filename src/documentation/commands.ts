@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { DeltaFunctionInfo } from '../code-health-monitor/delta-function-info';
 import { DeltaIssue } from '../code-health-monitor/delta-issue';
-import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { CodeSmell, Range, Review } from '../devtools-api/review-model';
@@ -87,7 +86,6 @@ export interface FunctionRange {
 export interface InteractiveDocsParams {
   issueInfo: IssueInfo;
   document?: vscode.TextDocument;
-  fnToRefactor?: FnToRefactor;
   codeSmell?: CodeSmell;
   functionRange?: FunctionRange;
 }
@@ -104,12 +102,10 @@ export function isInteractiveDocsParams(obj: unknown): obj is InteractiveDocsPar
 export function issueToDocsParams(issue: DeltaIssue, fnInfo?: DeltaFunctionInfo) {
   const params = toDocsParams(issue.changeDetail.category, issue.parentDocument, issue.position);
   params.issueInfo.fnName = fnInfo?.fnName;
-  params.fnToRefactor = fnInfo?.fnToRefactor;
   return params;
 }
 
 export interface ToDocsParamsRangedOptions {
-  fnToRefactor?: FnToRefactor;
   reviewResult?: Review;
 }
 
@@ -119,11 +115,11 @@ export function toDocsParamsRanged(
   codeSmell: CodeSmell,
   options?: ToDocsParamsRangedOptions
 ): InteractiveDocsParams {
-  const { fnToRefactor, reviewResult } = options || {};
+  const { reviewResult } = options || {};
   let functionRange: FunctionRange | undefined;
-  
-  // If we don't have fnToRefactor but have a review result, try to find the function range from function-level-code-smells
-  if (!fnToRefactor && reviewResult) {
+
+  // If we have a review result, try to find the function range from function-level-code-smells
+  if (reviewResult) {
     const functionInfo = findFunctionForCodeSmell(reviewResult, codeSmell);
     if (functionInfo) {
       functionRange = {
@@ -141,10 +137,9 @@ export function toDocsParamsRanged(
         codeSmell['highlight-range']['start-column'] - 1
       ),
       range: getVsCodeRangeByCodeSmell(codeSmell),
-      fnName: fnToRefactor?.name ?? functionRange?.function ?? '',
+      fnName: functionRange?.function ?? '',
     },
     document,
-    fnToRefactor,
     codeSmell,
     functionRange,
   };
@@ -160,10 +155,9 @@ export function getVsCodeRangeByCodeSmell(codeSmell: CodeSmell) {
 export function toDocsParams(
   category: string,
   document: vscode.TextDocument,
-  position?: vscode.Position,
-  fnToRefactor?: FnToRefactor
+  position?: vscode.Position
 ): InteractiveDocsParams {
-  return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
+  return { issueInfo: { category, position }, document };
 }
 
 export function categoryToDocsCode(issueCategory: string) {

@@ -17,7 +17,9 @@ import {
   OpenDocsMessage,
 } from '../../centralized-webview-framework/types/messages';
 import { FileMetaType } from '../../centralized-webview-framework/types';
+import { FunctionInfoExternal } from '../../centralized-webview-framework/types/delta';
 import { CodeSmell } from '../../devtools-api/review-model';
+import { logOutputChannel } from '../../log';
 
 /**
  * Changes the commit baseline
@@ -42,26 +44,6 @@ async function handleGoToFunction(homeView: HomeView, payload: FileMetaType) {
     (await showDocAtPosition(foundFileFunction.file.document, getFunctionPosition(payload.fn)));
 }
 
-/**
- * NYI: Find function in VSCode state and trigger autorefactor panel
- * @param payload
- */
-async function handleAutoRefactor(homeView: HomeView, payload: any) {
-  const document = await findOrOpenDocument(payload.fileName);
-  const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName, {
-    name: payload.fn.name,
-    startLine: payload.fn.range.startLine,
-  });
-
-  if (!foundFileFunction?.fnToRefactor) return;
-
-  void vscode.commands.executeCommand(
-    'codescene.requestAndPresentRefactoring',
-    document,
-    'code-health-details',
-    foundFileFunction?.fnToRefactor
-  );
-}
 
 /**
  * Opens docs panel for a codesmell
@@ -92,8 +74,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
         'end-line': payload.fn?.range?.endLine ?? 1,
         'end-column': payload.fn?.range?.endColumn ?? 1,
       },
-    } as CodeSmell,
-    { fnToRefactor: foundFileFunction.fnToRefactor }
+    } as CodeSmell
   );
   if (docsParams) {
     void vscode.commands.executeCommand('codescene.openInteractiveDocsPanel', docsParams, 'code-health-details');
@@ -184,18 +165,59 @@ async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType)
 }
 
 /**
+ * Handles auto-refactor requests from the webview
+ * @param homeView
+ * @param payload
+ * @returns
+ */
+async function handleAutoRefactor(homeView: HomeView, payload: { fileName: string; fn?: FunctionInfoExternal }) {
+  const foundFileFunction = getFileAndFunctionFromState(
+    homeView.getFileIssueMap(),
+    payload.fileName,
+    payload.fn ? { name: payload.fn.name, startLine: payload.fn.range?.startLine || 0 } : undefined
+  );
+
+  if (!foundFileFunction?.fn?.codeSmell) {
+    logOutputChannel.warn('No code smell found for refactoring');
+    return;
+  }
+
+  // Convert CWF codeSmell format to CodeSmell format expected by the command
+  const codeSmell: CodeSmell = {
+    category: foundFileFunction.fn.codeSmell.category,
+    details: foundFileFunction.fn.codeSmell.details,
+    'highlight-range': {
+      'start-line': foundFileFunction.fn.codeSmell.highlightRange.startLine,
+      'start-column': foundFileFunction.fn.codeSmell.highlightRange.startColumn,
+      'end-line': foundFileFunction.fn.codeSmell.highlightRange.endLine,
+      'end-column': foundFileFunction.fn.codeSmell.highlightRange.endColumn,
+    },
+  };
+
+  const document = await findOrOpenDocument(vscode.Uri.file(payload.fileName));
+  if (document) {
+    await vscode.commands.executeCommand(
+      'codescene.requestAndPresentRefactoring',
+      document,
+      'cwf-home',
+      codeSmell
+    );
+  }
+}
+
+/**
  * Handling messages related to opening new panels
  * @param homeView
  * @param message
  * @returns
  */
-function handlePanelMessage(homeView: HomeView, message: MessageToIDEType) {
+async function handlePanelMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
-    case 'request-and-present-refactoring':
-      void handleAutoRefactor(homeView, message.payload);
-      return;
     case 'open-docs-for-function':
       handleOpenDocs(homeView, message.payload);
+      return;
+    case 'request-and-present-refactoring':
+      await handleAutoRefactor(homeView, message.payload);
       return;
   }
 }
@@ -246,7 +268,7 @@ export async function handleCWFMessage(homeView: HomeView, message: MessageToIDE
       await handleLoginMessage(homeView, message);
       return;
     case 'panel':
-      handlePanelMessage(homeView, message);
+      await handlePanelMessage(homeView, message);
       return;
     case 'editor':
       await handleEditorMessage(homeView, message);

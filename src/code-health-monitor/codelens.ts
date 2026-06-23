@@ -1,9 +1,9 @@
 import vscode, { Uri } from 'vscode';
-import { ACE_ENABLED } from '../build-flags';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { issueToDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './delta-function-info';
+import { logOutputChannel } from '../log';
 
 export function register(context: vscode.ExtensionContext) {
   const codeLensProvider = new CodeHealthMonitorCodeLens();
@@ -54,20 +54,23 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     const codeLenses = [];
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
 
-    const requestAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
-      title: '$(sparkle) CodeScene ACE',
-      command: 'codescene.requestAndPresentRefactoring',
-      arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
-    });
-    const dismissAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
+    const dismissLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
       title: '$(circle-slash) Dismiss',
       command: 'codescene.monitorCodeLens.dismiss',
       arguments: [functionInfo.parent.document.uri],
     });
 
-    if (ACE_ENABLED && functionInfo.fnToRefactor) {
-      codeLenses.push(requestAceLens, dismissAceLens);
+    // Add refactoring lens if there's a code smell to refactor
+    if (functionInfo.codeSmell) {
+      const requestRefactorLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
+        title: '$(sparkle) CodeScene Agent',
+        command: 'codescene.requestAndPresentRefactoring',
+        arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.codeSmell],
+      });
+      codeLenses.push(requestRefactorLens, dismissLens);
+    } else {
     }
+
     let order = 1;
     if (!reviewCodeLensesEnabled()) {
       functionInfo.children.forEach((issue) => {
@@ -83,7 +86,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     }
     // Put this lens last on the line
     order++;
-    dismissAceLens.range = new vscode.Range(
+    dismissLens.range = new vscode.Range(
       functionStartLine.with({ character: order }),
       functionStartLine.with({ character: order })
     );

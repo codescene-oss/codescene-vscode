@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import { ACE_ENABLED } from '../build-flags';
-import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
@@ -8,7 +6,6 @@ import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { getAuthToken } from '../configuration';
-import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { buildInsertText, getLineIndentation } from '../utils/codeaction-utils';
 
 export function register(context: vscode.ExtensionContext) {
@@ -60,7 +57,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
 
     const actions: vscode.CodeAction[] = [];
 
-    await this.addRefactorAction(document, reviewCacheItem, codeSmells, actions);
+    await this.addRefactorAction(document, codeSmells, actions);
     await this.addExplainActions(document, reviewCacheItem, codeSmells, diagnosticsInRange, actions);
     this.addDisableAction(document, diagnosticsInRange, actions);
 
@@ -71,33 +68,26 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
 
   private async addRefactorAction(
     document: vscode.TextDocument,
-    reviewCacheItem: any,
     codeSmells: any[],
     actions: vscode.CodeAction[]
   ) {
-    if (!ACE_ENABLED) {
-      return;
-    }
-
     const authToken = getAuthToken();
-    const fnsToRefactor = await Promise.all(
-      codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
-    );
-    const fnToRefactor = fnsToRefactor.find(isDefined);
 
-    if (!fnToRefactor) return;
+    // Only add refactor action if there's exactly one code smell (to avoid ambiguity)
+    if (codeSmells.length !== 1) return;
 
-    const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
-    const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
-    refactorAction.diagnostics = [refactorHighligting];
+    const codeSmell = codeSmells[0];
+    if (!codeSmell) return;
+
+    const refactorAction = new vscode.CodeAction('Refactor using CodeScene Agent', vscode.CodeActionKind.QuickFix);
     refactorAction.command = {
       command: 'codescene.requestAndPresentRefactoring',
-      title: 'Refactor using CodeScene ACE',
-      arguments: [document, 'codeaction', fnToRefactor],
+      title: 'Refactor using CodeScene Agent',
+      arguments: [document, 'codeaction', codeSmell],
     };
     refactorAction.disabled = !authToken
       ? {
-          reason: 'Refactoring is not available. Please verify your authentication token in Workspace settings.',
+          reason: 'Activate the refactoring agent by providing your authentication token in Workspace settings.',
         }
       : undefined;
     actions.push(refactorAction);
@@ -113,11 +103,6 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     const reviewResultRaw = await reviewCacheItem.review.reviewResult;
     const reviewResult: Review | undefined = reviewResultRaw && typeof reviewResultRaw === 'object' ? reviewResultRaw : undefined;
 
-    const fnsToRefactor = await Promise.all(
-      codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
-    );
-    const fnToRefactor = fnsToRefactor.find(isDefined);
-
     codeSmells.forEach((codeSmell) => {
       const { category } = codeSmell;
       if (!category) return;
@@ -128,7 +113,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       action.command = {
         command: 'codescene.openInteractiveDocsPanel',
         title,
-        arguments: [toDocsParamsRanged(category, document, codeSmell, { fnToRefactor, reviewResult }), 'codeaction'],
+        arguments: [toDocsParamsRanged(category, document, codeSmell, { reviewResult }), 'codeaction'],
       };
       actions.push(action);
     });

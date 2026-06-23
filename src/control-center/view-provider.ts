@@ -9,13 +9,10 @@ import vscode, {
 } from 'vscode';
 import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI, getEffectiveToken } from '../devtools-api';
-import { CreditsInfoError } from '../devtools-api/credits-info-error';
-import { CreditsInfo } from '../devtools-api/refactor-models';
+import { DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import { getExtensionSettingsFilter } from '../extension-id';
 import Telemetry from '../telemetry';
-import { pluralize } from '../utils';
 import { commonResourceRoots, getUri, nonce } from '../webview-utils';
 
 export function registerControlCenterViewProvider(context: ExtensionContext) {
@@ -73,11 +70,6 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     const commands: { [key: string]: () => void } = {
       openAiPricing: () => this.openLink('https://codescene.com/product/ai-coding#pricing'),
       showLogOutput: () => logOutputChannel.show(),
-      retryAce: () => {
-        logOutputChannel.show();
-        logOutputChannel.info('Retrying ACE activation...');
-        void vscode.commands.executeCommand('codescene.ace.setEnabled');
-      },
       openSettings: () => {
         Telemetry.logUsage('control-center/open-settings');
         vscode.commands
@@ -233,104 +225,13 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     `;
   }
 
-  private static readonly aceStatusMap: Record<string, { iconClass: string; text: string; tooltip: string }> = {
-    loading: {
-      iconClass: 'codicon-loading codicon-modifier-spin',
-      text: 'initializing',
-      tooltip: '',
-    },
-    disabled: {
-      iconClass: 'codicon-circle-slash',
-      text: 'deactivated',
-      tooltip: 'Disabled in configuration',
-    },
-    error: {
-      iconClass: 'codicon-error',
-      text: 'error',
-      tooltip: 'Click to retry connecting to CodeScene ACE',
-    },
-    offline: {
-      iconClass: 'codicon-error',
-      text: 'offline',
-      tooltip: 'Internet connection unavailable',
-    },
-  };
-
-  private getAceStatus() {
-    const aceFeature = CsExtensionState.stateProperties.features.ace;
-
-    if (aceFeature.state === 'enabled') {
-      const hasToken = !!getEffectiveToken();
-      return {
-        iconClass: hasToken ? 'codicon-account' : 'codicon-warning',
-        text: hasToken ? 'signed in' : 'signed out',
-        tooltip: hasToken ? '' : 'Sign in or configure auth token in settings',
-      };
-    }
-
-    return (
-      ControlCenterViewProvider.aceStatusMap[aceFeature.state] || {
-        iconClass: 'codicon-sparkle',
-        text: '',
-        tooltip: '',
-      }
-    );
-  }
-
-  private applyAceStatusOverrides(status: { iconClass: string; text: string; tooltip: string }) {
-    const aceFeature = CsExtensionState.stateProperties.features.ace;
-
-    if (aceFeature.error instanceof CreditsInfoError) {
-      status.text = 'out of credits';
-    }
-
-    // Always in error if analysis error (fail to init or other error)
-    if (CsExtensionState.stateProperties.features.analysis.state === 'error') {
-      status.iconClass = 'codicon-error';
-      status.text = 'error';
-    }
-
-    return status;
-  }
-
   private aceStatusRow() {
-    const aceFeature = CsExtensionState.stateProperties.features.ace;
-    const status = this.applyAceStatusOverrides(this.getAceStatus());
-    const outOfCreditsBanner =
-      aceFeature.error instanceof CreditsInfoError ? this.creditBannerContent(aceFeature.error.creditsInfo) : '';
-
     return /*html*/ `
         <div class="row">
-            <div class="icon-and-text"><span class="codicon ${status.iconClass}"></span><span>CodeScene ACE</span></div>
-            <div class="badge badge-${status.text.replace(/ /g, '-')} ${status.text === 'error' ? 'clickable' : ''}"
-              id="ace-badge"
-              title="${status.tooltip}">${status.text}
-            </div>
+            <div class="icon-and-text"><span class="codicon codicon-circle-slash"></span><span>CodeScene Refactoring Agent</span></div>
+            <div class="badge badge-deactivated">deactivated</div>
         </div>
-        ${outOfCreditsBanner}
     `;
-  }
-
-  private creditBannerContent(creditInfo: CreditsInfo) {
-    if (!creditInfo.reset) return;
-    const resetTime = new Date(creditInfo.reset);
-    const differenceInDays = Math.floor((resetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-
-    const content = /* html*/ `
-    <div class="out-of-credits-banner">
-      <div class="icon-and-text">
-        <span class="codicon codicon-warning warning"></span>
-        <span class="bold">You're out of ACE credits</span>
-      </div>
-      <p>
-        You'll get new credits in ${differenceInDays} ${pluralize(
-      'day',
-      differenceInDays
-    )}. (${resetTime.toLocaleString()})
-      </p>
-    </div>
-    `;
-    return content;
   }
 
   private moreGroup() {

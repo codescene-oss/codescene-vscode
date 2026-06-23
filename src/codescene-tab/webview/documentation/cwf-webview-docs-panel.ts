@@ -7,9 +7,7 @@ import { initBaseContent } from '../../../centralized-webview-framework/cwf-html
 import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
-import { ACE_ENABLED } from '../../../build-flags';
 import { getExtensionSettingsFilter } from '../../../extension-id';
-import { onDidChangeConfiguration } from '../../../configuration';
 
 export type CodeSceneTabPanelState = InteractiveDocsParams & {
   isStale?: boolean;
@@ -47,12 +45,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.webViewPanelDisposable = this.webViewPanel.onDidDispose(() => this.dispose());
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
-    if (ACE_ENABLED) {
-      this.disposables.push(
-        CsExtensionState.onAceStateChanged(() => this.refreshAceState()),
-        onDidChangeConfiguration('authToken', () => this.refreshAceState())
-      );
-    }
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.document === e;
@@ -70,15 +62,6 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
       await this.handleDocumentationMessage(this.state, message);
     } catch (e) {
       reportError({ context: 'An error occurred in the CodeScene Docs panel', e });
-    }
-  }
-
-  private async refreshAceState() {
-    if (this.state) {
-      await this.webViewPanel.webview.postMessage({
-        messageType: 'update-renderer',
-        payload: await getDocsData(this.state),
-      });
     }
   }
 
@@ -111,29 +94,16 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
       'goto-function-location': () => {
         void showDocAtPosition(params.document, params.issueInfo.position);
       },
-
-      acknowledged: async () => {
-        await CsExtensionState.setAcknowledgedAceUsage(true);
-        void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
-          params.document,
-          'interactive-docs',
-          params.fnToRefactor,
-          false, // Never skip cache
-          params.codeSmell
-        );
-        this.webViewPanel.dispose();
-      },
       'request-and-present-refactoring': () => {
-        void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
-          params.document,
-          'interactive-docs',
-          params.fnToRefactor,
-          false, // Never skip cache
-          params.codeSmell
-        );
-        this.webViewPanel.dispose();
+        if (params.codeSmell) {
+          void vscode.commands.executeCommand(
+            'codescene.requestAndPresentRefactoring',
+            params.document,
+            'interactive-docs',
+            params.codeSmell
+          );
+          this.webViewPanel.dispose();
+        }
       },
     };
 

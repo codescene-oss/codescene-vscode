@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { FnToRefactor } from '../devtools-api/refactor-models';
+import { CodeSmell } from '../devtools-api/review-model';
 import { vscodeRange } from '../review/utils';
 import { isDefined, pluralize } from '../utils';
 import { isDegradation, okColor, errorColor } from './presentation';
@@ -7,6 +7,7 @@ import { DeltaTreeViewItem, countInTree } from './tree-model';
 import { FileWithIssues } from './file-with-issues';
 import { DeltaIssue } from './delta-issue';
 import { Function, ChangeType } from '../devtools-api/delta-model';
+import { logOutputChannel } from '../log';
 
 const warningColor = new vscode.ThemeColor('editorWarning.foreground');
 
@@ -15,7 +16,7 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   readonly range?: vscode.Range;
   readonly children: Array<DeltaIssue> = [];
 
-  constructor(readonly parent: FileWithIssues, fnMeta: Function, public fnToRefactor?: FnToRefactor) {
+  constructor(readonly parent: FileWithIssues, fnMeta: Function, public codeSmell?: CodeSmell) {
     this.fnName = fnMeta.name;
     this.range = vscodeRange(fnMeta.range);
   }
@@ -57,6 +58,6 @@ export class DeltaFunctionInfo implements DeltaTreeViewItem {
   }
 
   public get isRefactoringSupported() {
-    return isDefined(this.fnToRefactor);
+    return isDefined(this.codeSmell);
   }
 }

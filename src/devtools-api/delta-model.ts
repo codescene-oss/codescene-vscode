@@ -1,5 +1,3 @@
-import { FnToRefactor } from './refactor-models';
-
 /* eslint-disable @typescript-eslint/naming-convention */
 export interface Delta {
   'file-level-findings': ChangeDetail[];
@@ -59,9 +57,6 @@ export const sortOrder: { [key in ChangeType]: number } = {
 export interface FunctionFinding {
   'change-details': ChangeDetail[];
   function: Function;
-
-  /* Present if the function finding is deemed refactorable. See Analyser.addRefactorableFunctionsToDeltaResult() */
-  refactorableFn?: FnToRefactor;
 }
 
 export interface Function {

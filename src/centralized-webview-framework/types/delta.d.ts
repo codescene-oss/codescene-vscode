@@ -88,4 +88,14 @@ export interface FunctionInfo {
 export interface FunctionInfoExternal {
   name: string;
   range?: RangeCamel;
+  codeSmell?: {
+    category: string;
+    details: string;
+    highlightRange: {
+      startLine: number;
+      startColumn: number;
+      endLine: number;
+      endColumn: number;
+    };
+  };
 }

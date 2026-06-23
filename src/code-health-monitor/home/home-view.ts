@@ -13,10 +13,9 @@ import {
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-framework/types/messages';
-import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
+import { FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
-import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
-import { onDidChangeConfiguration, getServerUrl } from '../../configuration';
+import { getServerUrl } from '../../configuration';
 import { onFileDeletedFromGit } from '../../git-utils';
 import { logOutputChannel } from '../../log';
 import { StaleFileRemover } from '../stale-file-remover';
@@ -44,7 +43,6 @@ interface IdeContextData {
   showOnboarding: boolean;
   fileDeltaData: FileDeltaData[];
   commitBaseline: CommitBaselineType;
-  autoRefactor: AutoRefactorConfig;
   jobs: Job[];
 }
 
@@ -63,7 +61,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
     commitBaseline: convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline),
-    autoRefactor: getAutoRefactorConfig(),
     jobs: [],
   };
 
@@ -77,9 +74,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
       CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
-      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
-      CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
-      onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
+      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()) // Detect change to commit baseline
     );
 
     // Limit number of re-renders
@@ -108,7 +103,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       getHomeData({
         fileDeltaData: this.ideContextData.fileDeltaData,
         jobs: this.ideContextData.jobs,
-        autoRefactor: this.ideContextData.autoRefactor,
+        autoRefactor: { visible: true, activated: true, disabled: false },
         showOnboarding: false,
         commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),
@@ -218,11 +213,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.update();
   }
 
-  private refreshAceState() {
-    this.ideContextData.autoRefactor = getAutoRefactorConfig();
-    this.update();
-  }
-
   private handleSessionChanged() {
     this.session = CsExtensionState.session;
     if (this.session) {
@@ -295,7 +285,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       payload: getHomeData({
         fileDeltaData: this.ideContextData.fileDeltaData,
         jobs: this.ideContextData.jobs,
-        autoRefactor: this.ideContextData.autoRefactor,
+        autoRefactor: { visible: true, activated: true, disabled: false },
         showOnboarding: false,
         commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),

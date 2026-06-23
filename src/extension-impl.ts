@@ -21,7 +21,7 @@ import { register as registerCsDocProvider } from './documentation/csdoc-provide
 import { ensureCompatibleBinary } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { deactivate as deactivateLog, logOutputChannel, registerShowLogCommand } from './log';
-import { initAce } from './refactoring';
+import { initRefactoring } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
@@ -43,7 +43,6 @@ import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
-import { ACE_ENABLED } from './build-flags';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 
@@ -250,18 +249,6 @@ function setupCodeLensProviders(context: vscode.ExtensionContext) {
   context.subscriptions.push(codeLensProviderRegistration);
 }
 
-function setupAceConfiguration(context: vscode.ExtensionContext) {
-  // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-  const debouncedSetEnabledAce = debounce((enabled: boolean) => {
-    void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
-  }, 500);
-  const aceConfigDisposable = onDidChangeConfiguration('enableAutoRefactor', (e) => {
-    debouncedSetEnabledAce(e.value);
-  });
-  DISPOSABLES.push(aceConfigDisposable);
-  context.subscriptions.push(aceConfigDisposable);
-}
-
 async function startExtension(context: vscode.ExtensionContext) {
   const csWorkspace = new CsWorkspace(context);
   const csContext: CsContext = {
@@ -272,11 +259,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context);
-  if (ACE_ENABLED) {
-    initAce(context);
-  } else {
-    CsExtensionState.setACEState({ state: 'disabled' });
-  }
+  initRefactoring(context);
 
   const gitUnavailableDisposable = onGitDetectedAsUnavailable(() => {
     void vscode.window.showWarningMessage("'Git' binary not found by the CodeScene extension, or Git not initialized in this project.");
@@ -305,10 +288,6 @@ async function startExtension(context: vscode.ExtensionContext) {
   setupCodeLensProviders(context);
 
   registerCodeActionProvider(context);
-
-  if (ACE_ENABLED) {
-    setupAceConfiguration(context);
-  }
 }
 
 /**
@@ -326,9 +305,7 @@ function finalizeActivation(context: vscode.ExtensionContext) {
 function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
   registerShowLogCommand(context);
   registerDocumentationCommands(context);
-  if (ACE_ENABLED) {
-    registerOpenCsSettingsCommand(context);
-  }
+  registerOpenCsSettingsCommand(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();

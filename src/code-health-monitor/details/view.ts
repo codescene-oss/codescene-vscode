@@ -1,6 +1,5 @@
 import { basename } from 'path';
 import vscode, { Disposable, ExtensionContext, Webview, WebviewViewProvider } from 'vscode';
-import { refactoringButton } from '../../codescene-tab/webview/refactoring-components';
 import { issueToDocsParams } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots, getUri, nonce } from '../../webview-utils';
@@ -66,14 +65,6 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
 
   private messageHandler(message: any) {
     switch (message.command) {
-      case 'request-and-present-refactoring':
-        void vscode.commands.executeCommand(
-          'codescene.requestAndPresentRefactoring',
-          this.functionInfo?.parent.document,
-          'code-health-details',
-          this.functionInfo?.fnToRefactor
-        );
-        return;
       case 'interactive-docs':
         const issue = this.functionInfo?.children[message.issueIndex];
         if (issue) {
@@ -81,6 +72,16 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
             'codescene.openInteractiveDocsPanel',
             issueToDocsParams(issue, this.functionInfo),
             'code-health-details'
+          );
+        }
+        return;
+      case 'request-and-present-refactoring':
+        if (this.functionInfo?.codeSmell) {
+          void vscode.commands.executeCommand(
+            'codescene.requestAndPresentRefactoring',
+            this.functionInfo.parent.document,
+            'code-health-details',
+            this.functionInfo.codeSmell
           );
         }
         return;
@@ -130,10 +131,9 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
     let content = '';
     if (functionInfo) {
       content = this.functionInfoContent(functionInfo);
-      const { isRefactoringSupported, children } = functionInfo;
+      const { children } = functionInfo;
       Telemetry.logUsage('code-health-details/function-selected', {
         visible: this.view?.visible,
-        isRefactoringSupported,
         nIssues: children.length,
       });
     } else {
@@ -153,11 +153,14 @@ class CodeHealthDetailsView implements WebviewViewProvider, Disposable {
   }
 
   private functionInfoContent(functionInfo: DeltaFunctionInfo) {
+    const refactorButton = functionInfo.codeSmell
+      ? `<div class="block">
+           <button id="refactoring-button" class="vscode-button">Auto-Refactor</button>
+         </div>`
+      : '';
     return `
     ${this.fileAndCodeSmellSummary(functionInfo)}
-    <div class="block">
-      ${refactoringButton(functionInfo.fnToRefactor)}
-    </div>
+    ${refactorButton}
     ${this.issueDetails(functionInfo)}
     `;
   }

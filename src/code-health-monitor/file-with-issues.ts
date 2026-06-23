@@ -7,6 +7,8 @@ import { DeltaIssue } from './delta-issue';
 import { DeltaFunctionInfo } from './delta-function-info';
 import { sortFnInfo } from './sort-fn-info';
 import { Delta } from '../devtools-api/delta-model';
+import { findFirstRefactorableCodeSmell } from './change-detail-to-code-smell';
+import { logOutputChannel } from '../log';
 
 const fgColor = new vscode.ThemeColor('foreground');
 
@@ -78,7 +80,13 @@ export class FileWithIssues implements DeltaTreeViewItem {
     // Remove these from the tree, and show in file level details view later
     // this.fileLevelIssues = deltaForFile['file-level-findings'].map((finding) => new DeltaIssue(this, finding));
     this.functionLevelIssues = deltaForFile['function-level-findings'].map((finding) => {
-      const functionInfo = new DeltaFunctionInfo(this, finding.function, finding.refactorableFn);
+      // Find the first refactorable code smell from the change details
+      const codeSmell = findFirstRefactorableCodeSmell(
+        finding['change-details'],
+        finding.function.range
+      );
+
+      const functionInfo = new DeltaFunctionInfo(this, finding.function, codeSmell);
       finding['change-details'].forEach((changeDetail) =>
         functionInfo.children.push(new DeltaIssue(functionInfo, changeDetail))
       );

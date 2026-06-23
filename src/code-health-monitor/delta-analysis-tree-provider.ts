@@ -1,5 +1,4 @@
 import vscode from 'vscode';
-import { ACE_ENABLED } from '../build-flags';
 import { DeltaAnalysisEvent } from '../devtools-api';
 import Telemetry from '../telemetry';
 import { isDefined, pluralize } from '../utils';
@@ -8,6 +7,7 @@ import { DeltaFunctionInfo } from './delta-function-info';
 import { DeltaInfoItem } from './delta-info-item';
 import { FileWithIssues } from './file-with-issues';
 import { Baseline, CsExtensionState } from '../cs-extension-state';
+import { logOutputChannel } from '../log';
 
 interface SortOption extends vscode.QuickPickItem {
   label: string;
@@ -117,14 +117,12 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
 
   private update() {
     if (this.fileIssueMap.size > 0) {
-      // const statusItem = this.statusTreeItem();
       const filesWithIssues = Array.from(this.fileIssueMap.values());
       const sortOption = this.sortOptions.find((o) => o.picked);
       if (sortOption) {
         filesWithIssues.sort(sortOption.sortFn);
       }
 
-      // const summaryItem = this.issueSummaryItem(filesWithIssues);
       const baselineInfoItem = this.addBaselineInfo();
       const aceInfoItem = this.aceSummaryItem(filesWithIssues);
       this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
@@ -176,10 +174,11 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
   }
 
   private aceSummaryItem(filesWithIssues: FileWithIssues[]) {
-    if (!ACE_ENABLED) {
-      return;
-    }
     const refactorings = refactoringsCount(filesWithIssues);
+    filesWithIssues.forEach((f) => {
+      f.functionLevelIssues.forEach((fn) => {
+      });
+    });
     if (refactorings === 0) {
       return;
     }
