@@ -221,6 +221,16 @@ export class CsExtensionState {
     CsExtensionState._instance.updateStatusViews();
     CsExtensionState._instance.aceStateChangedEmitter.fire();
   }
+
+  static dispose(): void {
+    if (!CsExtensionState.hasInstance) {
+      return;
+    }
+    CsExtensionState._instance.statusBar.dispose();
+    CsExtensionState._instance.baselineChangedEmitter.dispose();
+    CsExtensionState._instance.sessionChangedEmitter.dispose();
+    CsExtensionState._instance.aceStateChangedEmitter.dispose();
+  }
 }
 
 function featureState(feature: CsFeature) {

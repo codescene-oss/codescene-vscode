@@ -15,17 +15,19 @@ import { SavedFilesTracker } from '../saved-files-tracker';
 import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
 import { SimpleExecutor } from '../simple-executor';
 import { OpenFilesObserver } from '../review/open-files-observer';
+import { WorkspaceFileWatcher } from './workspace-file-watcher';
+import { loadDocumentForBackgroundReview } from '../review/review-document-loader';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
  */
 export class GitChangeObserver {
-  private fileWatcher: vscode.FileSystemWatcher;
   private executor: Executor;
   private scheduledExecutor: DroppingScheduledExecutor;
   private context: vscode.ExtensionContext;
   private savedFilesTracker: SavedFilesTracker;
   private openFilesObserver: OpenFilesObserver;
+  private workspaceWatcher: WorkspaceFileWatcher;
 
   // Tracks the files that have been added though this Observer.
   // We need this because deletion events are tricky:
@@ -35,6 +37,7 @@ export class GitChangeObserver {
   private tracker: Set<string> = new Set();
 
   private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
+  private initialTrackerSeedPromise?: Promise<void>;
 
   constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver) {
     if (!savedFilesTracker) {
@@ -44,31 +47,50 @@ export class GitChangeObserver {
       throw new Error('OpenFilesObserver must be provided to GitChangeObserver');
     }
 
+    const workspaceWatcher = WorkspaceFileWatcher.getInstance();
+    if (!workspaceWatcher) {
+      throw new Error('WorkspaceFileWatcher must be initialized before GitChangeObserver');
+    }
+
     this.context = context;
     this.executor = executor;
     this.savedFilesTracker = savedFilesTracker;
     this.openFilesObserver = openFilesObserver;
+    this.workspaceWatcher = workspaceWatcher;
     this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
-    this.fileWatcher = this.createWatcher('**/*');
 
-    // Initially fill the tracker - this ensures `handleFileDelete` works well
+    this.seedTrackerFromRepoState(executor, savedFilesTracker);
+  }
+
+  /** Await initial repo scan used to populate the deletion tracker before tests run git commands. */
+  waitForInitialTrackerSeed(): Promise<void> {
+    return this.initialTrackerSeedPromise ?? Promise.resolve();
+  }
+
+  private seedTrackerFromRepoState(executor: Executor, savedFilesTracker: SavedFilesTracker): void {
     const lister = new GitChangeLister(executor, savedFilesTracker);
     const workspaceFolder = getWorkspaceFolder();
-    if (workspaceFolder) {
-      const workspacePath = getWorkspacePath(workspaceFolder);
-      const repo = getRepo(workspaceFolder.uri);
-      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-      void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
-        for (const file of files) {
-          this.tracker.add(file);
-        }
-      });
+    if (!workspaceFolder) {
+      return;
     }
+
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const repo = getRepo(workspaceFolder.uri);
+    const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+    this.initialTrackerSeedPromise = lister.collectFilesFromRepoState(gitRootPath, workspacePath).then((files) => {
+      for (const file of files) {
+        this.tracker.add(file);
+      }
+    });
   }
 
   start(): void {
-    this.bindWatcherEvents(this.fileWatcher);
-    this.context.subscriptions.push(this.fileWatcher);
+    // Queue create/change/delete from the shared WorkspaceFileWatcher (save/create/delete/rename).
+    this.context.subscriptions.push(
+      this.workspaceWatcher.onDidFileEvent((event) => {
+        this.eventQueue.push({ type: event.type, uri: event.uri });
+      })
+    );
 
     void this.scheduledExecutor.executeTask(() => this.processQueuedEvents());
   }
@@ -140,19 +162,21 @@ export class GitChangeObserver {
       return true;
     }
 
-    const relativePath = path.relative(getWorkspacePath(workspaceFolder), filePath);
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const relativePath = path.relative(workspacePath, filePath);
+    const normalizedRelativePath = path.normalize(relativePath);
 
-    if (!changedFiles.includes(relativePath)) {
-      return false;
-    }
-
-    return true;
+    return changedFiles.some((changedFile) => path.normalize(changedFile) === normalizedRelativePath);
   }
 
   private async reviewFile(filePath: string): Promise<void> {
     try {
-      // Load the file as a TextDocument (doesn't open in editor UI)
-      const document = await vscode.workspace.openTextDocument(filePath);
+      const isVisible = this.openFilesObserver.getAllVisibleFileNames().has(filePath);
+      // Load content for review without opening the file in the editor UI when possible.
+      const document = await loadDocumentForBackgroundReview(filePath, { allowOpenTextDocument: isVisible });
+      if (!document) {
+        return;
+      }
       CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
     } catch (error) {
       logOutputChannel.warn(`Could not load file for review ${filePath}: ${error}`);
@@ -169,27 +193,6 @@ export class GitChangeObserver {
     }
 
     return true;
-  }
-
-  private createWatcher(pattern: string | vscode.RelativePattern): vscode.FileSystemWatcher {
-    return vscode.workspace.createFileSystemWatcher(
-      pattern,
-      false, // Don't ignore create events
-      false, // Don't ignore change events
-      false  // Don't ignore delete events
-    );
-  }
-
-  private bindWatcherEvents(watcher: vscode.FileSystemWatcher): void {
-    watcher.onDidCreate((uri) => {
-      this.eventQueue.push({type: 'create', uri});
-    });
-    watcher.onDidChange((uri) => {
-      this.eventQueue.push({type: 'change', uri});
-    });
-    watcher.onDidDelete((uri) => {
-      this.eventQueue.push({type: 'delete', uri});
-    });
   }
 
   private async handleFileChange(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<void> {
@@ -250,7 +253,6 @@ export class GitChangeObserver {
   }
 
   dispose(): void {
-    this.fileWatcher.dispose();
     this.scheduledExecutor.dispose();
   }
 }

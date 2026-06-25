@@ -157,5 +157,9 @@ export class CsStatusBar implements Disposable {
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+    if (this.aceStatus) {
+      this.aceStatus.dispose();
+    }
+    this.analysisStatus.dispose();
   }
 }

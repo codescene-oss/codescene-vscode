@@ -94,6 +94,18 @@ suite('ReviewCache Test Suite', () => {
     assert.strictEqual(noMatch, undefined, 'Should not find match for different version');
   });
 
+  test('getExactVersion with false ignores skipMonitorUpdate true entries', async () => {
+    const document = createMockDocument('/test/visible-at-launch.ts');
+    await reviewCache.add(document, createMockReview(document), true, false);
+
+    assert.ok(reviewCache.getExactVersion(document, 'any'), 'any should match Problems-only cache');
+    assert.strictEqual(
+      reviewCache.getExactVersion(document, false),
+      undefined,
+      'false should miss so GitChangeLister can update the monitor'
+    );
+  });
+
   test('should update existing cache entry', async () => {
     const document = createMockDocument('/test/file.ts');
     await addReview(document);

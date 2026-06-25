@@ -5,6 +5,7 @@ import { GitExtension, Repository } from '../types/git';
 import { QueuedSingleTaskExecutor } from './queued-single-task-executor';
 import { logOutputChannel } from './log';
 import { markGitAsUnavailable } from './git/git-detection';
+import { disposeSharedGitIgnoreChecker } from './git/git-ignore-checker';
 import { getBaselineBranch } from './git/codescene-repo-config';
 
 export const GIT_TASK_ID = 'git';
@@ -264,4 +265,6 @@ export function updateGitState(repo: Repository) : GitStateChange {
 
 export function deactivate() {
   gitFileDeleteEvent.dispose();
+  gitExecutor.abortAllTasks();
+  disposeSharedGitIgnoreChecker();
 }

@@ -1,5 +1,4 @@
 import { ExecOptions } from 'child_process';
-import * as os from 'os';
 import { Command, ExecResult, Executor, Task } from './executor';
 import { logOutputChannel } from './log';
 
@@ -77,9 +76,30 @@ export class ConcurrencyLimitingExecutor implements Executor {
   }
 
   abort(taskId: string) {
+    for (const [command, abortController] of this.runningCommands.entries()) {
+      if ('taskId' in command && this.taskIdMatches(command.taskId, taskId)) {
+        try {
+          abortController.abort('[ConcurrencyLimitingExecutor] Task aborted');
+        } catch (error) {
+          logOutputChannel.error(`[ConcurrencyLimitingExecutor] Error aborting command: ${error}`);
+        }
+      }
+    }
+
     if ('abort' in this.executor && typeof (this.executor as any).abort === 'function') {
       (this.executor as any).abort(taskId);
     }
+  }
+
+  private taskIdMatches(runningTaskId: string, requestedTaskId: string): boolean {
+    if (runningTaskId === requestedTaskId) {
+      return true;
+    }
+
+    // Review task ids include a document version suffix, e.g. "review path v123".
+    const runningPrefix = runningTaskId.split(' v')[0];
+    const requestedPrefix = requestedTaskId.split(' v')[0];
+    return runningPrefix === requestedPrefix;
   }
 
   abortAllTasks(): void {
@@ -96,6 +116,9 @@ export class ConcurrencyLimitingExecutor implements Executor {
         logOutputChannel.error(`[ConcurrencyLimitingExecutor] Error aborting command: ${error}`);
       }
     }
+    this.executor.abortAllTasks();
+    // Drop queued work — callers use abortAllTasks during deactivation.
+    this.queue.length = 0;
   }
 
   dispose(): void {
