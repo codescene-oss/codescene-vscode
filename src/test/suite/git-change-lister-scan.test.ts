@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { GitChangeLister } from '../../git/git-change-lister';
 import { mockWorkspaceFolders, createMockWorkspaceFolder } from '../setup';
 import { resetWorkspaceFileActivity } from '../../git/workspace-activity';
+import Reviewer from '../../review/reviewer';
 import {
   GIT_CHANGE_LISTER_TEST_REPO,
   GitChangeListerFixture,
@@ -137,5 +138,65 @@ suite('GitChangeLister scan behavior Test Suite', () => {
     const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
     const document = { fileName: '/tmp/file.ts', version: 1 } as any;
     assert.strictEqual((lister as any).isAlreadyCached(document), false);
+  });
+
+  test('start returns early when there is no workspace folder', async function () {
+    this.timeout(20000);
+    mockWorkspaceFolders(undefined);
+
+    const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
+    let scanned = false;
+    (lister as any).getAllChangedFiles = async () => {
+      scanned = true;
+      return new Set<string>();
+    };
+
+    await lister.start();
+    assert.strictEqual(scanned, false, 'No git scan should run without a workspace folder');
+  });
+
+  test('sortFilesByPriority places non-visible files after visible ones', () => {
+    const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
+    const visibleFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'visible.ts');
+    const hiddenFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'hidden.ts');
+
+    const sorted = (lister as any).sortFilesByPriority(
+      new Set([hiddenFile, visibleFile]),
+      new Set([visibleFile])
+    );
+
+    assert.deepStrictEqual(sorted, [visibleFile, hiddenFile]);
+  });
+
+  test('isAlreadyCached returns true when the review cache has the exact version', () => {
+    const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
+    const original = (Reviewer as any)._instance;
+    (Reviewer as any)._instance = { reviewCache: { getExactVersion: () => ({}) } };
+
+    try {
+      const document = { fileName: '/tmp/file.ts', version: 1 } as any;
+      assert.strictEqual((lister as any).isAlreadyCached(document), true);
+    } finally {
+      (Reviewer as any)._instance = original;
+    }
+  });
+
+  test('isAlreadyCached returns false when the review cache lookup throws', () => {
+    const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
+    const original = (Reviewer as any)._instance;
+    (Reviewer as any)._instance = {
+      reviewCache: {
+        getExactVersion: () => {
+          throw new Error('cache exploded');
+        },
+      },
+    };
+
+    try {
+      const document = { fileName: '/tmp/file.ts', version: 1 } as any;
+      assert.strictEqual((lister as any).isAlreadyCached(document), false);
+    } finally {
+      (Reviewer as any)._instance = original;
+    }
   });
 });

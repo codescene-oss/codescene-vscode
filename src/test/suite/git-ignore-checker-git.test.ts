@@ -289,6 +289,92 @@ suite('GitIgnoreChecker git check-ignore Test Suite', () => {
     }
   });
 
+  test('resolveGitRootPath returns undefined when there is no workspace folder', async () => {
+    mockWorkspaceFolders(undefined);
+    const localChecker = new GitIgnoreChecker();
+    try {
+      assert.strictEqual(await (localChecker as any).resolveGitRootPath(), undefined);
+    } finally {
+      localChecker.dispose();
+    }
+  });
+
+  test('checkIgnoredPathsByGit returns an empty map for empty input', async () => {
+    const result = await (checker as any).checkIgnoredPathsByGit([]);
+    assert.strictEqual(result.size, 0);
+  });
+
+  test('cacheIgnoredPaths skips git lookup when all paths are already cached', async () => {
+    const filePath = path.join(testDir, 'already-cached.js');
+    (checker as any).gitExecutorCache.set(filePath, false);
+
+    let executeCalls = 0;
+    const originalExecute = gitExecutor.execute.bind(gitExecutor);
+    gitExecutor.execute = async (command, options, input) => {
+      executeCalls++;
+      return originalExecute(command, options, input);
+    };
+
+    try {
+      await (checker as any).cacheIgnoredPaths([filePath]);
+      assert.strictEqual(executeCalls, 0, 'No git call should be made when every path is cached');
+    } finally {
+      gitExecutor.execute = originalExecute;
+    }
+  });
+
+  test('queueGitCheck coalesces multiple waiters for the same path', async () => {
+    fs.writeFileSync(path.join(testDir, '.gitignore'), 'shared.txt\n');
+    const filePath = path.join(testDir, 'shared.txt');
+
+    const [first, second] = await Promise.all([
+      (checker as any).queueGitCheck(filePath),
+      (checker as any).queueGitCheck(filePath),
+    ]);
+
+    assert.strictEqual(first, true);
+    assert.strictEqual(second, true);
+  });
+
+  test('queueGitCheck flushes immediately when the batch size limit is reached', async function () {
+    this.timeout(10000);
+    const promises: Array<Promise<boolean>> = [];
+    for (let index = 0; index < 200; index++) {
+      promises.push((checker as any).queueGitCheck(path.join(testDir, `batch-${index}.js`)));
+    }
+
+    const results = await Promise.all(promises);
+    assert.strictEqual(results.length, 200);
+    assert.ok(results.every((ignored) => ignored === false), 'None of the batch files are ignored');
+  });
+
+  test('flushPendingChecks coalesces concurrent flushes into a single run', async () => {
+    const filePath = path.join(testDir, 'in-flight.js');
+    (checker as any).pendingChecks.set(filePath, [{ resolve: () => {} }]);
+
+    let flushRuns = 0;
+    const originalDoFlush = (checker as any).doFlushPendingChecks.bind(checker);
+    (checker as any).doFlushPendingChecks = async () => {
+      flushRuns++;
+      return originalDoFlush();
+    };
+
+    try {
+      await Promise.all([(checker as any).flushPendingChecks(), (checker as any).flushPendingChecks()]);
+      assert.strictEqual(flushRuns, 1, 'A second concurrent flush should reuse the in-flight run');
+    } finally {
+      (checker as any).doFlushPendingChecks = originalDoFlush;
+    }
+  });
+
+  test('dispose clears a pending flush timer', () => {
+    (checker as any).scheduleFlush();
+    assert.ok((checker as any).flushTimer, 'A flush timer should be armed');
+
+    checker.dispose();
+    assert.strictEqual((checker as any).flushTimer, undefined, 'dispose should clear the flush timer');
+  });
+
   test('registerGitIgnoreCacheInvalidation clears shared cache on gitignore workspace events', async () => {
     const sharedChecker = getSharedGitIgnoreChecker();
     const context = { subscriptions: [] as any[] };
