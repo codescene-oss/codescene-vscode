@@ -58,19 +58,24 @@ export class GitChangeObserver {
     this.workspaceWatcher = workspaceWatcher;
     this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
 
-    // Initially fill the tracker - this ensures `handleFileDelete` works well
+    this.seedTrackerFromRepoState(executor, savedFilesTracker);
+  }
+
+  private seedTrackerFromRepoState(executor: Executor, savedFilesTracker: SavedFilesTracker): void {
     const lister = new GitChangeLister(executor, savedFilesTracker);
     const workspaceFolder = getWorkspaceFolder();
-    if (workspaceFolder) {
-      const workspacePath = getWorkspacePath(workspaceFolder);
-      const repo = getRepo(workspaceFolder.uri);
-      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-      void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
-        for (const file of files) {
-          this.tracker.add(file);
-        }
-      });
+    if (!workspaceFolder) {
+      return;
     }
+
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const repo = getRepo(workspaceFolder.uri);
+    const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+    void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then((files) => {
+      for (const file of files) {
+        this.tracker.add(file);
+      }
+    });
   }
 
   start(): void {

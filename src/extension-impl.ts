@@ -93,6 +93,36 @@ function reReviewAfterCodeHealthRulesChange(): void {
 
 const onCodeHealthFileVersionChange = debounce(reReviewAfterCodeHealthRulesChange, 350);
 
+async function recordRulesFileVersion(uri: vscode.Uri): Promise<void> {
+  try {
+    const document = await vscode.workspace.openTextDocument(uri);
+    codeHealthFileVersion.set(document.fileName, document.version);
+    onCodeHealthFileVersionChange();
+  } catch (e) {
+    logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
+  }
+}
+
+function removeRulesFileVersion(uri: vscode.Uri): void {
+  codeHealthFileVersion.delete(uri.fsPath);
+  onCodeHealthFileVersionChange();
+}
+
+function dispatchCodesceneFileChange(uri: vscode.Uri, event: 'upsert' | 'delete'): void {
+  const filePath = uri.fsPath;
+  if (isCodeHealthRulesFile(filePath)) {
+    if (event === 'delete') {
+      removeRulesFileVersion(uri);
+    } else {
+      void recordRulesFileVersion(uri);
+    }
+    return;
+  }
+  if (isCodesceneConfigFile(filePath)) {
+    onCodesceneConfigChange(uri);
+  }
+}
+
 const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
   const gitRoot = gitRootFromCodesceneConfigUri(uri);
   if (gitRoot) {
@@ -348,71 +378,24 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 function registerCodesceneFileListeners(context: vscode.ExtensionContext) {
   // Re-run diagnostics when .codescene/code-health-rules.json or config.json changes.
   // Uses workspace events instead of FileSystemWatcher globs to avoid ripgrep indexing.
-  const handleRulesFileChange = async (uri: vscode.Uri) => {
-    try {
-      const document = await vscode.workspace.openTextDocument(uri);
-      codeHealthFileVersion.set(document.fileName, document.version);
-      onCodeHealthFileVersionChange();
-    } catch (e) {
-      logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
-    }
-  };
-
-  const handleRulesFileCreate = async (uri: vscode.Uri) => {
-    try {
-      const document = await vscode.workspace.openTextDocument(uri);
-      codeHealthFileVersion.set(document.fileName, document.version);
-      onCodeHealthFileVersionChange();
-    } catch (e) {
-      logOutputChannel.warn(`Failed to add code-health-rules.json version: ${uri.fsPath}`, e);
-    }
-  };
-
-  const handleRulesFileDelete = (uri: vscode.Uri) => {
-    codeHealthFileVersion.delete(uri.fsPath);
-    onCodeHealthFileVersionChange();
-  };
-
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((document) => {
-      if (isCodeHealthRulesFile(document.uri.fsPath)) {
-        void handleRulesFileChange(document.uri);
-      }
-      if (isCodesceneConfigFile(document.uri.fsPath)) {
-        onCodesceneConfigChange(document.uri);
-      }
+      dispatchCodesceneFileChange(document.uri, 'upsert');
     }),
     vscode.workspace.onDidCreateFiles((event) => {
       for (const uri of event.files) {
-        if (isCodeHealthRulesFile(uri.fsPath)) {
-          void handleRulesFileCreate(uri);
-        }
-        if (isCodesceneConfigFile(uri.fsPath)) {
-          onCodesceneConfigChange(uri);
-        }
+        dispatchCodesceneFileChange(uri, 'upsert');
       }
     }),
     vscode.workspace.onDidDeleteFiles((event) => {
       for (const uri of event.files) {
-        if (isCodeHealthRulesFile(uri.fsPath)) {
-          handleRulesFileDelete(uri);
-        }
-        if (isCodesceneConfigFile(uri.fsPath)) {
-          onCodesceneConfigChange(uri);
-        }
+        dispatchCodesceneFileChange(uri, 'delete');
       }
     }),
     vscode.workspace.onDidRenameFiles((event) => {
       for (const { oldUri, newUri } of event.files) {
-        if (isCodeHealthRulesFile(oldUri.fsPath)) {
-          handleRulesFileDelete(oldUri);
-        }
-        if (isCodeHealthRulesFile(newUri.fsPath)) {
-          void handleRulesFileCreate(newUri);
-        }
-        if (isCodesceneConfigFile(oldUri.fsPath) || isCodesceneConfigFile(newUri.fsPath)) {
-          onCodesceneConfigChange(newUri);
-        }
+        dispatchCodesceneFileChange(oldUri, 'delete');
+        dispatchCodesceneFileChange(newUri, 'upsert');
       }
     })
   );

@@ -163,12 +163,21 @@ export class GitIgnoreChecker {
 
     const gitRootPath = await this.resolveGitRootPath();
     if (!gitRootPath) {
-      for (const filePath of filePaths) {
-        results.set(filePath, this.isIgnoredPerHeuristics(filePath));
-      }
-      return results;
+      return this.heuristicResultsForPaths(filePaths);
     }
 
+    return this.gitCheckIgnoreResults(filePaths, gitRootPath);
+  }
+
+  private heuristicResultsForPaths(filePaths: string[]): Map<string, boolean> {
+    const results = new Map<string, boolean>();
+    for (const filePath of filePaths) {
+      results.set(filePath, this.isIgnoredPerHeuristics(filePath));
+    }
+    return results;
+  }
+
+  private async gitCheckIgnoreResults(filePaths: string[], gitRootPath: string): Promise<Map<string, boolean>> {
     const normalizedPaths = filePaths.map((filePath) => normalize(filePath));
     const stdin = normalizedPaths.map((filePath) => `${filePath}\0`).join('');
 
@@ -186,13 +195,11 @@ export class GitIgnoreChecker {
 
     if (result.exitCode === 'ENOENT') {
       markGitAsUnavailable();
-      for (const filePath of normalizedPaths) {
-        results.set(filePath, this.isIgnoredPerHeuristics(filePath));
-      }
-      return results;
+      return this.heuristicResultsForPaths(normalizedPaths);
     }
 
     const ignoredPaths = parseCheckIgnoreOutput(result.stdout);
+    const results = new Map<string, boolean>();
     for (const filePath of normalizedPaths) {
       results.set(filePath, ignoredPaths.has(filePath));
     }
@@ -249,41 +256,54 @@ export class GitIgnoreChecker {
   private async doFlushPendingChecks(): Promise<void> {
     while (this.pendingChecks.size > 0) {
       const batch = this.takePendingBatch();
-      const waitersByPath = new Map<string, PendingCheck[]>();
-
-      for (const filePath of batch) {
-        const waiters = this.pendingChecks.get(filePath);
-        if (waiters) {
-          waitersByPath.set(filePath, waiters);
-          this.pendingChecks.delete(filePath);
-        }
-      }
-
+      const waitersByPath = this.collectWaitersForBatch(batch);
       if (waitersByPath.size === 0) {
         return;
       }
 
-      const uncachedPaths = batch.filter((filePath) => !this.gitExecutorCache.has(filePath));
-      let ignoredByPath = new Map<string, boolean>();
-
-      if (uncachedPaths.length > 0) {
-        ignoredByPath = await this.checkIgnoredPathsByGit(uncachedPaths);
-        for (const [filePath, ignored] of ignoredByPath) {
-          this.gitExecutorCache.set(filePath, ignored);
-        }
-      }
-
-      for (const filePath of batch) {
-        const ignored = this.gitExecutorCache.get(filePath) ?? ignoredByPath.get(filePath) ?? false;
-        const waiters = waitersByPath.get(filePath) ?? [];
-        for (const waiter of waiters) {
-          waiter.resolve(ignored);
-        }
-      }
+      await this.resolveAndNotifyBatch(batch, waitersByPath);
     }
 
     if (this.pendingChecks.size > 0) {
       this.scheduleFlush();
+    }
+  }
+
+  private collectWaitersForBatch(batch: string[]): Map<string, PendingCheck[]> {
+    const waitersByPath = new Map<string, PendingCheck[]>();
+    for (const filePath of batch) {
+      const waiters = this.pendingChecks.get(filePath);
+      if (waiters) {
+        waitersByPath.set(filePath, waiters);
+        this.pendingChecks.delete(filePath);
+      }
+    }
+    return waitersByPath;
+  }
+
+  private async resolveAndNotifyBatch(batch: string[], waitersByPath: Map<string, PendingCheck[]>): Promise<void> {
+    await this.cacheIgnoredPaths(batch);
+    this.notifyBatchWaiters(batch, waitersByPath);
+  }
+
+  private async cacheIgnoredPaths(batch: string[]): Promise<void> {
+    const uncachedPaths = batch.filter((filePath) => !this.gitExecutorCache.has(filePath));
+    if (uncachedPaths.length === 0) {
+      return;
+    }
+
+    const ignoredByPath = await this.checkIgnoredPathsByGit(uncachedPaths);
+    for (const [filePath, ignored] of ignoredByPath) {
+      this.gitExecutorCache.set(filePath, ignored);
+    }
+  }
+
+  private notifyBatchWaiters(batch: string[], waitersByPath: Map<string, PendingCheck[]>): void {
+    for (const filePath of batch) {
+      const ignored = this.gitExecutorCache.get(filePath) ?? false;
+      for (const waiter of waitersByPath.get(filePath) ?? []) {
+        waiter.resolve(ignored);
+      }
     }
   }
 

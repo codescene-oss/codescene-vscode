@@ -1,4 +1,4 @@
-import { ChildProcess, execFile, ExecOptions, spawn } from 'child_process';
+import { ChildProcess, execFile, ExecFileException, ExecOptions, spawn } from 'child_process';
 import { logOutputChannel } from './log';
 import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
@@ -69,60 +69,106 @@ export class SimpleExecutor implements Executor {
   execute(command: Command, options: ExecOptions & { cwd: string }, input?: string) {
     const mergedArgsForLogging = input ? mergeJsonIntoArgs(command.args, input) : command.args;
     const logName = [command.command, ...mergedArgsForLogging].join(' ');
-    const trimmedArgsForLogging = mergedArgsForLogging.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
-    const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
     const allOptions = { maxBuffer: MAX_BUFFER, ...options };
-
-    if (command.command === 'git') { // These can be frequently executed, so demote their log level
-      logOutputChannel.debug(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
-    } else {
-      logOutputChannel.info(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
-    }
+    this.logCommandStart(command, mergedArgsForLogging, allOptions);
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
-      // Guard against resolving/rejecting twice when abort races the execFile callback.
       let settled = false;
 
       const childProcess = execFile(command.command, command.args, allOptions, (error, stdout, stderr) => {
-        this.runningProcesses.delete(childProcess);
-        if (settled) {
-          return;
-        }
+        this.handleExecCompletion({
+          childProcess,
+          command,
+          logName,
+          allOptions,
+          start,
+          error,
+          stdout,
+          stderr,
+          resolve,
+          reject,
+          markSettled: () => {
+            settled = true;
+          },
+          isSettled: () => settled,
+        });
+      });
+
+      this.trackRunningProcess(childProcess, () => settled, () => {
         settled = true;
-
-        if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`);
-          reject(error);
-          return;
-        }
-        const end = Date.now();
-        logOutputChannel.trace(
-          `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
-        );
-
-        this.stats.addRun(command, end - start);
-
-        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
-      });
-
-      this.runningProcesses.set(childProcess, {
-        childProcess,
-        reject: (error: Error) => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          this.runningProcesses.delete(childProcess);
-          reject(error);
-        },
-      });
+      }, reject);
 
       if (isDefined(input) && childProcess.stdin) {
         this.writeInput(childProcess, input);
       }
 
       logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" started`);
+    });
+  }
+
+  private logCommandStart(command: Command, mergedArgsForLogging: string[], allOptions: ExecOptions): void {
+    const trimmedArgsForLogging = mergedArgsForLogging.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
+    const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
+    if (command.command === 'git') {
+      logOutputChannel.debug(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
+    } else {
+      logOutputChannel.info(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
+    }
+  }
+
+  private handleExecCompletion(params: {
+    childProcess: ChildProcess;
+    command: Command;
+    logName: string;
+    allOptions: ExecOptions;
+    start: number;
+    error: ExecFileException | null;
+    stdout: string;
+    stderr: string;
+    resolve: (result: ExecResult) => void;
+    reject: (error: Error) => void;
+    markSettled: () => void;
+    isSettled: () => boolean;
+  }): void {
+    const { childProcess, command, logName, allOptions, start, error, stdout, stderr, resolve, reject, markSettled, isSettled } =
+      params;
+    this.runningProcesses.delete(childProcess);
+    if (isSettled()) {
+      return;
+    }
+    markSettled();
+
+    if (!command.ignoreError && error) {
+      logOutputChannel.error(
+        `[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`
+      );
+      reject(error);
+      return;
+    }
+
+    const end = Date.now();
+    logOutputChannel.trace(`[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`);
+    this.stats.addRun(command, end - start);
+    resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
+  }
+
+  private trackRunningProcess(
+    childProcess: ChildProcess,
+    isSettled: () => boolean,
+    markSettled: () => void,
+    reject: (error: Error) => void
+  ): void {
+    this.runningProcesses.set(childProcess, {
+      childProcess,
+      reject: (error: Error) => {
+        if (isSettled()) {
+          return;
+        }
+        markSettled();
+        this.runningProcesses.delete(childProcess);
+        reject(error);
+      },
     });
   }
 

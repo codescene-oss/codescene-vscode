@@ -53,9 +53,7 @@ export class GitChangeLister {
     }
 
     const hadWorkspaceActivity = consumeWorkspaceFileActivity();
-    // Skip expensive git work when idle and we already know the changed-file set.
-    // markDirty() and workspace file activity force the next scan.
-    if (!this.forceNextScan && !hadWorkspaceActivity && this.lastChangedFileSetKey !== undefined) {
+    if (this.shouldSkipIdleScan(hadWorkspaceActivity)) {
       return;
     }
 
@@ -65,14 +63,21 @@ export class GitChangeLister {
     const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
     const changedFileSetKey = this.serializeChangedFileSet(allChangedFiles);
 
-    // Same files as last scan — no need to enqueue reviews again.
-    if (!this.forceNextScan && changedFileSetKey === this.lastChangedFileSetKey) {
+    if (this.isUnchangedFileSet(changedFileSetKey)) {
       return;
     }
 
     this.forceNextScan = false;
     this.lastChangedFileSetKey = changedFileSetKey;
     this.reviewFiles(allChangedFiles);
+  }
+
+  private shouldSkipIdleScan(hadWorkspaceActivity: boolean): boolean {
+    return !this.forceNextScan && !hadWorkspaceActivity && this.lastChangedFileSetKey !== undefined;
+  }
+
+  private isUnchangedFileSet(changedFileSetKey: string): boolean {
+    return !this.forceNextScan && changedFileSetKey === this.lastChangedFileSetKey;
   }
 
   async getAllChangedFiles(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
