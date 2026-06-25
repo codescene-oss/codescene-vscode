@@ -108,7 +108,6 @@ suite('GitChangeObserver file changes Test Suite', () => {
     ctx.assertFileInTracker(file1);
     ctx.assertFileInTracker(file2);
 
-    fs.rmSync(subDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
     const workspaceFolder = getWorkspaceFolder();
     const changedFiles = await ctx.gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
     await ctx.getObserverInternals().handleFileDelete(Uri.file(subDir), changedFiles, workspaceFolder);

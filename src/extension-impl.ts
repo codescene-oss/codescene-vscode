@@ -44,10 +44,9 @@ import { ACE_ENABLED } from './build-flags';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 import { WorkspaceFileWatcher } from './git/workspace-file-watcher';
-import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
 import { registerGitIgnoreCacheInvalidation } from './git/git-ignore-checker';
-import { isCodeHealthRulesFile, isCodesceneConfigFile } from './utils/workspace-patterns';
 import { loadDocumentForBackgroundReview } from './review/review-document-loader';
+import { CodesceneFileListeners } from './codescene-file-listeners';
 
 export { reloadWindowForUpdate } from './extension-reload';
 
@@ -58,8 +57,6 @@ interface CsContext {
 }
 
 let DISPOSABLES: vscode.Disposable[] = [];
-
-const codeHealthFileVersion = new Map<string, number>();
 
 let savedFilesTrackerInstance: SavedFilesTracker;
 let openFilesObserverInstance: OpenFilesObserver | undefined;
@@ -93,36 +90,6 @@ function reReviewAfterCodeHealthRulesChange(): void {
 
 const onCodeHealthFileVersionChange = debounce(reReviewAfterCodeHealthRulesChange, 350);
 
-async function recordRulesFileVersion(uri: vscode.Uri): Promise<void> {
-  try {
-    const document = await vscode.workspace.openTextDocument(uri);
-    codeHealthFileVersion.set(document.fileName, document.version);
-    onCodeHealthFileVersionChange();
-  } catch (e) {
-    logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
-  }
-}
-
-function removeRulesFileVersion(uri: vscode.Uri): void {
-  codeHealthFileVersion.delete(uri.fsPath);
-  onCodeHealthFileVersionChange();
-}
-
-function dispatchCodesceneFileChange(uri: vscode.Uri, event: 'upsert' | 'delete'): void {
-  const filePath = uri.fsPath;
-  if (isCodeHealthRulesFile(filePath)) {
-    if (event === 'delete') {
-      removeRulesFileVersion(uri);
-    } else {
-      void recordRulesFileVersion(uri);
-    }
-    return;
-  }
-  if (isCodesceneConfigFile(filePath)) {
-    onCodesceneConfigChange(uri);
-  }
-}
-
 const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
   const gitRoot = gitRootFromCodesceneConfigUri(uri);
   if (gitRoot) {
@@ -152,27 +119,17 @@ const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
   });
 }, 350);
 
+const codesceneFileListeners = new CodesceneFileListeners({
+  onRulesFileChanged: () => onCodeHealthFileVersionChange(),
+  onConfigFileChanged: (uri) => onCodesceneConfigChange(uri),
+});
+
 export function getCodeHealthFileVersions(): Map<string, number> {
-  return codeHealthFileVersion;
+  return codesceneFileListeners.getCodeHealthFileVersions();
 }
 
 async function initializeCodeHealthFileVersions(gitRootPath?: string) {
-  const workspaceFolder = getWorkspaceFolder();
-  if (!workspaceFolder) {
-    return;
-  }
-
-  const workspacePath = getWorkspacePath(workspaceFolder);
-  const rulesFiles = await discoverCodeHealthRulesFileUris(workspacePath, gitRootPath);
-
-  for (const uri of rulesFiles) {
-    try {
-      const document = await vscode.workspace.openTextDocument(uri);
-      codeHealthFileVersion.set(document.fileName, document.version);
-    } catch (e) {
-      logOutputChannel.warn(`Failed to open code-health-rules.json: ${uri.fsPath}`, e);
-    }
-  }
+  await codesceneFileListeners.initializeCodeHealthFileVersions(gitRootPath);
 }
 
 /**
@@ -376,29 +333,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 }
 
 function registerCodesceneFileListeners(context: vscode.ExtensionContext) {
-  // Re-run diagnostics when .codescene/code-health-rules.json or config.json changes.
-  // Uses workspace events instead of FileSystemWatcher globs to avoid ripgrep indexing.
-  context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument((document) => {
-      dispatchCodesceneFileChange(document.uri, 'upsert');
-    }),
-    vscode.workspace.onDidCreateFiles((event) => {
-      for (const uri of event.files) {
-        dispatchCodesceneFileChange(uri, 'upsert');
-      }
-    }),
-    vscode.workspace.onDidDeleteFiles((event) => {
-      for (const uri of event.files) {
-        dispatchCodesceneFileChange(uri, 'delete');
-      }
-    }),
-    vscode.workspace.onDidRenameFiles((event) => {
-      for (const { oldUri, newUri } of event.files) {
-        dispatchCodesceneFileChange(oldUri, 'delete');
-        dispatchCodesceneFileChange(newUri, 'upsert');
-      }
-    })
-  );
+  codesceneFileListeners.register(context);
 }
 
 /**

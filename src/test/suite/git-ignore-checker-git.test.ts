@@ -4,12 +4,16 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { GitIgnoreChecker, disposeSharedGitIgnoreChecker } from '../../git/git-ignore-checker';
+import { GitIgnoreChecker, disposeSharedGitIgnoreChecker, getSharedGitIgnoreChecker, registerGitIgnoreCacheInvalidation } from '../../git/git-ignore-checker';
 import { gitExecutor } from '../../git-utils';
 import {
   mockWorkspaceFolders,
   createMockWorkspaceFolder,
   restoreDefaultWorkspaceFolders,
+  fireOnDidSaveTextDocument,
+  fireOnDidCreateFiles,
+  fireOnDidDeleteFiles,
+  fireOnDidRenameFiles,
 } from '../setup';
 import { resetGitAvailability } from '../../git/git-detection';
 
@@ -283,5 +287,32 @@ suite('GitIgnoreChecker git check-ignore Test Suite', () => {
     } finally {
       gitExecutor.execute = originalExecute;
     }
+  });
+
+  test('registerGitIgnoreCacheInvalidation clears shared cache on gitignore workspace events', async () => {
+    const sharedChecker = getSharedGitIgnoreChecker();
+    const context = { subscriptions: [] as any[] };
+    registerGitIgnoreCacheInvalidation(context as any);
+
+    const testFile = path.join(testDir, 'cached.js');
+    const mockDocument = createFileAndMockDocument(testFile, 'content');
+    await sharedChecker.isIgnored(mockDocument as any);
+    assert.strictEqual((sharedChecker as any).gitExecutorCache.size, 1);
+
+    const gitignorePath = path.join(testDir, '.gitignore');
+    fireOnDidSaveTextDocument({ uri: { fsPath: gitignorePath } });
+    assert.strictEqual((sharedChecker as any).gitExecutorCache.size, 0);
+
+    await sharedChecker.isIgnored(mockDocument as any);
+    fireOnDidCreateFiles([{ fsPath: gitignorePath }]);
+    assert.strictEqual((sharedChecker as any).gitExecutorCache.size, 0);
+
+    await sharedChecker.isIgnored(mockDocument as any);
+    fireOnDidDeleteFiles([{ fsPath: gitignorePath }]);
+    assert.strictEqual((sharedChecker as any).gitExecutorCache.size, 0);
+
+    await sharedChecker.isIgnored(mockDocument as any);
+    fireOnDidRenameFiles([{ oldUri: { fsPath: gitignorePath }, newUri: { fsPath: path.join(testDir, '.gitignore.bak') } }]);
+    assert.strictEqual((sharedChecker as any).gitExecutorCache.size, 0);
   });
 });

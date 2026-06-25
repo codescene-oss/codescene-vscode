@@ -175,6 +175,28 @@ suite('ConcurrencyLimitingExecutor Test Suite', () => {
     await assert.rejects(p2);
   });
 
+  test('abort aborts matching task by id', async () => {
+    const mock = new MockExecutor();
+    const exec = new ConcurrencyLimitingExecutor(mock, 2);
+
+    const p1 = exec.execute({ command: 'test1', args: [], taskId: 'review foo.ts v1' });
+    await tick();
+    exec.abort('review foo.ts');
+
+    await assert.rejects(p1);
+  });
+
+  test('abort matches task id prefix before version suffix', async () => {
+    const mock = new MockExecutor();
+    const exec = new ConcurrencyLimitingExecutor(mock, 1);
+
+    const p1 = exec.execute({ command: 'test1', args: [], taskId: 'review bar.ts v99' });
+    await tick();
+    exec.abort('review bar.ts v1');
+
+    await assert.rejects(p1);
+  });
+
   test('dispose calls abortAllTasks', async () => {
     const mock = new MockExecutor();
     const exec = new ConcurrencyLimitingExecutor(mock, 2);

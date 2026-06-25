@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import { GitChangeLister } from '../../git/git-change-lister';
 import { mockWorkspaceFolders, createMockWorkspaceFolder } from '../setup';
 import { resetWorkspaceFileActivity } from '../../git/workspace-activity';
 import {
@@ -98,5 +99,33 @@ suite('GitChangeLister scan behavior Test Suite', () => {
     gitScanCount = 0;
     await fixture.gitChangeLister.start();
     assert.ok(gitScanCount >= 1, 'markDirty should force a git scan');
+  });
+
+  test('start schedules reviews for changed supported files', async function () {
+    this.timeout(20000);
+    mockWorkspaceFolders([createMockWorkspaceFolder(GIT_CHANGE_LISTER_TEST_REPO)]);
+
+    const visibleFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'needs-review.ts');
+    fs.writeFileSync(visibleFile, 'export const x = 1;');
+
+    let tasksRun = 0;
+    const reviewingExecutor = {
+      execute: fixture.mockExecutor.execute.bind(fixture.mockExecutor),
+      executeTask: async (task: () => Promise<void>) => {
+        tasksRun++;
+        return task();
+      },
+      logStats: () => fixture.mockExecutor.logStats(),
+      abortAllTasks: () => fixture.mockExecutor.abortAllTasks(),
+    };
+
+    const lister = new GitChangeLister(
+      reviewingExecutor as any,
+      { getSavedFiles: () => new Set<string>() } as any,
+      () => new Set([visibleFile])
+    );
+
+    await lister.start();
+    assert.ok(tasksRun >= 1, 'Changed files should enqueue background reviews');
   });
 });

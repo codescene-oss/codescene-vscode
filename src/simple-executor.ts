@@ -1,7 +1,6 @@
 import { ChildProcess, execFile, ExecFileException, ExecOptions, spawn } from 'child_process';
 import { logOutputChannel } from './log';
 import { Command, ExecResult, Executor } from './executor';
-import { isDefined } from './utils';
 import { Stats } from './executor-stats';
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
@@ -99,7 +98,7 @@ export class SimpleExecutor implements Executor {
         settled = true;
       }, reject);
 
-      if (isDefined(input) && childProcess.stdin) {
+      if (input !== undefined && input !== null && childProcess.stdin) {
         this.writeInput(childProcess, input);
       }
 

@@ -3,6 +3,7 @@ import * as path from 'path';
 import { Uri } from 'vscode';
 import {
   activate as activateCodeHealthMonitor,
+  bindGitApiForTests,
   deactivate as deactivateCodeHealthMonitor,
   refreshMergeBaseBaselines,
   runGitChangeLister,
@@ -61,6 +62,12 @@ suite('Code Health Monitor Addon Test Suite', () => {
   });
 
   test('refreshMergeBaseBaselines is a no-op when git API is unavailable', () => {
+    refreshMergeBaseBaselines();
+  });
+
+  test('bindGitApiForTests wires mocked vscode.git API', () => {
+    setMockGitRepositories([createMockRepo()]);
+    bindGitApiForTests();
     refreshMergeBaseBaselines();
   });
 
