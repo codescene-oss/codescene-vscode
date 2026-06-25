@@ -1,30 +1,51 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
-import { Uri, Disposable, ExtensionContext } from '../mocks/vscode';
+import { Uri, ExtensionContext } from '../mocks/vscode';
 import { GitChangeObserver } from '../../git/git-change-observer';
 import { WorkspaceFileWatcher } from '../../git/workspace-file-watcher';
+import {
+  bindGitApiForTests,
+  deactivate as deactivateCodeHealthMonitor,
+} from '../../code-health-monitor/addon';
+import { CsExtensionState } from '../../cs-extension-state';
+import Reviewer from '../../review/reviewer';
 import { MockExecutor } from '../mocks/mock-executor';
-import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
+import {
+  mockWorkspaceFolders,
+  createMockWorkspaceFolder,
+  restoreDefaultWorkspaceFolders,
+  setMockGitRepositories,
+  clearMockGitRepositories,
+} from '../setup';
 import { getWorkspaceFolder } from '../../utils';
-
-export const GIT_CHANGE_OBSERVER_TEST_REPO = path.join(__dirname, '../../../test-git-repo-observer');
+import { createMockExtensionContext } from '../mocks/mock-extension-context';
+import { resetGitAvailability } from '../../git/git-detection';
+import { gitExecutor } from '../../git-utils';
 
 export class GitChangeObserverTestContext {
+  testRepoPath!: string;
   gitChangeObserver!: GitChangeObserver;
   mockExecutor!: MockExecutor;
   mockContext!: ExtensionContext;
 
   private readonly execSync = require('child_process').execSync;
 
-  execGit(args: string): void {
-    this.execSync(args, { cwd: GIT_CHANGE_OBSERVER_TEST_REPO, stdio: 'pipe' });
+  execGit(args: string, updateMock = true): void {
+    this.execSync(args, { cwd: this.testRepoPath, stdio: 'pipe' });
+    if (updateMock) {
+      this.updateMockGitRepository();
+    }
   }
 
-  async execGitAsync(args: string): Promise<void> {
+  async execGitAsync(args: string, updateMock = true): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       try {
-        this.execSync(args, { cwd: GIT_CHANGE_OBSERVER_TEST_REPO, stdio: 'pipe' });
+        this.execSync(args, { cwd: this.testRepoPath, stdio: 'pipe' });
+        if (updateMock) {
+          this.updateMockGitRepository();
+        }
         resolve();
       } catch (error) {
         reject(error);
@@ -33,7 +54,7 @@ export class GitChangeObserverTestContext {
   }
 
   createFile(filename: string, content: string): string {
-    const filePath = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, filename);
+    const filePath = path.join(this.testRepoPath, filename);
     fs.writeFileSync(filePath, content);
     return filePath;
   }
@@ -42,7 +63,7 @@ export class GitChangeObserverTestContext {
     this.createFile(filename, content);
     this.execGit(`git add ${filename}`);
     this.execGit(`git commit -m "${message}"`);
-    return path.join(GIT_CHANGE_OBSERVER_TEST_REPO, filename);
+    return path.join(this.testRepoPath, filename);
   }
 
   getObserverInternals(): any {
@@ -61,7 +82,7 @@ export class GitChangeObserverTestContext {
   }
 
   assertFileInChangedList(changedFiles: string[], filename: string, shouldExist: boolean = true): void {
-    const exists = changedFiles.some((f) => f.endsWith(filename));
+    const exists = changedFiles.some((f) => path.normalize(f).endsWith(filename));
     assert.strictEqual(exists, shouldExist, shouldExist ? `Should include ${filename}` : `Should not include ${filename}`);
   }
 
@@ -71,78 +92,110 @@ export class GitChangeObserverTestContext {
   }
 
   async setup(): Promise<void> {
-    if (fs.existsSync(GIT_CHANGE_OBSERVER_TEST_REPO)) {
-      fs.rmSync(GIT_CHANGE_OBSERVER_TEST_REPO, { recursive: true, force: true });
+    resetGitAvailability();
+
+    const testBaseDir = path.join(os.homedir(), '.codescene-test-data');
+    if (!fs.existsSync(testBaseDir)) {
+      fs.mkdirSync(testBaseDir, { recursive: true });
     }
-    fs.mkdirSync(GIT_CHANGE_OBSERVER_TEST_REPO, { recursive: true });
+    this.testRepoPath = fs.mkdtempSync(path.join(testBaseDir, 'git-change-observer-test-'));
 
-    this.execGit('git init');
-    this.execGit('git config user.email "test@example.com"');
-    this.execGit('git config user.name "Test User"');
-    this.execGit('git config advice.defaultBranchName false');
+    this.execSync('git init', { cwd: this.testRepoPath, stdio: 'pipe' });
+    this.execSync('git config user.email "test@example.com"', { cwd: this.testRepoPath, stdio: 'pipe' });
+    this.execSync('git config user.name "Test User"', { cwd: this.testRepoPath, stdio: 'pipe' });
+    this.execSync('git config advice.defaultBranchName false', { cwd: this.testRepoPath, stdio: 'pipe' });
 
-    const gitInfoDir = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, '.git', 'info');
+    const gitInfoDir = path.join(this.testRepoPath, '.git', 'info');
     fs.mkdirSync(gitInfoDir, { recursive: true });
     const dummyExcludesPath = path.join(gitInfoDir, 'exclude-test');
     fs.writeFileSync(dummyExcludesPath, '# Test excludes file - will not match anything\n__xxxxxxxxxxxxx__\n');
-    await this.execGitAsync(`git config core.excludesfile "${dummyExcludesPath}"`);
+    await this.execGitAsync(`git config core.excludesfile "${dummyExcludesPath}"`, false);
 
     this.commitFile('README.md', '# Test Repository', 'Initial commit');
 
-    mockWorkspaceFolders([createMockWorkspaceFolder(GIT_CHANGE_OBSERVER_TEST_REPO)]);
-
     const extensionPath = path.join(__dirname, '../../..');
-    this.mockContext = {
-      subscriptions: [] as Disposable[],
-      extensionPath,
+    this.mockContext = createMockExtensionContext(this.testRepoPath) as ExtensionContext;
+    this.mockContext.extension = {
+      id: 'test-extension',
       extensionUri: Uri.file(extensionPath),
-      globalState: {} as any,
-      workspaceState: {} as any,
-      secrets: {} as any,
-      storagePath: GIT_CHANGE_OBSERVER_TEST_REPO,
-      globalStoragePath: GIT_CHANGE_OBSERVER_TEST_REPO,
-      logPath: GIT_CHANGE_OBSERVER_TEST_REPO,
-      extensionMode: 3,
-      environmentVariableCollection: {} as any,
-      asAbsolutePath: (relativePath: string) => path.join(extensionPath, relativePath),
-      storageUri: Uri.file(GIT_CHANGE_OBSERVER_TEST_REPO),
-      globalStorageUri: Uri.file(GIT_CHANGE_OBSERVER_TEST_REPO),
-      logUri: Uri.file(GIT_CHANGE_OBSERVER_TEST_REPO),
-      extension: {
-        id: 'test-extension',
-        extensionUri: Uri.file(extensionPath),
-        extensionPath,
-        isActive: true,
-        packageJSON: {},
-        extensionKind: 1,
-        exports: {},
-        activate: () => Promise.resolve({}),
-      },
+      extensionPath,
+      isActive: true,
+      packageJSON: {},
+      extensionKind: 1,
+      exports: {},
+      activate: () => Promise.resolve({}),
     } as any;
+
+    mockWorkspaceFolders([createMockWorkspaceFolder(this.testRepoPath)]);
+
+    if (!CsExtensionState.hasInstance) {
+      CsExtensionState.init(this.mockContext);
+      Reviewer.init(this.mockContext, async () => undefined, () => new Map());
+    }
 
     this.mockExecutor = new MockExecutor();
     const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
     const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
+
+    this.updateMockGitRepository();
+    bindGitApiForTests();
+
     WorkspaceFileWatcher.init(this.mockContext);
     this.gitChangeObserver = new GitChangeObserver(this.mockContext, this.mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver);
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await this.gitChangeObserver.waitForInitialTrackerSeed();
   }
 
-  teardown(): void {
+  async teardown(): Promise<void> {
     if (this.gitChangeObserver) {
       this.gitChangeObserver.dispose();
     }
+    gitExecutor.abortAllTasks();
+    await new Promise((resolve) => setTimeout(resolve, 200));
     WorkspaceFileWatcher.disposeShared();
+    deactivateCodeHealthMonitor();
+    clearMockGitRepositories();
+    resetGitAvailability();
 
-    const gitignorePath = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
-      fs.unlinkSync(gitignorePath);
-    }
-
-    if (fs.existsSync(GIT_CHANGE_OBSERVER_TEST_REPO)) {
-      fs.rmSync(GIT_CHANGE_OBSERVER_TEST_REPO, { recursive: true, force: true });
+    if (this.testRepoPath && fs.existsSync(this.testRepoPath)) {
+      try {
+        fs.rmSync(this.testRepoPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      } catch (error: any) {
+        if (error?.code !== 'EBUSY') {
+          throw error;
+        }
+      }
     }
 
     restoreDefaultWorkspaceFolders();
+  }
+
+  private updateMockGitRepository(): void {
+    let headCommit: string;
+    try {
+      headCommit = this.execSync('git rev-parse HEAD', { cwd: this.testRepoPath, encoding: 'utf8' }).trim();
+    } catch {
+      return;
+    }
+
+    const branch =
+      this.execSync('git branch --show-current', { cwd: this.testRepoPath, encoding: 'utf8' }).trim() || 'main';
+
+    setMockGitRepositories([
+      {
+        rootUri: Uri.file(this.testRepoPath),
+        state: {
+          HEAD: { name: branch, commit: headCommit },
+          refs: [],
+          remotes: [],
+          submodules: [],
+          rebaseCommit: undefined,
+          mergeChanges: [],
+          indexChanges: [],
+          workingTreeChanges: [],
+          untrackedChanges: [],
+          onDidChange: () => ({ dispose: () => {} }),
+        },
+      },
+    ]);
   }
 }

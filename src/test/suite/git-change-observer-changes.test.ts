@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Uri } from '../mocks/vscode';
 import { getWorkspaceFolder } from '../../utils';
-import { GIT_CHANGE_OBSERVER_TEST_REPO, GitChangeObserverTestContext } from './git-change-observer-fixtures';
+import { GitChangeObserverTestContext } from './git-change-observer-fixtures';
 
 suite('GitChangeObserver file changes Test Suite', () => {
   let ctx: GitChangeObserverTestContext;
@@ -14,8 +14,8 @@ suite('GitChangeObserver file changes Test Suite', () => {
     await ctx.setup();
   });
 
-  teardown(() => {
-    ctx.teardown();
+  teardown(async () => {
+    await ctx.teardown();
   });
 
   test('getChangedFilesVsBaseline returns empty array for clean repository', async function () {
@@ -94,7 +94,7 @@ suite('GitChangeObserver file changes Test Suite', () => {
 
   test('handleFileDelete handles directory deletion', async function () {
     this.timeout(20000);
-    const subDir = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, 'subdir');
+    const subDir = path.join(ctx.testRepoPath, 'subdir');
     fs.mkdirSync(subDir, { recursive: true });
     const file1 = path.join(subDir, 'file1.ts');
     const file2 = path.join(subDir, 'file2.ts');
@@ -108,7 +108,7 @@ suite('GitChangeObserver file changes Test Suite', () => {
     ctx.assertFileInTracker(file1);
     ctx.assertFileInTracker(file2);
 
-    fs.rmSync(subDir, { recursive: true, force: true });
+    fs.rmSync(subDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
     const workspaceFolder = getWorkspaceFolder();
     const changedFiles = await ctx.gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
     await ctx.getObserverInternals().handleFileDelete(Uri.file(subDir), changedFiles, workspaceFolder);
@@ -212,7 +212,7 @@ suite('GitChangeObserver file changes Test Suite', () => {
 
   test('gitignored files are not tracked', async function () {
     this.timeout(20000);
-    const gitignorePath = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, '.gitignore');
+    const gitignorePath = path.join(ctx.testRepoPath, '.gitignore');
     fs.writeFileSync(gitignorePath, '*.ignored\n');
 
     const ignoredFile = ctx.createFile('secret.ignored', 'export const secret = "hidden";');
@@ -228,7 +228,7 @@ suite('GitChangeObserver file changes Test Suite', () => {
 
   test('file becomes tracked after gitignore removal', async function () {
     this.timeout(20000);
-    const gitignorePath = path.join(GIT_CHANGE_OBSERVER_TEST_REPO, '.gitignore');
+    const gitignorePath = path.join(ctx.testRepoPath, '.gitignore');
     fs.writeFileSync(gitignorePath, 'config.ts\n');
 
     const ignoredFile = ctx.createFile('config.ts', 'export const config = { secret: true };');

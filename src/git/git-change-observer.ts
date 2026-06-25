@@ -37,6 +37,7 @@ export class GitChangeObserver {
   private tracker: Set<string> = new Set();
 
   private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
+  private initialTrackerSeedPromise?: Promise<void>;
 
   constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver) {
     if (!savedFilesTracker) {
@@ -61,6 +62,11 @@ export class GitChangeObserver {
     this.seedTrackerFromRepoState(executor, savedFilesTracker);
   }
 
+  /** Await initial repo scan used to populate the deletion tracker before tests run git commands. */
+  waitForInitialTrackerSeed(): Promise<void> {
+    return this.initialTrackerSeedPromise ?? Promise.resolve();
+  }
+
   private seedTrackerFromRepoState(executor: Executor, savedFilesTracker: SavedFilesTracker): void {
     const lister = new GitChangeLister(executor, savedFilesTracker);
     const workspaceFolder = getWorkspaceFolder();
@@ -71,7 +77,7 @@ export class GitChangeObserver {
     const workspacePath = getWorkspacePath(workspaceFolder);
     const repo = getRepo(workspaceFolder.uri);
     const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-    void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then((files) => {
+    this.initialTrackerSeedPromise = lister.collectFilesFromRepoState(gitRootPath, workspacePath).then((files) => {
       for (const file of files) {
         this.tracker.add(file);
       }
@@ -156,13 +162,11 @@ export class GitChangeObserver {
       return true;
     }
 
-    const relativePath = path.relative(getWorkspacePath(workspaceFolder), filePath);
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const relativePath = path.relative(workspacePath, filePath);
+    const normalizedRelativePath = path.normalize(relativePath);
 
-    if (!changedFiles.includes(relativePath)) {
-      return false;
-    }
-
-    return true;
+    return changedFiles.some((changedFile) => path.normalize(changedFile) === normalizedRelativePath);
   }
 
   private async reviewFile(filePath: string): Promise<void> {

@@ -18,8 +18,8 @@ suite('GitChangeObserver event processing Test Suite', () => {
     await ctx.setup();
   });
 
-  teardown(() => {
-    ctx.teardown();
+  teardown(async () => {
+    await ctx.teardown();
   });
 
   test('dispose cleans up scheduled executor and workspace watcher reference', function () {

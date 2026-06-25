@@ -156,6 +156,10 @@ export async function runGitChangeLister(): Promise<void> {
   await gitChangeListerInstance.start();
 }
 
+export function bindGitApiForTests(): void {
+  gitApi = acquireGitApi();
+}
+
 export function deactivate() {
   ALL_DISPOSABLES.forEach((disposable) => disposable.dispose());
   ALL_DISPOSABLES = [];
