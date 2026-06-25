@@ -34,8 +34,7 @@ import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit, getWorkspacePath } from './git-utils';
-import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
+import { acquireGitApi, deactivate as deactivateGitUtils, fireFileDeletedFromGit, getWorkspacePath } from './git-utils';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
@@ -45,8 +44,8 @@ import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 import { WorkspaceFileWatcher } from './git/workspace-file-watcher';
 import { registerGitIgnoreCacheInvalidation } from './git/git-ignore-checker';
-import { loadDocumentForBackgroundReview } from './review/review-document-loader';
 import { CodesceneFileListeners } from './codescene-file-listeners';
+import { handleCodesceneConfigChange, reReviewAfterCodeHealthRulesChange } from './codescene-re-review';
 
 export { reloadWindowForUpdate } from './extension-reload';
 
@@ -61,61 +60,23 @@ let DISPOSABLES: vscode.Disposable[] = [];
 let savedFilesTrackerInstance: SavedFilesTracker;
 let openFilesObserverInstance: OpenFilesObserver | undefined;
 
-function reReviewAfterCodeHealthRulesChange(): void {
-  if (!openFilesObserverInstance) {
-    return;
-  }
-
-  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
-  const filesToReview = new Set(visibleFiles);
-  const homeView = getHomeViewInstance();
-  if (homeView) {
-    for (const filePath of homeView.getFileIssueMap().keys()) {
-      filesToReview.add(filePath);
-    }
-  }
-
-  // Re-review monitor and visible files with monitor updates enabled so ignored smells are removed.
-  filesToReview.forEach((filePath) => {
-    const isVisible = visibleFiles.has(filePath);
-    void loadDocumentForBackgroundReview(filePath, { allowOpenTextDocument: isVisible }).then((document) => {
-      if (!document) {
-        logOutputChannel.warn(`Failed to re-review file after rules change: ${filePath}`);
-        return;
-      }
-      CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: isVisible });
-    });
-  });
+function createRulesChangeReReviewDeps(): import('./codescene-re-review').RulesChangeReReviewDeps {
+  return {
+    getVisibleFiles: () => openFilesObserverInstance?.getAllVisibleFileNames() ?? new Set(),
+    getMonitorFilePaths: () => getHomeViewInstance()?.getFileIssueMap().keys() ?? [],
+  };
 }
 
-const onCodeHealthFileVersionChange = debounce(reReviewAfterCodeHealthRulesChange, 350);
-
-const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
-  const gitRoot = gitRootFromCodesceneConfigUri(uri);
-  if (gitRoot) {
-    clearMainBranchCandidatesCache(gitRoot);
-  } else {
-    clearMainBranchCandidatesCache();
-  }
-
-  refreshMergeBaseBaselines();
-  void runGitChangeLister();
-
+const onCodeHealthFileVersionChange = debounce(() => {
   if (!openFilesObserverInstance) {
     return;
   }
+  reReviewAfterCodeHealthRulesChange(createRulesChangeReReviewDeps());
+}, 350);
 
-  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
-  visibleFiles.forEach((filePath) => {
-    const fileUri = vscode.Uri.file(filePath);
-    void vscode.workspace.openTextDocument(fileUri).then(
-      (document) => {
-        CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
-      },
-      (e) => {
-        logOutputChannel.warn(`Failed to re-review file after config change: ${filePath}`, e);
-      }
-    );
+const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
+  handleCodesceneConfigChange(uri, {
+    getVisibleFiles: () => openFilesObserverInstance?.getAllVisibleFileNames() ?? new Set(),
   });
 }, 350);
 

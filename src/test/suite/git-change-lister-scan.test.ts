@@ -106,15 +106,14 @@ suite('GitChangeLister scan behavior Test Suite', () => {
     mockWorkspaceFolders([createMockWorkspaceFolder(GIT_CHANGE_LISTER_TEST_REPO)]);
 
     const visibleFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'needs-review.ts');
+    const hiddenFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'hidden-review.ts');
     fs.writeFileSync(visibleFile, 'export const x = 1;');
+    fs.writeFileSync(hiddenFile, 'export const y = 2;');
 
-    let tasksRun = 0;
+    const reviewed: string[] = [];
     const reviewingExecutor = {
       execute: fixture.mockExecutor.execute.bind(fixture.mockExecutor),
-      executeTask: async (task: () => Promise<void>) => {
-        tasksRun++;
-        return task();
-      },
+      executeTask: async (task: () => Promise<void>) => task(),
       logStats: () => fixture.mockExecutor.logStats(),
       abortAllTasks: () => fixture.mockExecutor.abortAllTasks(),
     };
@@ -125,7 +124,20 @@ suite('GitChangeLister scan behavior Test Suite', () => {
       () => new Set([visibleFile])
     );
 
+    const originalReviewFiles = (lister as any).reviewFiles.bind(lister);
+    (lister as any).reviewFiles = (filePaths: Set<string>) => {
+      reviewed.push(...(lister as any).sortFilesByPriority(filePaths, new Set([visibleFile])));
+      return originalReviewFiles(filePaths);
+    };
+
     await lister.start();
-    assert.ok(tasksRun >= 1, 'Changed files should enqueue background reviews');
+    assert.ok(reviewed.length >= 1, 'Changed files should enqueue background reviews');
+    assert.strictEqual(reviewed[0], visibleFile, 'Visible files should be reviewed first');
+  });
+
+  test('isAlreadyCached returns false when review cache is unavailable', () => {
+    const lister = new GitChangeLister(fixture.mockExecutor as any, { getSavedFiles: () => new Set() } as any);
+    const document = { fileName: '/tmp/file.ts', version: 1 } as any;
+    assert.strictEqual((lister as any).isAlreadyCached(document), false);
   });
 });
