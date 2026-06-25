@@ -5,6 +5,10 @@ import { Stats } from './executor-stats';
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
 
+function shouldWriteStdinInput(input: string | undefined, stdin: NodeJS.WritableStream | null): input is string {
+  return input !== undefined && input !== null && stdin !== null;
+}
+
 export function parseJsonInput(input: string): any {
   try {
     return JSON.parse(input);
@@ -98,7 +102,7 @@ export class SimpleExecutor implements Executor {
         settled = true;
       }, reject);
 
-      if (input !== undefined && input !== null && childProcess.stdin) {
+      if (shouldWriteStdinInput(input, childProcess.stdin)) {
         this.writeInput(childProcess, input);
       }
 
