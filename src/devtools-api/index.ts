@@ -30,7 +30,6 @@ import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
 import { DevtoolsError } from './devtools-error';
 import { AbortError } from './abort-error';
-
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
   private static reviewCache: ReviewCache;
@@ -572,7 +571,14 @@ export class DevtoolsAPI {
   }
 
   static dispose() {
-    try { DevtoolsAPI.instance?.concurrencyLimitingExecutor.dispose(); } catch {}
+    const instance = DevtoolsAPI.instance;
+    if (instance) {
+      try { instance.concurrencyLimitingExecutor.dispose(); } catch {}
+      try { instance.concurrencyLimitingExecutorForDelta.dispose(); } catch {}
+      try { instance.queuedSingleTaskExecutor.abortAllTasks(); } catch {}
+      try { instance.abortingSingleTaskExecutor.abortAllTasks(); } catch {}
+      try { instance.simpleExecutor.abortAllTasks(); } catch {}
+    }
     try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}

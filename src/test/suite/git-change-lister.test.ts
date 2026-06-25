@@ -5,6 +5,8 @@ import { GitChangeLister } from '../../git/git-change-lister';
 import { MockExecutor } from '../mocks/mock-executor';
 import { MockGitAPI } from '../mocks/mock-git-api';
 import { API } from '../../../types/git';
+import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
+import { resetWorkspaceFileActivity } from '../../git/workspace-activity';
 
 suite('GitChangeLister Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo');
@@ -35,6 +37,8 @@ suite('GitChangeLister Test Suite', () => {
   });
 
   teardown(() => {
+    restoreDefaultWorkspaceFolders();
+    resetWorkspaceFileActivity();
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }
@@ -159,5 +163,30 @@ suite('GitChangeLister Test Suite', () => {
     const fileNames = Array.from(changedFiles).map(f => path.basename(f));
     assert.ok(fileNames.includes('my file.ts'), 'Should include file with spaces: my file.ts');
     assert.ok(fileNames.includes('test file with spaces.js'), 'Should include file with spaces: test file with spaces.js');
+  });
+
+  test('start skips git when idle with cached file set', async function () {
+    this.timeout(20000);
+    mockWorkspaceFolders([createMockWorkspaceFolder(testRepoPath)]);
+
+    let gitScanCount = 0;
+    const originalGetAllChangedFiles = gitChangeLister.getAllChangedFiles.bind(gitChangeLister);
+    gitChangeLister.getAllChangedFiles = async (...args) => {
+      gitScanCount++;
+      return originalGetAllChangedFiles(...args);
+    };
+
+    await gitChangeLister.start();
+    assert.ok(gitScanCount >= 1, 'First start should run git');
+
+    gitScanCount = 0;
+    resetWorkspaceFileActivity();
+    await gitChangeLister.start();
+    assert.strictEqual(gitScanCount, 0, 'Idle start should skip git when file set is cached');
+
+    gitChangeLister.markDirty();
+    gitScanCount = 0;
+    await gitChangeLister.start();
+    assert.ok(gitScanCount >= 1, 'markDirty should force a git scan');
   });
 });

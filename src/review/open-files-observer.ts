@@ -8,6 +8,8 @@ import { FilteringReviewer } from './filtering-reviewer';
  */
 export class OpenFilesObserver {
   private reviewTimers = new Map<string, NodeJS.Timeout>();
+  private pollTimeoutHandle: NodeJS.Timeout | undefined;
+  private disposed = false;
   private context: vscode.ExtensionContext;
   private readonly docSelector: vscode.DocumentSelector;
   private filteringReviewer = new FilteringReviewer();
@@ -73,6 +75,10 @@ export class OpenFilesObserver {
   }
 
   private pollForVisibleEditors(): void {
+    if (this.disposed) {
+      return;
+    }
+
     const allVisibleFileNames = this.getAllVisibleFileNames();
 
     if (allVisibleFileNames.size > 0) {
@@ -86,7 +92,7 @@ export class OpenFilesObserver {
         });
       });
     } else {
-      setTimeout(() => this.pollForVisibleEditors(), 100);
+      this.pollTimeoutHandle = setTimeout(() => this.pollForVisibleEditors(), 100);
     }
   }
 
@@ -101,7 +107,7 @@ export class OpenFilesObserver {
       })
     );
 
-    setTimeout(() => this.pollForVisibleEditors(), 100);
+    this.pollTimeoutHandle = setTimeout(() => this.pollForVisibleEditors(), 100);
 
     // Detect closed editors (onDidCloseTextDocument event hook cannot be trusted as-is, so we use some extra detection)
     this.context.subscriptions.push(
@@ -154,6 +160,12 @@ export class OpenFilesObserver {
   }
 
   dispose(): void {
+    this.disposed = true;
+    if (this.pollTimeoutHandle) {
+      // Stop the startup poll chain when the observer is disposed.
+      clearTimeout(this.pollTimeoutHandle);
+      this.pollTimeoutHandle = undefined;
+    }
     // Clear all pending timers
     this.reviewTimers.forEach((timer) => clearTimeout(timer));
     this.reviewTimers.clear();

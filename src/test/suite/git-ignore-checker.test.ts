@@ -4,7 +4,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { GitIgnoreChecker } from '../../git/git-ignore-checker';
+import { GitIgnoreChecker, parseCheckIgnoreOutput, disposeSharedGitIgnoreChecker } from '../../git/git-ignore-checker';
+import { gitExecutor } from '../../git-utils';
 import {
   mockWorkspaceFolders,
   createMockWorkspaceFolder,
@@ -40,6 +41,7 @@ suite('GitIgnoreChecker Test Suite', () => {
     if (checker) {
       checker.dispose();
     }
+    disposeSharedGitIgnoreChecker();
     const gitignorePath = path.join(testDir, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
       fs.unlinkSync(gitignorePath);
@@ -349,10 +351,49 @@ suite('GitIgnoreChecker Test Suite', () => {
       let cacheSize = (checker as any).gitExecutorCache.size;
       assert.strictEqual(cacheSize, 1, 'Cache should have one entry');
 
-      (checker as any).clearCache();
+      (checker as any).invalidateCache();
 
       cacheSize = (checker as any).gitExecutorCache.size;
       assert.strictEqual(cacheSize, 0, 'Cache should be empty after clear');
+    });
+
+    test('should batch concurrent check-ignore requests', async function () {
+      this.timeout(10000);
+
+      fs.writeFileSync(path.join(testDir, '.gitignore'), 'ignored/\n');
+      const ignoredDir = createNestedDirs(['ignored']);
+      const files = Array.from({ length: 10 }, (_, index) => {
+        const filePath = path.join(ignoredDir, `file-${index}.js`);
+        return createFileAndMockDocument(filePath, `console.log(${index});`);
+      });
+
+      let checkIgnoreCalls = 0;
+      const originalExecute = gitExecutor.execute.bind(gitExecutor);
+      gitExecutor.execute = async (command, options, input) => {
+        if (command.args.includes('check-ignore')) {
+          checkIgnoreCalls++;
+        }
+        return originalExecute(command, options, input);
+      };
+
+      try {
+        const results = await Promise.all(files.map((document) => (checker as any).isIgnored(document)));
+        assert.ok(results.every((ignored) => ignored), 'All files in ignored/ should be ignored');
+        assert.ok(checkIgnoreCalls <= 2, `Expected batched check-ignore calls, got ${checkIgnoreCalls}`);
+      } finally {
+        gitExecutor.execute = originalExecute;
+      }
+    });
+  });
+
+  suite('parseCheckIgnoreOutput', () => {
+    test('parses NUL-delimited ignored paths', () => {
+      const ignored = parseCheckIgnoreOutput(`/tmp/a.js\0/tmp/b.js\0`);
+      assert.deepStrictEqual([...ignored], [path.normalize('/tmp/a.js'), path.normalize('/tmp/b.js')]);
+    });
+
+    test('returns empty set for empty stdout', () => {
+      assert.strictEqual(parseCheckIgnoreOutput('').size, 0);
     });
   });
 });

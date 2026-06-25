@@ -40,6 +40,57 @@ export function restoreDefaultWorkspaceFolders() {
   vscodeStub.workspace.workspaceFolders = defaultWorkspaceFolders as any;
 }
 
+const onDidSaveTextDocumentListeners: Array<(document: any) => void> = [];
+const onDidCreateFilesListeners: Array<(event: { files: any[] }) => void> = [];
+const onDidDeleteFilesListeners: Array<(event: { files: any[] }) => void> = [];
+const onDidRenameFilesListeners: Array<(event: { files: Array<{ oldUri: any; newUri: any }> }) => void> = [];
+
+let mockTextDocuments: any[] = [];
+let openTextDocumentHandler: ((uriOrPath: any) => Promise<any>) | undefined;
+const openTextDocumentCalls: any[] = [];
+
+export function setMockTextDocuments(documents: any[]) {
+  mockTextDocuments = documents;
+}
+
+export function resetMockTextDocuments() {
+  mockTextDocuments = [];
+}
+
+export function getOpenTextDocumentCalls(): any[] {
+  return openTextDocumentCalls;
+}
+
+export function setOpenTextDocumentHandler(handler: ((uriOrPath: any) => Promise<any>) | undefined) {
+  openTextDocumentHandler = handler;
+}
+
+export function fireOnDidSaveTextDocument(document: any) {
+  onDidSaveTextDocumentListeners.forEach((listener) => listener(document));
+}
+
+export function fireOnDidCreateFiles(files: any[]) {
+  onDidCreateFilesListeners.forEach((listener) => listener({ files }));
+}
+
+export function fireOnDidDeleteFiles(files: any[]) {
+  onDidDeleteFilesListeners.forEach((listener) => listener({ files }));
+}
+
+export function fireOnDidRenameFiles(files: Array<{ oldUri: any; newUri: any }>) {
+  onDidRenameFilesListeners.forEach((listener) => listener({ files }));
+}
+
+export function resetWorkspaceEventListeners() {
+  onDidSaveTextDocumentListeners.length = 0;
+  onDidCreateFilesListeners.length = 0;
+  onDidDeleteFilesListeners.length = 0;
+  onDidRenameFilesListeners.length = 0;
+  mockTextDocuments = [];
+  openTextDocumentHandler = undefined;
+  openTextDocumentCalls.length = 0;
+}
+
 let mockGitRepositories: any[] = [];
 
 export type MockWebviewPanel = {
@@ -197,6 +248,16 @@ const vscodeStub = {
     executeCommand: () => Promise.resolve(),
   },
   workspace: {
+    get textDocuments() {
+      return mockTextDocuments;
+    },
+    openTextDocument: async (uriOrPath: any) => {
+      openTextDocumentCalls.push(uriOrPath);
+      if (openTextDocumentHandler) {
+        return openTextDocumentHandler(uriOrPath);
+      }
+      throw new Error(`openTextDocument not mocked for: ${uriOrPath}`);
+    },
     workspaceFolders: defaultWorkspaceFolders as any,
     onDidChangeConfiguration: (listener: any) => {
       void listener;
@@ -204,6 +265,22 @@ const vscodeStub = {
     },
     onDidCloseTextDocument: (listener: any) => {
       void listener;
+      return { dispose: () => {} };
+    },
+    onDidSaveTextDocument: (listener: any) => {
+      onDidSaveTextDocumentListeners.push(listener);
+      return { dispose: () => {} };
+    },
+    onDidCreateFiles: (listener: any) => {
+      onDidCreateFilesListeners.push(listener);
+      return { dispose: () => {} };
+    },
+    onDidDeleteFiles: (listener: any) => {
+      onDidDeleteFilesListeners.push(listener);
+      return { dispose: () => {} };
+    },
+    onDidRenameFiles: (listener: any) => {
+      onDidRenameFilesListeners.push(listener);
       return { dispose: () => {} };
     },
     createFileSystemWatcher: () => ({
@@ -289,10 +366,22 @@ const vscodeStub = {
     Information: 2,
     Hint: 3,
   },
+  EndOfLine: {
+    LF: 1,
+    CRLF: 2,
+  },
   ThemeColor: ThemeColorStub,
   TreeItem: TreeItemStub,
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   ThemeIcon: ThemeIconStub,
+  RelativePattern: class {
+    baseUri: any;
+    pattern: string;
+    constructor(base: any, pattern: string) {
+      this.baseUri = base;
+      this.pattern = pattern;
+    }
+  },
   CodeActionKind: {
     QuickFix: 'quickfix',
     Refactor: 'refactor',

@@ -3,7 +3,7 @@ import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { ReviewOpts } from './reviewer';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
-import { GitIgnoreChecker } from '../git/git-ignore-checker';
+import { getSharedGitIgnoreChecker } from '../git/git-ignore-checker';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -13,11 +13,7 @@ import { GitIgnoreChecker } from '../git/git-ignore-checker';
  * downgraded to the injected reviewer (which for normal use is the CachingReviewer)
  */
 export class FilteringReviewer {
-  private gitIgnoreChecker: GitIgnoreChecker;
-
-  constructor() {
-    this.gitIgnoreChecker = new GitIgnoreChecker();
-  }
+  private gitIgnoreChecker = getSharedGitIgnoreChecker();
 
   async review(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<Review | void> {
     const ignored = await this.gitIgnoreChecker.isIgnored(document);
@@ -47,7 +43,6 @@ export class FilteringReviewer {
     DevtoolsAPI.abortReviews(document);
   }
 
-  dispose() {
-    this.gitIgnoreChecker.dispose();
-  }
+  // Shared GitIgnoreChecker is owned by the extension lifetime; do not dispose here.
+  dispose() {}
 }

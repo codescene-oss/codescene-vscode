@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { markWorkspaceFileActivity } from './git/workspace-activity';
 
 export class SavedFilesTracker {
   private savedFiles: Set<string> = new Set();
@@ -19,6 +20,7 @@ export class SavedFilesTracker {
 
   private onFileSaved(document: vscode.TextDocument): void {
     const filePath = document.fileName;
+    markWorkspaceFileActivity();
 
     if (this.isFileOpenInEditor(filePath)) {
       this.savedFiles.add(filePath);

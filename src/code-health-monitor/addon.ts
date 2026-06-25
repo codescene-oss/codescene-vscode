@@ -9,9 +9,9 @@ import { InteractiveDocsParams } from '../documentation/commands';
 import { CodeSceneCWFDocsTabPanel } from '../codescene-tab/webview/documentation/cwf-webview-docs-panel';
 import { BackgroundServiceView } from './background-view';
 import { GitChangeLister } from '../git/git-change-lister';
+import { getSharedGitIgnoreChecker } from '../git/git-ignore-checker';
 import { DevtoolsAPI } from '../devtools-api';
 import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
-import { logOutputChannel } from '../log';
 import { SimpleExecutor } from '../simple-executor';
 import { isGitAvailable } from '../git/git-detection';
 import { SavedFilesTracker } from '../saved-files-tracker';
@@ -24,7 +24,11 @@ export const onTreeDataCleared = clearTreeEmitter.event;
 
 let ALL_DISPOSABLES: vscode.Disposable[] = [];
 
-export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
+export function activate(
+  context: vscode.ExtensionContext,
+  savedFilesTracker: SavedFilesTracker,
+  getVisibleFileNames?: () => Set<string>
+) {
   if (!savedFilesTracker) {
     throw new Error('SavedFilesTracker must be provided to activate Code Health Monitor');
   }
@@ -55,12 +59,15 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
   // Review all changed/added files every 9 seconds.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
   // because `CsDiagnostics.review` has built-in caching.
-  gitChangeListerInstance = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker);
+  gitChangeListerInstance = new GitChangeLister(
+    DevtoolsAPI.concurrencyLimitingExecutor,
+    savedFilesTracker,
+    getVisibleFileNames
+  );
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
   void scheduledExecutor.executeTask(async () => {
     if (!isGitAvailable()) return;
-    logOutputChannel.info('Starting scheduled git change review');
     await gitChangeListerInstance!.start();
   });
 
@@ -111,6 +118,10 @@ async function getHeadCommit(repo: Repository) {
  * setting the baseline if either of them changed
  */
 function onRepoStateChange(repo: Repository) {
+  // Branch/index changes can alter merge-base diffs and .gitignore applicability.
+  getSharedGitIgnoreChecker().invalidateCache();
+  gitChangeListerInstance?.markDirty();
+
   const gitStateChange = updateGitState(repo);
 
   if (gitStateChange.branchChanged || gitStateChange.commitChanged) {
@@ -141,6 +152,7 @@ export async function runGitChangeLister(): Promise<void> {
   if (!gitChangeListerInstance || !isGitAvailable()) {
     return;
   }
+  gitChangeListerInstance.markDirty();
   await gitChangeListerInstance.start();
 }
 

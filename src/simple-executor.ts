@@ -1,4 +1,4 @@
-import { ChildProcess, execFile, ExecOptions } from 'child_process';
+import { ChildProcess, execFile, ExecOptions, spawn } from 'child_process';
 import { logOutputChannel } from './log';
 import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
@@ -40,6 +40,12 @@ export function mergeJsonIntoArgs(args: string[], input: string): string[] {
   return [...args, ...arrayToMerge.map((v) => typeof v === 'string' ? v : JSON.stringify(v))];
 }
 
+interface RunningProcess {
+  /** Tracks spawned processes so abortAllTasks can reject in-flight execute() promises. */
+  childProcess: ChildProcess;
+  reject: (error: Error) => void;
+}
+
 export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
     if (childProcess.stdin) {
@@ -54,6 +60,7 @@ export class SimpleExecutor implements Executor {
   }
 
   private stats: Stats = new Stats();
+  private readonly runningProcesses = new Map<ChildProcess, RunningProcess>();
 
   logStats(): void {
     this.stats.logStats();
@@ -74,8 +81,16 @@ export class SimpleExecutor implements Executor {
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
+      // Guard against resolving/rejecting twice when abort races the execFile callback.
+      let settled = false;
 
       const childProcess = execFile(command.command, command.args, allOptions, (error, stdout, stderr) => {
+        this.runningProcesses.delete(childProcess);
+        if (settled) {
+          return;
+        }
+        settled = true;
+
         if (!command.ignoreError && error) {
           logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`);
           reject(error);
@@ -91,6 +106,18 @@ export class SimpleExecutor implements Executor {
         resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
       });
 
+      this.runningProcesses.set(childProcess, {
+        childProcess,
+        reject: (error: Error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          this.runningProcesses.delete(childProcess);
+          reject(error);
+        },
+      });
+
       if (isDefined(input) && childProcess.stdin) {
         this.writeInput(childProcess, input);
       }
@@ -103,7 +130,32 @@ export class SimpleExecutor implements Executor {
     return task();
   }
 
-  abortAllTasks(): void {}
+  abortAllTasks(): void {
+    for (const { childProcess, reject } of [...this.runningProcesses.values()]) {
+      this.killProcessTree(childProcess);
+      reject(new Error('Task aborted'));
+    }
+    this.runningProcesses.clear();
+  }
+
+  private killProcessTree(childProcess: ChildProcess): void {
+    const pid = childProcess.pid;
+    if (!pid) {
+      return;
+    }
+
+    // execFile on Windows leaves child processes alive unless the whole tree is killed.
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+      return;
+    }
+
+    try {
+      childProcess.kill('SIGTERM');
+    } catch (error) {
+      logOutputChannel.debug(`Failed to kill child process ${pid}: ${error}`);
+    }
+  }
 }
 
 export interface Task extends Command {

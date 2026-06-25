@@ -15,6 +15,7 @@ export class DroppingScheduledExecutor implements Executor {
   private scheduledTask: (() => Promise<any>) | null = null;
   private hasStarted = false;
   private initialPromise: Promise<any> | null = null;
+  private disposed = false;
 
   constructor(executor: Executor, intervalSeconds: number) {
     if (intervalSeconds <= 0) {
@@ -68,10 +69,11 @@ export class DroppingScheduledExecutor implements Executor {
   }
 
   abortAllTasks(): void {
+    this.executor.abortAllTasks();
   }
 
   private async runScheduledTask(): Promise<any> {
-    if (this.isRunning) {
+    if (this.disposed || this.isRunning) {
       return;
     }
 
@@ -93,9 +95,11 @@ export class DroppingScheduledExecutor implements Executor {
   }
 
   dispose(): void {
+    this.disposed = true;
     if (this.intervalHandle !== null) {
       clearInterval(this.intervalHandle);
       this.intervalHandle = null;
     }
+    this.abortAllTasks();
   }
 }

@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { Uri, Disposable, ExtensionContext } from '../mocks/vscode';
 import { GitChangeObserver } from '../../git/git-change-observer';
+import { WorkspaceFileWatcher } from '../../git/workspace-file-watcher';
 import { MockExecutor } from '../mocks/mock-executor';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { getWorkspaceFolder } from '../../utils';
@@ -125,6 +126,7 @@ suite('GitChangeObserver Test Suite', () => {
     mockExecutor = new MockExecutor();
     const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
     const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
+    WorkspaceFileWatcher.init(mockContext);
     gitChangeObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver);
     await new Promise(resolve => setTimeout(resolve, 500));
   });
@@ -133,6 +135,7 @@ suite('GitChangeObserver Test Suite', () => {
     if (gitChangeObserver) {
       gitChangeObserver.dispose();
     }
+    WorkspaceFileWatcher.disposeShared();
 
     const gitignorePath = path.join(testRepoPath, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
@@ -389,11 +392,16 @@ suite('GitChangeObserver Test Suite', () => {
     assertFileInTracker(ignoredFile);
   });
 
-  test('dispose cleans up file watcher', function () {
+  test('dispose cleans up scheduled executor and workspace watcher reference', function () {
     this.timeout(20000);
-    assert.ok(getObserverInternals().fileWatcher, 'File watcher should exist');
+    const observer = getObserverInternals();
+    assert.ok(observer.workspaceWatcher, 'Workspace watcher should exist');
+    assert.ok(observer.scheduledExecutor, 'Scheduled executor should exist');
+
     gitChangeObserver.dispose();
-    assert.ok(true, 'Dispose completed without errors');
+
+    // After dispose, the interval should be cleared
+    assert.strictEqual(observer.scheduledExecutor.intervalHandle, null, 'Interval should be cleared after dispose');
   });
 
   test('events are queued instead of processed immediately', async function () {
@@ -470,7 +478,7 @@ suite('GitChangeObserver Test Suite', () => {
     assert.strictEqual(getChangedFilesCallCount, 0, 'getChangedFilesVsBaseline should not be called for empty queue');
   });
 
-  test('dispose cleans up scheduled executor', function () {
+  test('dispose clears scheduled executor interval', function () {
     this.timeout(20000);
     const observer = getObserverInternals();
     assert.ok(observer.scheduledExecutor, 'Scheduled executor should exist');

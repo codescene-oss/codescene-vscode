@@ -61,5 +61,7 @@ export class AbortingSingleTaskExecutor implements Executor {
         logOutputChannel.error(`[AbortingSingleTaskExecutor] Error aborting task ${taskId}: ${error}`);
       }
     }
+    // Also kill any in-flight git/cli subprocesses owned by the inner executor.
+    this.executor.abortAllTasks();
   }
 }

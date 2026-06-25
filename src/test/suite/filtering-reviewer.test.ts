@@ -11,6 +11,7 @@ import {
   restoreDefaultWorkspaceFolders,
 } from '../setup';
 import { resetGitAvailability } from '../../git/git-detection';
+import { disposeSharedGitIgnoreChecker } from '../../git/git-ignore-checker';
 
 const execAsync = promisify(exec);
 
@@ -49,6 +50,7 @@ suite('FilteringReviewer Test Suite', () => {
     }
     restoreDefaultWorkspaceFolders();
     resetGitAvailability();
+    disposeSharedGitIgnoreChecker();
   });
 
   function createNestedDirs(segments: string[]): string {
@@ -99,6 +101,7 @@ suite('FilteringReviewer Test Suite', () => {
 
   suite('when git is unavailable (uses heuristics)', () => {
     setup(async () => {
+      disposeSharedGitIgnoreChecker();
       mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
       reviewer = new FilteringReviewer();
       await (reviewer as any).gitIgnoreChecker.gitAvailabilityCheck;
@@ -149,6 +152,7 @@ suite('FilteringReviewer Test Suite', () => {
 
   suite('when git is available (uses git check-ignore)', () => {
     setup(async () => {
+      disposeSharedGitIgnoreChecker();
       await initGitRepo(testDir);
       mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
       reviewer = new FilteringReviewer();

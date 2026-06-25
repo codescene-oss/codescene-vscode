@@ -1,5 +1,6 @@
 import vscode, { Disposable, Uri } from 'vscode';
 import { AbortError } from '../devtools-api/abort-error';
+import { WorkspaceFileWatcher } from '../git/workspace-file-watcher';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { reportError } from '../utils';
@@ -18,13 +19,15 @@ export class CachingReviewer implements Disposable {
     getCodeHealthFileVersions: () => Map<string, number>
   ) {
     this.reviewCache = new ReviewCache(getBaselineCommit, getCodeHealthFileVersions);
-    const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
-    this.disposables.push(
-      deleteFileWatcher,
-      deleteFileWatcher.onDidDelete((uri) => {
-        this.reviewCache.delete(uri.fsPath);
-      })
-    );
+    const workspaceWatcher = WorkspaceFileWatcher.getInstance();
+    if (workspaceWatcher) {
+      // Drop cached reviews when files are deleted (via shared workspace delete events).
+      this.disposables.push(
+        workspaceWatcher.onDidDelete((uri) => {
+          this.reviewCache.delete(uri.fsPath);
+        })
+      );
+    }
   }
 
   private handleReviewError(e: Error, document: vscode.TextDocument) {
