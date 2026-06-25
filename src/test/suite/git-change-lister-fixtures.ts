@@ -39,6 +39,12 @@ export function teardownGitChangeListerFixture(): void {
   restoreDefaultWorkspaceFolders();
   resetWorkspaceFileActivity();
   if (fs.existsSync(GIT_CHANGE_LISTER_TEST_REPO)) {
-    fs.rmSync(GIT_CHANGE_LISTER_TEST_REPO, { recursive: true, force: true });
+    try {
+      fs.rmSync(GIT_CHANGE_LISTER_TEST_REPO, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+    } catch (error: any) {
+      if (error?.code !== 'EBUSY' && error?.code !== 'ENOTEMPTY') {
+        throw error;
+      }
+    }
   }
 }

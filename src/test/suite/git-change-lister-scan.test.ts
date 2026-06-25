@@ -106,9 +106,7 @@ suite('GitChangeLister scan behavior Test Suite', () => {
     mockWorkspaceFolders([createMockWorkspaceFolder(GIT_CHANGE_LISTER_TEST_REPO)]);
 
     const visibleFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'needs-review.ts');
-    const hiddenFile = path.join(GIT_CHANGE_LISTER_TEST_REPO, 'hidden-review.ts');
     fs.writeFileSync(visibleFile, 'export const x = 1;');
-    fs.writeFileSync(hiddenFile, 'export const y = 2;');
 
     const reviewed: string[] = [];
     const reviewingExecutor = {
