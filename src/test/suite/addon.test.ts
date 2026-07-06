@@ -6,12 +6,14 @@ import {
   deactivate as deactivateCodeHealthMonitor,
   refreshMergeBaseBaselines,
   runGitChangeLister,
+  runScheduledGitChangeReview,
 } from '../../code-health-monitor/addon';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
 import Reviewer from '../../review/reviewer';
 import { GitChangeLister } from '../../git/git-change-lister';
 import { markGitAsUnavailable, resetGitAvailability } from '../../git/git-detection';
+import { setWindowFocusedForTesting } from '../../extension-impl';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { setMockGitRepositories, clearMockGitRepositories, mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { ensureBinary } from '../integration_helper';
@@ -137,5 +139,33 @@ suite('Code Health Monitor Addon Test Suite', () => {
 
     assert.strictEqual(startCalled, false);
     GitChangeLister.prototype.start = originalStart;
+  });
+
+  [
+    { focused: false, expectStartCalled: false, description: 'skips when window is not focused' },
+    { focused: true,  expectStartCalled: true , description: 'proceeds when window is focused' },
+  ].forEach(({ focused, expectStartCalled, description }) => {
+    test(`runScheduledGitChangeReview ${description}`, async function () {
+      this.timeout(20000);
+      setMockGitRepositories([createMockRepo()]);
+      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+
+      setWindowFocusedForTesting(focused);
+
+      let startCalled = false;
+      const originalStart = GitChangeLister.prototype.start;
+      GitChangeLister.prototype.start = async function () {
+        startCalled = true;
+        return originalStart.call(this);
+      };
+
+      await runScheduledGitChangeReview();
+
+      assert.strictEqual(startCalled, expectStartCalled);
+      GitChangeLister.prototype.start = originalStart;
+      if (!focused) {
+        setWindowFocusedForTesting(true);
+      }
+    });
   });
 });

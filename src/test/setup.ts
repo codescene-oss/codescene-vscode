@@ -7,6 +7,7 @@ import { PositionStub } from './stubs/position-stub';
 import { SelectionStub } from './stubs/selection-stub';
 import { WorkspaceEditStub } from './stubs/workspace-edit-stub';
 import { CodeActionStub } from './stubs/code-action-stub';
+import { CodeLensStub } from './stubs/code-lens-stub';
 import { ThemeColorStub } from './stubs/theme-color-stub';
 import { ThemeIconStub } from './stubs/theme-icon-stub';
 import { TreeItemStub } from './stubs/tree-item-stub';
@@ -149,6 +150,13 @@ const vscodeStub = {
     },
   },
   window: {
+    state: {
+      focused: true,
+    },
+    onDidChangeWindowState: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
     createOutputChannel: (name: string) => ({
       append: (text: string) => enableTestLogging && process.stdout.write(`[${name}] ${text}`),
       appendLine: (text: string) => enableTestLogging && console.log(`[${name}] ${text}`),
@@ -283,6 +291,7 @@ const vscodeStub = {
   Selection: SelectionStub,
   WorkspaceEdit: WorkspaceEditStub,
   CodeAction: CodeActionStub,
+  CodeLens: CodeLensStub,
   DiagnosticSeverity: {
     Error: 0,
     Warning: 1,
