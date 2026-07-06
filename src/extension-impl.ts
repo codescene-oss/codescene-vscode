@@ -58,6 +58,7 @@ const codeHealthFileVersion = new Map<string, number>();
 
 let savedFilesTrackerInstance: SavedFilesTracker;
 let openFilesObserverInstance: OpenFilesObserver | undefined;
+let isWindowFocused: boolean = true;
 
 const onCodeHealthFileVersionChange = debounce(() => {
   if (!openFilesObserverInstance) {
@@ -108,8 +109,55 @@ const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
   });
 }, 350);
 
+function handleWindowStateChange(state: vscode.WindowState): void {
+  const previousState = isWindowFocused;
+  isWindowFocused = state.focused;
+
+  if (state.focused && !previousState) {
+    logOutputChannel.debug('VSCode window gained focus');
+  } else if (!state.focused && previousState) {
+    logOutputChannel.debug('VSCode window lost focus');
+  }
+}
+
+async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
+  try {
+    const document = await vscode.workspace.openTextDocument(uri);
+    codeHealthFileVersion.set(document.fileName, document.version);
+    onCodeHealthFileVersionChange();
+  } catch (e) {
+    logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
+  }
+}
+
+async function inspectStaleHomeViewFiles(gitChangeObserver: GitChangeObserver | undefined): Promise<void> {
+  const homeView = getHomeViewInstance();
+  if (!homeView) return;
+
+  const filenames = Array.from(homeView.getFileIssueMap().keys());
+
+  for (const filePath of filenames) {
+    try {
+      await access(filePath);
+    } catch {
+      fireFileDeletedFromGit(filePath);
+      if (gitChangeObserver) {
+        gitChangeObserver.removeFromTracker(filePath);
+      }
+    }
+  }
+}
+
 export function getCodeHealthFileVersions(): Map<string, number> {
   return codeHealthFileVersion;
+}
+
+export function isVSCodeWindowFocused(): boolean {
+  return isWindowFocused;
+}
+
+export function setWindowFocusedForTesting(focused: boolean): void {
+  isWindowFocused = focused;
 }
 
 async function initializeCodeHealthFileVersions() {
@@ -277,6 +325,12 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   DISPOSABLES.push(openFilesObserverInstance);
   context.subscriptions.push(openFilesObserverInstance);
 
+  isWindowFocused = vscode.window.state.focused;
+
+  const windowStateListener = vscode.window.onDidChangeWindowState(handleWindowStateChange);
+  DISPOSABLES.push(windowStateListener);
+  context.subscriptions.push(windowStateListener);
+
   // Watch for discrete Git file changes (create, modify, delete)
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
@@ -289,49 +343,15 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   // Remove CHM stale files
   const filenameInspectorExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
-  void filenameInspectorExecutor.executeTask(async () => {
-    const homeView = getHomeViewInstance();
-    if (homeView) {
-      const filenames = Array.from(homeView.getFileIssueMap().keys());
-
-      // Check each file and fire deletion event for files that don't exist
-      for (const filePath of filenames) {
-        try {
-          await access(filePath);
-        } catch {
-          fireFileDeletedFromGit(filePath);
-          if (gitChangeObserver) {
-            gitChangeObserver.removeFromTracker(filePath);
-          }
-        }
-      }
-    }
-  });
+  void filenameInspectorExecutor.executeTask(() => inspectStaleHomeViewFiles(gitChangeObserver));
   DISPOSABLES.push(filenameInspectorExecutor);
   context.subscriptions.push(filenameInspectorExecutor);
 
   // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
 
-  rulesFileWatcher.onDidChange(async (uri: vscode.Uri) => {
-    try {
-      const document = await vscode.workspace.openTextDocument(uri);
-      codeHealthFileVersion.set(document.fileName, document.version);
-      onCodeHealthFileVersionChange();
-    } catch (e) {
-      logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
-    }
-  });
-
-  rulesFileWatcher.onDidCreate(async (uri: vscode.Uri) => {
-    try {
-      const document = await vscode.workspace.openTextDocument(uri);
-      codeHealthFileVersion.set(document.fileName, document.version);
-      onCodeHealthFileVersionChange();
-    } catch (e) {
-      logOutputChannel.warn(`Failed to add code-health-rules.json version: ${uri.fsPath}`, e);
-    }
-  });
+  rulesFileWatcher.onDidChange(updateCodeHealthRulesVersion);
+  rulesFileWatcher.onDidCreate(updateCodeHealthRulesVersion);
 
   rulesFileWatcher.onDidDelete((uri: vscode.Uri) => {
     codeHealthFileVersion.delete(uri.fsPath);

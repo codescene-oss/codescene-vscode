@@ -15,6 +15,7 @@ import { logOutputChannel } from '../log';
 import { SimpleExecutor } from '../simple-executor';
 import { isGitAvailable } from '../git/git-detection';
 import { SavedFilesTracker } from '../saved-files-tracker';
+import { isVSCodeWindowFocused } from '../extension-impl';
 
 let gitApi: API | undefined;
 let gitChangeListerInstance: GitChangeLister | undefined;
@@ -23,6 +24,16 @@ const clearTreeEmitter = new vscode.EventEmitter<void>();
 export const onTreeDataCleared = clearTreeEmitter.event;
 
 let ALL_DISPOSABLES: vscode.Disposable[] = [];
+
+export async function runScheduledGitChangeReview(): Promise<void> {
+  if (!isVSCodeWindowFocused()) {
+    logOutputChannel.debug('Skipping scheduled git change review: window not focused');
+    return;
+  }
+  if (!isGitAvailable()) return;
+  logOutputChannel.info('Starting scheduled git change review');
+  await gitChangeListerInstance!.start();
+}
 
 export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
   if (!savedFilesTracker) {
@@ -46,11 +57,7 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
     .filter((repo) => repo?.state)
     .map((repo) => repo.state.onDidChange(() => void onRepoStateChange(repo)));
 
-  const baselineChangedListener = CsExtensionState.onBaselineChanged(async () => {
-    for (const repo of gitApi!.repositories) {
-      await setBaseline(repo);
-    }
-  });
+  const baselineChangedListener = CsExtensionState.onBaselineChanged(refreshMergeBaseBaselines);
 
   // Review all changed/added files every 9 seconds.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
@@ -58,11 +65,7 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
   gitChangeListerInstance = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker);
   const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
 
-  void scheduledExecutor.executeTask(async () => {
-    if (!isGitAvailable()) return;
-    logOutputChannel.info('Starting scheduled git change review');
-    await gitChangeListerInstance!.start();
-  });
+  void scheduledExecutor.executeTask(runScheduledGitChangeReview);
 
   const codeHealthMonitorHelpCommand = vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
     const params: InteractiveDocsParams = {
