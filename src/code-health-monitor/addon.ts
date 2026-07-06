@@ -17,8 +17,11 @@ import { isGitAvailable } from '../git/git-detection';
 import { SavedFilesTracker } from '../saved-files-tracker';
 import { isVSCodeWindowFocused } from '../extension-impl';
 
+const GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS = 9;
+
 let gitApi: API | undefined;
 let gitChangeListerInstance: GitChangeLister | undefined;
+let scheduledExecutorInstance: DroppingScheduledExecutor | undefined;
 
 const clearTreeEmitter = new vscode.EventEmitter<void>();
 export const onTreeDataCleared = clearTreeEmitter.event;
@@ -32,7 +35,22 @@ export async function runScheduledGitChangeReview(): Promise<void> {
   }
   if (!isGitAvailable()) return;
   logOutputChannel.info('Starting scheduled git change review');
+
+  const startTime = Date.now();
   await gitChangeListerInstance!.start();
+  const elapsedMs = Date.now() - startTime;
+  const elapsedSeconds = Math.ceil(elapsedMs / 1000);
+
+  logOutputChannel.debug(`Scheduled git change review completed in ${elapsedSeconds}s`);
+
+  if (elapsedSeconds > GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS && scheduledExecutorInstance) {
+    const newPeriod = GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS * 2 + elapsedSeconds;
+    const currentPeriod = scheduledExecutorInstance.getIntervalSeconds();
+    if (newPeriod > currentPeriod) {
+      scheduledExecutorInstance.setInterval(newPeriod);
+      logOutputChannel.info(`Git change review took ${elapsedSeconds}s, increased period to ${newPeriod}s`);
+    }
+  }
 }
 
 export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
@@ -59,13 +77,13 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
 
   const baselineChangedListener = CsExtensionState.onBaselineChanged(refreshMergeBaseBaselines);
 
-  // Review all changed/added files every 9 seconds.
+  // Review all changed/added files periodically.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
   // because `CsDiagnostics.review` has built-in caching.
   gitChangeListerInstance = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker);
-  const scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
+  scheduledExecutorInstance = new DroppingScheduledExecutor(new SimpleExecutor(), GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS);
 
-  void scheduledExecutor.executeTask(runScheduledGitChangeReview);
+  void scheduledExecutorInstance.executeTask(runScheduledGitChangeReview);
 
   const codeHealthMonitorHelpCommand = vscode.commands.registerCommand('codescene.codeHealthMonitorHelp', () => {
     const params: InteractiveDocsParams = {
@@ -78,7 +96,7 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
   ALL_DISPOSABLES = [
     clearTreeEmitter,
     codeHealthMonitorView,
-    scheduledExecutor,
+    scheduledExecutorInstance,
     baselineChangedListener,
     codeHealthMonitorHelpCommand,
     ...repoStateListeners,
@@ -151,5 +169,10 @@ export function deactivate() {
   ALL_DISPOSABLES.forEach((disposable) => disposable.dispose());
   ALL_DISPOSABLES = [];
   gitChangeListerInstance = undefined;
+  scheduledExecutorInstance = undefined;
   gitApi = undefined;
+}
+
+export function getScheduledExecutorForTesting(): DroppingScheduledExecutor | undefined {
+  return scheduledExecutorInstance;
 }

@@ -7,6 +7,7 @@ import {
   refreshMergeBaseBaselines,
   runGitChangeLister,
   runScheduledGitChangeReview,
+  getScheduledExecutorForTesting,
 } from '../../code-health-monitor/addon';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
@@ -167,5 +168,71 @@ suite('Code Health Monitor Addon Test Suite', () => {
         setWindowFocusedForTesting(true);
       }
     });
+  });
+
+  test('runScheduledGitChangeReview increases period when git operations exceed base period', async function () {
+    this.timeout(20000);
+    setMockGitRepositories([createMockRepo()]);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    setWindowFocusedForTesting(true);
+
+    const executor = getScheduledExecutorForTesting();
+    assert.ok(executor, 'Scheduled executor should exist');
+    const initialPeriod = executor.getIntervalSeconds();
+    assert.strictEqual(initialPeriod, 9);
+
+    const originalStart = GitChangeLister.prototype.start;
+    GitChangeLister.prototype.start = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+
+    const originalDateNow = Date.now;
+    let callCount = 0;
+    Date.now = () => {
+      callCount++;
+      if (callCount === 1) return 0;
+      return 15000;
+    };
+
+    await runScheduledGitChangeReview();
+
+    const newPeriod = executor.getIntervalSeconds();
+    assert.strictEqual(newPeriod, 9 * 2 + Math.ceil(15));
+
+    Date.now = originalDateNow;
+    GitChangeLister.prototype.start = originalStart;
+  });
+
+  test('runScheduledGitChangeReview does not decrease period', async function () {
+    this.timeout(20000);
+    setMockGitRepositories([createMockRepo()]);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    setWindowFocusedForTesting(true);
+
+    const executor = getScheduledExecutorForTesting();
+    assert.ok(executor, 'Scheduled executor should exist');
+
+    executor.setInterval(50);
+    assert.strictEqual(executor.getIntervalSeconds(), 50);
+
+    const originalStart = GitChangeLister.prototype.start;
+    GitChangeLister.prototype.start = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+
+    const originalDateNow = Date.now;
+    let callCount = 0;
+    Date.now = () => {
+      callCount++;
+      if (callCount === 1) return 0;
+      return 15000;
+    };
+
+    await runScheduledGitChangeReview();
+
+    assert.strictEqual(executor.getIntervalSeconds(), 50);
+
+    Date.now = originalDateNow;
+    GitChangeLister.prototype.start = originalStart;
   });
 });
