@@ -106,6 +106,12 @@ export class DevtoolsAPI {
   /** Emits events when review or delta analysis state changes (running/idle?) */
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
+  public static get isAnalysisRunning(): boolean {
+    return DevtoolsAPI.analysesRunning > 0;
+  }
+  public static setAnalysesRunningForTesting(count: number): void {
+    DevtoolsAPI.analysesRunning = count;
+  }
   public static jobs = new Set<string>(); // Keep track of the filename of current jobs
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
