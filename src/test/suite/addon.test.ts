@@ -170,6 +170,35 @@ suite('Code Health Monitor Addon Test Suite', () => {
     });
   });
 
+  [
+    { analysesRunning: 0, expectStartCalled: true,  description: 'proceeds when no analysis is running' },
+    { analysesRunning: 1, expectStartCalled: false, description: 'skips when analysis is running' },
+  ].forEach(({ analysesRunning, expectStartCalled, description }) => {
+    test(`runScheduledGitChangeReview ${description}`, async function () {
+      this.timeout(20000);
+      setMockGitRepositories([createMockRepo()]);
+      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+
+      setWindowFocusedForTesting(true);
+      DevtoolsAPI.setAnalysesRunningForTesting(analysesRunning);
+
+      let startCalled = false;
+      const originalStart = GitChangeLister.prototype.start;
+      GitChangeLister.prototype.start = async function () {
+        startCalled = true;
+        return originalStart.call(this);
+      };
+
+      try {
+        await runScheduledGitChangeReview();
+        assert.strictEqual(startCalled, expectStartCalled);
+      } finally {
+        GitChangeLister.prototype.start = originalStart;
+        DevtoolsAPI.setAnalysesRunningForTesting(0);
+      }
+    });
+  });
+
   test('runScheduledGitChangeReview increases period when git operations exceed base period', async function () {
     this.timeout(20000);
     setMockGitRepositories([createMockRepo()]);

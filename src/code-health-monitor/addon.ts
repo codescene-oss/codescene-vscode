@@ -34,6 +34,10 @@ export async function runScheduledGitChangeReview(): Promise<void> {
     return;
   }
   if (!isGitAvailable()) return;
+  if (DevtoolsAPI.isAnalysisRunning) {
+    logOutputChannel.info('Skipping scheduled git change review: analysis in progress');
+    return;
+  }
   logOutputChannel.info('Starting scheduled git change review');
 
   const startTime = Date.now();
