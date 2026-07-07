@@ -9,7 +9,7 @@ import { logOutputChannel } from './log';
  */
 export class DroppingScheduledExecutor implements Executor {
   private readonly executor: Executor;
-  private readonly intervalMs: number;
+  private intervalMs: number;
   private intervalHandle: NodeJS.Timeout | null = null;
   private isRunning = false;
   private scheduledTask: (() => Promise<any>) | null = null;
@@ -68,6 +68,21 @@ export class DroppingScheduledExecutor implements Executor {
   }
 
   abortAllTasks(): void {
+  }
+
+  getIntervalSeconds(): number {
+    return this.intervalMs / 1000;
+  }
+
+  setInterval(newIntervalSeconds: number): void {
+    this.intervalMs = newIntervalSeconds * 1000;
+
+    if (this.intervalHandle !== null) {
+      clearInterval(this.intervalHandle);
+      this.intervalHandle = setInterval(() => {
+        this.runScheduledTask().catch(() => {});
+      }, this.intervalMs);
+    }
   }
 
   private async runScheduledTask(): Promise<any> {

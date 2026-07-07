@@ -20,6 +20,7 @@ tsc:
 lint:
 	npx commitlint --from main --to HEAD --verbose
 	npm run lint
+	@(command -v cs >/dev/null 2>&1 && cs delta main) || true
 
 watch:
 	npm run watch
