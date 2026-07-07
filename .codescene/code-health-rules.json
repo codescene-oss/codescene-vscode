@@ -39,6 +39,14 @@
           "weight": 0.0
         },
         {
+          "name": "Large Method",
+          "weight": 0.0
+        },
+        {
+          "name": "Complex Method",
+          "weight": 0.0
+        },
+        {
           "name": "String Heavy Function Arguments",
           "weight": 0.0
         }

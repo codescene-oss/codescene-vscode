@@ -207,7 +207,9 @@ suite('FilteringReviewer Test Suite', () => {
       await assertMatchesGitCheckIgnore(testFile, 'console.log("hello");');
     });
 
-    test('should respect complex .gitignore patterns', async () => {
+    test('should respect complex .gitignore patterns', async function () {
+      // ~5s expected from batching delays (350ms per check), 10s as safety margin for slow CI
+      this.timeout(10000);
       fs.writeFileSync(
         path.join(testDir, '.gitignore'),
         'node_modules/\n*.log\nbuild/\n.env\n'
