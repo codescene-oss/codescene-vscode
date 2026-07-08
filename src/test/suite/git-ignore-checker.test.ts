@@ -104,82 +104,28 @@ suite('GitIgnoreChecker Test Suite', () => {
       await (checker as any).gitAvailabilityCheck;
     });
 
-    test('should ignore files in node_modules directory', async () => {
-      const dir = createNestedDirs(['node_modules']);
-      const testFile = path.join(dir, 'test.js');
-      await assertIsIgnored(testFile, 'console.log("test");', true, 'node_modules should be ignored by heuristic');
-    });
+    const heuristicTestCases = [
+      { name: 'node_modules directory', dirs: ['node_modules'], file: 'test.js', ignored: true },
+      { name: 'nested node_modules', dirs: ['src', 'node_modules', 'package'], file: 'index.js', ignored: true },
+      { name: 'root-level directory starting with .', dirs: ['.baz'], file: 'x.js', ignored: true },
+      { name: 'root-level directory starting with _', dirs: ['_private'], file: 'secret.js', ignored: true },
+      { name: 'non-root-level directory starting with .', dirs: ['qqq', '.baz'], file: 'x.js', ignored: false },
+      { name: 'non-root-level directory starting with _', dirs: ['qqq', '_private'], file: 'secret.js', ignored: false },
+      { name: 'regular directories', dirs: ['src'], file: 'index.js', ignored: false },
+      { name: 'build directory', dirs: ['build'], file: 'output.js', ignored: true },
+      { name: 'dist directory', dirs: ['dist'], file: 'bundle.js', ignored: true },
+      { name: 'target directory', dirs: ['target'], file: 'classes.jar', ignored: true },
+      { name: 'out directory', dirs: ['out'], file: 'compiled.js', ignored: true },
+      { name: 'vendor directory', dirs: ['vendor'], file: 'lib.php', ignored: true },
+      { name: 'coverage directory', dirs: ['coverage'], file: 'lcov.info', ignored: true },
+    ];
 
-    test('should ignore files in nested node_modules', async () => {
-      const dir = createNestedDirs(['src', 'node_modules', 'package']);
-      const testFile = path.join(dir, 'index.js');
-      await assertIsIgnored(testFile, 'module.exports = {};', true, 'nested node_modules should be ignored by heuristic');
-    });
-
-    test('should ignore files in root-level directory starting with .', async () => {
-      const dir = createNestedDirs(['.baz']);
-      const testFile = path.join(dir, 'x.js');
-      await assertIsIgnored(testFile, 'console.log("test");', true, 'root-level .baz should be ignored by heuristic');
-    });
-
-    test('should ignore files in root-level directory starting with _', async () => {
-      const dir = createNestedDirs(['_private']);
-      const testFile = path.join(dir, 'secret.js');
-      await assertIsIgnored(testFile, 'console.log("secret");', true, 'root-level _private should be ignored by heuristic');
-    });
-
-    test('should not ignore files in non-root-level directory starting with .', async () => {
-      const dir = createNestedDirs(['qqq', '.baz']);
-      const testFile = path.join(dir, 'x.js');
-      await assertIsIgnored(testFile, 'console.log("test");', false, 'non-root .baz should not be ignored by heuristic');
-    });
-
-    test('should not ignore files in non-root-level directory starting with _', async () => {
-      const dir = createNestedDirs(['qqq', '_private']);
-      const testFile = path.join(dir, 'secret.js');
-      await assertIsIgnored(testFile, 'console.log("secret");', false, 'non-root _private should not be ignored by heuristic');
-    });
-
-    test('should not ignore files in regular directories', async () => {
-      const dir = createNestedDirs(['src']);
-      const testFile = path.join(dir, 'index.js');
-      await assertIsIgnored(testFile, 'console.log("hello");', false, 'regular files should not be ignored by heuristic');
-    });
-
-    test('should ignore files in build directory', async () => {
-      const dir = createNestedDirs(['build']);
-      const testFile = path.join(dir, 'output.js');
-      await assertIsIgnored(testFile, 'console.log("build");', true, 'build directory should be ignored by heuristic');
-    });
-
-    test('should ignore files in dist directory', async () => {
-      const dir = createNestedDirs(['dist']);
-      const testFile = path.join(dir, 'bundle.js');
-      await assertIsIgnored(testFile, 'console.log("dist");', true, 'dist directory should be ignored by heuristic');
-    });
-
-    test('should ignore files in target directory', async () => {
-      const dir = createNestedDirs(['target']);
-      const testFile = path.join(dir, 'classes.jar');
-      await assertIsIgnored(testFile, 'compiled code', true, 'target directory should be ignored by heuristic');
-    });
-
-    test('should ignore files in out directory', async () => {
-      const dir = createNestedDirs(['out']);
-      const testFile = path.join(dir, 'compiled.js');
-      await assertIsIgnored(testFile, 'console.log("out");', true, 'out directory should be ignored by heuristic');
-    });
-
-    test('should ignore files in vendor directory', async () => {
-      const dir = createNestedDirs(['vendor']);
-      const testFile = path.join(dir, 'lib.php');
-      await assertIsIgnored(testFile, '<?php echo "vendor"; ?>', true, 'vendor directory should be ignored by heuristic');
-    });
-
-    test('should ignore files in coverage directory', async () => {
-      const dir = createNestedDirs(['coverage']);
-      const testFile = path.join(dir, 'lcov.info');
-      await assertIsIgnored(testFile, 'coverage data', true, 'coverage directory should be ignored by heuristic');
+    heuristicTestCases.forEach(({ name, dirs, file, ignored }) => {
+      test(`should ${ignored ? 'ignore' : 'not ignore'} files in ${name}`, async () => {
+        const dir = createNestedDirs(dirs);
+        const testFile = path.join(dir, file);
+        await assertIsIgnored(testFile, 'content', ignored, `${name} should ${ignored ? '' : 'not '}be ignored by heuristic`);
+      });
     });
   });
 
@@ -191,137 +137,122 @@ suite('GitIgnoreChecker Test Suite', () => {
       await (checker as any).gitAvailabilityCheck;
     });
 
-    test('should ignore node_modules when in .gitignore', async () => {
-      fs.writeFileSync(path.join(testDir, '.gitignore'), 'node_modules/\n');
-      const dir = createNestedDirs(['node_modules']);
-      const testFile = path.join(dir, 'test.js');
-      await assertIsIgnored(testFile, 'console.log("test");', true, 'node_modules should be ignored when in .gitignore');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("test");');
+    const gitignorePatternTests = [
+      { name: 'node_modules when in .gitignore', gitignore: 'node_modules/\n', dirs: ['node_modules'], file: 'test.js', ignored: true },
+      { name: 'node_modules when not in .gitignore', gitignore: '', dirs: ['node_modules'], file: 'test.js', ignored: false },
+      { name: 'root-level dot directory by default', gitignore: '', dirs: ['.baz'], file: 'x.js', ignored: false },
+      { name: 'root-level dot directory when in .gitignore', gitignore: '.baz/\n', dirs: ['.baz'], file: 'x.js', ignored: true },
+      { name: 'root-level underscore directory by default', gitignore: '', dirs: ['_private'], file: 'secret.js', ignored: false },
+      { name: 'root-level underscore directory when in .gitignore', gitignore: '_private/\n', dirs: ['_private'], file: 'secret.js', ignored: true },
+      { name: 'regular files', gitignore: '', dirs: ['src'], file: 'index.js', ignored: false },
+      { name: 'files with spaces in name (matching)', gitignore: '*.log\n', dirs: ['logs'], file: 'my debug file.log', ignored: true },
+      { name: 'files with spaces in name (not matching)', gitignore: '*.log\n', dirs: ['logs'], file: 'my source file.ts', ignored: false },
+      ...(process.platform !== 'win32' ? [
+        { name: 'files with newlines in name (matching)', gitignore: '*.log\n', dirs: [] as string[], file: 'file\nwith\nnewlines.log', ignored: true },
+        { name: 'files with newlines in name (not matching)', gitignore: '*.log\n', dirs: [] as string[], file: 'file\nwith\nnewlines.ts', ignored: false },
+      ] : []),
+      { name: 'directories with spaces in path', gitignore: 'build/\n', dirs: ['my project', 'build'], file: 'output.js', ignored: true },
+      { name: 'deeply nested paths', gitignore: '*.log\n', dirs: ['a', 'b', 'c', 'd', 'e', 'f'], file: 'deep.log', ignored: true },
+      { name: 'absolute paths', gitignore: '*.tmp\n', dirs: [], file: 'cache.tmp', ignored: true },
+    ];
+
+    gitignorePatternTests.forEach(({ name, gitignore, dirs, file, ignored }) => {
+      test(`should handle ${name}`, async () => {
+        if (gitignore) {
+          fs.writeFileSync(path.join(testDir, '.gitignore'), gitignore);
+        }
+        const dir = dirs.length > 0 ? createNestedDirs(dirs) : testDir;
+        const testFile = path.join(dir, file);
+        await assertIsIgnored(testFile, 'content', ignored, name);
+        await assertMatchesGitCheckIgnore(testFile, 'content');
+      });
     });
 
-    test('should not ignore node_modules when not in .gitignore', async () => {
-      const dir = createNestedDirs(['node_modules']);
-      const testFile = path.join(dir, 'test.js');
-      await assertIsIgnored(testFile, 'console.log("test");', false, 'node_modules should not be ignored without .gitignore entry');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("test");');
-    });
+    test('should respect complex .gitignore patterns', async function () {
+      this.timeout(5000);
+      fs.writeFileSync(path.join(testDir, '.gitignore'), 'node_modules/\n*.log\nbuild/\n.env\n');
 
-    test('should not ignore root-level dot directory by default', async () => {
-      const dir = createNestedDirs(['.baz']);
-      const testFile = path.join(dir, 'x.js');
-      await assertIsIgnored(testFile, 'console.log("test");', false, 'dot directories are not ignored by git by default');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("test");');
-    });
+      const cases = [
+        { dirs: ['node_modules'], file: 'package.js', ignored: true },
+        { dirs: [], file: 'debug.log', ignored: true },
+        { dirs: ['build'], file: 'output.js', ignored: true },
+        { dirs: [], file: '.env', ignored: true },
+        { dirs: ['src'], file: 'index.js', ignored: false },
+      ];
 
-    test('should ignore root-level dot directory when in .gitignore', async () => {
-      fs.writeFileSync(path.join(testDir, '.gitignore'), '.baz/\n');
-      const dir = createNestedDirs(['.baz']);
-      const testFile = path.join(dir, 'x.js');
-      await assertIsIgnored(testFile, 'console.log("test");', true, 'dot directory should be ignored when in .gitignore');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("test");');
-    });
+      for (const { dirs } of cases) {
+        if (dirs.length > 0) createNestedDirs(dirs);
+      }
 
-    test('should not ignore root-level underscore directory by default', async () => {
-      const dir = createNestedDirs(['_private']);
-      const testFile = path.join(dir, 'secret.js');
-      await assertIsIgnored(testFile, 'console.log("secret");', false, 'underscore directories are not ignored by git by default');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("secret");');
-    });
+      const testFiles = cases.map(({ dirs, file }) => {
+        const dir = dirs.length > 0 ? path.join(testDir, ...dirs) : testDir;
+        return path.join(dir, file);
+      });
 
-    test('should ignore root-level underscore directory when in .gitignore', async () => {
-      fs.writeFileSync(path.join(testDir, '.gitignore'), '_private/\n');
-      const dir = createNestedDirs(['_private']);
-      const testFile = path.join(dir, 'secret.js');
-      await assertIsIgnored(testFile, 'console.log("secret");', true, 'underscore directory should be ignored when in .gitignore');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("secret");');
-    });
-
-    test('should not ignore regular files', async () => {
-      const dir = createNestedDirs(['src']);
-      const testFile = path.join(dir, 'index.js');
-      await assertIsIgnored(testFile, 'console.log("hello");', false, 'regular files should not be ignored');
-      await assertMatchesGitCheckIgnore(testFile, 'console.log("hello");');
-    });
-
-    test('should respect complex .gitignore patterns', async () => {
-      fs.writeFileSync(
-        path.join(testDir, '.gitignore'),
-        'node_modules/\n*.log\nbuild/\n.env\n'
+      await Promise.all(
+        cases.map(async ({ ignored }, i) => {
+          await assertIsIgnored(testFiles[i], 'content', ignored, `${cases[i].file} should ${ignored ? '' : 'not '}be ignored`);
+        })
       );
 
-      const nodeModulesFile = path.join(createNestedDirs(['node_modules']), 'package.js');
-      await assertIsIgnored(nodeModulesFile, 'module.exports = {};', true, 'node_modules files should be ignored');
-      await assertMatchesGitCheckIgnore(nodeModulesFile, 'module.exports = {};');
-
-      const logFile = path.join(testDir, 'debug.log');
-      await assertIsIgnored(logFile, 'log content', true, '*.log files should be ignored');
-      await assertMatchesGitCheckIgnore(logFile, 'log content');
-
-      const buildFile = path.join(createNestedDirs(['build']), 'output.js');
-      await assertIsIgnored(buildFile, 'console.log("build");', true, 'build/ files should be ignored');
-      await assertMatchesGitCheckIgnore(buildFile, 'console.log("build");');
-
-      const envFile = path.join(testDir, '.env');
-      await assertIsIgnored(envFile, 'SECRET=value', true, '.env files should be ignored');
-      await assertMatchesGitCheckIgnore(envFile, 'SECRET=value');
-
-      const regularFile = path.join(createNestedDirs(['src']), 'index.js');
-      await assertIsIgnored(regularFile, 'console.log("hello");', false, 'regular files should not be ignored');
-      await assertMatchesGitCheckIgnore(regularFile, 'console.log("hello");');
+      await Promise.all(
+        testFiles.map(async (testFile) => {
+          await assertMatchesGitCheckIgnore(testFile, 'content');
+        })
+      );
     });
 
-    test('should handle wildcard patterns in .gitignore', async () => {
-      fs.writeFileSync(
-        path.join(testDir, '.gitignore'),
-        '*.tmp\ntest-*\n'
+    test('should handle wildcard and negation patterns', async function () {
+      this.timeout(5000);
+      fs.writeFileSync(path.join(testDir, '.gitignore'), '*.tmp\ntest-*\n*.log\n!important.log\n');
+
+      const cases = [
+        { file: 'data.tmp', ignored: true },
+        { file: 'test-file.js', ignored: true },
+        { file: 'normal.js', ignored: false },
+        { file: 'debug.log', ignored: true },
+        { file: 'important.log', ignored: false },
+      ];
+
+      const testFiles = cases.map(({ file }) => path.join(testDir, file));
+
+      await Promise.all(
+        cases.map(async ({ ignored }, i) => {
+          await assertIsIgnored(testFiles[i], 'content', ignored, `${cases[i].file} should ${ignored ? '' : 'not '}be ignored`);
+        })
       );
 
-      const tmpFile = path.join(testDir, 'data.tmp');
-      await assertIsIgnored(tmpFile, 'temporary data', true, '*.tmp files should be ignored');
-      await assertMatchesGitCheckIgnore(tmpFile, 'temporary data');
-
-      const testPrefixFile = path.join(testDir, 'test-file.js');
-      await assertIsIgnored(testPrefixFile, 'console.log("test");', true, 'test-* files should be ignored');
-      await assertMatchesGitCheckIgnore(testPrefixFile, 'console.log("test");');
-
-      const normalFile = path.join(testDir, 'normal.js');
-      await assertIsIgnored(normalFile, 'console.log("normal");', false, 'normal files should not be ignored');
-      await assertMatchesGitCheckIgnore(normalFile, 'console.log("normal");');
+      await Promise.all(
+        testFiles.map(async (testFile) => {
+          await assertMatchesGitCheckIgnore(testFile, 'content');
+        })
+      );
     });
 
-    test('should handle negation patterns in .gitignore', async () => {
-      fs.writeFileSync(
-        path.join(testDir, '.gitignore'),
-        '*.log\n!important.log\n'
+    test('should handle directory-specific patterns', async function () {
+      this.timeout(5000);
+      fs.writeFileSync(path.join(testDir, '.gitignore'), 'tests/*.tmp\n');
+      const testsDir = createNestedDirs(['tests']);
+
+      const cases = [
+        { dir: testsDir, file: 'data.tmp', ignored: true },
+        { dir: testsDir, file: 'test.js', ignored: false },
+        { dir: testDir, file: 'root.tmp', ignored: false },
+      ];
+
+      const testFiles = cases.map(({ dir, file }) => path.join(dir, file));
+
+      await Promise.all(
+        cases.map(async ({ ignored }, i) => {
+          await assertIsIgnored(testFiles[i], 'content', ignored, `${cases[i].file} should ${ignored ? '' : 'not '}be ignored`);
+        })
       );
 
-      const ignoredLog = path.join(testDir, 'debug.log');
-      await assertIsIgnored(ignoredLog, 'debug log', true, '*.log files should be ignored');
-      await assertMatchesGitCheckIgnore(ignoredLog, 'debug log');
-
-      const importantLog = path.join(testDir, 'important.log');
-      await assertIsIgnored(importantLog, 'important log', false, 'important.log should not be ignored due to negation');
-      await assertMatchesGitCheckIgnore(importantLog, 'important log');
-    });
-
-    test('should handle directory-specific patterns', async () => {
-      fs.writeFileSync(
-        path.join(testDir, '.gitignore'),
-        'tests/*.tmp\n'
+      await Promise.all(
+        testFiles.map(async (testFile) => {
+          await assertMatchesGitCheckIgnore(testFile, 'content');
+        })
       );
-
-      const dir = createNestedDirs(['tests']);
-      const tmpInTests = path.join(dir, 'data.tmp');
-      await assertIsIgnored(tmpInTests, 'test data', true, '*.tmp in tests/ should be ignored');
-      await assertMatchesGitCheckIgnore(tmpInTests, 'test data');
-
-      const jsInTests = path.join(dir, 'test.js');
-      await assertIsIgnored(jsInTests, 'console.log("test");', false, '.js in tests/ should not be ignored');
-      await assertMatchesGitCheckIgnore(jsInTests, 'console.log("test");');
-
-      const tmpInRoot = path.join(testDir, 'root.tmp');
-      await assertIsIgnored(tmpInRoot, 'root data', false, '*.tmp in root should not be ignored by tests/*.tmp pattern');
-      await assertMatchesGitCheckIgnore(tmpInRoot, 'root data');
     });
 
     test('should use cache for repeated checks on same file', async () => {
@@ -353,6 +284,52 @@ suite('GitIgnoreChecker Test Suite', () => {
 
       cacheSize = (checker as any).gitExecutorCache.size;
       assert.strictEqual(cacheSize, 0, 'Cache should be empty after clear');
+    });
+
+    test('should batch multiple concurrent checks into single git call', async () => {
+      fs.writeFileSync(path.join(testDir, '.gitignore'), '*.log\nnode_modules/\n');
+
+      const files = [
+        { path: path.join(testDir, 'app.ts'), ignored: false },
+        { path: path.join(testDir, 'debug.log'), ignored: true },
+        { path: path.join(createNestedDirs(['node_modules']), 'pkg.js'), ignored: true },
+        { path: path.join(testDir, 'index.js'), ignored: false },
+        { path: path.join(testDir, 'error.log'), ignored: true },
+      ];
+
+      const mockDocuments = files.map(({ path: filePath }) => createFileAndMockDocument(filePath, 'content'));
+      const promises = mockDocuments.map((doc) => (checker as any).isIgnored(doc));
+      const results = await Promise.all(promises);
+
+      files.forEach(({ path: filePath, ignored }, i) => {
+        assert.strictEqual(results[i], ignored, `${filePath} should ${ignored ? '' : 'not '}be ignored`);
+      });
+    });
+
+    test('should create separate batches for time-separated requests', async function () {
+      this.timeout(5000);
+      fs.writeFileSync(path.join(testDir, '.gitignore'), '*.log\n*.tmp\n');
+
+      let flushCount = 0;
+      const originalFlush = (checker as any).flushPendingChecks.bind(checker);
+      (checker as any).flushPendingChecks = async function () {
+        flushCount++;
+        return originalFlush();
+      };
+
+      const batch1Doc = createFileAndMockDocument(path.join(testDir, 'first.log'), 'content');
+      const batch1Result = await (checker as any).isIgnored(batch1Doc);
+      assert.strictEqual(batch1Result, true);
+      assert.strictEqual(flushCount, 1, 'First batch should have flushed');
+
+      // Wait longer than BATCH_DELAY_MS so next request starts a new batch
+      const batchDelayMs = (GitIgnoreChecker as any).BATCH_DELAY_MS;
+      await new Promise((resolve) => setTimeout(resolve, batchDelayMs + 50));
+
+      const batch2Doc = createFileAndMockDocument(path.join(testDir, 'second.tmp'), 'content');
+      const batch2Result = await (checker as any).isIgnored(batch2Doc);
+      assert.strictEqual(batch2Result, true);
+      assert.strictEqual(flushCount, 2, 'Second batch should have flushed separately');
     });
   });
 });
