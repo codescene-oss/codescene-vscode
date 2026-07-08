@@ -6,6 +6,6 @@ If a linting issue is found, you must prioritize fixing it before resuming your 
 
 Don't add comments to any code you add, however keep any existing comments you find.
 
-When writing tests, when possible express multiple test cases as a single array of objects to iterate on.
+Testing practices: see [TESTING.md](.claude/TESTING.md).
 
 Validate your work using `make lint`.
