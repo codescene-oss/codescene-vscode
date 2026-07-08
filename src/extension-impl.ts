@@ -35,6 +35,7 @@ import { registerCopyDeviceIdCommand } from './device-id';
 import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
 import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
+import { DefaultBranchGate } from './git/default-branch-gate';
 import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
@@ -58,6 +59,7 @@ const codeHealthFileVersion = new Map<string, number>();
 
 let savedFilesTrackerInstance: SavedFilesTracker;
 let openFilesObserverInstance: OpenFilesObserver | undefined;
+let defaultBranchGateInstance: DefaultBranchGate | undefined;
 let isWindowFocused: boolean = true;
 
 const onCodeHealthFileVersionChange = debounce(() => {
@@ -211,6 +213,41 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 }
 
+function initializeGitIntegration() {
+  const gitApi = acquireGitApi();
+  if (!gitApi) return;
+
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  const repo = workspaceFolder ? gitApi.getRepository(workspaceFolder.uri) : undefined;
+  const gitRootPath = repo?.rootUri.fsPath || workspaceFolder?.uri.fsPath || '';
+  defaultBranchGateInstance = new DefaultBranchGate(gitRootPath);
+}
+
+function setupCodeLensProviders(context: vscode.ExtensionContext) {
+  // Add Review CodeLens support
+  const codeLensProvider = new CsReviewCodeLensProvider();
+  DISPOSABLES.push(codeLensProvider);
+  context.subscriptions.push(codeLensProvider);
+  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(
+    reviewDocumentSelector(),
+    codeLensProvider
+  );
+  DISPOSABLES.push(codeLensProviderRegistration);
+  context.subscriptions.push(codeLensProviderRegistration);
+}
+
+function setupAceConfiguration(context: vscode.ExtensionContext) {
+  // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
+  const debouncedSetEnabledAce = debounce((enabled: boolean) => {
+    void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
+  }, 500);
+  const aceConfigDisposable = onDidChangeConfiguration('enableAutoRefactor', (e) => {
+    debouncedSetEnabledAce(e.value);
+  });
+  DISPOSABLES.push(aceConfigDisposable);
+  context.subscriptions.push(aceConfigDisposable);
+}
+
 async function startExtension(context: vscode.ExtensionContext) {
   const csWorkspace = new CsWorkspace(context);
   const csContext: CsContext = {
@@ -247,31 +284,16 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   setupStatsCollector(context);
 
-  activateCHMonitor(context, savedFilesTrackerInstance);
+  initializeGitIntegration();
 
-  // Add Review CodeLens support
-  const codeLensProvider = new CsReviewCodeLensProvider();
-  DISPOSABLES.push(codeLensProvider);
-  context.subscriptions.push(codeLensProvider);
-  const codeLensProviderRegistration = vscode.languages.registerCodeLensProvider(
-    reviewDocumentSelector(),
-    codeLensProvider
-  );
-  DISPOSABLES.push(codeLensProviderRegistration);
-  context.subscriptions.push(codeLensProviderRegistration);
+  activateCHMonitor(context, savedFilesTrackerInstance, defaultBranchGateInstance);
+
+  setupCodeLensProviders(context);
 
   registerCodeActionProvider(context);
 
   if (ACE_ENABLED) {
-    // If configuration option is changed, en/disable ACE capabilities accordingly - debounce to handle rapid changes
-    const debouncedSetEnabledAce = debounce((enabled: boolean) => {
-      void vscode.commands.executeCommand('codescene.ace.setEnabled', enabled);
-    }, 500);
-    const aceConfigDisposable = onDidChangeConfiguration('enableAutoRefactor', (e) => {
-      debouncedSetEnabledAce(e.value);
-    });
-    DISPOSABLES.push(aceConfigDisposable);
-    context.subscriptions.push(aceConfigDisposable);
+    setupAceConfiguration(context);
   }
 }
 
@@ -334,8 +356,8 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   // Watch for discrete Git file changes (create, modify, delete)
   const gitApi = acquireGitApi();
   let gitChangeObserver: GitChangeObserver | undefined;
-  if (gitApi) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserverInstance);
+  if (gitApi && defaultBranchGateInstance) {
+    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserverInstance, defaultBranchGateInstance);
     gitChangeObserver.start();
     DISPOSABLES.push(gitChangeObserver);
     context.subscriptions.push(gitChangeObserver);

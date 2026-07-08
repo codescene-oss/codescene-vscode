@@ -18,9 +18,11 @@ import { setWindowFocusedForTesting } from '../../extension-impl';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { setMockGitRepositories, clearMockGitRepositories, mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { ensureBinary } from '../integration_helper';
+import { DefaultBranchGate } from '../../git/default-branch-gate';
 
 suite('Code Health Monitor Addon Test Suite', () => {
   let mockContext: ReturnType<typeof createMockExtensionContext>;
+  let mockDefaultBranchGate: DefaultBranchGate;
   const repoRoot = path.join(__dirname, '../../../test-git-repo-addon');
 
   function createMockRepo(rootPath: string = repoRoot) {
@@ -41,6 +43,12 @@ suite('Code Health Monitor Addon Test Suite', () => {
     };
   }
 
+  function createMockDefaultBranchGate(): DefaultBranchGate {
+    return {
+      shouldSkipBasedOnDefaultBranch: async () => false,
+    } as any;
+  }
+
   suiteSetup(async function () {
     this.timeout(60000);
     const binaryPath = await ensureBinary();
@@ -54,6 +62,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     resetGitAvailability();
     clearMockGitRepositories();
     mockWorkspaceFolders([createMockWorkspaceFolder(repoRoot)]);
+    mockDefaultBranchGate = createMockDefaultBranchGate();
   });
 
   teardown(() => {
@@ -73,7 +82,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
 
   test('refreshMergeBaseBaselines updates review baselines for all repositories', () => {
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
 
     let setBaselineCalls = 0;
     const originalSetBaseline = Reviewer.instance.setBaseline.bind(Reviewer.instance);
@@ -91,7 +100,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
   test('runGitChangeLister invokes lister after activation', async function () {
     this.timeout(20000);
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
 
     let startCalled = false;
     const originalStart = GitChangeLister.prototype.start;
@@ -108,7 +117,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
 
   test('runGitChangeLister is a no-op when git is unavailable', async () => {
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
     markGitAsUnavailable();
 
     let startCalled = false;
@@ -126,7 +135,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
 
   test('deactivate clears git change lister instance', async () => {
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
     deactivateCodeHealthMonitor();
 
     let startCalled = false;
@@ -149,7 +158,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     test(`runScheduledGitChangeReview ${description}`, async function () {
       this.timeout(20000);
       setMockGitRepositories([createMockRepo()]);
-      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
 
       setWindowFocusedForTesting(focused);
 
@@ -177,7 +186,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     test(`runScheduledGitChangeReview ${description}`, async function () {
       this.timeout(20000);
       setMockGitRepositories([createMockRepo()]);
-      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+      activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
 
       setWindowFocusedForTesting(true);
       DevtoolsAPI.setAnalysesRunningForTesting(analysesRunning);
@@ -202,7 +211,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
   test('runScheduledGitChangeReview increases period when git operations exceed base period', async function () {
     this.timeout(20000);
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
     setWindowFocusedForTesting(true);
 
     const executor = getScheduledExecutorForTesting();
@@ -235,7 +244,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
   test('runScheduledGitChangeReview does not decrease period', async function () {
     this.timeout(20000);
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any);
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
     setWindowFocusedForTesting(true);
 
     const executor = getScheduledExecutorForTesting();

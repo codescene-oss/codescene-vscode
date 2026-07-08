@@ -8,4 +8,6 @@ Don't add comments to any code you add, however keep any existing comments you f
 
 Testing practices: see [TESTING.md](.claude/TESTING.md).
 
-Validate your work using `make lint`.
+Validate your work using `make lint`. Satifying all linter faults is mandatory - they must be addressed before proceeding with other work.
+
+If you find an issue at any stage, you must fix it immediately, regardless of whether you think it's pre-existing.

@@ -5,13 +5,17 @@ import * as vscode from 'vscode';
 import { Uri, Disposable, ExtensionContext } from '../mocks/vscode';
 import { GitChangeObserver } from '../../git/git-change-observer';
 import { MockExecutor } from '../mocks/mock-executor';
-import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
+import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders, setMockGitRepositories, clearMockGitRepositories } from '../setup';
+import { setGitApiForTesting } from '../../code-health-monitor/addon';
+import { MockGitAPI } from '../mocks/mock-git-api';
+import { CsExtensionState } from '../../cs-extension-state';
 import { getWorkspaceFolder } from '../../utils';
 import Reviewer from '../../review/reviewer';
 import { ReviewCacheItem } from '../../review/review-cache-item';
 import { CsReview } from '../../review/cs-review';
 import { DevtoolsAPI } from '../../devtools-api';
 import { TestTextDocument } from '../mocks/test-text-document';
+import { DefaultBranchGate } from '../../git/default-branch-gate';
 
 suite('GitChangeObserver Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-observer');
@@ -19,6 +23,7 @@ suite('GitChangeObserver Test Suite', () => {
   let gitChangeObserver: GitChangeObserver;
   let mockExecutor: MockExecutor;
   let mockContext: ExtensionContext;
+  let mockDefaultBranchGate: DefaultBranchGate;
 
   const execGit = (args: string) => execSync(args, { cwd: testRepoPath, stdio: 'pipe' });
 
@@ -94,11 +99,17 @@ suite('GitChangeObserver Test Suite', () => {
     mockWorkspaceFolders([createMockWorkspaceFolder(testRepoPath)]);
 
     const extensionPath = path.join(__dirname, '../../..');
+    const globalStateStorage = new Map<string, any>();
     mockContext = {
       subscriptions: [] as Disposable[],
       extensionPath: extensionPath,
       extensionUri: Uri.file(extensionPath),
-      globalState: {} as any,
+      globalState: {
+        get: <T>(key: string): T | undefined => globalStateStorage.get(key),
+        update: async (key: string, value: any) => { globalStateStorage.set(key, value); },
+        setKeysForSync: (keys: string[]) => {},
+        keys: () => Array.from(globalStateStorage.keys())
+      } as any,
       workspaceState: {} as any,
       secrets: {} as any,
       storagePath: testRepoPath,
@@ -125,7 +136,8 @@ suite('GitChangeObserver Test Suite', () => {
     mockExecutor = new MockExecutor();
     const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
     const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
-    gitChangeObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver);
+    mockDefaultBranchGate = { shouldSkipBasedOnDefaultBranch: async () => false } as any;
+    gitChangeObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver, mockDefaultBranchGate);
     await new Promise(resolve => setTimeout(resolve, 500));
   });
 
@@ -577,5 +589,100 @@ suite('GitChangeObserver Test Suite', () => {
       vscode.workspace.fs.stat = originalStat;
       DevtoolsAPI.delta = originalDelta;
     }
+  });
+
+  suite('DefaultBranchGate integration', () => {
+    test('processQueuedEvents skips file changes when gate returns true', async function () {
+      this.timeout(20000);
+
+      const mockRepo = {
+        rootUri: Uri.file(testRepoPath),
+        state: {
+          HEAD: { name: 'main', commit: 'abc123' },
+          refs: [],
+          remotes: [],
+          submodules: [],
+          onDidChange: () => ({ dispose: () => {} }),
+        },
+      };
+
+      const mockGitApi = new MockGitAPI();
+      mockGitApi.repositories = [mockRepo];
+      setGitApiForTesting(mockGitApi as any);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext as any);
+      }
+
+      const skipGate = { shouldSkipBasedOnDefaultBranch: async () => true } as any;
+      const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
+      const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
+      const skipObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver, skipGate);
+      skipObserver.start();
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const newFile = createFile('skipped.ts', 'export const skipped = true;');
+      const observer = skipObserver as any;
+      observer.tracker.clear();
+      observer.eventQueue.push({ type: 'create', uri: Uri.file(newFile) });
+
+      await observer.processQueuedEvents();
+
+      assert.strictEqual(observer.tracker.has(newFile), false, 'File should not be in tracker when skip is enabled');
+
+      skipObserver.dispose();
+      setGitApiForTesting(undefined);
+    });
+
+    test('processQueuedEvents still handles delete events when gate returns true', async function () {
+      this.timeout(20000);
+
+      const mockRepo = {
+        rootUri: Uri.file(testRepoPath),
+        state: {
+          HEAD: { name: 'main', commit: 'abc123' },
+          refs: [],
+          remotes: [],
+          submodules: [],
+          onDidChange: () => ({ dispose: () => {} }),
+        },
+      };
+
+      const mockGitApi = new MockGitAPI();
+      mockGitApi.repositories = [mockRepo];
+      setGitApiForTesting(mockGitApi as any);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext as any);
+      }
+
+      const skipGate = { shouldSkipBasedOnDefaultBranch: async () => true } as any;
+      const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
+      const mockOpenFilesObserver = { getAllVisibleFileNames: () => new Set<string>() } as any;
+      const skipObserver = new GitChangeObserver(mockContext, mockExecutor, mockSavedFilesTracker, mockOpenFilesObserver, skipGate);
+      skipObserver.start();
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const deletableFile = createFile('deletable.ts', 'export const del = 1;');
+      const observer = skipObserver as any;
+      observer.tracker.add(deletableFile);
+
+      fs.unlinkSync(deletableFile);
+      observer.eventQueue.push({ type: 'delete', uri: Uri.file(deletableFile) });
+
+      await observer.processQueuedEvents();
+
+      assert.strictEqual(observer.tracker.has(deletableFile), false, 'Deleted file should be removed from tracker even when skip is enabled');
+
+      skipObserver.dispose();
+      setGitApiForTesting(undefined);
+    });
+
+    test('processQueuedEvents processes file changes when gate returns false', async function () {
+      this.timeout(20000);
+
+      const newFile = createFile('processed.ts', 'export const processed = true;');
+      await triggerFileChange(newFile);
+
+      assertFileInTracker(newFile, true);
+    });
   });
 });

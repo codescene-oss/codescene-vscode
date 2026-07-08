@@ -7,7 +7,8 @@ import { getStatusChanges, getCommittedChanges, parseGitStatusFilename, createWo
 suite('Git Diff Utils Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-diff-utils');
 
-  setup(async () => {
+  setup(async function () {
+    this.timeout(20000);
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }
@@ -26,7 +27,9 @@ suite('Git Diff Utils Test Suite', () => {
     execSync('git commit -m "Initial commit"', { cwd: testRepoPath });
   });
 
-  teardown(() => {
+  teardown(async function () {
+    this.timeout(20000);
+    await new Promise((resolve) => setTimeout(resolve, 100));
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }

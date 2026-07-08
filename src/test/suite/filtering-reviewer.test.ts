@@ -36,10 +36,12 @@ suite('FilteringReviewer Test Suite', () => {
     testDir = fs.mkdtempSync(path.join(testBaseDir, 'filtering-reviewer-test-'));
   });
 
-  teardown(() => {
+  teardown(async function () {
+    this.timeout(20000);
     if (reviewer) {
       reviewer.dispose();
     }
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const gitignorePath = path.join(testDir, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
       fs.unlinkSync(gitignorePath);
@@ -148,7 +150,8 @@ suite('FilteringReviewer Test Suite', () => {
   });
 
   suite('when git is available (uses git check-ignore)', () => {
-    setup(async () => {
+    setup(async function () {
+      this.timeout(20000);
       await initGitRepo(testDir);
       mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
       reviewer = new FilteringReviewer();
