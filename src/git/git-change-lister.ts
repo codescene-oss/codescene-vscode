@@ -49,14 +49,15 @@ export class GitChangeLister {
         return;
       }
 
-      const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath);
-      this.reviewFiles(allChangedFiles);
+      const baselineCommit = repo ? await getMergeBaseCommit(repo) : '';
+      const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath, baselineCommit);
+      this.reviewFiles(allChangedFiles, baselineCommit);
     }
   }
 
-  async getAllChangedFiles(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
+  async getAllChangedFiles(gitRootPath: string, workspacePath: string, baselineCommit: string): Promise<Set<string>> {
     const filesFromRepoState = await this.collectFilesFromRepoState(gitRootPath, workspacePath);
-    const filesFromGitDiff = await this.collectFilesFromGitDiff(gitRootPath, workspacePath);
+    const filesFromGitDiff = await this.collectFilesFromGitDiff(gitRootPath, workspacePath, baselineCommit);
     return new Set([...filesFromRepoState, ...filesFromGitDiff]);
   }
 
@@ -77,9 +78,9 @@ export class GitChangeLister {
     return files;
   }
 
-  private async collectFilesFromGitDiff(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
+  private async collectFilesFromGitDiff(gitRootPath: string, workspacePath: string, baselineCommit: string): Promise<Set<string>> {
     const files = new Set<string>();
-    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase(gitRootPath, workspacePath);
+    const changedFilesVsMergeBase = await this.getChangedFilesVsMergeBase(gitRootPath, workspacePath, baselineCommit);
 
     for (const relativeFilePath of changedFilesVsMergeBase) {
       const absolutePath = path.join(workspacePath, relativeFilePath);
@@ -93,12 +94,12 @@ export class GitChangeLister {
     return files;
   }
 
-  private reviewFiles(filePaths: Set<string>): void {
+  private reviewFiles(filePaths: Set<string>, baselineCommit: string): void {
     for (const filePath of filePaths) {
       void this.executor.executeTask(async () => {
         try {
           const document = await vscode.workspace.openTextDocument(filePath);
-          CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
+          CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: false, updateDiagnosticsPane: false });
         } catch (error) {
           logOutputChannel.error(`Could not review ${filePath}: ${error}`);
         }
@@ -111,16 +112,10 @@ export class GitChangeLister {
     return supportedExtensions.includes(fileExt);
   }
 
-  async getChangedFilesVsMergeBase(gitRootPath: string, workspacePath: string): Promise<Set<string>> {
-    const workspaceFolder = getWorkspaceFolder();
-    if (!workspaceFolder) {
-      return new Set<string>();
-    }
-
-    const repo = getRepo(workspaceFolder.uri);
-    const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
-
-    if (!baseCommit) {
+  async getChangedFilesVsMergeBase(gitRootPath: string, workspacePath: string, baselineCommit: string): Promise<Set<string>> {
+    if (!baselineCommit) {
+      const workspaceFolder = getWorkspaceFolder();
+      const repo = workspaceFolder ? getRepo(workspaceFolder.uri) : undefined;
       const currentBranch = repo?.state.HEAD?.name;
       if (currentBranch){
         const isMain = await isMainBranch(currentBranch, gitRootPath);
@@ -133,9 +128,9 @@ export class GitChangeLister {
     }
 
     try {
-      return await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
+      return await getCommittedChanges(gitRootPath, baselineCommit, workspacePath);
     } catch (error) {
-      logOutputChannel.warn(`Error getting changed files vs merge-base ${baseCommit}: ${error}`);
+      logOutputChannel.warn(`Error getting changed files vs merge-base ${baselineCommit}: ${error}`);
       return new Set<string>();
     }
   }

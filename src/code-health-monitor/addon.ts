@@ -125,6 +125,16 @@ export async function getBaselineCommit(fileUri: Uri): Promise<string | undefine
   return await getMergeBaseCommit(repo);
 }
 
+import { getWorkspaceFolder } from '../utils';
+
+export async function getMergeBaseCommitForWorkspace(): Promise<string | undefined> {
+  const workspaceFolder = getWorkspaceFolder();
+  if (!workspaceFolder) return;
+  const repo = getRepo(workspaceFolder.uri);
+  if (!repo) return;
+  return await getMergeBaseCommit(repo);
+}
+
 /**
  * Retrieves the commit point for the HEAD of the current repository for a given file.
  *
@@ -139,29 +149,30 @@ async function getHeadCommit(repo: Repository) {
  * Reacts to changes in the repository's HEAD commit or branch by
  * setting the baseline if either of them changed
  */
-function onRepoStateChange(repo: Repository) {
+async function onRepoStateChange(repo: Repository) {
   const gitStateChange = updateGitState(repo);
 
   if (gitStateChange.branchChanged || gitStateChange.commitChanged) {
-    setBaseline(repo);
+    await setBaseline(repo);
   }
 }
 
-function setBaseline(repo: Repository) {
+async function setBaseline(repo: Repository) {
   const repoPath = getRepoRootPath(repo);
+  const baselineCommit = await getMergeBaseCommit(repo);
   Reviewer.instance.setBaseline((fileUri: Uri) => {
     const r = getRepo(fileUri);
     return r ? getRepoRootPath(r) === repoPath : false;
-  });
+  }, baselineCommit);
 }
 
 /** Refreshes review baselines for all open repositories after main-branch detection changes. */
-export function refreshMergeBaseBaselines(): void {
+export async function refreshMergeBaseBaselines(): Promise<void> {
   if (!gitApi) {
     return;
   }
   for (const repo of gitApi.repositories) {
-    setBaseline(repo);
+    await setBaseline(repo);
   }
 }
 

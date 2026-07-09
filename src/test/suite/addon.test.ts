@@ -54,7 +54,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     const binaryPath = await ensureBinary();
     mockContext = createMockExtensionContext(repoRoot);
     CsExtensionState.init(mockContext);
-    Reviewer.init(mockContext, async () => undefined, () => new Map());
+    Reviewer.init(mockContext, () => new Map());
     DevtoolsAPI.init(binaryPath, mockContext);
   });
 
@@ -72,26 +72,29 @@ suite('Code Health Monitor Addon Test Suite', () => {
     restoreDefaultWorkspaceFolders();
   });
 
-  test('refreshMergeBaseBaselines is a no-op when git API is unavailable', () => {
-    refreshMergeBaseBaselines();
+  test('refreshMergeBaseBaselines is a no-op when git API is unavailable', async () => {
+    await refreshMergeBaseBaselines();
   });
 
   test('runGitChangeLister is a no-op before code health monitor activation', async () => {
     await runGitChangeLister();
   });
 
-  test('refreshMergeBaseBaselines updates review baselines for all repositories', () => {
+  test('refreshMergeBaseBaselines updates review baselines for all repositories', async () => {
     setMockGitRepositories([createMockRepo()]);
     activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
 
+    // Wait for activation's initial setBaseline call to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     let setBaselineCalls = 0;
     const originalSetBaseline = Reviewer.instance.setBaseline.bind(Reviewer.instance);
-    Reviewer.instance.setBaseline = (fileFilter) => {
+    Reviewer.instance.setBaseline = (fileFilter, baselineCommit) => {
       setBaselineCalls += 1;
-      return originalSetBaseline(fileFilter);
+      return originalSetBaseline(fileFilter, baselineCommit);
     };
 
-    refreshMergeBaseBaselines();
+    await refreshMergeBaseBaselines();
 
     assert.strictEqual(setBaselineCalls, 1);
     Reviewer.instance.setBaseline = originalSetBaseline;

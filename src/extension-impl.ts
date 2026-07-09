@@ -5,6 +5,7 @@ import {
   activate as activateCHMonitor,
   deactivate as deactivateAddon,
   getBaselineCommit,
+  getMergeBaseCommitForWorkspace,
   refreshMergeBaseBaselines,
   runGitChangeLister,
 } from './code-health-monitor/addon';
@@ -62,10 +63,12 @@ let openFilesObserverInstance: OpenFilesObserver | undefined;
 let defaultBranchGateInstance: DefaultBranchGate | undefined;
 let isWindowFocused: boolean = true;
 
-const onCodeHealthFileVersionChange = debounce(() => {
+const onCodeHealthFileVersionChange = debounce(async () => {
   if (!openFilesObserverInstance) {
     return;
   }
+
+  const baselineCommit = await getMergeBaseCommitForWorkspace() ?? '';
 
   // Re-review all currently visible files since code health rules have changed
   const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
@@ -73,7 +76,7 @@ const onCodeHealthFileVersionChange = debounce(() => {
     const fileUri = vscode.Uri.file(filePath);
     void vscode.workspace.openTextDocument(fileUri).then(
       (document) => {
-        CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+        CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true });
       },
       (e) => {
         logOutputChannel.warn(`Failed to re-review file after rules change: ${filePath}`, e);
@@ -82,7 +85,7 @@ const onCodeHealthFileVersionChange = debounce(() => {
   });
 }, 350);
 
-const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
+const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
   const gitRoot = gitRootFromCodesceneConfigUri(uri);
   if (gitRoot) {
     clearMainBranchCandidatesCache(gitRoot);
@@ -90,19 +93,21 @@ const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
     clearMainBranchCandidatesCache();
   }
 
-  refreshMergeBaseBaselines();
+  void refreshMergeBaseBaselines();
   void runGitChangeLister();
 
   if (!openFilesObserverInstance) {
     return;
   }
 
+  const baselineCommit = await getMergeBaseCommitForWorkspace() ?? '';
+
   const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
   visibleFiles.forEach((filePath) => {
     const fileUri = vscode.Uri.file(filePath);
     void vscode.workspace.openTextDocument(fileUri).then(
       (document) => {
-        CsDiagnostics.review(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+        CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true });
       },
       (e) => {
         logOutputChannel.warn(`Failed to re-review file after config change: ${filePath}`, e);
@@ -126,7 +131,7 @@ async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
   try {
     const document = await vscode.workspace.openTextDocument(uri);
     codeHealthFileVersion.set(document.fileName, document.version);
-    onCodeHealthFileVersionChange();
+    void onCodeHealthFileVersionChange();
   } catch (e) {
     logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
   }
@@ -193,7 +198,7 @@ export async function activate(context: vscode.ExtensionContext) {
       await Telemetry.init(context);
 
       try {
-        Reviewer.init(context, getBaselineCommit, getCodeHealthFileVersions);
+        Reviewer.init(context, getCodeHealthFileVersions);
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
         finalizeActivation(context);
@@ -377,7 +382,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   rulesFileWatcher.onDidDelete((uri: vscode.Uri) => {
     codeHealthFileVersion.delete(uri.fsPath);
-    onCodeHealthFileVersionChange();
+    void onCodeHealthFileVersionChange();
   });
 
   DISPOSABLES.push(rulesFileWatcher);

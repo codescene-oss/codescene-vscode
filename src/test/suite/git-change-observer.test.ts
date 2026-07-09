@@ -58,8 +58,8 @@ suite('GitChangeObserver Test Suite', () => {
   const triggerFileChange = async (filePath: string) => {
     const observer = getObserverInternals();
     const workspaceFolder = getWorkspaceFolder();
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
-    await observer.handleFileChange(Uri.file(filePath), changedFiles, workspaceFolder);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder, '');
+    await observer.handleFileChange(Uri.file(filePath), changedFiles, workspaceFolder, '');
   };
 
   const assertFileInChangedList = (changedFiles: string[], filename: string, shouldExist: boolean = true) => {
@@ -160,14 +160,14 @@ suite('GitChangeObserver Test Suite', () => {
 
   test('getChangedFilesVsBaseline returns empty array for clean repository', async function () {
     this.timeout(20000);
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assert.strictEqual(changedFiles.length, 0);
   });
 
   test('getChangedFilesVsBaseline detects new untracked files', async function () {
     this.timeout(20000);
     createFile('test.ts', 'console.log("test");');
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'test.ts');
   });
 
@@ -175,7 +175,7 @@ suite('GitChangeObserver Test Suite', () => {
     this.timeout(20000);
     const testFile = commitFile('index.js', 'console.log("hello");', 'Add index.js');
     fs.writeFileSync(testFile, 'console.log("modified");');
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'index.js');
   });
 
@@ -183,7 +183,7 @@ suite('GitChangeObserver Test Suite', () => {
     this.timeout(20000);
     createFile('script.py', 'print("hello")');
     execGit('git add script.py');
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'script.py');
   });
 
@@ -193,7 +193,7 @@ suite('GitChangeObserver Test Suite', () => {
     commitFile('committed.ts', 'export const foo = 1;', 'Add committed.ts');
     createFile('uncommitted.ts', 'export const bar = 2;');
 
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'committed.ts');
     assertFileInChangedList(changedFiles, 'uncommitted.ts');
   });
@@ -227,7 +227,7 @@ suite('GitChangeObserver Test Suite', () => {
     assertFileInTracker(newFile);
     fs.unlinkSync(newFile);
     const workspaceFolder = getWorkspaceFolder();
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder, '');
     await getObserverInternals().handleFileDelete(Uri.file(newFile), changedFiles, workspaceFolder);
     assertFileInTracker(newFile, false);
   });
@@ -250,7 +250,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     fs.rmSync(subDir, { recursive: true, force: true });
     const workspaceFolder = getWorkspaceFolder();
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder, '');
     await getObserverInternals().handleFileDelete(Uri.file(subDir), changedFiles, workspaceFolder);
     assertFileInTracker(file1, false);
     assertFileInTracker(file2, false);
@@ -260,7 +260,7 @@ suite('GitChangeObserver Test Suite', () => {
     this.timeout(20000);
     const txtFile = createFile('notes.txt', 'Some notes');
     const workspaceFolder = getWorkspaceFolder();
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder, '');
     const shouldProcess = getObserverInternals().shouldProcessFile(txtFile, changedFiles, workspaceFolder);
     assert.strictEqual(shouldProcess, false, 'Should not process .txt files');
   });
@@ -269,7 +269,7 @@ suite('GitChangeObserver Test Suite', () => {
     this.timeout(20000);
     const tsFile = createFile('code.ts', 'export const x = 1;');
     const workspaceFolder = getWorkspaceFolder();
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder);
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(workspaceFolder, '');
     const shouldProcess = getObserverInternals().shouldProcessFile(tsFile, changedFiles, workspaceFolder);
     assert.strictEqual(shouldProcess, true, 'Should process .ts files');
   });
@@ -279,7 +279,7 @@ suite('GitChangeObserver Test Suite', () => {
     const changedFile = createFile('changed.ts', 'export const x = 1;');
     const committedFile = commitFile('committed.js', 'console.log("committed");', 'Add committed.js');
 
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'changed.ts');
     assertFileInChangedList(changedFiles, 'committed.js', false);
 
@@ -301,7 +301,7 @@ suite('GitChangeObserver Test Suite', () => {
     execGit('git add stale-change.ts');
     execGit('git commit -m "Make stale-change.ts clean"');
 
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'stale-change.ts', false);
 
     const observer = getObserverInternals();
@@ -321,7 +321,7 @@ suite('GitChangeObserver Test Suite', () => {
     const filePath = commitFile(fileName, originalContent, 'Add healthy file');
 
     // 2. Verify file is not in changed list (healthy state)
-    let changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    let changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, fileName, false);
 
     // 3. Modify file at filesystem level (simulating outside process)
@@ -330,7 +330,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     // 4. Trigger change detection and verify file appears in Code Health Monitor
     await triggerFileChange(filePath);
-    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, fileName, true);
     assertFileInTracker(filePath, true);
 
@@ -338,7 +338,7 @@ suite('GitChangeObserver Test Suite', () => {
     fs.writeFileSync(filePath, originalContent);
 
     // 6. Verify file is no longer in changed list after revert
-    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, fileName, false);
 
     // 7. Queue change event and process it to trigger cleanup
@@ -355,7 +355,7 @@ suite('GitChangeObserver Test Suite', () => {
     createFile('my file.ts', 'console.log("has spaces");');
     createFile('test file with spaces.js', 'console.log("also has spaces");');
 
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     const fileNames = changedFiles.map(f => path.basename(f));
     assert.ok(fileNames.includes('my file.ts'), 'Should include file with spaces: my file.ts');
     assert.ok(fileNames.includes('test file with spaces.js'), 'Should include file with spaces: test file with spaces.js');
@@ -368,7 +368,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     const ignoredFile = createFile('secret.ignored', 'export const secret = "hidden";');
 
-    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    const changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'secret.ignored', false);
 
     await triggerFileChange(ignoredFile);
@@ -384,7 +384,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     const ignoredFile = createFile('config.ts', 'export const config = { secret: true };');
 
-    let changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    let changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'config.ts', false);
 
     await triggerFileChange(ignoredFile);
@@ -394,7 +394,7 @@ suite('GitChangeObserver Test Suite', () => {
 
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder());
+    changedFiles = await gitChangeObserver.getChangedFilesVsBaseline(getWorkspaceFolder(), '');
     assertFileInChangedList(changedFiles, 'config.ts');
 
     await triggerFileChange(ignoredFile);
@@ -446,9 +446,9 @@ suite('GitChangeObserver Test Suite', () => {
 
     let getChangedFilesCallCount = 0;
     const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
-    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder) {
+    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder, baselineCommit) {
       getChangedFilesCallCount++;
-      return originalGetChangedFiles(workspaceFolder);
+      return originalGetChangedFiles(workspaceFolder, baselineCommit);
     };
 
     for (const file of files) {
@@ -472,9 +472,9 @@ suite('GitChangeObserver Test Suite', () => {
 
     let getChangedFilesCallCount = 0;
     const originalGetChangedFiles = gitChangeObserver.getChangedFilesVsBaseline.bind(gitChangeObserver);
-    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder) {
+    gitChangeObserver.getChangedFilesVsBaseline = async function (workspaceFolder, baselineCommit) {
       getChangedFilesCallCount++;
-      return originalGetChangedFiles(workspaceFolder);
+      return originalGetChangedFiles(workspaceFolder, baselineCommit);
     };
 
     await new Promise(resolve => setTimeout(resolve, 5000));
@@ -500,7 +500,6 @@ suite('GitChangeObserver Test Suite', () => {
     if (!Reviewer.instance) {
       Reviewer.init(
         mockContext,
-        async () => undefined,
         () => new Map()
       );
     }

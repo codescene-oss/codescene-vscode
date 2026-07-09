@@ -2,6 +2,8 @@ import vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
+import { getMergeBaseCommitForWorkspace } from '../code-health-monitor/addon';
+import { logOutputChannel } from '../log';
 
 /**
  * Observes open file events, and triggers reviews accordingly (only meant for Problems, not for the Code Health Monitor).
@@ -24,19 +26,20 @@ export class OpenFilesObserver {
     this.docSelector = reviewDocumentSelector();
   }
 
-  private reviewDocument(document: vscode.TextDocument, skipMonitorUpdateForDelta?: boolean): boolean {
+  private reviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
-    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
+    logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason}, baseline: ${baselineCommit || 'none'})`);
+    void this.filteringReviewer.reviewDiagnostics(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
     return true;
   }
 
-  private trackAndReviewDocument(document: vscode.TextDocument, reason: string): void {
+  private trackAndReviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string): void {
     const fileName = document.fileName;
     if (!this.visibleDocuments.has(fileName)) {
       this.visibleDocuments.add(fileName);
-      this.reviewDocument(document);
+      this.reviewDocument(document, baselineCommit, reason);
     }
   }
 
@@ -78,11 +81,14 @@ export class OpenFilesObserver {
     if (allVisibleFileNames.size > 0) {
       this.hasInitialized = true;
 
-      allVisibleFileNames.forEach((filePath) => {
-        const fileUri = vscode.Uri.file(filePath);
-        // Open the document without showing it in UI
-        void vscode.workspace.openTextDocument(fileUri).then((document) => {
-          this.trackAndReviewDocument(document, 'startup - visible file');
+      void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
+        const baseline = baselineCommit ?? '';
+        allVisibleFileNames.forEach((filePath) => {
+          const fileUri = vscode.Uri.file(filePath);
+          // Open the document without showing it in UI
+          void vscode.workspace.openTextDocument(fileUri).then((document) => {
+            this.trackAndReviewDocument(document, baseline, 'startup');
+          });
         });
       });
     } else {
@@ -97,7 +103,9 @@ export class OpenFilesObserver {
         if (!editor) {
           return;
         }
-        this.trackAndReviewDocument(editor.document, 'active editor changed');
+        void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
+          this.trackAndReviewDocument(editor.document, baselineCommit ?? '', 'editor changed');
+        });
       })
     );
 
@@ -145,7 +153,9 @@ export class OpenFilesObserver {
             // The `false` param is for CS-6117 - unsaved changes should show up in the Monitor,
             // but only if they come from a live change (i.e. `onDidChangeTextDocument` callback) -
             // not from merely opening this file at startup.
-            this.reviewDocument(e.document, false);
+            void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
+              this.reviewDocument(e.document, baselineCommit ?? '', 'text changed', false);
+            });
           }, 1000)
         );
       })
