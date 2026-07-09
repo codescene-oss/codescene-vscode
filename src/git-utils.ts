@@ -65,13 +65,17 @@ export function getWorkspacePath(workspaceFolder: vscode.WorkspaceFolder): strin
 }
 
 const mainBranchCandidatesCache = new Map<string, string[]>();
+const defaultBranchCache = new Map<string, string | undefined>();
 
 export function clearMainBranchCandidatesCache(gitRootPath?: string): void {
   if (!gitRootPath) {
     mainBranchCandidatesCache.clear();
+    defaultBranchCache.clear();
     return;
   }
-  mainBranchCandidatesCache.delete(path.normalize(gitRootPath));
+  const normalizedPath = path.normalize(gitRootPath);
+  mainBranchCandidatesCache.delete(normalizedPath);
+  defaultBranchCache.delete(normalizedPath);
 }
 
 /**
@@ -80,8 +84,13 @@ export function clearMainBranchCandidatesCache(gitRootPath?: string): void {
 export async function getDefaultBranch(repoPath: string): Promise<string | undefined> {
   const normalizedPath = path.normalize(repoPath);
 
+  if (defaultBranchCache.has(normalizedPath)) {
+    return defaultBranchCache.get(normalizedPath);
+  }
+
   const configured = getBaselineBranch(normalizedPath);
   if (configured) {
+    defaultBranchCache.set(normalizedPath, configured);
     return configured;
   }
 
@@ -92,16 +101,21 @@ export async function getDefaultBranch(repoPath: string): Promise<string | undef
     );
 
     if (exitCode !== 0) {
+      defaultBranchCache.set(normalizedPath, undefined);
       return undefined;
     }
 
     const target = stdout.trim();
     if (target.startsWith(ORIGIN_REMOTE_PREFIX)) {
-      return target.substring(ORIGIN_REMOTE_PREFIX.length);
+      const result = target.substring(ORIGIN_REMOTE_PREFIX.length);
+      defaultBranchCache.set(normalizedPath, result);
+      return result;
     }
 
+    defaultBranchCache.set(normalizedPath, undefined);
     return undefined;
   } catch {
+    defaultBranchCache.set(normalizedPath, undefined);
     return undefined;
   }
 }
