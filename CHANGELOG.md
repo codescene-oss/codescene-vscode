@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.2...v0.27.3) (2026-07-09)
+
+
+### Features
+
+* batch git check-ignore calls to reduce process spawns ([#326](https://github.com/codescene-oss/codescene-vscode/issues/326)) ([0c7b5c9](https://github.com/codescene-oss/codescene-vscode/commit/0c7b5c9b479741438d372efe521de5d3a03bd1c4))
+* cache getDefaultBranch to reduce git process spawns ([57c9917](https://github.com/codescene-oss/codescene-vscode/commit/57c991772014562931ed238ed1bba4a2cb4d7647))
+* dynamically increase GitChangeLister period based on execution time ([255f4f4](https://github.com/codescene-oss/codescene-vscode/commit/255f4f4278bd3890f3ee79f52bb2c43ac0694946))
+* pass `baselineCommit` as argument to eliminate redundant `git merge-base` calls ([c1cc670](https://github.com/codescene-oss/codescene-vscode/commit/c1cc6706ddcffe8be521c982c1b8ab99442cb313))
+* skip GitChangeLister and GitChangeObserver on default branch ([fba0a89](https://github.com/codescene-oss/codescene-vscode/commit/fba0a8993aa3f07a410969c587ae66a72798fb63))
+* skip GitChangeLister when analyses are running ([11a73ab](https://github.com/codescene-oss/codescene-vscode/commit/11a73abf14a4d7a84eed4945338ee08a7db162c9))
+* skip periodic GitChangeLister if VSCode is in the background ([1dc0ec0](https://github.com/codescene-oss/codescene-vscode/commit/1dc0ec06fbc9c22c10ea54179f647ab4abd953c5))
+
+
+### Bug fixes
+
+* remove TOCTOU existsSync(cwd) diagnostic check (CS-11199) ([5e98142](https://github.com/codescene-oss/codescene-vscode/commit/5e98142e25aa110e001b79c97785ea3e6cafe560))
+
 ### [0.27.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.1...v0.27.2) (2026-06-16)
 
 
