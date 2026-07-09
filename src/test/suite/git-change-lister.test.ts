@@ -1,18 +1,25 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Uri, ExtensionContext } from '../mocks/vscode';
 import { GitChangeLister } from '../../git/git-change-lister';
 import { MockExecutor } from '../mocks/mock-executor';
-import { MockGitAPI } from '../mocks/mock-git-api';
 import { API } from '../../../types/git';
+import { DefaultBranchGate } from '../../git/default-branch-gate';
+import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders, setMockGitRepositories, clearMockGitRepositories } from '../setup';
+import { setGitApiForTesting } from '../../code-health-monitor/addon';
+import { MockGitAPI } from '../mocks/mock-git-api';
+import { CsExtensionState } from '../../cs-extension-state';
+import { createMockExtensionContext } from '../mocks/mock-extension-context';
 
 suite('GitChangeLister Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo');
   let gitChangeLister: GitChangeLister;
-  let mockGitApi: MockGitAPI;
   let mockExecutor: MockExecutor;
+  let mockDefaultBranchGate: DefaultBranchGate;
 
-  setup(async () => {
+  setup(async function () {
+    this.timeout(20000);
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }
@@ -28,13 +35,15 @@ suite('GitChangeLister Test Suite', () => {
     execSync('git add README.md', { cwd: testRepoPath });
     execSync('git commit -m "Initial commit"', { cwd: testRepoPath });
 
-    mockGitApi = new MockGitAPI();
     mockExecutor = new MockExecutor();
     const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
-    gitChangeLister = new GitChangeLister(mockExecutor, mockSavedFilesTracker);
+    mockDefaultBranchGate = { shouldSkipBasedOnDefaultBranch: async () => false } as any;
+    gitChangeLister = new GitChangeLister(mockExecutor, mockSavedFilesTracker, mockDefaultBranchGate);
   });
 
-  teardown(() => {
+  teardown(async function () {
+    this.timeout(20000);
+    await new Promise((resolve) => setTimeout(resolve, 100));
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
     }
@@ -159,5 +168,67 @@ suite('GitChangeLister Test Suite', () => {
     const fileNames = Array.from(changedFiles).map(f => path.basename(f));
     assert.ok(fileNames.includes('my file.ts'), 'Should include file with spaces: my file.ts');
     assert.ok(fileNames.includes('test file with spaces.js'), 'Should include file with spaces: test file with spaces.js');
+  });
+
+  suite('DefaultBranchGate integration', () => {
+    test('getAllChangedFiles still works when gate returns false', async function () {
+      this.timeout(20000);
+      const newFile = path.join(testRepoPath, 'test.ts');
+      fs.writeFileSync(newFile, 'console.log("test");');
+
+      const changedFiles = await gitChangeLister.getAllChangedFiles(testRepoPath, testRepoPath);
+      assert.ok(Array.from(changedFiles).some(f => f.endsWith('test.ts')));
+    });
+
+    [
+      { gateReturns: true,  expectGetAllChangedFilesCalled: false, description: 'skips review when gate returns true' },
+      { gateReturns: false, expectGetAllChangedFilesCalled: true,  description: 'proceeds with review when gate returns false' },
+    ].forEach(({ gateReturns, expectGetAllChangedFilesCalled, description }) => {
+      test(`start ${description}`, async function () {
+        this.timeout(20000);
+
+        const mockRepo = {
+          rootUri: Uri.file(testRepoPath),
+          state: {
+            HEAD: { name: 'main', commit: 'abc123' },
+            refs: [],
+            remotes: [],
+            submodules: [],
+            onDidChange: () => ({ dispose: () => {} }),
+          },
+        };
+
+        const mockGitApi = new MockGitAPI();
+        mockGitApi.repositories = [mockRepo];
+        setGitApiForTesting(mockGitApi as any);
+
+        const mockContext = createMockExtensionContext(testRepoPath);
+        if (!CsExtensionState.hasInstance) {
+          CsExtensionState.init(mockContext);
+        }
+
+        mockWorkspaceFolders([createMockWorkspaceFolder(testRepoPath)]);
+        setMockGitRepositories([mockRepo]);
+
+        const skipGate = { shouldSkipBasedOnDefaultBranch: async () => gateReturns } as any;
+        const mockSavedFilesTracker = { getSavedFiles: () => new Set<string>() } as any;
+        const skipLister = new GitChangeLister(mockExecutor, mockSavedFilesTracker, skipGate);
+
+        let getAllChangedFilesCalled = false;
+        const originalGetAllChangedFiles = skipLister.getAllChangedFiles.bind(skipLister);
+        skipLister.getAllChangedFiles = async function (...args) {
+          getAllChangedFilesCalled = true;
+          return originalGetAllChangedFiles(...args);
+        };
+
+        await skipLister.start();
+
+        assert.strictEqual(getAllChangedFilesCalled, expectGetAllChangedFilesCalled);
+
+        setGitApiForTesting(undefined);
+        restoreDefaultWorkspaceFolders();
+        clearMockGitRepositories();
+      });
+    });
   });
 });

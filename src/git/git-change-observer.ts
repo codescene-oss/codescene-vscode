@@ -15,6 +15,7 @@ import { SavedFilesTracker } from '../saved-files-tracker';
 import { DroppingScheduledExecutor } from '../dropping-scheduled-executor';
 import { SimpleExecutor } from '../simple-executor';
 import { OpenFilesObserver } from '../review/open-files-observer';
+import { DefaultBranchGate } from './default-branch-gate';
 
 /**
  * Observes discrete Git file changes in real-time, filtering them against the Git merge-base.
@@ -26,6 +27,7 @@ export class GitChangeObserver {
   private context: vscode.ExtensionContext;
   private savedFilesTracker: SavedFilesTracker;
   private openFilesObserver: OpenFilesObserver;
+  private defaultBranchGate: DefaultBranchGate;
 
   // Tracks the files that have been added though this Observer.
   // We need this because deletion events are tricky:
@@ -36,34 +38,46 @@ export class GitChangeObserver {
 
   private eventQueue: Array<{type: 'create' | 'change' | 'delete', uri: vscode.Uri}> = [];
 
-  constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver) {
+  constructor(context: vscode.ExtensionContext, executor: Executor, savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver, defaultBranchGate: DefaultBranchGate) {
+    this.validateDependencies(savedFilesTracker, openFilesObserver, defaultBranchGate);
+
+    this.context = context;
+    this.executor = executor;
+    this.savedFilesTracker = savedFilesTracker;
+    this.openFilesObserver = openFilesObserver;
+    this.defaultBranchGate = defaultBranchGate;
+    this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
+    this.fileWatcher = this.createWatcher('**/*');
+
+    this.initializeTracker(executor, savedFilesTracker, defaultBranchGate);
+  }
+
+  private validateDependencies(savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver, defaultBranchGate: DefaultBranchGate): void {
     if (!savedFilesTracker) {
       throw new Error('SavedFilesTracker must be provided to GitChangeObserver');
     }
     if (!openFilesObserver) {
       throw new Error('OpenFilesObserver must be provided to GitChangeObserver');
     }
-
-    this.context = context;
-    this.executor = executor;
-    this.savedFilesTracker = savedFilesTracker;
-    this.openFilesObserver = openFilesObserver;
-    this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
-    this.fileWatcher = this.createWatcher('**/*');
-
-    // Initially fill the tracker - this ensures `handleFileDelete` works well
-    const lister = new GitChangeLister(executor, savedFilesTracker);
-    const workspaceFolder = getWorkspaceFolder();
-    if (workspaceFolder) {
-      const workspacePath = getWorkspacePath(workspaceFolder);
-      const repo = getRepo(workspaceFolder.uri);
-      const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-      void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
-        for (const file of files) {
-          this.tracker.add(file);
-        }
-      });
+    if (!defaultBranchGate) {
+      throw new Error('DefaultBranchGate must be provided to GitChangeObserver');
     }
+  }
+
+  private initializeTracker(executor: Executor, savedFilesTracker: SavedFilesTracker, defaultBranchGate: DefaultBranchGate): void {
+    // Initially fill the tracker - this ensures `handleFileDelete` works well
+    const lister = new GitChangeLister(executor, savedFilesTracker, defaultBranchGate);
+    const workspaceFolder = getWorkspaceFolder();
+    if (!workspaceFolder) return;
+
+    const workspacePath = getWorkspacePath(workspaceFolder);
+    const repo = getRepo(workspaceFolder.uri);
+    const gitRootPath = repo?.rootUri.fsPath || workspacePath;
+    void lister.collectFilesFromRepoState(gitRootPath, workspacePath).then(files => {
+      for (const file of files) {
+        this.tracker.add(file);
+      }
+    });
   }
 
   start(): void {
@@ -82,19 +96,40 @@ export class GitChangeObserver {
     }
 
     const workspaceFolder = getWorkspaceFolder();
+    const repo = workspaceFolder ? getRepo(workspaceFolder.uri) : undefined;
+    const shouldSkip = repo
+      ? await this.defaultBranchGate.shouldSkipBasedOnDefaultBranch(repo)
+      : false;
+
     const changedFiles = await this.getChangedFilesVsBaseline(workspaceFolder);
 
     for (const event of events) {
+      await this.processEvent(event, changedFiles, workspaceFolder, shouldSkip);
+    }
+  }
 
-      // NOTE: we _don't_ need to use gitignore to efficiently determine if a file should be processed,
-      // because we use `getChangedFilesVsBaseline` as the computation basis, which uses `git diff` and `git status`,
-      // which inherently honor gitignore.
+  private async processEvent(
+    event: {type: 'create' | 'change' | 'delete', uri: vscode.Uri},
+    changedFiles: string[],
+    workspaceFolder: vscode.WorkspaceFolder | undefined,
+    shouldSkip: boolean
+  ): Promise<void> {
+    // NOTE: we _don't_ need to use gitignore to efficiently determine if a file should be processed,
+    // because we use `getChangedFilesVsBaseline` as the computation basis, which uses `git diff` and `git status`,
+    // which inherently honor gitignore.
 
-      if (event.type === 'delete' || !this.isFileInChangedList(event.uri.fsPath, changedFiles, workspaceFolder)) {
-        await this.handleFileDelete(event.uri, changedFiles, workspaceFolder);
-      } else {
-        await this.handleFileChange(event.uri, changedFiles, workspaceFolder);
-      }
+    const isDeleteEvent = event.type === 'delete';
+    const isFileNotInChangedList = !this.isFileInChangedList(event.uri.fsPath, changedFiles, workspaceFolder);
+
+    if (isDeleteEvent || isFileNotInChangedList) {
+      await this.handleFileDelete(event.uri, changedFiles, workspaceFolder);
+      return;
+    }
+
+    if (!shouldSkip) {
+      await this.handleFileChange(event.uri, changedFiles, workspaceFolder);
+    } else {
+      logOutputChannel.debug(`GitChangeObserver: skipping file change ${event.uri.fsPath}, current branch matches default branch`);
     }
   }
 

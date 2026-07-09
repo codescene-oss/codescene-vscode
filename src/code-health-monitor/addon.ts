@@ -16,6 +16,7 @@ import { SimpleExecutor } from '../simple-executor';
 import { isGitAvailable } from '../git/git-detection';
 import { SavedFilesTracker } from '../saved-files-tracker';
 import { isVSCodeWindowFocused } from '../extension-impl';
+import { DefaultBranchGate } from '../git/default-branch-gate';
 
 const GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS = 9;
 
@@ -57,9 +58,12 @@ export async function runScheduledGitChangeReview(): Promise<void> {
   }
 }
 
-export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker) {
+export function activate(context: vscode.ExtensionContext, savedFilesTracker: SavedFilesTracker, defaultBranchGate: DefaultBranchGate | undefined) {
   if (!savedFilesTracker) {
     throw new Error('SavedFilesTracker must be provided to activate Code Health Monitor');
+  }
+  if (!defaultBranchGate) {
+    throw new Error('DefaultBranchGate must be provided to activate Code Health Monitor');
   }
 
   gitApi = acquireGitApi();
@@ -84,7 +88,7 @@ export function activate(context: vscode.ExtensionContext, savedFilesTracker: Sa
   // Review all changed/added files periodically.
   // NOTE: while this spawns Git processes that often, it does not trigger CLI processed that often,
   // because `CsDiagnostics.review` has built-in caching.
-  gitChangeListerInstance = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker);
+  gitChangeListerInstance = new GitChangeLister(DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTracker, defaultBranchGate);
   scheduledExecutorInstance = new DroppingScheduledExecutor(new SimpleExecutor(), GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS);
 
   void scheduledExecutorInstance.executeTask(runScheduledGitChangeReview);
@@ -179,4 +183,8 @@ export function deactivate() {
 
 export function getScheduledExecutorForTesting(): DroppingScheduledExecutor | undefined {
   return scheduledExecutorInstance;
+}
+
+export function setGitApiForTesting(api: API | undefined): void {
+  gitApi = api;
 }
