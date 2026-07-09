@@ -101,10 +101,11 @@ export class GitChangeObserver {
       ? await this.defaultBranchGate.shouldSkipBasedOnDefaultBranch(repo)
       : false;
 
-    const changedFiles = await this.getChangedFilesVsBaseline(workspaceFolder);
+    const baselineCommit = repo ? await getMergeBaseCommit(repo) : '';
+    const changedFiles = await this.getChangedFilesVsBaseline(workspaceFolder, baselineCommit);
 
     for (const event of events) {
-      await this.processEvent(event, changedFiles, workspaceFolder, shouldSkip);
+      await this.processEvent(event, changedFiles, workspaceFolder, shouldSkip, baselineCommit);
     }
   }
 
@@ -112,7 +113,8 @@ export class GitChangeObserver {
     event: {type: 'create' | 'change' | 'delete', uri: vscode.Uri},
     changedFiles: string[],
     workspaceFolder: vscode.WorkspaceFolder | undefined,
-    shouldSkip: boolean
+    shouldSkip: boolean,
+    baselineCommit: string
   ): Promise<void> {
     // NOTE: we _don't_ need to use gitignore to efficiently determine if a file should be processed,
     // because we use `getChangedFilesVsBaseline` as the computation basis, which uses `git diff` and `git status`,
@@ -127,13 +129,13 @@ export class GitChangeObserver {
     }
 
     if (!shouldSkip) {
-      await this.handleFileChange(event.uri, changedFiles, workspaceFolder);
+      await this.handleFileChange(event.uri, changedFiles, workspaceFolder, baselineCommit);
     } else {
       logOutputChannel.debug(`GitChangeObserver: skipping file change ${event.uri.fsPath}, current branch matches default branch`);
     }
   }
 
-  async getChangedFilesVsBaseline(workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<string[]> {
+  async getChangedFilesVsBaseline(workspaceFolder: vscode.WorkspaceFolder | undefined, baselineCommit: string): Promise<string[]> {
     if (!isGitAvailable()){
       return [];
     }
@@ -143,7 +145,6 @@ export class GitChangeObserver {
     }
 
     const repo = getRepo(workspaceFolder.uri);
-    const baseCommit = repo ? await getMergeBaseCommit(repo) : '';
 
     try {
       const workspacePath = getWorkspacePath(workspaceFolder);
@@ -152,7 +153,7 @@ export class GitChangeObserver {
         ...this.savedFilesTracker.getSavedFiles(),
         ...this.openFilesObserver.getAllVisibleFileNames()
       ]);
-      const committedChanges = await getCommittedChanges(gitRootPath, baseCommit, workspacePath);
+      const committedChanges = await getCommittedChanges(gitRootPath, baselineCommit, workspacePath);
       const statusChanges = await getStatusChanges(gitRootPath, workspacePath, filesToExcludeFromHeuristic);
 
       const allChangedFiles = new Set([...committedChanges, ...statusChanges]);
@@ -160,7 +161,7 @@ export class GitChangeObserver {
       const result = Array.from(allChangedFiles);
       return result;
     } catch (error) {
-      logOutputChannel.warn(`Error getting changed files vs base commit ${baseCommit}: ${error}`);
+      logOutputChannel.warn(`Error getting changed files vs base commit ${baselineCommit}: ${error}`);
       return [];
     }
   }
@@ -184,11 +185,11 @@ export class GitChangeObserver {
     return true;
   }
 
-  private async reviewFile(filePath: string): Promise<void> {
+  private async reviewFile(filePath: string, baselineCommit: string): Promise<void> {
     try {
       // Load the file as a TextDocument (doesn't open in editor UI)
       const document = await vscode.workspace.openTextDocument(filePath);
-      CsDiagnostics.review(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
+      CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: false, updateDiagnosticsPane: false });
     } catch (error) {
       logOutputChannel.warn(`Could not load file for review ${filePath}: ${error}`);
     }
@@ -227,7 +228,7 @@ export class GitChangeObserver {
     });
   }
 
-  private async handleFileChange(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<void> {
+  private async handleFileChange(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined, baselineCommit: string): Promise<void> {
     const filePath = uri.fsPath;
 
     // Don't add directories to the tracker - would make deletion handling work incorrectly
@@ -241,7 +242,7 @@ export class GitChangeObserver {
     }
 
     this.tracker.add(filePath);
-    void this.executor.executeTask(() => this.reviewFile(filePath));
+    void this.executor.executeTask(() => this.reviewFile(filePath, baselineCommit));
   }
 
   private async handleFileDelete(uri: vscode.Uri, changedFiles: string[], workspaceFolder: vscode.WorkspaceFolder | undefined): Promise<void> {

@@ -14,7 +14,6 @@ export class ReviewCache {
   private _cache = new Map<string, Map<Map<string, number>, CacheEntry>>();
 
   constructor(
-    private getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
     private getCodeHealthFileVersions: () => Map<string, number>
   ) {}
 
@@ -84,7 +83,7 @@ export class ReviewCache {
     return cachedValue === false ? false : newValue;
   }
 
-  async add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
+  add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean, baselineCommit: string) {
     const item = new ReviewCacheItem(document, review);
 
     let innerMap = this._cache.get(document.fileName);
@@ -113,7 +112,6 @@ export class ReviewCache {
     innerMap.set(snapshot, { item, skipMonitorUpdate: finalSkipMonitorUpdate });
 
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
-    const baselineCommit = await this.getBaselineCommit(document.uri);
     if (baselineCommit) {
       item.setBaseline(baselineCommit, finalSkipMonitorUpdate, updateDiagnosticsPane);
     }
@@ -153,11 +151,10 @@ export class ReviewCache {
     this._cache.clear();
   }
 
-  setBaseline(fileFilter: (fileUri: Uri) => boolean) {
+  setBaseline(fileFilter: (fileUri: Uri) => boolean, baselineCommit: string) {
     this._cache.forEach((innerMap) => {
-      innerMap.forEach(async (entry) => {
+      innerMap.forEach((entry) => {
         if (fileFilter(entry.item.document.uri)) {
-          const baselineCommit = await this.getBaselineCommit(entry.item.document.uri);
           if (baselineCommit) {
             void entry.item.setBaseline(baselineCommit, false, false);
           }

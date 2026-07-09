@@ -31,25 +31,19 @@ function createMockReview(document: vscode.TextDocument): CsReview {
 suite('ReviewCache Test Suite', () => {
   let reviewCache: ReviewCache;
   let codeHealthFileVersions: Map<string, number>;
-  let baselineCommitMap: Map<string, string>;
 
   setup(() => {
     codeHealthFileVersions = new Map();
-    baselineCommitMap = new Map();
-
-    const getBaselineCommit = async (fileUri: vscode.Uri) => {
-      return baselineCommitMap.get(fileUri.fsPath);
-    };
 
     const getCodeHealthFileVersions = () => {
       return codeHealthFileVersions;
     };
 
-    reviewCache = new ReviewCache(getBaselineCommit, getCodeHealthFileVersions);
+    reviewCache = new ReviewCache(getCodeHealthFileVersions);
   });
 
-  async function addReview(document: vscode.TextDocument): Promise<void> {
-    await reviewCache.add(document, createMockReview(document), false, false);
+  function addReview(document: vscode.TextDocument): void {
+    reviewCache.add(document, createMockReview(document), false, false, '');
   }
 
   function assertCacheHit(document: vscode.TextDocument, message: string): void {
@@ -70,7 +64,7 @@ suite('ReviewCache Test Suite', () => {
 
   test('should add and retrieve review from cache', async () => {
     const document = createMockDocument('/test/file.ts');
-    await addReview(document);
+    addReview(document);
 
     const retrieved = reviewCache.get(document, false);
     assert.ok(retrieved, 'Should retrieve cached review');
@@ -84,7 +78,7 @@ suite('ReviewCache Test Suite', () => {
 
   test('should return exact version only when document version matches', async () => {
     const document = createMockDocument('/test/file.ts', 'content', 1);
-    await addReview(document);
+    addReview(document);
 
     const exactMatch = reviewCache.getExactVersion(document, false);
     assert.ok(exactMatch, 'Should find exact version match');
@@ -96,7 +90,7 @@ suite('ReviewCache Test Suite', () => {
 
   test('should update existing cache entry', async () => {
     const document = createMockDocument('/test/file.ts');
-    await addReview(document);
+    addReview(document);
 
     const updated = reviewCache.update(document, createMockReview(document), false, false);
     assert.strictEqual(updated, true, 'Should successfully update existing entry');
@@ -110,7 +104,7 @@ suite('ReviewCache Test Suite', () => {
 
   test('should delete cache entry by file path', async () => {
     const document = createMockDocument('/test/file.ts');
-    await addReview(document);
+    addReview(document);
     reviewCache.delete(document.fileName);
 
     assertCacheMiss(document, 'Should not find deleted cache entry');
@@ -120,8 +114,8 @@ suite('ReviewCache Test Suite', () => {
     const doc1 = createMockDocument('/test/file1.ts');
     const doc2 = createMockDocument('/test/file2.ts');
 
-    await addReview(doc1);
-    await addReview(doc2);
+    addReview(doc1);
+    addReview(doc2);
     reviewCache.clear();
 
     assertCacheMiss(doc1, 'Should not find first document after clear');
@@ -131,13 +125,13 @@ suite('ReviewCache Test Suite', () => {
   test('should cache entries separately based on code-health-rules versions', async () => {
     const document = createMockDocument('/test/file.ts');
 
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with empty code-health-rules snapshot');
 
     codeHealthFileVersions.set('/project/.codescene/code-health-rules.json', 1);
     assertCacheMiss(document, 'Should not find cache entry with different code-health-rules snapshot');
 
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with new code-health-rules snapshot');
   });
 
@@ -145,13 +139,13 @@ suite('ReviewCache Test Suite', () => {
     const document = createMockDocument('/test/file.ts');
 
     setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with version 1');
 
     setRulesVersions({ '/project/.codescene/code-health-rules.json': 2 });
     assertCacheMiss(document, 'Should not find cache entry with old code-health-rules version');
 
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with version 2');
   });
 
@@ -162,7 +156,7 @@ suite('ReviewCache Test Suite', () => {
       '/project1/.codescene/code-health-rules.json': 1,
       '/project2/.codescene/code-health-rules.json': 1
     });
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with multiple rules files');
 
     codeHealthFileVersions.set('/project1/.codescene/code-health-rules.json', 2);
@@ -173,7 +167,7 @@ suite('ReviewCache Test Suite', () => {
     const document = createMockDocument('/test/file.ts');
 
     setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
-    await addReview(document);
+    addReview(document);
     assertCacheHit(document, 'Should retrieve review with rules file');
 
     codeHealthFileVersions.delete('/project/.codescene/code-health-rules.json');
@@ -186,8 +180,8 @@ suite('ReviewCache Test Suite', () => {
 
     setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
 
-    await addReview(doc1);
-    await addReview(doc2);
+    addReview(doc1);
+    addReview(doc2);
 
     assertCacheHit(doc1, 'Should retrieve first document');
     assertCacheHit(doc2, 'Should retrieve second document');
@@ -197,7 +191,7 @@ suite('ReviewCache Test Suite', () => {
     const document = createMockDocument('/test/file.ts');
 
     setRulesVersions({ '/b.json': 1, '/a.json': 1 });
-    await addReview(document);
+    addReview(document);
 
     codeHealthFileVersions.clear();
     setRulesVersions({ '/a.json': 1, '/b.json': 1 });
@@ -208,10 +202,10 @@ suite('ReviewCache Test Suite', () => {
   test('should delete all versions of a file from cache', async () => {
     const document = createMockDocument('/test/file.ts');
 
-    await addReview(document);
+    addReview(document);
 
     setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
-    await addReview(document);
+    addReview(document);
 
     reviewCache.delete(document.fileName);
 
@@ -305,24 +299,24 @@ suite('ReviewCache Test Suite', () => {
       return undefined;
     }
 
-    async function testAddBehavior(initial: boolean, second: boolean, expected: boolean): Promise<void> {
+    function testAddBehavior(initial: boolean, second: boolean, expected: boolean): void {
       const document = createMockDocument('/test/file.ts');
 
-      await reviewCache.add(document, createMockReview(document), initial, false);
+      reviewCache.add(document, createMockReview(document), initial, false, '');
       let entry = getCacheEntry(document);
       assert.ok(entry);
       assert.strictEqual(entry.skipMonitorUpdate, initial);
 
-      await reviewCache.add(document, createMockReview(document), second, false);
+      reviewCache.add(document, createMockReview(document), second, false, '');
       entry = getCacheEntry(document);
       assert.ok(entry);
       assert.strictEqual(entry.skipMonitorUpdate, expected);
     }
 
-    async function testUpdateBehavior(initial: boolean, second: boolean, expected: boolean): Promise<void> {
+    function testUpdateBehavior(initial: boolean, second: boolean, expected: boolean): void {
       const document = createMockDocument('/test/file.ts');
 
-      await reviewCache.add(document, createMockReview(document), initial, false);
+      reviewCache.add(document, createMockReview(document), initial, false, '');
       let entry = getCacheEntry(document);
       assert.ok(entry);
       assert.strictEqual(entry.skipMonitorUpdate, initial);
@@ -336,27 +330,27 @@ suite('ReviewCache Test Suite', () => {
     }
 
     test('should override skipMonitorUpdate true with false when adding', async () => {
-      await testAddBehavior(true, false, false);
+      testAddBehavior(true, false, false);
     });
 
     test('should not override skipMonitorUpdate false with true when adding', async () => {
-      await testAddBehavior(false, true, false);
+      testAddBehavior(false, true, false);
     });
 
     test('should override skipMonitorUpdate true with false when updating', async () => {
-      await testUpdateBehavior(true, false, false);
+      testUpdateBehavior(true, false, false);
     });
 
     test('should not override skipMonitorUpdate false with true when updating', async () => {
-      await testUpdateBehavior(false, true, false);
+      testUpdateBehavior(false, true, false);
     });
 
     test('should keep skipMonitorUpdate true when both are true', async () => {
-      await testUpdateBehavior(true, true, true);
+      testUpdateBehavior(true, true, true);
     });
 
     test('should keep skipMonitorUpdate false when both are false', async () => {
-      await testUpdateBehavior(false, false, false);
+      testUpdateBehavior(false, false, false);
     });
   });
 
@@ -500,7 +494,7 @@ suite('ReviewCache Test Suite', () => {
 
     async function addDocumentToCache(filePath: string): Promise<vscode.TextDocument> {
       const document = createMockDocument(filePath);
-      await addReview(document);
+      addReview(document);
       return document;
     }
 
@@ -570,13 +564,13 @@ suite('ReviewCache Test Suite', () => {
       const nonExistentFilePath = createTempFilePath('multi-version.ts');
       const document = createMockDocument(nonExistentFilePath);
 
-      await addReview(document);
+      addReview(document);
 
       setRulesVersions({ '/project/.codescene/code-health-rules.json': 1 });
-      await addReview(document);
+      addReview(document);
 
       setRulesVersions({ '/project/.codescene/code-health-rules.json': 2 });
-      await addReview(document);
+      addReview(document);
 
       let cacheItem = reviewCache.get(document, false);
       assert.ok(cacheItem, 'Cache item should exist before refreshDeltas');

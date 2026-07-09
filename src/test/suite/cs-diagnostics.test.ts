@@ -33,7 +33,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     originalCollection = (CsDiagnostics as any).collection;
     (CsDiagnostics as any).collection = mockCollection;
     CsDiagnostics.init(mockContext);
-    Reviewer.init(mockContext, async () => undefined, () => new Map());
+    Reviewer.init(mockContext, () => new Map());
   });
 
   teardown(() => {
@@ -59,7 +59,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     const testFile = path.resolve(testDir, 'gc.cpp');
     fs.writeFileSync(testFile, fileContent);
     const document = new TestTextDocument(testFile, fileContent, 'cpp');
-    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -125,7 +125,7 @@ return 0;
 `;
     fs.writeFileSync(cleanFile, cleanCode);
     const document = new TestTextDocument(cleanFile, cleanCode, 'cpp');
-    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -153,7 +153,7 @@ return 0;
     const code = `int foo() { return 42; }\n`;
     fs.writeFileSync(cppFile, code);
     const document = new TestTextDocument(cppFile, code, 'cpp');
-    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -181,7 +181,7 @@ return 0;
     const content = 'This is just text';
     fs.writeFileSync(txtFile, content);
     const document = new TestTextDocument(txtFile, content, 'plaintext');
-    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {

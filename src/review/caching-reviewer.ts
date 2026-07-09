@@ -1,4 +1,4 @@
-import vscode, { Disposable, Uri } from 'vscode';
+import vscode, { Disposable } from 'vscode';
 import { AbortError } from '../devtools-api/abort-error';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
@@ -14,10 +14,9 @@ export class CachingReviewer implements Disposable {
   readonly reviewCache: ReviewCache;
 
   constructor(
-    getBaselineCommit: (fileUri: Uri) => Promise<string | undefined>,
     getCodeHealthFileVersions: () => Map<string, number>
   ) {
-    this.reviewCache = new ReviewCache(getBaselineCommit, getCodeHealthFileVersions);
+    this.reviewCache = new ReviewCache(getCodeHealthFileVersions);
     const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     this.disposables.push(
       deleteFileWatcher,
@@ -60,7 +59,7 @@ export class CachingReviewer implements Disposable {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.updateOrAdd(document, csReview, skipMonitorUpdateForDelta ?? skipMonitorUpdate, reviewOpts.updateDiagnosticsPane);
+    this.updateOrAdd(document, csReview, skipMonitorUpdateForDelta ?? skipMonitorUpdate, reviewOpts.updateDiagnosticsPane, reviewOpts.baselineCommit);
 
     return csReview;
   }
@@ -69,8 +68,8 @@ export class CachingReviewer implements Disposable {
     this.reviewCache.refreshDeltas();
   }
 
-  setBaseline(fileFilter: (fileUri: Uri) => boolean) {
-    this.reviewCache.setBaseline(fileFilter);
+  setBaseline(fileFilter: (fileUri: vscode.Uri) => boolean, baselineCommit: string) {
+    this.reviewCache.setBaseline(fileFilter, baselineCommit);
   }
 
   /**
@@ -80,7 +79,7 @@ export class CachingReviewer implements Disposable {
    */
   async baselineScore(baselineCommit: string, document: vscode.TextDocument, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
     return this.reviewer
-      .review(document, { baseline: baselineCommit, skipMonitorUpdate, updateDiagnosticsPane })
+      .review(document, { baseline: baselineCommit, baselineCommit, skipMonitorUpdate, updateDiagnosticsPane })
       .then((reviewResult) => {
         return reviewResult && reviewResult['raw-score'];
       })
@@ -94,9 +93,9 @@ export class CachingReviewer implements Disposable {
    * @param skipMonitorUpdate
    * @param updateDiagnosticsPane
    */
-  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
+  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean, baselineCommit: string) {
     if (!this.reviewCache.update(document, review, skipMonitorUpdate, updateDiagnosticsPane)) {
-      void this.reviewCache.add(document, review, skipMonitorUpdate, updateDiagnosticsPane);
+      this.reviewCache.add(document, review, skipMonitorUpdate, updateDiagnosticsPane, baselineCommit);
     }
   }
 
