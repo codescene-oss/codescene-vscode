@@ -215,6 +215,33 @@ suite('Git Utils Test Suite', () => {
       createBranchWithCommit('main');
       assert.strictEqual(await getDefaultBranch(testRepoPath), undefined);
     });
+
+    test('getDefaultBranch caches the result', async function () {
+      this.timeout(20000);
+      createBranchWithCommit('main');
+      setupOriginHead('main');
+      clearMainBranchCandidatesCache(testRepoPath);
+
+      assert.strictEqual(await getDefaultBranch(testRepoPath), 'main');
+
+      execSync('git symbolic-ref -d refs/remotes/origin/HEAD', { cwd: testRepoPath, stdio: 'pipe' });
+
+      assert.strictEqual(await getDefaultBranch(testRepoPath), 'main');
+    });
+
+    test('clearMainBranchCandidatesCache also clears getDefaultBranch cache', async function () {
+      this.timeout(20000);
+      createBranchWithCommit('main');
+      setupOriginHead('main');
+      clearMainBranchCandidatesCache(testRepoPath);
+
+      assert.strictEqual(await getDefaultBranch(testRepoPath), 'main');
+
+      execSync('git symbolic-ref -d refs/remotes/origin/HEAD', { cwd: testRepoPath, stdio: 'pipe' });
+      clearMainBranchCandidatesCache(testRepoPath);
+
+      assert.strictEqual(await getDefaultBranch(testRepoPath), undefined);
+    });
   });
 
   suite('getMergeBaseCommit', () => {
