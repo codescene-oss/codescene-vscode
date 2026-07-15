@@ -28,7 +28,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
     mockCollection = new MockDiagnosticCollection();
     originalCollection = (CsDiagnostics as any).collection;
     (CsDiagnostics as any).collection = mockCollection;

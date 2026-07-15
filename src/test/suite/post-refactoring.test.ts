@@ -73,7 +73,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       configurable: true
     });
 
-    DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
 
     analysisError = undefined;
     refactoringError = undefined;

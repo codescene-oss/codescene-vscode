@@ -30,13 +30,14 @@ import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
 import { DevtoolsError } from './devtools-error';
 import { AbortError } from './abort-error';
+import { IsCpuTooBusyFn } from '../cpu-usage-based-executor';
 
 export class DevtoolsAPI {
   private static instance: DevtoolsAPIImpl;
   private static reviewCache: ReviewCache;
 
-  static init(binaryPath: string, context: ExtensionContext) {
-    DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context);
+  static init(binaryPath: string, context: ExtensionContext, isCpuTooBusyFn?: IsCpuTooBusyFn) {
+    DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context, isCpuTooBusyFn);
     DevtoolsAPI.reviewCache = new ReviewCache(context);
   }
 
