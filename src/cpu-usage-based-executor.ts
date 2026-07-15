@@ -1,12 +1,13 @@
 import { ExecOptions } from 'child_process';
 import { Command, ExecResult, Executor } from './executor';
 import { isCpuTooBusy as defaultIsCpuTooBusy } from './cpu-monitor';
+import { ConcurrencyLimitingExecutor } from './concurrency-limiting-executor';
 import { logOutputChannel } from './log';
 
 const RETRY_DELAY_MS = 9000;
 
-type SetTimeoutFn = (callback: (...args: any[]) => void, ms: number) => any;
-type IsCpuTooBusyFn = () => Promise<boolean>;
+export type SetTimeoutFn = (callback: (...args: any[]) => void, ms: number) => any;
+export type IsCpuTooBusyFn = () => Promise<boolean>;
 
 export class CpuUsageBasedExecutor implements Executor {
   constructor(
@@ -51,4 +52,16 @@ export class CpuUsageBasedExecutor implements Executor {
       (this.executor as any).dispose();
     }
   }
+}
+
+export function createCpuAwareConcurrencyExecutor(
+  executor: Executor,
+  maxConcurrency?: number,
+  setTimeoutFn?: SetTimeoutFn,
+  isCpuTooBusyFn?: IsCpuTooBusyFn
+): ConcurrencyLimitingExecutor {
+  return new ConcurrencyLimitingExecutor(
+    new CpuUsageBasedExecutor(executor, setTimeoutFn, isCpuTooBusyFn),
+    maxConcurrency
+  );
 }
