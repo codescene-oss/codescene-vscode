@@ -23,6 +23,7 @@ import { logOutputChannel } from '../log';
 import { DevtoolsError } from './devtools-error';
 import { CreditsInfoError } from './credits-info-error';
 import { AbortError } from './abort-error';
+import { CpuUsageBasedExecutor } from '../cpu-usage-based-executor';
 
 function presentCommand(obj: Task | Command, cwd: string): string {
   const trimmedObj = {
@@ -37,11 +38,11 @@ export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
   public abortingSingleTaskExecutor: AbortingSingleTaskExecutor = new AbortingSingleTaskExecutor(this.simpleExecutor);
   public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
-  public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
-    this.simpleExecutor
+  public concurrencyLimitingExecutor = new CpuUsageBasedExecutor(
+    new ConcurrencyLimitingExecutor(this.simpleExecutor)
   );
-  public concurrencyLimitingExecutorForDelta: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
-    this.simpleExecutor
+  public concurrencyLimitingExecutorForDelta = new CpuUsageBasedExecutor(
+    new ConcurrencyLimitingExecutor(this.simpleExecutor)
   );
   public preflightJson?: string;
   public networkError: boolean = false;
