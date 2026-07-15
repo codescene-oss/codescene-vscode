@@ -132,6 +132,45 @@ suite('CPU Monitor Test Suite', () => {
     });
   });
 
+  suite('core count boundaries', () => {
+    [
+      { coreCount: 1, threshold: 65, desc: '1 core uses 65% threshold' },
+      { coreCount: 3, threshold: 65, desc: '3 cores uses 65% threshold' },
+      { coreCount: 4, threshold: 70, desc: '4 cores uses 70% threshold' },
+      { coreCount: 5, threshold: 70, desc: '5 cores uses 70% threshold' },
+      { coreCount: 7, threshold: 70, desc: '7 cores uses 70% threshold' },
+      { coreCount: 8, threshold: 75, desc: '8 cores uses 75% threshold' },
+      { coreCount: 9, threshold: 75, desc: '9 cores uses 75% threshold' },
+    ].forEach(({ coreCount, threshold, desc }) => {
+      test(desc, async () => {
+        const usageAboveThreshold = threshold + 1;
+        const deltaTotal = 1000;
+        const deltaIdle = deltaTotal * (100 - usageAboveThreshold) / 100;
+
+        const snapshots: os.CpuInfo[][] = [];
+        let baseIdle = 5000;
+        let baseTotal = 10000;
+
+        for (let i = 0; i < 6; i++) {
+          snapshots.push(Array(coreCount).fill(null).map(() => createCpuInfo(baseIdle, baseTotal)));
+          baseIdle += deltaIdle;
+          baseTotal += deltaTotal;
+        }
+
+        let providerCallCount = 0;
+        const mockProvider = () => {
+          const result = snapshots[providerCallCount % snapshots.length];
+          providerCallCount++;
+          return result;
+        };
+        setCpuProvider(mockProvider);
+
+        const result = await isCpuTooBusy();
+        assert.strictEqual(result, true, `${coreCount} cores at ${usageAboveThreshold}% should be too busy`);
+      });
+    });
+  });
+
   suite('with mixed CPU loads', () => {
     test('calculates average across cores with different loads (8 cores)', async () => {
       const snapshots: os.CpuInfo[][] = [];

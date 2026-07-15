@@ -7,6 +7,16 @@ interface CpuSnapshot {
 
 export type CpuProvider = () => os.CpuInfo[];
 
+/**
+ * CPU usage thresholds by core count. Systems with more cores can tolerate higher
+ * average usage before being considered "too busy" since load is more distributed.
+ */
+const cpuThresholds: Array<{ minCores: number; threshold: number }> = [
+  { minCores: 8, threshold: 75 },
+  { minCores: 4, threshold: 70 },
+  { minCores: 0, threshold: 65 },
+];
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -62,14 +72,7 @@ export async function isCpuTooBusy(): Promise<boolean> {
   const avgCoreUsages = coreUsageSums.map(sum => sum / samples);
   const averageUsage = avgCoreUsages.reduce((sum, usage) => sum + usage, 0) / avgCoreUsages.length;
 
-  let threshold: number;
-  if (coreCount >= 8) {
-    threshold = 75;
-  } else if (coreCount >= 4) {
-    threshold = 70;
-  } else {
-    threshold = 65;
-  }
+  const threshold = cpuThresholds.find(t => coreCount >= t.minCores)!.threshold;
 
   return averageUsage > threshold;
 }
