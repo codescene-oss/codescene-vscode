@@ -218,6 +218,71 @@ const vscodeStub = {
     findFiles: async () => {
       return mockFindFilesResults;
     },
+    openTextDocument: async (pathOrUri: string | { fsPath: string }) => {
+      const filePath = typeof pathOrUri === 'string' ? pathOrUri : pathOrUri.fsPath;
+      const content = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
+      const lines = content.split('\n');
+      return {
+        uri: {
+          scheme: 'file',
+          authority: '',
+          path: filePath,
+          query: '',
+          fragment: '',
+          fsPath: filePath,
+          with: () => ({}),
+          toString: () => filePath,
+          toJSON: () => ({ scheme: 'file', path: filePath }),
+        },
+        fileName: filePath,
+        isUntitled: false,
+        languageId: filePath.endsWith('.ts') ? 'typescript' : filePath.endsWith('.js') ? 'javascript' : 'plaintext',
+        version: 1,
+        isDirty: false,
+        isClosed: false,
+        eol: 1,
+        lineCount: lines.length,
+        getText: (range?: any) => {
+          if (!range) return content;
+          const startLine = range.start?.line ?? 0;
+          const endLine = range.end?.line ?? lines.length - 1;
+          return lines.slice(startLine, endLine + 1).join('\n');
+        },
+        lineAt: (lineOrPosition: number | { line: number }) => {
+          const lineNum = typeof lineOrPosition === 'number' ? lineOrPosition : lineOrPosition.line;
+          const text = lines[lineNum] || '';
+          return {
+            lineNumber: lineNum,
+            text,
+            range: { start: { line: lineNum, character: 0 }, end: { line: lineNum, character: text.length } },
+            rangeIncludingLineBreak: { start: { line: lineNum, character: 0 }, end: { line: lineNum + 1, character: 0 } },
+            firstNonWhitespaceCharacterIndex: text.search(/\S/),
+            isEmptyOrWhitespace: text.trim().length === 0,
+          };
+        },
+        offsetAt: (position: { line: number; character: number }) => {
+          let offset = 0;
+          for (let i = 0; i < position.line && i < lines.length; i++) {
+            offset += lines[i].length + 1;
+          }
+          return offset + position.character;
+        },
+        positionAt: (offset: number) => {
+          let remaining = offset;
+          for (let i = 0; i < lines.length; i++) {
+            if (remaining <= lines[i].length) {
+              return { line: i, character: remaining };
+            }
+            remaining -= lines[i].length + 1;
+          }
+          return { line: lines.length - 1, character: lines[lines.length - 1]?.length || 0 };
+        },
+        getWordRangeAtPosition: () => undefined,
+        validateRange: (range: any) => range,
+        validatePosition: (position: any) => position,
+        save: () => Promise.resolve(true),
+      };
+    },
     onDidChangeConfiguration: (listener: any) => {
       void listener;
       return { dispose: () => {} };
