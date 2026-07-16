@@ -42,6 +42,15 @@ export function restoreDefaultWorkspaceFolders() {
 }
 
 let mockGitRepositories: any[] = [];
+let mockFindFilesResults: any[] = [];
+
+export function setMockFindFilesResults(results: any[]) {
+  mockFindFilesResults = results;
+}
+
+export function clearMockFindFilesResults() {
+  mockFindFilesResults = [];
+}
 
 export type MockWebviewPanel = {
   visible: boolean;
@@ -206,6 +215,9 @@ const vscodeStub = {
   },
   workspace: {
     workspaceFolders: defaultWorkspaceFolders as any,
+    findFiles: async () => {
+      return mockFindFilesResults;
+    },
     onDidChangeConfiguration: (listener: any) => {
       void listener;
       return { dispose: () => {} };
