@@ -1,12 +1,26 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { execSync } from 'child_process';
 import { discoverCodeHealthRulesFileUris } from '../../git/codescene-file-discovery';
-import { createTestDir } from '../integration_helper';
+import { setMockFindFilesResults, clearMockFindFilesResults } from '../setup';
+
+function assertNotInGitRepo(dir: string): void {
+  let current = dir;
+  const root = path.parse(current).root;
+
+  while (current !== root) {
+    const gitDir = path.join(current, '.git');
+    if (fs.existsSync(gitDir)) {
+      throw new Error(`Test directory ${dir} is inside a Git repository at ${current}`);
+    }
+    current = path.dirname(current);
+  }
+}
 
 suite('CodeScene File Discovery Test Suite', function () {
-  const testDir = createTestDir('test-codescene-file-discovery');
+  let testDir: string;
 
   function createCodeHealthRulesFile(relativePath: string): string {
     const fullPath = path.join(testDir, relativePath);
@@ -20,24 +34,25 @@ suite('CodeScene File Discovery Test Suite', function () {
 
   function gitAdd(filePath: string) {
     const relativePath = path.relative(testDir, filePath);
-    execSync(`git add "${relativePath}"`, { cwd: testDir });
+    execSync(`git add "${relativePath}"`, { cwd: testDir, stdio: 'pipe' });
   }
 
   function gitCommit(message: string) {
-    execSync(`git commit -m "${message}"`, { cwd: testDir });
+    execSync(`git commit -m "${message}"`, { cwd: testDir, stdio: 'pipe' });
   }
 
   setup(function () {
     this.timeout(20000);
-    if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
+    const testBaseDir = path.join(os.homedir(), '.codescene-test-data');
+    if (!fs.existsSync(testBaseDir)) {
+      fs.mkdirSync(testBaseDir, { recursive: true });
     }
-    fs.mkdirSync(testDir, { recursive: true });
+    testDir = fs.mkdtempSync(path.join(testBaseDir, 'codescene-file-discovery-test-'));
 
-    execSync('git init', { cwd: testDir });
-    execSync('git config user.email "test@example.com"', { cwd: testDir });
-    execSync('git config user.name "Test User"', { cwd: testDir });
-    execSync('git config advice.defaultBranchName false', { cwd: testDir });
+    execSync('git init', { cwd: testDir, stdio: 'pipe' });
+    execSync('git config user.email "test@example.com"', { cwd: testDir, stdio: 'pipe' });
+    execSync('git config user.name "Test User"', { cwd: testDir, stdio: 'pipe' });
+    execSync('git config advice.defaultBranchName false', { cwd: testDir, stdio: 'pipe' });
   });
 
   teardown(function () {
@@ -145,5 +160,52 @@ suite('CodeScene File Discovery Test Suite', function () {
 
     assert.strictEqual(uris.length, 1);
     assert.strictEqual(path.normalize(uris[0].fsPath), path.normalize(insideRules));
+  });
+
+  suite('non-git workspace (uses findFiles fallback)', function () {
+    let nonGitTempDir: string;
+
+    setup(function () {
+      nonGitTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codescene-nongit-test-'));
+      assertNotInGitRepo(nonGitTempDir);
+    });
+
+    teardown(function () {
+      clearMockFindFilesResults();
+      if (fs.existsSync(nonGitTempDir)) {
+        fs.rmSync(nonGitTempDir, { recursive: true, force: true });
+      }
+    });
+
+    const nonGitTestCases = [
+      {
+        name: 'uses findFiles fallback in non-git workspace with files',
+        mockResultPaths: ['.codescene/code-health-rules.json', 'sub/.codescene/code-health-rules.json'],
+        expectedCount: 2,
+      },
+      {
+        name: 'uses findFiles fallback in non-git workspace with no files',
+        mockResultPaths: [],
+        expectedCount: 0,
+      },
+    ];
+
+    for (const tc of nonGitTestCases) {
+      test(tc.name, async function () {
+        this.timeout(10000);
+
+        const mockResults = tc.mockResultPaths.map((p) => ({ fsPath: path.join(nonGitTempDir, p) }));
+        setMockFindFilesResults(mockResults);
+
+        const uris = await discoverCodeHealthRulesFileUris(nonGitTempDir, undefined);
+
+        assert.strictEqual(uris.length, tc.expectedCount);
+        if (tc.expectedCount > 0) {
+          const fsPaths = uris.map((u) => u.fsPath).sort();
+          const expectedPaths = mockResults.map((r) => r.fsPath).sort();
+          assert.deepStrictEqual(fsPaths, expectedPaths);
+        }
+      });
+    }
   });
 });

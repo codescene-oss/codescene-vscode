@@ -16,6 +16,10 @@ export async function discoverCodeHealthRulesFileUris(
   workspacePath: string,
   gitRootPath?: string
 ): Promise<vscode.Uri[]> {
+  if (!gitRootPath) {
+    return vscode.workspace.findFiles('**/.codescene/code-health-rules.json');
+  }
+
   const absolutePaths = new Set<string>();
 
   const workspaceRules = path.join(workspacePath, CODE_SCENE_DIR, CODE_HEALTH_RULES_FILE);
@@ -23,13 +27,11 @@ export async function discoverCodeHealthRulesFileUris(
     absolutePaths.add(path.normalize(workspaceRules));
   }
 
-  if (gitRootPath) {
-    const trackedPaths = await listTrackedCodeHealthRulesPaths(gitRootPath);
-    for (const relativePath of trackedPaths) {
-      const absolutePath = path.normalize(path.resolve(gitRootPath, relativePath));
-      if (isWithinDirectory(absolutePath, workspacePath)) {
-        absolutePaths.add(absolutePath);
-      }
+  const trackedPaths = await listTrackedCodeHealthRulesPaths(gitRootPath);
+  for (const relativePath of trackedPaths) {
+    const absolutePath = path.normalize(path.resolve(gitRootPath, relativePath));
+    if (isWithinDirectory(absolutePath, workspacePath)) {
+      absolutePaths.add(absolutePath);
     }
   }
 
