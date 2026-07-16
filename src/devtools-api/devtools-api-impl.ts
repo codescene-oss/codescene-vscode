@@ -1,7 +1,6 @@
 import { ExecOptions } from 'child_process';
 import { Command, ExecResult, Task } from '../executor';
 import { SimpleExecutor } from '../simple-executor';
-import { ConcurrencyLimitingExecutor } from '../concurrency-limiting-executor';
 import { AbortingSingleTaskExecutor } from '../aborting-single-task-executor';
 import { QueuedSingleTaskExecutor } from '../queued-single-task-executor';
 import { safeJsonParse, rangeStr, networkErrors } from '../utils';
@@ -23,6 +22,7 @@ import { logOutputChannel } from '../log';
 import { DevtoolsError } from './devtools-error';
 import { CreditsInfoError } from './credits-info-error';
 import { AbortError } from './abort-error';
+import { createCpuAwareConcurrencyExecutor, IsCpuTooBusyFn } from '../cpu-usage-based-executor';
 
 function presentCommand(obj: Task | Command, cwd: string): string {
   const trimmedObj = {
@@ -37,16 +37,14 @@ export class DevtoolsAPIImpl {
   public simpleExecutor: SimpleExecutor = new SimpleExecutor();
   public abortingSingleTaskExecutor: AbortingSingleTaskExecutor = new AbortingSingleTaskExecutor(this.simpleExecutor);
   public queuedSingleTaskExecutor: QueuedSingleTaskExecutor = new QueuedSingleTaskExecutor(this.simpleExecutor);
-  public concurrencyLimitingExecutor: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
-    this.simpleExecutor
-  );
-  public concurrencyLimitingExecutorForDelta: ConcurrencyLimitingExecutor = new ConcurrencyLimitingExecutor(
-    this.simpleExecutor
-  );
+  public concurrencyLimitingExecutor;
+  public concurrencyLimitingExecutorForDelta;
   public preflightJson?: string;
   public networkError: boolean = false;
 
-  constructor(public binaryPath: string, context: ExtensionContext) {
+  constructor(public binaryPath: string, context: ExtensionContext, isCpuTooBusyFn?: IsCpuTooBusyFn) {
+    this.concurrencyLimitingExecutor = createCpuAwareConcurrencyExecutor(this.simpleExecutor, undefined, undefined, isCpuTooBusyFn);
+    this.concurrencyLimitingExecutorForDelta = createCpuAwareConcurrencyExecutor(this.simpleExecutor, undefined, undefined, isCpuTooBusyFn);
     context.subscriptions.push(
       vscode.commands.registerCommand('codescene.printDevtoolsApiStats', () => {
         this.simpleExecutor.logStats();

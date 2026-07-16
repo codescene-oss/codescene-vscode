@@ -55,7 +55,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     mockContext = createMockExtensionContext(repoRoot);
     CsExtensionState.init(mockContext);
     Reviewer.init(mockContext, () => new Map());
-    DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
   });
 
   setup(() => {

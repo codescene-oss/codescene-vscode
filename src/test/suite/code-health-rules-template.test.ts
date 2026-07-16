@@ -30,7 +30,7 @@ suite('Code Health Rules Template Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
   });
 
   teardown(() => {
