@@ -38,6 +38,7 @@ import { OpenFilesObserver } from './review/open-files-observer';
 import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
 import { DefaultBranchGate } from './git/default-branch-gate';
 import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
+import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
 import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
 import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
@@ -168,7 +169,15 @@ export function setWindowFocusedForTesting(focused: boolean): void {
 }
 
 async function initializeCodeHealthFileVersions() {
-  const rulesFiles = await vscode.workspace.findFiles('**/.codescene/code-health-rules.json');
+  const gitApi = acquireGitApi();
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+  if (!workspaceFolder) return;
+
+  const workspacePath = workspaceFolder.uri.fsPath;
+  const repo = gitApi?.getRepository(workspaceFolder.uri);
+  const gitRootPath = repo?.rootUri.fsPath;
+
+  const rulesFiles = await discoverCodeHealthRulesFileUris(workspacePath, gitRootPath);
 
   for (const uri of rulesFiles) {
     try {
