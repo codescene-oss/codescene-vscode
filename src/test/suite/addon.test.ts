@@ -225,6 +225,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     const originalStart = GitChangeLister.prototype.start;
     GitChangeLister.prototype.start = async function () {
       await new Promise((resolve) => setTimeout(resolve, 10));
+      return new Set<string>();
     };
 
     const originalDateNow = Date.now;
@@ -259,6 +260,7 @@ suite('Code Health Monitor Addon Test Suite', () => {
     const originalStart = GitChangeLister.prototype.start;
     GitChangeLister.prototype.start = async function () {
       await new Promise((resolve) => setTimeout(resolve, 10));
+      return new Set<string>();
     };
 
     const originalDateNow = Date.now;

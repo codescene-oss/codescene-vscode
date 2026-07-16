@@ -188,13 +188,27 @@ const vscodeStub = {
       void provider;
       return { dispose: () => {} };
     },
+    registerFileDecorationProvider: (provider: any) => {
+      void provider;
+      return { dispose: () => {} };
+    },
     createTreeView: (id: string, opts: any) => {
       void id;
       void opts;
       return {
-      badge: undefined,
-      dispose: () => {},
-    };
+        visible: false,
+        selection: [],
+        badge: undefined,
+        message: undefined,
+        title: undefined,
+        description: undefined,
+        onDidChangeSelection: () => ({ dispose: () => {} }),
+        onDidChangeVisibility: () => ({ dispose: () => {} }),
+        onDidCollapseElement: () => ({ dispose: () => {} }),
+        onDidExpandElement: () => ({ dispose: () => {} }),
+        reveal: () => Promise.resolve(),
+        dispose: () => {},
+      };
     },
     createStatusBarItem: () => ({
       text: '',

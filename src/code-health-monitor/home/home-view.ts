@@ -1,4 +1,5 @@
 import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscode';
+import * as path from 'path';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
@@ -267,6 +268,37 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());
+  }
+
+  private isPathInSet(filePath: string, pathSet: Set<string>): boolean {
+    const normalized = path.normalize(filePath);
+    for (const p of pathSet) {
+      if (path.normalize(p) === normalized) return true;
+    }
+    return false;
+  }
+
+  removeStaleFiles(changedFiles: Set<string>, visibleFiles: Set<string>): void {
+    const stalePaths: string[] = [];
+
+    for (const filePath of this.fileIssueMap.keys()) {
+      const inChangedFiles = this.isPathInSet(filePath, changedFiles);
+      const inVisibleFiles = this.isPathInSet(filePath, visibleFiles);
+
+      if (!inChangedFiles && !inVisibleFiles) {
+        stalePaths.push(filePath);
+      }
+    }
+
+    for (const stalePath of stalePaths) {
+      this.removeTreeEntry(stalePath);
+    }
+
+    if (stalePaths.length > 0) {
+      this.updateBadgeIfSignedIn();
+      this.rebuildFileDeltaData();
+      this.update();
+    }
   }
 
   private async updateHomeRenderer() {

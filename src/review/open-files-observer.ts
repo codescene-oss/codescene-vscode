@@ -5,6 +5,12 @@ import { FilteringReviewer } from './filtering-reviewer';
 import { getMergeBaseCommitForWorkspace } from '../code-health-monitor/addon';
 import { logOutputChannel } from '../log';
 
+let openFilesObserverInstance: OpenFilesObserver | undefined;
+
+export function getOpenFilesObserverInstance(): OpenFilesObserver | undefined {
+  return openFilesObserverInstance;
+}
+
 /**
  * Observes open file events, and triggers reviews accordingly (only meant for Problems, not for the Code Health Monitor).
  */
@@ -24,6 +30,7 @@ export class OpenFilesObserver {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.docSelector = reviewDocumentSelector();
+    openFilesObserverInstance = this;
   }
 
   private reviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {

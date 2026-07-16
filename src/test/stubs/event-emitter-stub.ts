@@ -1,20 +1,31 @@
 export class EventEmitterStub<T = any> {
-  private listeners: Array<(e: T) => any> = [];
+  private listeners: Array<{ fn: (e: T) => any; thisArg?: any }> = [];
 
-  event = (listener: (e: T) => any) => {
-    this.listeners.push(listener);
-    return {
+  event = (listener: (e: T) => any, thisArg?: any, disposables?: any[]) => {
+    const entry = { fn: listener, thisArg };
+    this.listeners.push(entry);
+    const disposable = {
       dispose: () => {
-        const index = this.listeners.indexOf(listener);
+        const index = this.listeners.indexOf(entry);
         if (index > -1) {
           this.listeners.splice(index, 1);
         }
       }
     };
+    if (disposables) {
+      disposables.push(disposable);
+    }
+    return disposable;
   };
 
   fire(data: T) {
-    this.listeners.forEach(listener => listener(data));
+    this.listeners.forEach(({ fn, thisArg }) => {
+      if (thisArg) {
+        fn.call(thisArg, data);
+      } else {
+        fn(data);
+      }
+    });
   }
 
   dispose() {
