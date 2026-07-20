@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.3...v0.27.4) (2026-07-20)
+
+
+### Features
+
+* add CPU monitoring module with configurable thresholds ([02421ba](https://github.com/codescene-oss/codescene-vscode/commit/02421ba962eb56679fda12536fc68adee80591fb))
+* add CpuUsageBasedExecutor to throttle analysis during high CPU load ([2cfb371](https://github.com/codescene-oss/codescene-vscode/commit/2cfb3712d35bb593703843d37e1b4ba42aaea9e4))
+* add targeted .codescene file discovery using git lookups ([4a089ed](https://github.com/codescene-oss/codescene-vscode/commit/4a089edffd52ddc4f2acdaace9722a31b42005f1))
+* remove stale files from Code Health Monitor after GitChangeLister runs ([9846028](https://github.com/codescene-oss/codescene-vscode/commit/9846028bb31b3f0d03fd0e151a37a4a1adf42892))
+
+
+### Bug fixes
+
+* eliminate race condition in `refreshMergeBaseBaselines` test ([091051d](https://github.com/codescene-oss/codescene-vscode/commit/091051d59a9c6e659ca92d963db26e69b5e00860))
+* fall back to `findFiles` for non-git workspaces ([9f010a0](https://github.com/codescene-oss/codescene-vscode/commit/9f010a03191739ce7a3e40ffde04d3f29d47323d))
+* make CPU throttling injectable to prevent test failures on single-core CI ([514fe90](https://github.com/codescene-oss/codescene-vscode/commit/514fe90fd43bd8fbe74668af0991997cbf1e4ad1))
+
 ### [0.27.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.2...v0.27.3) (2026-07-09)
 
 
