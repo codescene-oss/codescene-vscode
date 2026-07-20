@@ -82,10 +82,6 @@ suite('Code Health Monitor Addon Test Suite', () => {
 
   test('refreshMergeBaseBaselines updates review baselines for all repositories', async () => {
     setMockGitRepositories([createMockRepo()]);
-    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
-
-    // Wait for activation's initial setBaseline call to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
 
     let setBaselineCalls = 0;
     const originalSetBaseline = Reviewer.instance.setBaseline.bind(Reviewer.instance);
@@ -93,6 +89,20 @@ suite('Code Health Monitor Addon Test Suite', () => {
       setBaselineCalls += 1;
       return originalSetBaseline(fileFilter, baselineCommit);
     };
+
+    activateCodeHealthMonitor(mockContext, { getSavedFiles: () => new Set<string>() } as any, mockDefaultBranchGate);
+
+    // Wait for activation's initial setBaseline call to complete
+    const maxWaitMs = 12000;
+    const startTime = Date.now();
+    while (setBaselineCalls < 1) {
+      if (Date.now() - startTime > maxWaitMs) {
+        assert.fail('Timed out waiting for activation setBaseline call');
+      }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    setBaselineCalls = 0;
 
     await refreshMergeBaseBaselines();
 
