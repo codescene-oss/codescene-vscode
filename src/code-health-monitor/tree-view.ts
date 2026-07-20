@@ -151,6 +151,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     }
 
     for (const stalePath of stalePaths) {
+      logOutputChannel.debug(`Removing stale file from Code Health Monitor: ${stalePath}`);
       this.treeDataProvider.removeTreeEntry(stalePath);
     }
   }

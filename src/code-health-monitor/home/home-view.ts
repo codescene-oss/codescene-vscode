@@ -19,6 +19,7 @@ import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralize
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 import { onDidChangeConfiguration, getServerUrl } from '../../configuration';
 import { onFileDeletedFromGit } from '../../git-utils';
+import { logOutputChannel } from '../../log';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -291,6 +292,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     }
 
     for (const stalePath of stalePaths) {
+      logOutputChannel.debug(`Removing stale file from Home View: ${stalePath}`);
       this.removeTreeEntry(stalePath);
     }
 
