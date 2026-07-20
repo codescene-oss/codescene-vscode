@@ -16,6 +16,7 @@ import { CsReview } from '../../review/cs-review';
 import { DevtoolsAPI } from '../../devtools-api';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { DefaultBranchGate } from '../../git/default-branch-gate';
+import { resetGitAvailability } from '../../git/git-detection';
 
 suite('GitChangeObserver Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo-observer');
@@ -76,6 +77,7 @@ suite('GitChangeObserver Test Suite', () => {
 
   setup(async function () {
     this.timeout(20000);
+    resetGitAvailability();
 
     if (fs.existsSync(testRepoPath)) {
       fs.rmSync(testRepoPath, { recursive: true, force: true });
