@@ -1,5 +1,4 @@
 import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscode';
-import * as path from 'path';
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
@@ -20,6 +19,7 @@ import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowled
 import { onDidChangeConfiguration, getServerUrl } from '../../configuration';
 import { onFileDeletedFromGit } from '../../git-utils';
 import { logOutputChannel } from '../../log';
+import { StaleFileRemover } from '../stale-file-remover';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
 
@@ -271,25 +271,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.disposables.forEach((d) => d.dispose());
   }
 
-  private isPathInSet(filePath: string, pathSet: Set<string>): boolean {
-    const normalized = path.normalize(filePath);
-    for (const p of pathSet) {
-      if (path.normalize(p) === normalized) return true;
-    }
-    return false;
-  }
-
   removeStaleFiles(changedFiles: Set<string>, visibleFiles: Set<string>): void {
-    const stalePaths: string[] = [];
-
-    for (const filePath of this.fileIssueMap.keys()) {
-      const inChangedFiles = this.isPathInSet(filePath, changedFiles);
-      const inVisibleFiles = this.isPathInSet(filePath, visibleFiles);
-
-      if (!inChangedFiles && !inVisibleFiles) {
-        stalePaths.push(filePath);
-      }
-    }
+    const staleFileRemover = new StaleFileRemover();
+    const stalePaths = staleFileRemover.findStaleFiles(this.fileIssueMap, changedFiles, visibleFiles);
 
     for (const stalePath of stalePaths) {
       logOutputChannel.debug(`Removing stale file from Home View: ${stalePath}`);
