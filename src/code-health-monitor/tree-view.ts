@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import * as path from 'path';
 import { DevtoolsAPI, DeltaAnalysisEvent } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
@@ -11,6 +12,12 @@ import { onFileDeletedFromGit } from '../git-utils';
 import { onTreeDataCleared } from './addon';
 import { DeltaAnalysisTreeProvider } from './delta-analysis-tree-provider';
 
+let codeHealthMonitorViewInstance: CodeHealthMonitorView | undefined;
+
+export function getCodeHealthMonitorViewInstance(): CodeHealthMonitorView | undefined {
+  return codeHealthMonitorViewInstance;
+}
+
 export class CodeHealthMonitorView implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private treeDataProvider: DeltaAnalysisTreeProvider;
@@ -20,6 +27,7 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     registerDeltaAnalysisDecorations(context);
 
     this.treeDataProvider = new DeltaAnalysisTreeProvider();
+    codeHealthMonitorViewInstance = this;
 
     this.view = vscode.window.createTreeView('codescene.codeHealthMonitorView', {
       treeDataProvider: this.treeDataProvider,
@@ -116,6 +124,35 @@ export class CodeHealthMonitorView implements vscode.Disposable {
 
   isVisible() {
     return this.view.visible;
+  }
+
+  getFileIssueMap(): Map<string, FileWithIssues> {
+    return this.treeDataProvider.fileIssueMap;
+  }
+
+  private isPathInSet(filePath: string, pathSet: Set<string>): boolean {
+    const normalized = path.normalize(filePath);
+    for (const p of pathSet) {
+      if (path.normalize(p) === normalized) return true;
+    }
+    return false;
+  }
+
+  removeStaleFiles(changedFiles: Set<string>, visibleFiles: Set<string>): void {
+    const stalePaths: string[] = [];
+
+    for (const filePath of this.treeDataProvider.fileIssueMap.keys()) {
+      const inChangedFiles = this.isPathInSet(filePath, changedFiles);
+      const inVisibleFiles = this.isPathInSet(filePath, visibleFiles);
+
+      if (!inChangedFiles && !inVisibleFiles) {
+        stalePaths.push(filePath);
+      }
+    }
+
+    for (const stalePath of stalePaths) {
+      this.treeDataProvider.removeTreeEntry(stalePath);
+    }
   }
 
   dispose() {

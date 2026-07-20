@@ -37,7 +37,7 @@ export class GitChangeLister {
   // However, that doesn't matter, because GitChangeLister is always run within a DroppingScheduledExecutor,
   // so if it fails at the first run, a second one will succeed.
   // We used to have some code trying to avoid that unreliability, but it turned out to be complex and expensive.
-  async start(): Promise<void> {
+  async start(): Promise<Set<string>> {
     const workspaceFolder = getWorkspaceFolder();
     if (workspaceFolder) {
       const workspacePath = getWorkspacePath(workspaceFolder);
@@ -46,13 +46,15 @@ export class GitChangeLister {
 
       if (repo && await this.defaultBranchGate.shouldSkipBasedOnDefaultBranch(repo)) {
         logOutputChannel.debug('GitChangeLister: skipping processing, current branch matches default branch');
-        return;
+        return new Set<string>();
       }
 
       const baselineCommit = repo ? await getMergeBaseCommit(repo) : '';
       const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath, baselineCommit);
       this.reviewFiles(allChangedFiles, baselineCommit);
+      return allChangedFiles;
     }
+    return new Set<string>();
   }
 
   async getAllChangedFiles(gitRootPath: string, workspacePath: string, baselineCommit: string): Promise<Set<string>> {

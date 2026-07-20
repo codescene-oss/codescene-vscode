@@ -2,7 +2,7 @@ import vscode, { Uri } from 'vscode';
 import { API, Repository } from '../../types/git';
 import Reviewer from '../review/reviewer';
 import { register as registerCodeLens } from './codelens';
-import { register as registerHomeView } from './home/home-view';
+import { register as registerHomeView, getHomeViewInstance } from './home/home-view';
 import { acquireGitApi, getMergeBaseCommit, getRepoRootPath, updateGitState } from '../git-utils';
 import { CsExtensionState } from '../cs-extension-state';
 import { InteractiveDocsParams } from '../documentation/commands';
@@ -17,6 +17,8 @@ import { isGitAvailable } from '../git/git-detection';
 import { SavedFilesTracker } from '../saved-files-tracker';
 import { isVSCodeWindowFocused } from '../extension-impl';
 import { DefaultBranchGate } from '../git/default-branch-gate';
+import { getOpenFilesObserverInstance } from '../review/open-files-observer';
+import { getCodeHealthMonitorViewInstance } from './tree-view';
 
 const GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS = 9;
 
@@ -28,6 +30,13 @@ const clearTreeEmitter = new vscode.EventEmitter<void>();
 export const onTreeDataCleared = clearTreeEmitter.event;
 
 let ALL_DISPOSABLES: vscode.Disposable[] = [];
+
+function removeStaleFilesFromMonitors(changedFiles: Set<string>): void {
+  const visibleFiles = getOpenFilesObserverInstance()?.getAllVisibleFileNames() ?? new Set<string>();
+
+  getCodeHealthMonitorViewInstance()?.removeStaleFiles(changedFiles, visibleFiles);
+  getHomeViewInstance()?.removeStaleFiles(changedFiles, visibleFiles);
+}
 
 export async function runScheduledGitChangeReview(): Promise<void> {
   if (!isVSCodeWindowFocused()) {
@@ -42,7 +51,8 @@ export async function runScheduledGitChangeReview(): Promise<void> {
   logOutputChannel.info('Starting scheduled git change review');
 
   const startTime = Date.now();
-  await gitChangeListerInstance!.start();
+  const changedFiles = await gitChangeListerInstance!.start();
+  removeStaleFilesFromMonitors(changedFiles);
   const elapsedMs = Date.now() - startTime;
   const elapsedSeconds = Math.ceil(elapsedMs / 1000);
 
@@ -181,7 +191,8 @@ export async function runGitChangeLister(): Promise<void> {
   if (!gitChangeListerInstance || !isGitAvailable()) {
     return;
   }
-  await gitChangeListerInstance.start();
+  const changedFiles = await gitChangeListerInstance.start();
+  removeStaleFilesFromMonitors(changedFiles);
 }
 
 export function deactivate() {
