@@ -55,8 +55,10 @@ export class OpenFilesObserver {
     const fileNames = new Set<string>();
     vscode.window.tabGroups.all.forEach((tabGroup) => {
       tabGroup.tabs.forEach((tab) => {
-        if (tab.input instanceof vscode.TabInputText) {
-          fileNames.add(tab.input.uri.fsPath);
+        // Only include file:// scheme URIs (excludes output channels, logs, etc.)
+        const isTextInput = tab.input instanceof vscode.TabInputText || (tab.input && typeof tab.input === 'object' && 'uri' in tab.input);
+        if (isTextInput && (tab.input as any).uri?.scheme === 'file') {
+          fileNames.add((tab.input as any).uri.fsPath);
         }
       });
     });
@@ -67,7 +69,10 @@ export class OpenFilesObserver {
     const fileNames = new Set<string>();
 
     vscode.window.visibleTextEditors.forEach(editor => {
-      fileNames.add(editor.document.fileName);
+      // Only include file:// scheme URIs (excludes output channels, logs, etc.)
+      if (editor.document.uri.scheme === 'file') {
+        fileNames.add(editor.document.fileName);
+      }
     });
 
     this.getVisibleTabFileNames().forEach((fileName) => {

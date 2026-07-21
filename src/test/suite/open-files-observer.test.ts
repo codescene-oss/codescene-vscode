@@ -1,17 +1,25 @@
 import * as assert from 'assert';
+import * as vscode from '../mocks/vscode';
 import { OpenFilesObserver } from '../../review/open-files-observer';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-event';
-import { ExtensionContext } from '../mocks/vscode';
+import { MockEditor } from '../mocks/mock-editor';
+import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow } from '../setup';
 
 suite('OpenFilesObserver Test Suite', () => {
   let observer: OpenFilesObserver;
 
   setup(() => {
+    resetMockWindow();
+
     const mockContext = {
       subscriptions: [],
-    } as unknown as ExtensionContext;
+    } as unknown as vscode.ExtensionContext;
     observer = new OpenFilesObserver(mockContext as any);
+  });
+
+  teardown(() => {
+    resetMockWindow();
   });
 
   suite('shouldSkipDocumentChange', () => {
@@ -100,6 +108,55 @@ suite('OpenFilesObserver Test Suite', () => {
 
       assert.strictEqual(getAllVisibleFileNamesCalled, false,
         'getAllVisibleFileNames should not be called by shouldSkipDocumentChange - it is called in onDidChangeTextDocument handler');
+    });
+  });
+
+  suite('scheme filtering', () => {
+    const testCases = [
+      {
+        name: 'excludes non-file scheme from visibleTextEditors',
+        editors: [
+          { document: new TestTextDocument('/test/file.ts', '', 'typescript'), scheme: 'file' },
+          { document: { fileName: 'output.log', uri: { scheme: 'output', fsPath: 'output.log' } }, scheme: 'output' },
+        ],
+        expectedCount: 1,
+      },
+      {
+        name: 'excludes non-file scheme from tabGroups',
+        tabGroups: [
+          { tabs: [{ input: new vscode.TabInputText(vscode.Uri.file('/test/file1.ts')) }] },
+          { tabs: [{ input: new vscode.TabInputText({ scheme: 'output', fsPath: 'log.log', path: 'log.log' } as any) }] },
+        ],
+        expectedCount: 1,
+      },
+      {
+        name: 'includes only file scheme URIs',
+        editors: [
+          { document: new TestTextDocument('/test/file1.ts', '', 'typescript'), scheme: 'file' },
+          { document: new TestTextDocument('/test/file2.ts', '', 'typescript'), scheme: 'file' },
+        ],
+        tabGroups: [
+          { tabs: [{ input: new vscode.TabInputText(vscode.Uri.file('/test/file3.ts')) }] },
+        ],
+        expectedCount: 3,
+      },
+    ];
+
+    testCases.forEach(({ name, editors, tabGroups, expectedCount }) => {
+      test(name, () => {
+        if (editors) {
+          const mockEditors = editors.map(e => new MockEditor(e.document));
+          setMockVisibleTextEditors(mockEditors);
+        }
+        if (tabGroups) {
+          setMockTabGroups(tabGroups);
+        }
+
+        const result = observer.getAllVisibleFileNames();
+
+        assert.strictEqual(result.size, expectedCount,
+          `Expected ${expectedCount} files, got ${result.size}: ${Array.from(result).join(', ')}`);
+      });
     });
   });
 });
