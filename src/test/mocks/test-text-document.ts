@@ -5,19 +5,21 @@ export class TestTextDocument implements vscode.TextDocument {
   private _fileName: string;
   private _content: string;
   private _languageId: string;
+  private _version: number;
 
-  constructor(filePath: string, content: string, languageId: string) {
+  constructor(filePath: string, content: string, languageId: string, version: number = 1) {
     this._fileName = filePath;
     this._content = content;
     this._languageId = languageId;
     this._uri = vscode.Uri.file(filePath);
+    this._version = version;
   }
 
   get uri() { return this._uri; }
   get fileName() { return this._fileName; }
   get isUntitled() { return false; }
   get languageId() { return this._languageId; }
-  get version() { return 1; }
+  get version() { return this._version; }
   get isDirty() { return false; }
   get isClosed() { return false; }
   get eol() { return vscode.EndOfLine.LF; }

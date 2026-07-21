@@ -23,6 +23,7 @@ export class OpenFilesObserver {
   // Tracks files that were opened as visible in the UI.
   // The reason for tracking them is that onDidOpenTextDocument does not reflect files open in the UI and can be called at arbitrary times.
   private visibleDocuments = new Set<string>();
+  private documentVersions = new Map<string, number>();
 
   // For code to be called just once.
   private hasInitialized = false;
@@ -54,8 +55,10 @@ export class OpenFilesObserver {
     const fileNames = new Set<string>();
     vscode.window.tabGroups.all.forEach((tabGroup) => {
       tabGroup.tabs.forEach((tab) => {
-        if (tab.input instanceof vscode.TabInputText) {
-          fileNames.add(tab.input.uri.fsPath);
+        // Only include file:// scheme URIs (excludes output channels, logs, etc.)
+        const isTextInput = tab.input instanceof vscode.TabInputText || (tab.input && typeof tab.input === 'object' && 'uri' in tab.input);
+        if (isTextInput && (tab.input as any).uri?.scheme === 'file') {
+          fileNames.add((tab.input as any).uri.fsPath);
         }
       });
     });
@@ -66,7 +69,10 @@ export class OpenFilesObserver {
     const fileNames = new Set<string>();
 
     vscode.window.visibleTextEditors.forEach(editor => {
-      fileNames.add(editor.document.fileName);
+      // Only include file:// scheme URIs (excludes output channels, logs, etc.)
+      if (editor.document.uri.scheme === 'file') {
+        fileNames.add(editor.document.fileName);
+      }
     });
 
     this.getVisibleTabFileNames().forEach((fileName) => {
@@ -80,6 +86,21 @@ export class OpenFilesObserver {
     const uri = vscode.Uri.file(fileName);
     CsDiagnostics.set(uri, []);
     this.visibleDocuments.delete(fileName);
+    this.documentVersions.delete(fileName);
+  }
+
+  shouldSkipDocumentChange(e: vscode.TextDocumentChangeEvent): boolean {
+    if (e.contentChanges.length === 0) {
+      return true;
+    }
+    const filePath = e.document.fileName;
+    const newVersion = e.document.version;
+    const oldVersion = this.documentVersions.get(filePath);
+    if (oldVersion !== undefined && oldVersion === newVersion) {
+      return true;
+    }
+    this.documentVersions.set(filePath, newVersion);
+    return false;
   }
 
   private pollForVisibleEditors(): void {
@@ -150,6 +171,14 @@ export class OpenFilesObserver {
       vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
         const filePath = e.document.fileName;
         if (!this.visibleDocuments.has(filePath)) {
+          return;
+        }
+        // Verify file has an actual UI tab (not internal buffers like log outputs)
+        const allVisibleTabs = this.getAllVisibleFileNames();
+        if (!allVisibleTabs.has(filePath)) {
+          return;
+        }
+        if (this.shouldSkipDocumentChange(e)) {
           return;
         }
         clearTimeout(this.reviewTimers.get(filePath));

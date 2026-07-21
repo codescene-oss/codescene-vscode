@@ -41,6 +41,19 @@ export function restoreDefaultWorkspaceFolders() {
   vscodeStub.workspace.workspaceFolders = defaultWorkspaceFolders as any;
 }
 
+export function setMockVisibleTextEditors(editors: any[]) {
+  vscodeStub.window.visibleTextEditors = editors;
+}
+
+export function setMockTabGroups(tabGroups: any[]) {
+  vscodeStub.window.tabGroups = { all: tabGroups };
+}
+
+export function resetMockWindow() {
+  vscodeStub.window.visibleTextEditors = [];
+  vscodeStub.window.tabGroups = { all: [] };
+}
+
 let mockGitRepositories: any[] = [];
 let mockFindFilesResults: any[] = [];
 
@@ -142,7 +155,12 @@ function createMockGitApi() {
   };
 }
 
+class TabInputTextStub {
+  constructor(public uri: any) {}
+}
+
 const vscodeStub = {
+  TabInputText: TabInputTextStub,
   extensions: {
     getExtension: (id: string) => {
       if (id === 'vscode.git') {
@@ -159,6 +177,8 @@ const vscodeStub = {
     },
   },
   window: {
+    visibleTextEditors: [] as any[],
+    tabGroups: { all: [] as any[] },
     state: {
       focused: true,
     },
