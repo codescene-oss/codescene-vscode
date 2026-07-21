@@ -168,6 +168,11 @@ export class OpenFilesObserver {
         if (!this.visibleDocuments.has(filePath)) {
           return;
         }
+        // Verify file has an actual UI tab (not internal buffers like log outputs)
+        const allVisibleTabs = this.getAllVisibleFileNames();
+        if (!allVisibleTabs.has(filePath)) {
+          return;
+        }
         if (this.shouldSkipDocumentChange(e)) {
           return;
         }

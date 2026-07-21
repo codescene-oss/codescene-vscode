@@ -23,6 +23,7 @@ suite('OpenFilesObserver Test Suite', () => {
         contentChanges: [],
         priorVersion: undefined,
         expected: true,
+        description: 'Diagnostic-only updates have no content changes',
       },
       {
         name: 'returns false on first call (no prior version stored)',
@@ -31,6 +32,7 @@ suite('OpenFilesObserver Test Suite', () => {
         contentChanges: [{}],
         priorVersion: undefined,
         expected: false,
+        description: 'First edit should trigger review',
       },
       {
         name: 'returns true when document version unchanged',
@@ -39,6 +41,7 @@ suite('OpenFilesObserver Test Suite', () => {
         contentChanges: [{}],
         priorVersion: 5,
         expected: true,
+        description: 'Duplicate events with same version should be skipped',
       },
       {
         name: 'returns false when document version changed',
@@ -47,6 +50,16 @@ suite('OpenFilesObserver Test Suite', () => {
         contentChanges: [{}],
         priorVersion: 5,
         expected: false,
+        description: 'New version should trigger review',
+      },
+      {
+        name: 'returns true when contentChanges empty even with new version',
+        filePath: '/test/file5.ts',
+        version: 7,
+        contentChanges: [],
+        priorVersion: 6,
+        expected: true,
+        description: 'Empty contentChanges check takes precedence',
       },
     ];
 
@@ -64,6 +77,29 @@ suite('OpenFilesObserver Test Suite', () => {
 
         assert.strictEqual(result, expected, name);
       });
+    });
+  });
+
+  suite('getAllVisibleFileNames interaction', () => {
+    test('getAllVisibleFileNames is called during document change processing', () => {
+      const filePath = '/test/visible-file.ts';
+      const originalGetAllVisibleFileNames = observer.getAllVisibleFileNames.bind(observer);
+      let getAllVisibleFileNamesCalled = false;
+
+      observer.getAllVisibleFileNames = () => {
+        getAllVisibleFileNamesCalled = true;
+        return originalGetAllVisibleFileNames();
+      };
+
+      (observer as any).visibleDocuments.add(filePath);
+
+      const doc = new TestTextDocument(filePath, '', 'typescript', 1);
+      const event = new MockTextDocumentChangeEvent(doc, [{}] as any);
+
+      observer.shouldSkipDocumentChange(event);
+
+      assert.strictEqual(getAllVisibleFileNamesCalled, false,
+        'getAllVisibleFileNames should not be called by shouldSkipDocumentChange - it is called in onDidChangeTextDocument handler');
     });
   });
 });
