@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.4...v0.27.5) (2026-07-21)
+
+
+### Bug fixes
+
+* filter non-file scheme URIs in getAllVisibleFileNames ([2a5115c](https://github.com/codescene-oss/codescene-vscode/commit/2a5115c8bd9036e63c527ae8809faf068f3660a9))
+* prevent excessive `git merge-base` calls in `OpenFilesObserver` ([243d5b8](https://github.com/codescene-oss/codescene-vscode/commit/243d5b8d77568d5e8c4cfc8226742857ad2ccf15))
+* skip document change events for files without UI tabs ([b902ebf](https://github.com/codescene-oss/codescene-vscode/commit/b902ebf4aa8ce312f4f385806cda446ee2ba15ac))
+
 ### [0.27.4](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.3...v0.27.4) (2026-07-20)
 
 
