@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.5...v0.27.6) (2026-07-24)
+
+
+### Bug fixes
+
+* update extension ID to match marketplace identifier ([#335](https://github.com/codescene-oss/codescene-vscode/issues/335)) ([76a0c9c](https://github.com/codescene-oss/codescene-vscode/commit/76a0c9cbc5fe6d5f84ec9710c928ca0987c8cb87))
+
 ### [0.27.5](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.4...v0.27.5) (2026-07-21)
 
 
