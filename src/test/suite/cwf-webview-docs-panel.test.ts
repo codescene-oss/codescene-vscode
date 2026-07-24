@@ -36,7 +36,7 @@ suite('CodeSceneCWFDocsTabPanel Test Suite', () => {
     resetWebviewPanelMocks();
     resetDocsPanel();
     mockContext = createMockExtensionContext('/test/docs-panel');
-    initExtensionId({ extension: { id: 'codescene.codescene-vscode' } } as vscode.ExtensionContext);
+    initExtensionId({ extension: { id: 'CodeScene.codescene-vscode' } } as vscode.ExtensionContext);
     CsExtensionState.init(mockContext);
 
     originalExecuteCommand = vscode.commands.executeCommand;
@@ -94,7 +94,7 @@ suite('CodeSceneCWFDocsTabPanel Test Suite', () => {
       executedCommands.some((c) => c.command === 'workbench.action.openWorkspaceSettings'),
       'Expected workspace settings command'
     );
-    assert.strictEqual(executedCommands[0].args[0], '@ext:codescene.codescene-vscode');
+    assert.strictEqual(executedCommands[0].args[0], '@ext:CodeScene.codescene-vscode');
   });
 
   test('open-settings falls back to user settings when workspace settings fail', async () => {
