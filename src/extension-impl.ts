@@ -300,7 +300,7 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   initializeGitIntegration();
 
-  activateCHMonitor(context, savedFilesTrackerInstance, defaultBranchGateInstance);
+  activateCHMonitor(context, savedFilesTrackerInstance);
 
   setupCodeLensProviders(context);
 
