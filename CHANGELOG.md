@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.27.7](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.6...v0.27.7) (2026-08-06)
+
+
+### Bug fixes
+
+* exclude in-flight jobs from stale file removal ([#338](https://github.com/codescene-oss/codescene-vscode/issues/338)) ([480d95b](https://github.com/codescene-oss/codescene-vscode/commit/480d95bec98ae900dec0bfeea42e11e4d6024ed4))
+
 ### [0.27.6](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.5...v0.27.6) (2026-07-24)
 
 
