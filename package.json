@@ -156,6 +156,13 @@
           "default": true,
           "description": "Enable sending usage telemetry to CodeScene",
           "order": 20
+        },
+        "codescene.serverWorkerThreads": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of worker threads used by the CodeScene IDE server. Set to 0 to use half of the available logical CPU cores.",
+          "order": 21
         }
       }
     },
@@ -228,6 +235,7 @@
     "follow-redirects": "^1.15.6",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "vscode-jsonrpc": "^8.2.1"
   }
 }

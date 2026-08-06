@@ -6,19 +6,19 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '0bfb30fca2c1c9dfce83a2d0393315dc14a5eeef';
+const requiredDevtoolsVersion = 'eb5ec94fa47c9af7d16ba2192c600675a40a806d';
 
 const artifacts = {
   darwin: {
-    x64: `cs-ide-macos-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-macos-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-macos-amd64-${requiredDevtoolsVersion}.zip`,
+    arm64: `cs-ide-jre-macos-aarch64-${requiredDevtoolsVersion}.zip`,
   },
   linux: {
-    x64: `cs-ide-linux-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-linux-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-linux-amd64-${requiredDevtoolsVersion}.zip`,
+    arm64: `cs-ide-jre-linux-aarch64-${requiredDevtoolsVersion}.zip`,
   },
   win32: {
-    x64: `cs-ide-windows-amd64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-windows-amd64-${requiredDevtoolsVersion}.zip`,
   },
 };
 

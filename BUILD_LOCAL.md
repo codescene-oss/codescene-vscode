@@ -27,20 +27,90 @@ npm install
 
 This is the fastest way to test changes during development.
 
-### 1. Bundle CLI Binary for Your Platform
+### 1. Bundle CLI Distribution for Your Platform
 
-The extension needs the CLI binary for your current platform:
+The extension needs a local `cs-ide` distribution (bundled JRE + `cs-ide.jar`) for your current platform:
 
 ```bash
 npm run bundle-cli-test
 ```
 
 This will:
-- Detect your platform automatically (darwin/arm64, darwin/x64, linux/x64, etc.)
-- Download and extract the appropriate CLI binary
-- Place it in the project root (e.g., `cs-darwin-arm64`)
+- Detect your platform automatically (darwin/arm64, darwin/x64, linux/x64, win32/x64, etc.)
+- Download and extract the CLI zip from `downloads.codescene.io`
+- Place it in the project root as a directory, e.g. `cs-darwin-arm64/` or `cs-win32-x64/`
 
-**Note:** You only need to run this once, or when switching platforms.
+Expected layout:
+
+```text
+cs-<platform>-<arch>/
+  cs-ide.jar
+  jre/
+    bin/
+      java          # java.exe on Windows
+```
+
+**Note:** You only need to run this once, or when switching platforms / CLI versions.
+
+### Using a Local CLI Distribution (`CS_IDE_USE_LOCAL_DISTRIBUTION`)
+
+Use this when you have built `cs-ide` yourself (for example from the `cli-server` branch) and do not want `bundle-cli` to download a published zip.
+
+1. Place a complete distribution at the expected path for your platform/arch, for example:
+   - macOS ARM64: `cs-darwin-arm64/`
+   - Windows x64: `cs-win32-x64/`
+   - Linux x64: `cs-linux-x64/`
+
+   It must contain `cs-ide.jar` and `jre/bin/java` (or `java.exe`).
+
+2. Skip the download when bundling / packaging:
+
+```bash
+# macOS / Linux
+export CS_IDE_USE_LOCAL_DISTRIBUTION=true
+npm run bundle-cli-test
+
+# Windows PowerShell
+$env:CS_IDE_USE_LOCAL_DISTRIBUTION = 'true'
+npm run bundle-cli-test
+```
+
+With that flag set, `scripts/bundle-cli.js` validates the local directory and does **not** download. `scripts/package-platform.js` also skips remote docs/webview refresh when packaging.
+
+3. If your local build's SHA differs from `scripts/cli-config.js` (`requiredDevtoolsVersion`), override the runtime check.
+
+Get the SHA from your distribution:
+
+```bash
+# Windows
+cs-win32-x64\jre\bin\java.exe --enable-native-access=ALL-UNNAMED -jar cs-win32-x64\cs-ide.jar version --sha
+
+# macOS / Linux
+cs-darwin-arm64/jre/bin/java --enable-native-access=ALL-UNNAMED -jar cs-darwin-arm64/cs-ide.jar version --sha
+```
+
+**Important for F5:** a shell `export` / `$env:...` only affects that terminal. The Extension Development Host needs the variable in [`.vscode/launch.json`](.vscode/launch.json):
+
+```json
+"env": {
+  "CS_IDE_REQUIRED_VERSION": "<sha-from-version-sha>"
+}
+```
+
+Without that, activation fails if the server's `sha` does not match the pin in `cli-config.js`.
+
+4. Build and press F5 as usual. The extension starts:
+
+```text
+jre/bin/java --enable-native-access=ALL-UNNAMED -jar cs-ide.jar server --threads <N>
+```
+
+For the opt-in native contract test (talks to a real distribution):
+
+```bash
+export CS_IDE_DISTRIBUTION_PATH=/absolute/path/to/cs-<platform>-<arch>
+npm run test -- --grep 'Native IDE Server Contract'
+```
 
 ### 2. Build the Extension
 
@@ -172,9 +242,9 @@ Or manually:
    - Should see: "CodeScene devtools binary is ready."
    - ❌ Should NOT see: "Downloading..." messages
 
-2. **Verify Binary Path:**
-   - In the output, check it found the binary at the correct path
-   - Path should match: `.../codescene-vscode-X.X.X/cs-<platform>-<arch>[.exe]`
+2. **Verify Distribution Path:**
+   - In the output, check it found the distribution at the correct path
+   - Path should match: `.../codescene-vscode-X.X.X/cs-<platform>-<arch>/` (directory containing `cs-ide.jar` and `jre/`)
 
 ## Common Commands
 
@@ -217,13 +287,17 @@ npm run package-platform -- win32 x64      # Windows x64
 
 ### Development Mode Issues
 
-#### Binary Not Found Error
+#### Distribution Not Found / Incomplete Error
 
-**Error:** `The devtools binary "cs-darwin-arm64" does not exist`
+**Error:** `The cs-ide distribution "..." is incomplete`
 
 **Solution:**
 ```bash
-# Bundle the CLI binary for your platform
+# Bundle the published CLI distribution for your platform
+npm run bundle-cli-test
+
+# Or use a local build (see CS_IDE_USE_LOCAL_DISTRIBUTION above)
+export CS_IDE_USE_LOCAL_DISTRIBUTION=true
 npm run bundle-cli-test
 
 # Then rebuild
@@ -232,10 +306,20 @@ npm run build
 # Reload VS Code window (F5 again)
 ```
 
+#### Version Mismatch Error
+
+**Error:** `The devtools binary version does not match the required version ...`
+
+**Solution:** Either rebuild against a published CLI zip whose SHA matches `scripts/cli-config.js`, or point at your local build and override:
+
+```bash
+export CS_IDE_REQUIRED_VERSION=<sha-from-cs-ide-start>
+```
+
 #### Extension Doesn't Activate
 
 **Check:**
-1. Binary is bundled: `ls -lh cs-*` should show your platform's binary
+1. Distribution is present: `cs-<platform>-<arch>/cs-ide.jar` and `cs-<platform>-<arch>/jre/bin/java` exist
 2. Extension is built: `ls -lh out/main.js` should exist
 3. Check Output panel for errors
 4. Check Developer Console: Help → Toggle Developer Tools
@@ -278,8 +362,9 @@ nvm use 20
 # List contents of VSIX
 unzip -l codescene-vscode-*-<platform>-<arch>.vsix | grep "cs-"
 
-# Should show your platform's binary, e.g.:
-# cs-darwin-arm64  (for macOS ARM64)
+# Should show your platform's distribution directory, e.g.:
+# extension/cs-darwin-arm64/cs-ide.jar
+# extension/cs-darwin-arm64/jre/bin/java
 ```
 
 ## Clean Up
@@ -287,8 +372,8 @@ unzip -l codescene-vscode-*-<platform>-<arch>.vsix | grep "cs-"
 After testing:
 
 ```bash
-# Remove bundled binaries (optional - you may want to keep them for development)
-rm -f cs-* *.zip
+# Remove bundled distributions (optional - you may want to keep them for development)
+rm -rf cs-darwin-* cs-linux-* cs-win32-* *.zip
 
 # Remove VSIX files
 rm -f *.vsix
@@ -310,9 +395,10 @@ code --uninstall-extension codescene.codescene-vscode
    npm run watch  # (runs in background)
    ```
 
-3. **If you need to test with a fresh binary:**
+3. **If you need to test with a fresh CLI distribution:**
    ```bash
    npm run bundle-cli-test
+   # Or: CS_IDE_USE_LOCAL_DISTRIBUTION=true npm run bundle-cli-test
    ```
 
 4. **Reload Extension Development Host:**
@@ -324,7 +410,7 @@ code --uninstall-extension codescene.codescene-vscode
 ### Testing Checklist
 
 - [ ] Extension activates without errors
-- [ ] Binary is found and verified
+- [ ] CLI distribution is found and verified (`cs-ide/start` SHA matches)
 - [ ] Code review features work
 - [ ] Diagnostics appear correctly
 - [ ] Monitor works (if Git is available)

@@ -10,6 +10,7 @@ export interface Review {
    * If file is scorable, this will be a number between 1.0 and 10.0
    */
   score?: number;
+  'git-blob-sha'?: string;
   /**
    * Optional map with error info about code-health-rules. Present if there were any issues
    * parsing the rules-file.

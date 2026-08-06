@@ -10,27 +10,31 @@ export function createTestDir(testName: string): string {
 
 export async function ensureBinary(): Promise<string> {
   const extensionPath = path.join(__dirname, '../..');
-  const binaryPath = new ArtifactInfo(extensionPath).absoluteBinaryPath;
+  const artifact = new ArtifactInfo(extensionPath);
+  const binaryPath = artifact.absoluteBinaryPath;
 
-  if (!fs.existsSync(binaryPath)) {
-    console.log(`CLI binary not found at ${binaryPath}, attempting to download...`);
+  const distributionReady =
+    fs.existsSync(binaryPath) && fs.existsSync(artifact.absoluteJavaPath) && fs.existsSync(artifact.absoluteJarPath);
+
+  if (!distributionReady) {
+    console.log(`CLI distribution not found at ${binaryPath}, attempting to download...`);
     try {
       await ensureCompatibleBinary(extensionPath);
-      console.log(`CLI binary downloaded successfully to ${binaryPath}`);
+      console.log(`CLI distribution downloaded successfully to ${binaryPath}`);
     } catch (error) {
       throw new Error(
-        `CLI binary not found and download failed. ` +
-          `Expected binary at: ${binaryPath}. ` +
+        `CLI distribution not found and download failed. ` +
+          `Expected distribution at: ${binaryPath}. ` +
           `Error: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
-  if (!fs.existsSync(binaryPath)) {
+  if (!fs.existsSync(artifact.absoluteJavaPath) || !fs.existsSync(artifact.absoluteJarPath)) {
     throw new Error(
-      `CLI binary still not found after download attempt. ` +
-        `Expected at: ${binaryPath}. ` +
-        `Please ensure the binary is available for platform: ${process.platform}-${process.arch}`
+      `CLI distribution still incomplete after download attempt. ` +
+        `Expected java/jar under: ${binaryPath}. ` +
+        `Please ensure the distribution is available for platform: ${process.platform}-${process.arch}`
     );
   }
 

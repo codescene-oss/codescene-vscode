@@ -18,6 +18,14 @@ export class ArtifactInfo {
     return path.join(this.extensionPath, this.binaryName);
   }
 
+  get absoluteJavaPath() {
+    return path.join(this.absoluteBinaryPath, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
+  }
+
+  get absoluteJarPath() {
+    return path.join(this.absoluteBinaryPath, 'cs-ide.jar');
+  }
+
   get artifactName() {
     const artifactName = artifacts[process.platform]?.[process.arch];
     if (!artifactName) {
@@ -27,7 +35,6 @@ export class ArtifactInfo {
   }
 
   get binaryName(): string {
-    // E.g. cs-darwin-x64/arm64, cs-linux-x64, cs-win32-x64.exe
-    return `cs-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`;
+    return `cs-${process.platform}-${process.arch}`;
   }
 }

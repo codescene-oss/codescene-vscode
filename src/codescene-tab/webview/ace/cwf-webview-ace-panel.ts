@@ -1,6 +1,6 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { MessageToIDEType } from '../../../centralized-webview-framework/types/messages';
-import { showDocAtPosition } from '../../../utils';
+import { reportError, showDocAtPosition } from '../../../utils';
 import { commonResourceRoots } from '../../../webview-utils';
 import Telemetry from '../../../telemetry';
 import {
@@ -15,7 +15,7 @@ import { RefactoringRequest } from '../../../refactoring/request';
 import { initBaseContent } from '../../../centralized-webview-framework/cwf-html-utils';
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
-import debounce from 'lodash.debounce';
+import debounce = require('lodash.debounce');
 import { logIdString } from '../../../devtools-api';
 import { AbortError } from '../../../devtools-api/abort-error';
 import { DevtoolsError } from '../../../devtools-api/devtools-error';
@@ -38,7 +38,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   private disposables: Disposable[] = [];
   private state?: CwfAceTabParams;
   private initialized: boolean = false;
-  private debouncedUpdateWebView: (request: RefactoringRequest) => void;
+  private readonly debouncedUpdateWebView = debounce((request: RefactoringRequest) => {
+    void this.updateWebView(request);
+  }, 1000);
   private isDisposing: boolean = false;
 
   public static get instance() {
@@ -49,8 +51,6 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   }
 
   constructor() {
-    this.debouncedUpdateWebView = debounce((request) => this.updateWebView(request), 1000);
-
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceTabPanel.viewType,
       'CodeScene ACE',
@@ -80,7 +80,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   }
 
   private handleIsStale(e: vscode.TextDocumentChangeEvent) {
-    if (!this.state) return;
+    if (this.isDisposing || !this.state) return;
     const { document, fnToRefactor } = this.state.request;
     if (document !== e.document || e.contentChanges.length === 0) return;
     const { shouldUpdateRange, isStale } = isFunctionUnchangedInDocument(document, fnToRefactor);
@@ -229,12 +229,14 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   }
 
   private async updateWebView(request: RefactoringRequest) {
+    if (this.isDisposing) return;
     const isStale = this.state?.isStale ?? false;
 
     await this.renderAce(request, getAceData({ request, isStale, loading: true }));
 
     try {
       const result = await request.promise;
+      if (this.isDisposing) return;
       result.code = decorateCode(result, request.document.languageId);
 
       await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
@@ -266,6 +268,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   }
 
   private async renderAce(request: RefactoringRequest, aceData: AceContextViewProps) {
+    if (this.isDisposing) return;
     this.state = { request, cwfProps: aceData };
 
     const message = {
@@ -291,18 +294,20 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     if (this.isDisposing) return;
     this.isDisposing = true;
 
+    this.debouncedUpdateWebView.cancel();
     CodeSceneCWFAceTabPanel._instance = undefined;
 
     this.state = undefined;
     this.initialized = false;
     this.hasSetInitialScript = false;
+    this.messageQueue = [];
 
     const disposable = this.webViewPanelDisposable;
     this.webViewPanelDisposable = null;
     disposable?.dispose();
 
-    this.webViewPanel.dispose();
     this.disposables.forEach((d) => d.dispose());
+    this.webViewPanel.dispose();
   }
 
   static show(request: RefactoringRequest) {
