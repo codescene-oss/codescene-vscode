@@ -15,6 +15,10 @@ export class ReviewCacheItem {
     this.documentVersion = document.version;
   }
 
+  setDelta(delta: Delta | undefined) {
+    this.delta = delta;
+  }
+
   setReview(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     this.review = review;
     this.documentVersion = document.version;
