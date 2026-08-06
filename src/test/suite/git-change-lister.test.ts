@@ -466,7 +466,7 @@ suite('GitChangeLister Test Suite', () => {
       test(name, () => {
         initialFiles.forEach(addFileToMap);
 
-        codeHealthMonitorView.removeStaleFiles(new Set(changedFiles), new Set(visibleFiles));
+        codeHealthMonitorView.removeStaleFiles(new Set(changedFiles), new Set(visibleFiles), new Set());
 
         const fileIssueMap = codeHealthMonitorView.getFileIssueMap();
         assert.strictEqual(fileIssueMap.size, expectedFiles.length);
@@ -496,7 +496,7 @@ suite('GitChangeLister Test Suite', () => {
       test(`path normalization: ${name}`, () => {
         addFileToMap(mapPath);
 
-        codeHealthMonitorView.removeStaleFiles(new Set([changedPath]), new Set());
+        codeHealthMonitorView.removeStaleFiles(new Set([changedPath]), new Set(), new Set());
 
         const fileIssueMap = codeHealthMonitorView.getFileIssueMap();
         assert.strictEqual(fileIssueMap.size, 1, `Expected file to be kept when matching via ${changedPath}`);

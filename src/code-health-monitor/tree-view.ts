@@ -130,9 +130,14 @@ export class CodeHealthMonitorView implements vscode.Disposable {
     return this.treeDataProvider.fileIssueMap;
   }
 
-  removeStaleFiles(changedFiles: Set<string>, visibleFiles: Set<string>): void {
+  removeStaleFiles(changedFiles: Set<string>, visibleFiles: Set<string>, filesInJob: Set<string>): void {
     const staleFileRemover = new StaleFileRemover();
-    const stalePaths = staleFileRemover.findStaleFiles(this.treeDataProvider.fileIssueMap, changedFiles, visibleFiles);
+    const stalePaths = staleFileRemover.findStaleFiles(
+      this.treeDataProvider.fileIssueMap,
+      changedFiles,
+      visibleFiles,
+      filesInJob
+    );
 
     for (const stalePath of stalePaths) {
       logOutputChannel.debug(`Removing stale file from Code Health Monitor: ${stalePath}`);

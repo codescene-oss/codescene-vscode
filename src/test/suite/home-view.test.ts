@@ -115,7 +115,7 @@ suite('HomeView', () => {
       test(name, () => {
         initialFiles.forEach(addFileToHomeView);
 
-        homeView.removeStaleFiles(new Set(changedFiles), new Set(visibleFiles));
+        homeView.removeStaleFiles(new Set(changedFiles), new Set(visibleFiles), new Set());
 
         const fileIssueMap = homeView.getFileIssueMap();
         assert.strictEqual(fileIssueMap.size, expectedFiles.length);
@@ -145,7 +145,7 @@ suite('HomeView', () => {
       test(`path normalization: ${name}`, () => {
         addFileToHomeView(mapPath);
 
-        homeView.removeStaleFiles(new Set([changedPath]), new Set());
+        homeView.removeStaleFiles(new Set([changedPath]), new Set(), new Set());
 
         const fileIssueMap = homeView.getFileIssueMap();
         assert.strictEqual(fileIssueMap.size, 1, `Expected file to be kept when matching via ${changedPath}`);
@@ -161,7 +161,7 @@ suite('HomeView', () => {
       addFileToHomeView('/workspace/fileA.ts');
       addFileToHomeView('/workspace/fileB.ts');
 
-      homeView.removeStaleFiles(new Set(), new Set());
+      homeView.removeStaleFiles(new Set(), new Set(), new Set());
 
       assert.ok(badgeUpdateCalled, 'Expected updateBadge to be called when files are removed');
     });
@@ -174,7 +174,7 @@ suite('HomeView', () => {
 
       addFileToHomeView('/workspace/fileA.ts');
 
-      homeView.removeStaleFiles(new Set(['/workspace/fileA.ts']), new Set());
+      homeView.removeStaleFiles(new Set(['/workspace/fileA.ts']), new Set(), new Set());
 
       assert.ok(!badgeUpdateCalled, 'Expected updateBadge not to be called when no files are removed');
     });
@@ -189,7 +189,7 @@ suite('HomeView', () => {
       addFileToHomeView('/workspace/fileB.ts');
       addFileToHomeView('/workspace/fileC.ts');
 
-      homeView.removeStaleFiles(new Set(['/workspace/fileA.ts']), new Set());
+      homeView.removeStaleFiles(new Set(['/workspace/fileA.ts']), new Set(), new Set());
 
       assert.strictEqual(badgeCount, 1, 'Expected badge count to be 1 after removing 2 files');
     });

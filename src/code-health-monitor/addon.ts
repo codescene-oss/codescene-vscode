@@ -32,9 +32,10 @@ let ALL_DISPOSABLES: vscode.Disposable[] = [];
 
 function removeStaleFilesFromMonitors(changedFiles: Set<string>): void {
   const visibleFiles = getOpenFilesObserverInstance()?.getAllVisibleFileNames() ?? new Set<string>();
+  const filesInJob = DevtoolsAPI.jobs;
 
-  getCodeHealthMonitorViewInstance()?.removeStaleFiles(changedFiles, visibleFiles);
-  getHomeViewInstance()?.removeStaleFiles(changedFiles, visibleFiles);
+  getCodeHealthMonitorViewInstance()?.removeStaleFiles(changedFiles, visibleFiles, filesInJob);
+  getHomeViewInstance()?.removeStaleFiles(changedFiles, visibleFiles, filesInJob);
 }
 
 export async function runScheduledGitChangeReview(): Promise<void> {

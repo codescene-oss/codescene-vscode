@@ -9,14 +9,20 @@ export class StaleFileRemover {
     return false;
   }
 
+  private isPathInAnySets(filePath: string, sets: Set<string>[]): boolean {
+    return sets.some((set) => this.isPathInSet(filePath, set));
+  }
+
   findStaleFiles(
     fileIssueMap: Map<string, unknown>,
     changedFiles: Set<string>,
-    visibleFiles: Set<string>
+    visibleFiles: Set<string>,
+    filesInJob: Set<string>
   ): string[] {
     const stalePaths: string[] = [];
+    const activeSets = [changedFiles, visibleFiles, filesInJob];
     for (const filePath of fileIssueMap.keys()) {
-      if (!this.isPathInSet(filePath, changedFiles) && !this.isPathInSet(filePath, visibleFiles)) {
+      if (!this.isPathInAnySets(filePath, activeSets)) {
         stalePaths.push(filePath);
       }
     }

@@ -15,6 +15,7 @@ suite('StaleFileRemover', () => {
         mapKeys: [] as string[],
         changed: [] as string[],
         visible: [] as string[],
+        inJob: [] as string[],
         expected: [] as string[],
       },
       {
@@ -22,6 +23,7 @@ suite('StaleFileRemover', () => {
         mapKeys: ['/workspace/a.ts'],
         changed: ['/workspace/a.ts'],
         visible: [],
+        inJob: [],
         expected: [],
       },
       {
@@ -29,6 +31,15 @@ suite('StaleFileRemover', () => {
         mapKeys: ['/workspace/a.ts'],
         changed: [],
         visible: ['/workspace/a.ts'],
+        inJob: [],
+        expected: [],
+      },
+      {
+        name: 'file in filesInJob set is not stale',
+        mapKeys: ['/workspace/a.ts'],
+        changed: [],
+        visible: [],
+        inJob: ['/workspace/a.ts'],
         expected: [],
       },
       {
@@ -36,6 +47,7 @@ suite('StaleFileRemover', () => {
         mapKeys: ['/workspace/a.ts'],
         changed: [],
         visible: [],
+        inJob: [],
         expected: ['/workspace/a.ts'],
       },
       {
@@ -43,20 +55,23 @@ suite('StaleFileRemover', () => {
         mapKeys: ['/workspace/a.ts'],
         changed: ['/workspace/a.ts'],
         visible: ['/workspace/a.ts'],
+        inJob: [],
         expected: [],
       },
       {
         name: 'multiple files - mixed stale and non-stale',
-        mapKeys: ['/workspace/a.ts', '/workspace/b.ts', '/workspace/c.ts'],
+        mapKeys: ['/workspace/a.ts', '/workspace/b.ts', '/workspace/c.ts', '/workspace/d.ts'],
         changed: ['/workspace/a.ts'],
         visible: ['/workspace/b.ts'],
-        expected: ['/workspace/c.ts'],
+        inJob: ['/workspace/c.ts'],
+        expected: ['/workspace/d.ts'],
       },
       {
-        name: 'all files stale when both sets empty',
+        name: 'all files stale when all sets empty',
         mapKeys: ['/workspace/a.ts', '/workspace/b.ts'],
         changed: [],
         visible: [],
+        inJob: [],
         expected: ['/workspace/a.ts', '/workspace/b.ts'],
       },
       {
@@ -64,16 +79,17 @@ suite('StaleFileRemover', () => {
         mapKeys: ['/workspace/a.ts', '/workspace/b.ts'],
         changed: ['/workspace/a.ts', '/workspace/b.ts'],
         visible: [],
+        inJob: [],
         expected: [],
       },
     ];
 
-    testCases.forEach(({ name, mapKeys, changed, visible, expected }) => {
+    testCases.forEach(({ name, mapKeys, changed, visible, inJob, expected }) => {
       test(name, () => {
         const fileIssueMap = new Map<string, unknown>();
         mapKeys.forEach((key) => fileIssueMap.set(key, {}));
 
-        const result = remover.findStaleFiles(fileIssueMap, new Set(changed), new Set(visible));
+        const result = remover.findStaleFiles(fileIssueMap, new Set(changed), new Set(visible), new Set(inJob));
 
         assert.deepStrictEqual(result.sort(), expected.sort());
       });
@@ -113,7 +129,7 @@ suite('StaleFileRemover', () => {
         const fileIssueMap = new Map<string, unknown>();
         fileIssueMap.set(mapPath, {});
 
-        const result = remover.findStaleFiles(fileIssueMap, new Set([changedPath]), new Set());
+        const result = remover.findStaleFiles(fileIssueMap, new Set([changedPath]), new Set(), new Set());
 
         if (shouldBeStale) {
           assert.strictEqual(result.length, 1, `Expected ${mapPath} to be stale`);
