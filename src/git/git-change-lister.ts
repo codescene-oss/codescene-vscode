@@ -10,7 +10,6 @@ import { getRepo } from '../code-health-monitor/addon';
 import { getCommittedChanges, getStatusChanges } from './git-diff-utils';
 import { getWorkspaceFolder } from '../utils';
 import { SavedFilesTracker } from '../saved-files-tracker';
-import { DefaultBranchGate } from './default-branch-gate';
 
 /**
  * Lists all changed files exhaustively from Git status, and Git diff vs. merge-base.
@@ -18,18 +17,13 @@ import { DefaultBranchGate } from './default-branch-gate';
 export class GitChangeLister {
   private executor: Executor;
   private savedFilesTracker: SavedFilesTracker;
-  private defaultBranchGate: DefaultBranchGate;
 
-  constructor(executor: Executor, savedFilesTracker: SavedFilesTracker, defaultBranchGate: DefaultBranchGate) {
+  constructor(executor: Executor, savedFilesTracker: SavedFilesTracker) {
     if (!savedFilesTracker) {
       throw new Error('SavedFilesTracker must be provided to GitChangeLister');
     }
-    if (!defaultBranchGate) {
-      throw new Error('DefaultBranchGate must be provided to GitChangeLister');
-    }
     this.executor = executor;
     this.savedFilesTracker = savedFilesTracker;
-    this.defaultBranchGate = defaultBranchGate;
   }
 
   // NOTE:
@@ -43,11 +37,6 @@ export class GitChangeLister {
       const workspacePath = getWorkspacePath(workspaceFolder);
       const repo = getRepo(workspaceFolder.uri);
       const gitRootPath = repo?.rootUri.fsPath || workspacePath;
-
-      if (repo && await this.defaultBranchGate.shouldSkipBasedOnDefaultBranch(repo)) {
-        logOutputChannel.debug('GitChangeLister: skipping processing, current branch matches default branch');
-        return new Set<string>();
-      }
 
       const baselineCommit = repo ? await getMergeBaseCommit(repo) : '';
       const allChangedFiles = await this.getAllChangedFiles(gitRootPath, workspacePath, baselineCommit);

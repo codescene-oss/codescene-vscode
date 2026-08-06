@@ -49,7 +49,7 @@ export class GitChangeObserver {
     this.scheduledExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 1);
     this.fileWatcher = this.createWatcher('**/*');
 
-    this.initializeTracker(executor, savedFilesTracker, defaultBranchGate);
+    this.initializeTracker(executor, savedFilesTracker);
   }
 
   private validateDependencies(savedFilesTracker: SavedFilesTracker, openFilesObserver: OpenFilesObserver, defaultBranchGate: DefaultBranchGate): void {
@@ -64,9 +64,9 @@ export class GitChangeObserver {
     }
   }
 
-  private initializeTracker(executor: Executor, savedFilesTracker: SavedFilesTracker, defaultBranchGate: DefaultBranchGate): void {
+  private initializeTracker(executor: Executor, savedFilesTracker: SavedFilesTracker): void {
     // Initially fill the tracker - this ensures `handleFileDelete` works well
-    const lister = new GitChangeLister(executor, savedFilesTracker, defaultBranchGate);
+    const lister = new GitChangeLister(executor, savedFilesTracker);
     const workspaceFolder = getWorkspaceFolder();
     if (!workspaceFolder) return;
 
