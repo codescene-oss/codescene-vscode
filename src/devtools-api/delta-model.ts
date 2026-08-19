@@ -18,6 +18,8 @@ export interface Delta {
    * If the file was not recently created, the old file score
    */
   'old-score'?: number;
+  'old-git-blob-sha'?: string;
+  'new-git-blob-sha'?: string;
   /**
    * Represents the change in score for this Delta. An empty old- or new score is assumed to
    * be 10.0 when comparing.

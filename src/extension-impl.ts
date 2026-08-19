@@ -1,13 +1,9 @@
 import vscode from 'vscode';
-import { access } from 'fs/promises';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import {
   activate as activateCHMonitor,
   deactivate as deactivateAddon,
-  getBaselineCommit,
-  getMergeBaseCommitForWorkspace,
   refreshMergeBaseBaselines,
-  runGitChangeLister,
 } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
@@ -18,7 +14,7 @@ import { DevtoolsAPI } from './devtools-api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
-import { ensureCompatibleBinary } from './download';
+import { ensureCompatibleIdeServer } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { deactivate as deactivateLog, logOutputChannel, registerShowLogCommand } from './log';
 import { initAce } from './refactoring';
@@ -26,22 +22,17 @@ import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
-import { SavedFilesTracker } from './saved-files-tracker';
 import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
-import { GitChangeObserver } from './git/git-change-observer';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, fireFileDeletedFromGit } from './git-utils';
-import { DefaultBranchGate } from './git/default-branch-gate';
+import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, getRepoRootPath } from './git-utils';
 import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
 import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
-import { DroppingScheduledExecutor } from './dropping-scheduled-executor';
-import { SimpleExecutor } from './simple-executor';
-import { getHomeViewInstance } from './code-health-monitor/home/home-view';
+import { createWorkspaceWatchDependencies, WorkspaceWatch } from './git/workspace-watch';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
 import { ACE_ENABLED } from './build-flags';
 import { initExtensionId } from './extension-id';
@@ -59,31 +50,12 @@ let DISPOSABLES: vscode.Disposable[] = [];
 
 const codeHealthFileVersion = new Map<string, number>();
 
-let savedFilesTrackerInstance: SavedFilesTracker;
 let openFilesObserverInstance: OpenFilesObserver | undefined;
-let defaultBranchGateInstance: DefaultBranchGate | undefined;
+let workspaceWatchInstance: WorkspaceWatch | undefined;
 let isWindowFocused: boolean = true;
 
-const onCodeHealthFileVersionChange = debounce(async () => {
-  if (!openFilesObserverInstance) {
-    return;
-  }
-
-  const baselineCommit = await getMergeBaseCommitForWorkspace() ?? '';
-
-  // Re-review all currently visible files since code health rules have changed
-  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
-  visibleFiles.forEach((filePath) => {
-    const fileUri = vscode.Uri.file(filePath);
-    void vscode.workspace.openTextDocument(fileUri).then(
-      (document) => {
-        CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true });
-      },
-      (e) => {
-        logOutputChannel.warn(`Failed to re-review file after rules change: ${filePath}`, e);
-      }
-    );
-  });
+const onCodeHealthFileVersionChange = debounce(() => {
+  DevtoolsAPI.invalidateReviewEpoch();
 }, 350);
 
 const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
@@ -94,27 +66,9 @@ const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
     clearMainBranchCandidatesCache();
   }
 
-  void refreshMergeBaseBaselines();
-  void runGitChangeLister();
-
-  if (!openFilesObserverInstance) {
-    return;
-  }
-
-  const baselineCommit = await getMergeBaseCommitForWorkspace() ?? '';
-
-  const visibleFiles = openFilesObserverInstance.getAllVisibleFileNames();
-  visibleFiles.forEach((filePath) => {
-    const fileUri = vscode.Uri.file(filePath);
-    void vscode.workspace.openTextDocument(fileUri).then(
-      (document) => {
-        CsDiagnostics.review(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true });
-      },
-      (e) => {
-        logOutputChannel.warn(`Failed to re-review file after config change: ${filePath}`, e);
-      }
-    );
-  });
+  await refreshMergeBaseBaselines();
+  DevtoolsAPI.invalidateReviewEpoch();
+  await workspaceWatchInstance?.syncAll();
 }, 350);
 
 function handleWindowStateChange(state: vscode.WindowState): void {
@@ -138,34 +92,8 @@ async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
   }
 }
 
-async function inspectStaleHomeViewFiles(gitChangeObserver: GitChangeObserver | undefined): Promise<void> {
-  const homeView = getHomeViewInstance();
-  if (!homeView) return;
-
-  const filenames = Array.from(homeView.getFileIssueMap().keys());
-
-  for (const filePath of filenames) {
-    try {
-      await access(filePath);
-    } catch {
-      fireFileDeletedFromGit(filePath);
-      if (gitChangeObserver) {
-        gitChangeObserver.removeFromTracker(filePath);
-      }
-    }
-  }
-}
-
 export function getCodeHealthFileVersions(): Map<string, number> {
   return codeHealthFileVersion;
-}
-
-export function isVSCodeWindowFocused(): boolean {
-  return isWindowFocused;
-}
-
-export function setWindowFocusedForTesting(focused: boolean): void {
-  isWindowFocused = focused;
 }
 
 async function initializeCodeHealthFileVersions() {
@@ -201,9 +129,9 @@ export async function activate(context: vscode.ExtensionContext) {
   initExtensionId(context);
   CsExtensionState.init(context);
 
-  ensureCompatibleBinary(context.extensionPath).then(
-    async (binaryPath) => {
-      DevtoolsAPI.init(binaryPath, context);
+  ensureCompatibleIdeServer(context.extensionPath).then(
+    async (ideServer) => {
+      DevtoolsAPI.init(ideServer.binaryPath, context, undefined, ideServer);
       await Telemetry.init(context);
 
       try {
@@ -225,16 +153,6 @@ export async function activate(context: vscode.ExtensionContext) {
       Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
     }
   );
-}
-
-function initializeGitIntegration() {
-  const gitApi = acquireGitApi();
-  if (!gitApi) return;
-
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  const repo = workspaceFolder ? gitApi.getRepository(workspaceFolder.uri) : undefined;
-  const gitRootPath = repo?.rootUri.fsPath || workspaceFolder?.uri.fsPath || '';
-  defaultBranchGateInstance = new DefaultBranchGate(gitRootPath);
 }
 
 function setupCodeLensProviders(context: vscode.ExtensionContext) {
@@ -284,23 +202,17 @@ async function startExtension(context: vscode.ExtensionContext) {
   DISPOSABLES.push(gitUnavailableDisposable);
   context.subscriptions.push(gitUnavailableDisposable);
 
-  // The DiagnosticCollection provides the squigglies and also form the basis for the CodeLenses.
   CsDiagnostics.init(context);
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
   await initializeCodeHealthFileVersions();
-  savedFilesTrackerInstance = new SavedFilesTracker(context);
-  savedFilesTrackerInstance.start();
-  DISPOSABLES.push(savedFilesTrackerInstance);
 
   addReviewListeners(context);
 
   setupStatsCollector(context);
 
-  initializeGitIntegration();
-
-  activateCHMonitor(context, savedFilesTrackerInstance);
+  activateCHMonitor(context);
 
   setupCodeLensProviders(context);
 
@@ -351,11 +263,6 @@ function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
  * Adds listeners for all events that should trigger a review.
  */
 function addReviewListeners(context: vscode.ExtensionContext) {
-  if (!savedFilesTrackerInstance) {
-    throw new Error('SavedFilesTracker must be initialized before calling addReviewListeners');
-  }
-
-  // Observe open file events and trigger reviews
   openFilesObserverInstance = new OpenFilesObserver(context);
   openFilesObserverInstance.start();
   DISPOSABLES.push(openFilesObserverInstance);
@@ -367,44 +274,50 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   DISPOSABLES.push(windowStateListener);
   context.subscriptions.push(windowStateListener);
 
-  // Watch for discrete Git file changes (create, modify, delete)
-  const gitApi = acquireGitApi();
-  let gitChangeObserver: GitChangeObserver | undefined;
-  if (gitApi && defaultBranchGateInstance) {
-    gitChangeObserver = new GitChangeObserver(context, DevtoolsAPI.concurrencyLimitingExecutor, savedFilesTrackerInstance, openFilesObserverInstance, defaultBranchGateInstance);
-    gitChangeObserver.start();
-    DISPOSABLES.push(gitChangeObserver);
-    context.subscriptions.push(gitChangeObserver);
-  }
+  setupWorkspaceWatch(context);
 
-  // Remove CHM stale files
-  const filenameInspectorExecutor = new DroppingScheduledExecutor(new SimpleExecutor(), 9);
-  void filenameInspectorExecutor.executeTask(() => inspectStaleHomeViewFiles(gitChangeObserver));
-  DISPOSABLES.push(filenameInspectorExecutor);
-  context.subscriptions.push(filenameInspectorExecutor);
-
-  // Use a file system watcher to rerun diagnostics when .codescene/code-health-rules.json changes.
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
-
   rulesFileWatcher.onDidChange(updateCodeHealthRulesVersion);
   rulesFileWatcher.onDidCreate(updateCodeHealthRulesVersion);
-
   rulesFileWatcher.onDidDelete((uri: vscode.Uri) => {
     codeHealthFileVersion.delete(uri.fsPath);
     void onCodeHealthFileVersionChange();
   });
-
   DISPOSABLES.push(rulesFileWatcher);
   context.subscriptions.push(rulesFileWatcher);
 
   const configFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/config.json');
-
   configFileWatcher.onDidChange((uri) => onCodesceneConfigChange(uri));
   configFileWatcher.onDidCreate((uri) => onCodesceneConfigChange(uri));
   configFileWatcher.onDidDelete((uri) => onCodesceneConfigChange(uri));
-
   DISPOSABLES.push(configFileWatcher);
   context.subscriptions.push(configFileWatcher);
+}
+
+function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
+  const gitApi = acquireGitApi();
+  if (!gitApi) {
+    logOutputChannel.warn('Git API unavailable; workspace watch not started');
+    return;
+  }
+  workspaceWatchInstance = new WorkspaceWatch(
+    { watchFiles: DevtoolsAPI.watchFiles, stopWatchFiles: DevtoolsAPI.stopWatchFiles },
+    DevtoolsAPI.reviewPipeline,
+    createWorkspaceWatchDependencies(() => gitApi.repositories)
+  );
+  const openListener = gitApi.onDidOpenRepository((repo) => {
+    workspaceWatchInstance?.bindRepository(repo);
+    void workspaceWatchInstance?.syncAll();
+  });
+  const closeListener = gitApi.onDidCloseRepository((repo) => {
+    workspaceWatchInstance?.stopWatching(getRepoRootPath(repo));
+  });
+  const baselineListener = CsExtensionState.onBaselineChanged(() => {
+    void workspaceWatchInstance?.syncAll();
+  });
+  DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener, baselineListener);
+  context.subscriptions.push(workspaceWatchInstance, openListener, closeListener, baselineListener);
+  workspaceWatchInstance.start();
 }
 
 /**
@@ -491,7 +404,6 @@ export function deactivate() {
   deactivateAddon();
   deactivateGitUtils();
   deactivateLog();
-  DevtoolsAPI.dispose();
 
   for (const disposable of DISPOSABLES) {
     try {
@@ -499,6 +411,7 @@ export function deactivate() {
     } catch (e) {}
   }
   DISPOSABLES = [];
+  DevtoolsAPI.dispose();
 }
 
 function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {

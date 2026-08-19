@@ -6,7 +6,7 @@ import { logOutputChannel } from '../../../../log';
 import { RefactoringRequest } from '../../../../refactoring/request';
 import { highlightCode } from '../../../../refactoring/utils';
 import Telemetry from '../../../../telemetry';
-import { showDocAtPosition } from '../../../../utils';
+import { reportError, showDocAtPosition } from '../../../../utils';
 import { commonResourceRoots } from '../../../../webview-utils';
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { getAceAcknowledgeData } from './ace-acknowledgement-mapper';

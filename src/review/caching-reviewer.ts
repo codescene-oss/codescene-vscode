@@ -17,13 +17,6 @@ export class CachingReviewer implements Disposable {
     getCodeHealthFileVersions: () => Map<string, number>
   ) {
     this.reviewCache = new ReviewCache(getCodeHealthFileVersions);
-    const deleteFileWatcher = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
-    this.disposables.push(
-      deleteFileWatcher,
-      deleteFileWatcher.onDidDelete((uri) => {
-        this.reviewCache.delete(uri.fsPath);
-      })
-    );
   }
 
   private handleReviewError(e: Error, document: vscode.TextDocument) {
