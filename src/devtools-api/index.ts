@@ -46,6 +46,14 @@ export class DevtoolsAPI {
     return DevtoolsAPI.pipeline;
   }
 
+  static watchFiles(repoRoot: string, baselineRevision?: string): void {
+    DevtoolsAPI.ideServer.watchFiles(repoRoot, baselineRevision);
+  }
+
+  static stopWatchFiles(repoRoot: string): void {
+    DevtoolsAPI.ideServer.stopWatchFiles(repoRoot);
+  }
+
   static invalidateReviewEpoch(): void {
     DevtoolsAPI.pipeline?.invalidate();
   }

@@ -325,6 +325,7 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
+    textDocuments: [],
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),

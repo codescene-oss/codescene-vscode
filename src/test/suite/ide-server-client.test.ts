@@ -83,13 +83,13 @@ suite('CsIdeServerClient Test Suite', () => {
   });
 
   test('receives correlated review, delta, and failure notifications', async () => {
-    const review = new Promise<{ id: string; sha: string | undefined }>((resolve) => {
+    const review = new Promise<{ id?: string; sha: string | undefined }>((resolve) => {
       client.onDidReview((event) => resolve({ id: event.id, sha: event.result['git-blob-sha'] }));
     });
-    const delta = new Promise<{ id: string; score: number | undefined }>((resolve) => {
+    const delta = new Promise<{ id?: string; score: number | undefined }>((resolve) => {
       client.onDidDelta((event) => resolve({ id: event.id, score: event.result?.['new-score'] }));
     });
-    const failure = new Promise<{ id: string; message: string }>((resolve) => {
+    const failure = new Promise<{ id?: string; message: string }>((resolve) => {
       client.onDidReviewFailed((event) => resolve({ id: event.id, message: event.message }));
     });
 
@@ -101,6 +101,37 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await review, { id: 'file-1', sha: gitBlobSha('const x = 1;') });
     assert.deepStrictEqual(await delta, { id: 'file-1', score: 9.68 });
     assert.deepStrictEqual(await failure, { id: 'file-2', message: 'fixture review failed' });
+  });
+
+  test('sends kebab-case watch payloads and forwards id-less notifications', async () => {
+    const review = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReview((event) => resolve({ id: event.id, path: event.path }));
+    });
+    const stopped = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReviewFailed((event) => resolve({ id: event.id, path: event.path }));
+    });
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+
+    client.watchFiles('/repo', 'abc123');
+    assert.deepStrictEqual(await review, { id: undefined, path: 'watched.ts' });
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastWatch', {}), {
+      'repo-root': '/repo',
+      'baseline-revision': 'abc123',
+    });
+
+    client.stopWatchFiles('/repo');
+    assert.deepStrictEqual(await stopped, { id: undefined, path: 'stopped.ts' });
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), { 'repo-root': '/repo' });
+  });
+
+  test('omits optional reviewFiles id and content on the wire', async () => {
+    const review = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReview((event) => resolve({ id: event.id, path: event.path }));
+    });
+
+    client.reviewFiles('/repo', [{ relPath: 'disk.ts' }]);
+
+    assert.deepStrictEqual(await review, { id: undefined, path: 'disk.ts' });
   });
 
   test('rejects an in-flight request when the server exits', async () => {

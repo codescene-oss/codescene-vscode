@@ -25,7 +25,10 @@ connection.onRequest('cs-ide/preflight', () => ({
   languageCommon: { maxInputLoc: 100, codeSmells: ['Complex Method'] },
 }));
 connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; fileName?: string }) => {
-  if (!params || typeof params !== 'object' || Array.isArray(params) || !(params['file-name'] ?? params.fileName)) {
+  const fileName = params && typeof params === 'object' && !Array.isArray(params)
+    ? params['file-name'] ?? params.fileName
+    : undefined;
+  if (!fileName) {
     throw new Error('Missing file-name');
   }
   return [{
@@ -62,18 +65,47 @@ connection.onRequest('test/exit', () => {
 });
 connection.onRequest('test/never', () => new Promise(() => {}));
 
+let lastWatch: unknown;
+let lastStop: unknown;
+connection.onRequest('test/lastWatch', () => lastWatch);
+connection.onRequest('test/lastStop', () => lastStop);
+
+connection.onNotification('cs-ide/watchFiles', (params) => {
+  lastWatch = params;
+  void connection.sendNotification('cs-ide/fileReview', {
+    path: 'watched.ts',
+    repoRoot: params['repo-root'],
+    result: {
+      fileLevelCodeSmells: [],
+      functionLevelCodeSmells: [],
+      rawScore: 'raw',
+      score: 9.68,
+      gitBlobSha: 'watch-sha',
+    },
+  });
+});
+connection.onNotification('cs-ide/stopWatchFiles', (params) => {
+  lastStop = params;
+  void connection.sendNotification('cs-ide/reviewFailed', {
+    path: 'stopped.ts',
+    repoRoot: params['repo-root'],
+    message: 'stopped',
+  });
+});
+
 connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot }) => {
   for (const file of files) {
     if (file.content === 'fail') {
       void connection.sendNotification('cs-ide/reviewFailed', {
-        id: file.id,
+        ...(file.id ? { id: file.id } : {}),
         path: file['rel-path'],
         repoRoot,
         message: 'fixture review failed',
       });
       continue;
     }
-    const bytes = Buffer.from(file.content, 'utf8');
+    const content = file.content ?? '';
+    const bytes = Buffer.from(content, 'utf8');
     const gitBlobSha = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
     const codeSmells = file['rel-path'].endsWith('gc.cpp') ? [{
       category: 'Complex Method',
@@ -86,7 +118,7 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
       },
     }] : [];
     void connection.sendNotification('cs-ide/fileReview', {
-      id: file.id,
+      ...(file.id ? { id: file.id } : {}),
       path: file['rel-path'],
       repoRoot,
       result: {
@@ -98,7 +130,7 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
       },
     });
     void connection.sendNotification('cs-ide/deltaReview', {
-      id: file.id,
+      ...(file.id ? { id: file.id } : {}),
       path: file['rel-path'],
       repoRoot,
       result: {

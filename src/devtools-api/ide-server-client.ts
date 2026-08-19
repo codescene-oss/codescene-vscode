@@ -27,27 +27,27 @@ export interface ServerMetadata {
 }
 
 export interface ReviewFile {
-  id: string;
+  id?: string;
   relPath: string;
-  content: string;
+  content?: string;
 }
 
 export interface ReviewResult {
-  id: string;
+  id?: string;
   path: string;
   repoRoot: string;
   result: Review;
 }
 
 export interface DeltaResult {
-  id: string;
+  id?: string;
   path: string;
   repoRoot: string;
   result: Delta | null;
 }
 
 export interface ReviewFailed {
-  id: string;
+  id?: string;
   path: string;
   repoRoot: string;
   message: string;
@@ -89,7 +89,7 @@ interface ResultNotification<T> {
 }
 
 interface NotificationIdentity {
-  id: string;
+  id?: string;
   path: string;
   repoRoot: string;
 }
@@ -225,6 +225,22 @@ export class CsIdeServerClient implements vscode.Disposable {
     });
   }
 
+  watchFiles(repoRoot: string, baselineRevision?: string): void {
+    void this.sendNotification('cs-ide/watchFiles', {
+      'repo-root': repoRoot,
+      ...(baselineRevision ? { 'baseline-revision': baselineRevision } : {}),
+    }).catch((error) => {
+      this.handleError(error instanceof Error ? error : new Error(String(error)));
+    });
+  }
+
+  stopWatchFiles(repoRoot: string): void {
+    if (!this.connection) return;
+    void this.connection.sendNotification('cs-ide/stopWatchFiles', { 'repo-root': repoRoot }).catch((error) => {
+      this.handleError(error instanceof Error ? error : new Error(String(error)));
+    });
+  }
+
   dispose(): void {
     this.stopProcess(new Error('CodeScene IDE server stopped'));
     this.reviewEmitter.dispose();
@@ -241,14 +257,22 @@ export class CsIdeServerClient implements vscode.Disposable {
       : this.connection.sendRequest<T>(method, params, token);
   }
 
-  private async sendReviewFiles(repoRoot: string, files: ReviewFile[], baselineRevision?: string): Promise<void> {
+  private async sendNotification(method: string, params: unknown): Promise<void> {
     await this.start();
     if (!this.connection) throw new Error('CodeScene IDE server is not running');
+    await this.connection.sendNotification(method, params);
+  }
+
+  private async sendReviewFiles(repoRoot: string, files: ReviewFile[], baselineRevision?: string): Promise<void> {
     logOutputChannel.info(`[cs-ide] sending reviewFiles count=${files.length}`);
-    await this.connection.sendNotification('cs-ide/reviewFiles', {
+    await this.sendNotification('cs-ide/reviewFiles', {
       'repo-root': repoRoot,
       ...(baselineRevision ? { 'baseline-revision': baselineRevision } : {}),
-      files: files.map((file) => ({ id: file.id, 'rel-path': file.relPath, content: file.content })),
+      files: files.map((file) => ({
+        'rel-path': file.relPath,
+        ...(file.id ? { id: file.id } : {}),
+        ...(file.content !== undefined ? { content: file.content } : {}),
+      })),
     });
   }
 
@@ -263,7 +287,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private handleReview(notification: ResultNotification<Record<string, any>>): void {
     const identity = this.notificationIdentity(notification);
     if (!identity) return;
-    logOutputChannel.info(`[cs-ide] received fileReview id=${identity.id} path=${identity.path}`);
+    logOutputChannel.info(`[cs-ide] received fileReview id=${identity.id ?? '(none)'} path=${identity.path}`);
     this.reviewEmitter.fire({
       ...identity,
       result: reviewResponse(notification.result),
@@ -273,7 +297,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private handleDelta(notification: ResultNotification<Record<string, any> | null>): void {
     const identity = this.notificationIdentity(notification);
     if (!identity) return;
-    logOutputChannel.info(`[cs-ide] received deltaReview id=${identity.id} path=${identity.path}`);
+    logOutputChannel.info(`[cs-ide] received deltaReview id=${identity.id ?? '(none)'} path=${identity.path}`);
     this.deltaEmitter.fire({
       ...identity,
       result: notification.result ? deltaResponse(notification.result) : null,
@@ -293,10 +317,9 @@ export class CsIdeServerClient implements vscode.Disposable {
 
   private notificationIdentity(notification: { id?: string; path?: string; repoRoot?: string; 'repo-root'?: string }): NotificationIdentity | undefined {
     const repoRoot = notificationRepoRoot(notification);
-    if (!notification.id) return;
     if (!notification.path) return;
     if (!repoRoot) return;
-    return { id: notification.id, path: notification.path, repoRoot };
+    return { ...(notification.id ? { id: notification.id } : {}), path: notification.path, repoRoot };
   }
 
   private handleProcessFailure(error: Error, process?: ChildProcess): void {
