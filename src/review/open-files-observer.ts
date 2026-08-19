@@ -179,6 +179,7 @@ export class OpenFilesObserver {
     const filePath = e.document.fileName;
     if (!this.visibleDocuments.has(filePath)) return;
     if (!this.getAllVisibleFileNames().has(filePath)) return;
+    if (!e.document.isDirty) return;
     if (this.shouldSkipDocumentChange(e)) return;
     clearTimeout(this.reviewTimers.get(filePath));
     this.reviewTimers.set(

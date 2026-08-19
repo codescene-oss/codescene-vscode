@@ -47,6 +47,39 @@ function nativeContractComplexity(value: number) {
     assert.strictEqual(typeof await delta, 'number');
   });
 
+  test('emits id-less fileReview for disk reviewFiles', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    const review = new Promise<{ id?: string; path: string; score: number | undefined }>((resolve) => {
+      client.onDidReview((event) => resolve({
+        id: event.id,
+        path: event.path.replace(/\\/g, '/'),
+        score: event.result.score,
+      }));
+    });
+
+    client.reviewFiles(repoRoot, [{ relPath: 'src/device-id.ts' }]);
+
+    const event = await review;
+    assert.strictEqual(event.id, undefined);
+    assert.strictEqual(event.path, 'src/device-id.ts');
+    assert.strictEqual(typeof event.score, 'number');
+  });
+
+  test('accepts watchFiles and stopWatchFiles without error', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    await client.start();
+    const error = new Promise<Error | undefined>((resolve) => {
+      const timer = setTimeout(() => resolve(undefined), 1500);
+      client.onDidError((err) => {
+        clearTimeout(timer);
+        resolve(err);
+      });
+    });
+    client.watchFiles(repoRoot);
+    client.stopWatchFiles(repoRoot);
+    assert.strictEqual(await error, undefined);
+  });
+
   test('normalizes native device ID', async () => {
     assert.match((await client.deviceId())['device-id'], /^[a-f0-9]{32}$/);
   });

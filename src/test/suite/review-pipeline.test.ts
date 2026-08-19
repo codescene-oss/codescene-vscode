@@ -6,8 +6,10 @@ import {
   PresentedDelta,
   PresentedReview,
   ReviewPipeline,
+  ReviewPipelineFileAccess,
   ReviewPipelinePresentation,
   ReviewSubmission,
+  gitBlobSha,
 } from '../../review/review-pipeline';
 import { TestTextDocument } from '../mocks/test-text-document';
 
@@ -16,13 +18,13 @@ class FakeReviewClient {
   readonly deltaEmitter = new vscode.EventEmitter<DeltaResult>();
   readonly failureEmitter = new vscode.EventEmitter<ReviewFailed>();
   readonly errorEmitter = new vscode.EventEmitter<Error>();
-  readonly batches: Array<{ repoRoot: string; baseline?: string; files: Array<{ id: string; relPath: string; content: string }> }> = [];
+  readonly batches: Array<{ repoRoot: string; baseline?: string; files: Array<{ id?: string; relPath: string; content?: string }> }> = [];
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
   readonly onDidReviewFailed = this.failureEmitter.event;
   readonly onDidError = this.errorEmitter.event;
 
-  reviewFiles(repoRoot: string, files: Array<{ id: string; relPath: string; content: string }>, baseline?: string): void {
+  reviewFiles(repoRoot: string, files: Array<{ id?: string; relPath: string; content?: string }>, baseline?: string): void {
     this.batches.push({ repoRoot, baseline, files });
   }
 }
@@ -209,4 +211,69 @@ suite('ReviewPipeline Test Suite', () => {
     assert.strictEqual(events.deltas.length, 1);
   });
 
+  test('submits disk files without id or content', () => {
+    void pipeline.submitBatch(repoRoot, 'base', 'epoch', [{
+      relPath: 'src/file.ts',
+      updateDiagnosticsPane: false,
+      updateMonitor: true,
+    }]);
+
+    assert.strictEqual(client.batches.length, 1);
+    assert.deepStrictEqual(client.batches[0].files, [{ relPath: 'src/file.ts' }]);
+  });
+
+  test('presents id-less watch results when the git-blob SHA matches', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    pipeline.dispose();
+    pipeline = new ReviewPipeline(client as any, createPresentation(events), () => 'review-1', fileAccess(document, true));
+    const sha = gitBlobSha(document.getText());
+
+    client.reviewEmitter.fire({
+      repoRoot,
+      path: 'src/file.ts',
+      result: { ...emptyReview(), 'git-blob-sha': sha },
+    });
+    client.deltaEmitter.fire({
+      repoRoot,
+      path: 'src/file.ts',
+      result: { 'file-level-findings': [], 'function-level-findings': [], 'new-git-blob-sha': sha } as any,
+    });
+
+    await waitUntil(() => events.reviews.length === 1 && events.deltas.length === 1);
+    assert.strictEqual(events.reviews[0].updateDiagnosticsPane, true);
+    assert.strictEqual(events.reviews[0].updateMonitor, true);
+    assert.strictEqual(events.deltas[0].result?.['new-git-blob-sha'], sha);
+  });
+
+  test('discards id-less watch results with a stale git-blob SHA', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    pipeline.dispose();
+    pipeline = new ReviewPipeline(client as any, createPresentation(events), () => 'review-1', fileAccess(document, false));
+
+    client.reviewEmitter.fire({
+      repoRoot,
+      path: 'src/file.ts',
+      result: { ...emptyReview(), 'git-blob-sha': 'stale-sha' },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.strictEqual(events.reviews.length, 0);
+  });
 });
+
+function fileAccess(document: vscode.TextDocument, visible: boolean): ReviewPipelineFileAccess {
+  return {
+    findOpenDocument: () => document,
+    openDocument: async () => document,
+    readFileBytes: async () => Buffer.from(document.getText(), 'utf8'),
+    isVisible: () => visible,
+  };
+}
+
+async function waitUntil(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error('timed out waiting for pipeline presentation');
+}
