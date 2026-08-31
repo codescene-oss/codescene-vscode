@@ -20,6 +20,7 @@ import { getAuthToken } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
+import { AgentRefactoringService } from '../refactoring/agent-service';
 import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
@@ -387,24 +388,6 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
-  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string) {
-    const payload: Record<string, any> = {
-      'token': token,
-    };
-
-    if (fnToRefactor['nippy-b64']) {
-      payload['fn-to-refactor-nippy-b64'] = fnToRefactor['nippy-b64'];
-    } else {
-      payload['fn-to-refactor'] = fnToRefactor;
-    }
-
-    if (skipCache) {
-      payload['skip-cache'] = true;
-    }
-
-    return payload;
-  }
-
   /**
    * Posts a refactoring using devtools binary
    *
@@ -417,17 +400,13 @@ export class DevtoolsAPI {
     this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;
 
-    const token = this.getAuthToken();
+    this.getAuthToken();
 
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
-      const payload = DevtoolsAPI.buildRefactoringPayload(fnToRefactor, skipCache, token);
-
       this.logRefactorRequested(fnToRefactor, skipCache);
 
-      const fp = this.getValidatedFileParts(document);
-
-      const response = await this.executeRefactor(payload, signal, fp);
+      const response = await this.executeRefactor(document, fnToRefactor, signal);
 
       this.logRefactorDone(fnToRefactor, skipCache, response);
 
@@ -436,7 +415,6 @@ export class DevtoolsAPI {
       return response;
     } catch (e) {
       this.handleRefactorError(e);
-      // Some general error reporting above, but pass along the error for further handling
       throw e;
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
@@ -463,25 +441,12 @@ export class DevtoolsAPI {
     );
   }
 
-  private static getValidatedFileParts(document: any) {
-    const fp = fileParts(document);
-    if (!validateFileParts('postRefactoring', fp, document)) {
-      throw new Error('Invalid file parts: document directory is missing or does not exist');
-    }
-    return fp;
-  }
-
   private static async executeRefactor(
-    payload: any,
-    signal: AbortSignal,
-    fp: { documentDirectory: string }
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    signal: AbortSignal
   ): Promise<RefactorResponse> {
-    return DevtoolsAPI.instance.executeAsJson<RefactorResponse>({
-      args: ['run-command', 'refactor'],
-      input: JSON.stringify(payload),
-      execOptions: { signal, cwd: fp.documentDirectory },
-      taskId: REFACTOR_TASK_ID, // Limit to only 1 refactoring at a time
-    });
+    return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal);
   }
 
   private static logRefactorDone(fnToRefactor: any, skipCache: boolean, response: RefactorResponse): void {

@@ -29,6 +29,12 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     return;
   }
 
+  const agentBinaryPath = path.join(__dirname, '..', '..', '..', 'bin', 'cs-agent');
+  if (!fs.existsSync(agentBinaryPath)) {
+    console.log('Skipping PostRefactoring tests: cs-agent binary not found at ' + agentBinaryPath);
+    return;
+  }
+
   function createTestFile(filename: string, content: string, languageId: string = 'cpp'): TestTextDocument {
     const testFile = path.resolve(testDir, filename);
     fs.writeFileSync(testFile, content);

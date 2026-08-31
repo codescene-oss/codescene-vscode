@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs
+.PHONY: build package package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64 package-all tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs
 
 .DEFAULT_GOAL := build
 
@@ -13,6 +13,34 @@ package: lint pretest
 	node ./scripts/bundle-cli-for-current-platform.js; \
 	npx @vscode/vsce@3.7.1 package; \
 	git checkout .vscodeignore; \
+
+package-darwin-arm64: lint pretest
+	npm i
+	cd ~/refactoring-agent/agent && $(MAKE) build-all
+	mkdir -p ./bin
+	cp ~/refactoring-agent/agent/target/aarch64-apple-darwin/release/cs-agent ./bin/cs-agent
+	node ./scripts/package-platform.js darwin arm64
+
+package-darwin-x64: lint pretest
+	npm i
+	cd ~/refactoring-agent/agent && $(MAKE) build-all
+	mkdir -p ./bin
+	cp ~/refactoring-agent/agent/target/x86_64-apple-darwin/release/cs-agent ./bin/cs-agent
+	node ./scripts/package-platform.js darwin x64
+
+package-linux-arm64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux arm64
+
+package-linux-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux x64
+
+package-win32-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js win32 x64
+
+package-all: package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64
 
 tsc:
 	npx tsc --noEmit

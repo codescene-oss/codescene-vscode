@@ -1,0 +1,23 @@
+{
+  "@context": { "@vocab": "https://codescene.io/schemas/code-health-fix#" },
+  "schema_version": "1.0",
+  "task_id": "refactor-test-123",
+  "fix_result": "fix_proposed",
+  "confidence": "high",
+  "summary": "Extracted helper function to reduce complexity",
+  "reasoning": "The original function had deep nesting which made it hard to read. By extracting the inner logic into a helper function, we reduce the cognitive load and improve maintainability.",
+  "changes": [
+    {
+      "file": "test.ts",
+      "change_type": "partial",
+      "description": "Extract deeply nested condition to helper",
+      "replacements": [
+        {
+          "search": "if (a > 0) {\n    if (a > 1) {\n      return a;\n    }\n  }",
+          "replace": "return processValue(a);"
+        }
+      ]
+    }
+  ],
+  "generated_at": "2026-08-31T12:00:00Z"
+}
