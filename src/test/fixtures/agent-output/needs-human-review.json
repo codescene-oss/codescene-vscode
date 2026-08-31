@@ -1,0 +1,23 @@
+{
+  "@context": { "@vocab": "https://codescene.io/schemas/code-health-fix#" },
+  "schema_version": "1.0",
+  "task_id": "refactor-test-789",
+  "fix_result": "needs_human_review",
+  "confidence": "medium",
+  "summary": "Partial refactoring suggested - review recommended",
+  "reasoning": "The suggested refactoring simplifies the structure but may change error handling behavior. Please verify that the new error handling approach meets your requirements.",
+  "changes": [
+    {
+      "file": "test.ts",
+      "change_type": "partial",
+      "description": "Simplify error handling",
+      "replacements": [
+        {
+          "search": "try {\n    doSomething();\n  } catch (e) {\n    handleError(e);\n  }",
+          "replace": "await doSomethingSafe();"
+        }
+      ]
+    }
+  ],
+  "generated_at": "2026-08-31T12:00:00Z"
+}
