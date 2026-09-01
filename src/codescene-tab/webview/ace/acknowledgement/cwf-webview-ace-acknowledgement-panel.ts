@@ -35,7 +35,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
   constructor() {
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceAcknowledgementTabPanel.viewType,
-      'CodeScene ACE - AI-Powered Refactoring',
+      'CodeScene Refactoring Agent - AI-Powered Refactoring',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -61,7 +61,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'An error occurred in the CodeScene ACE Acknowledgement panel', e });
+      reportError({ context: 'An error occurred in the CodeScene Agent Acknowledgement panel', e });
     }
   }
 

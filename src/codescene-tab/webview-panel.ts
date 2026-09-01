@@ -266,11 +266,11 @@ export class CodeSceneTabPanel implements Disposable {
 
     const ackContent = /*html*/ `
       <div class="ace-acknowledgement-container">
-        <h4>CodeScene ACE - AI-Powered Refactoring</h4>
-        <p><a href="https://codescene.com/product/ai-coding">CodeScene ACE</a> combines multiple LLMs with fact-based validation.
-        ACE chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier
+        <h4>CodeScene Refactoring Agent - AI-Powered Refactoring</h4>
+        <p><a href="https://codescene.com/product/ai-coding">CodeScene Refactoring Agent</a> combines multiple LLMs with fact-based validation.
+        The agent chooses the best LLM for the job, validates its output, and proposes refactoring for cleaner code which is easier
         to maintain.</p>
-        <p>CodeScene ACE is built on our CodeHealth™ Metric, the only code analysis metric with a
+        <p>CodeScene Refactoring Agent is built on our CodeHealth™ Metric, the only code analysis metric with a
         <a href="https://codescene.com/hubfs/web_docs/Business-impact-of-code-quality.pdf?utm_campaign=AI Coding&utm_source=IDE&utm_medium=extension&utm_content=code-red">
         proven business impact</a>.</p>
 
@@ -278,19 +278,19 @@ export class CodeSceneTabPanel implements Disposable {
           <li><span class="codicon codicon-check green"></span> Your code is never stored by us or the LLMs</li>
           <li><span class="codicon codicon-check green"></span> Your code snippets are shared only with select LLMs</li>
           <li><span class="codicon codicon-check green"></span> Your code is not used to train any LLM</li>
-          <li><span class="codicon codicon-check green"></span> All communications with CodeScene ACE is fully encrypted</li>
+          <li><span class="codicon codicon-check green"></span> All communications with CodeScene Refactoring Agent is fully encrypted</li>
         </ul>
 
         <a href="https://codescene.com/product/ace/principles" class="privacy-link">View CodeScene's AI Privacy Principles</a><br>
         <div class="button-container">
-          <vscode-button id="acknowledge-button">Show me CodeScene ACE</vscode-button>
+          <vscode-button id="acknowledge-button">Show me CodeScene Refactoring Agent</vscode-button>
         </div>
-        <p class="fineprint">You can disable CodeScene ACE anytime in settings.</p>
+        <p class="fineprint">You can disable CodeScene Refactoring Agent anytime in settings.</p>
       </div>
     `;
 
     renderHtmlTemplate(this.webViewPanel, {
-      title: 'CodeScene ACE  - AI Powered Refactoring',
+      title: 'CodeScene Refactoring Agent  - AI Powered Refactoring',
       bodyContent: [fnLocContent, ackContent],
       cssPaths: [['out', 'codescene-tab', 'webview', 'ace-acknowledgement-styles.css']],
       scriptPaths: [['out', 'codescene-tab', 'webview', 'ace-acknowledgement-script.js']],

@@ -88,16 +88,16 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     if (!fnToRefactor) return;
 
     const refactorHighligting = new vscode.Diagnostic(fnToRefactor.vscodeRange, 'Function to refactor');
-    const refactorAction = new vscode.CodeAction('Refactor using CodeScene ACE', vscode.CodeActionKind.QuickFix);
+    const refactorAction = new vscode.CodeAction('Refactor using CodeScene Agent', vscode.CodeActionKind.QuickFix);
     refactorAction.diagnostics = [refactorHighligting];
     refactorAction.command = {
       command: 'codescene.requestAndPresentRefactoring',
-      title: 'Refactor using CodeScene ACE',
+      title: 'Refactor using CodeScene Agent',
       arguments: [document, 'codeaction', fnToRefactor],
     };
     refactorAction.disabled = !authToken
       ? {
-          reason: 'Refactoring is not available. Please verify your authentication token in Workspace settings.',
+          reason: 'Activate the refactoring agent by providing your authentication token in Workspace settings.',
         }
       : undefined;
     actions.push(refactorAction);

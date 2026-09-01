@@ -187,7 +187,7 @@ export function refactoringError(isAuthError = false) {
     default:
       return /*html*/ `
         <div class="refactoring-error-content">
-          <p>Unfortunately, we are unable to provide a CodeScene ACE refactoring recommendation or a code improvement
+          <p>Unfortunately, we are unable to provide a CodeScene Refactoring Agent recommendation or a code improvement
           guide at this time. We recommend reviewing your code manually to identify potential areas for enhancement. </p>
           <p>For further assistance, please refer to the <a href="https://codescene.io/docs">CodeScene documentation</a>
           for best practices and guidance on improving your code.</p>

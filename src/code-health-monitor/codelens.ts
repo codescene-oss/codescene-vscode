@@ -55,7 +55,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
 
     const requestAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
-      title: '$(sparkle) CodeScene ACE',
+      title: '$(sparkle) CodeScene Agent',
       command: 'codescene.requestAndPresentRefactoring',
       arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
     });

@@ -45,12 +45,4 @@ export interface AgentOutput {
 export interface AgentConfig {
   codescene_access_token: string;
   plugins: string[];
-  opencode_config: OpencodeConfig;
-}
-
-export interface OpencodeConfig {
-  model: string;
-  provider?: string;
-  aws_profile?: string;
-  aws_region?: string;
 }

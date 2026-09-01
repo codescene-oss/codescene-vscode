@@ -150,7 +150,7 @@ export class CsStatusBar implements Disposable {
         text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
         command: 'codescene.openSettingsAndFocusToken',
         background: hasToken ? undefined : 'statusBarItem.warningBackground',
-        tooltip: hasToken ? 'CodeScene ACE is active' : 'Configure ACE auth token in extension Workspace settings',
+        tooltip: hasToken ? 'CodeScene Agent is active' : 'Configure Agent auth token in extension Workspace settings',
       });
     },
   };

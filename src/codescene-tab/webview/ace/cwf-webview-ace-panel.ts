@@ -53,7 +53,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceTabPanel.viewType,
-      'CodeScene ACE',
+      'CodeScene Agent',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -97,7 +97,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleAceMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'An error occurred in the CodeScene ACE panel', e });
+      reportError({ context: 'An error occurred in the CodeScene Agent panel', e });
     }
   }
 
