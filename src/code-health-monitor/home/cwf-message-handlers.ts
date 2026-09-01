@@ -103,7 +103,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
 /**
  * Open settings in editor
  */
-function handleOpenSettings() {
+export function handleOpenSettings() {
   Telemetry.logUsage('control-center/open-settings');
   vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', getExtensionSettingsFilter()).then(
     () => {},

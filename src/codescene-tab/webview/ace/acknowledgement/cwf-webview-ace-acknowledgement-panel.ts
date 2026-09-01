@@ -8,6 +8,7 @@ import { highlightCode } from '../../../../refactoring/utils';
 import Telemetry from '../../../../telemetry';
 import { showDocAtPosition } from '../../../../utils';
 import { commonResourceRoots } from '../../../../webview-utils';
+import { handleOpenSettings } from '../../../../code-health-monitor/home/cwf-message-handlers';
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { getAceAcknowledgeData } from './ace-acknowledgement-mapper';
 
@@ -72,6 +73,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
         await showDocAtPosition(request.document, request.fnToRefactor.vscodeRange.start);
         void highlightCode(request, false);
       },
+      'open-settings': handleOpenSettings,
       acknowledged: async () => {
         const document = this.state?.request.document;
         const fnToRefactor = this.state?.request.fnToRefactor;
