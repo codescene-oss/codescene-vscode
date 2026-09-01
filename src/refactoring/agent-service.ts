@@ -10,6 +10,7 @@ import { buildAgentConfigWithToken } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
 import { getEffectiveToken } from '../devtools-api';
+import { acquireGitApi, getRepoRootPath } from '../git-utils';
 
 const INPUT_FILE = 'render-code-fix-input.json';
 const OUTPUT_FILE = 'render-code-fix-output.json';
@@ -40,7 +41,7 @@ export class AgentRefactoringService {
 
       logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      await AgentRefactoringService.invokeAgent(workDir, signal);
+      await AgentRefactoringService.invokeAgent(workDir, document, signal);
 
       if (!fs.existsSync(outputPath)) {
         throw new Error('Agent did not produce output file');
@@ -72,7 +73,7 @@ export class AgentRefactoringService {
     };
   }
 
-  private static invokeAgent(workDir: string, signal?: AbortSignal): Promise<void> {
+  private static invokeAgent(workDir: string, document: TextDocument, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const binaryPath = AgentRefactoringService.getAgentBinaryPath();
       const token = getEffectiveToken();
@@ -89,10 +90,14 @@ export class AgentRefactoringService {
         CS_AGENT_CONFIG: configJson,
       };
 
+      const gitApi = acquireGitApi();
+      const repo = gitApi?.getRepository(document.uri);
+      const cwd = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
+
       logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
 
       const proc: ChildProcess = spawn(binaryPath, args, {
-        cwd: workDir,
+        cwd,
         env,
       });
 
