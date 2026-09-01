@@ -247,7 +247,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
     error: {
       iconClass: 'codicon-error',
       text: 'error',
-      tooltip: 'Click to retry connecting to CodeScene ACE',
+      tooltip: 'Click to retry connecting to CodeScene Agent',
     },
     offline: {
       iconClass: 'codicon-error',
@@ -301,7 +301,7 @@ export class ControlCenterViewProvider implements WebviewViewProvider, Disposabl
 
     return /*html*/ `
         <div class="row">
-            <div class="icon-and-text"><span class="codicon ${status.iconClass}"></span><span>CodeScene ACE</span></div>
+            <div class="icon-and-text"><span class="codicon ${status.iconClass}"></span><span>CodeScene Agent</span></div>
             <div class="badge badge-${status.text.replace(/ /g, '-')} ${status.text === 'error' ? 'clickable' : ''}"
               id="ace-badge"
               title="${status.tooltip}">${status.text}

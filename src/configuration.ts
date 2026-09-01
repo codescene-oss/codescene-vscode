@@ -71,15 +71,3 @@ export function toggleReviewCodeLenses() {
 export function getAuthToken() {
   return getConfiguration<string>('authToken', '');
 }
-
-export function getAgentModel() {
-  return getConfiguration<string>('agentModel', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6');
-}
-
-export function getAwsProfile() {
-  return getConfiguration<string>('awsProfile', '');
-}
-
-export function getAwsRegion() {
-  return getConfiguration<string>('awsRegion', 'eu-west-1');
-}

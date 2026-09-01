@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
-import { buildAgentConfigWithToken, getAgentModel } from './agent-config';
+import { buildAgentConfigWithToken } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
 import { getEffectiveToken } from '../devtools-api';
@@ -75,7 +75,6 @@ export class AgentRefactoringService {
   private static invokeAgent(workDir: string, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-      const model = getAgentModel() ?? 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6';
       const token = getEffectiveToken();
       if (!token) {
         reject(new Error('No authentication token available for agent'));
@@ -84,7 +83,7 @@ export class AgentRefactoringService {
       const config = buildAgentConfigWithToken(token);
       const configJson = JSON.stringify(config);
 
-      const args: string[] = ['run', 'skill:render-code-fix', '--model', model];
+      const args: string[] = ['run', 'skill:render-code-fix'];
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         CS_AGENT_CONFIG: configJson,
