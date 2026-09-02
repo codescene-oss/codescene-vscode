@@ -16,7 +16,7 @@ export interface AgentOutputContext {
 
 export type FixResult = 'fix_proposed' | 'unable_to_fix' | 'needs_human_review';
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
-export type ChangeType = 'partial' | 'full';
+export type ChangeType = 'partial' | 'whole_file';
 
 export interface AgentReplacement {
   search: string;
@@ -27,7 +27,8 @@ export interface AgentChange {
   file: string;
   change_type: ChangeType;
   description: string;
-  replacements: AgentReplacement[];
+  replacements?: AgentReplacement[];
+  whole_file_content?: string;
 }
 
 export interface AgentOutput {

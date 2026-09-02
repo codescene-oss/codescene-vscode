@@ -1,7 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
@@ -33,10 +32,13 @@ export class AgentRefactoringService {
   static async runRefactoring(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    skipCleanup?: boolean
   ): Promise<RefactorResponse> {
     const taskId = `refactor-${uuidv4()}`;
-    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agent-'));
+    const gitApi = acquireGitApi();
+    const repo = gitApi?.getRepository(document.uri);
+    const workDir = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
     const inputPath = path.join(workDir, INPUT_FILE);
     const outputPath = path.join(workDir, OUTPUT_FILE);
 
@@ -46,7 +48,7 @@ export class AgentRefactoringService {
 
       logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      await AgentRefactoringService.invokeAgent(workDir, document, signal);
+      await AgentRefactoringService.invokeAgent(workDir, signal);
 
       if (!fs.existsSync(outputPath)) {
         throw new Error('Agent did not produce output file');
@@ -59,7 +61,9 @@ export class AgentRefactoringService {
 
       return AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
     } finally {
-      AgentRefactoringService.cleanup(workDir);
+      if (!skipCleanup) {
+        AgentRefactoringService.cleanup(inputPath, outputPath);
+      }
     }
   }
 
@@ -78,7 +82,7 @@ export class AgentRefactoringService {
     };
   }
 
-  private static invokeAgent(workDir: string, document: TextDocument, signal?: AbortSignal): Promise<void> {
+  private static invokeAgent(workDir: string, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       const binaryPath = AgentRefactoringService.getAgentBinaryPath();
       const token = getEffectiveToken();
@@ -95,14 +99,10 @@ export class AgentRefactoringService {
         CS_AGENT_CONFIG: configJson,
       };
 
-      const gitApi = acquireGitApi();
-      const repo = gitApi?.getRepository(document.uri);
-      const cwd = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
-
       logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
 
       const proc: ChildProcess = spawn(binaryPath, args, {
-        cwd,
+        cwd: workDir,
         env,
       });
 
@@ -186,8 +186,12 @@ export class AgentRefactoringService {
         continue;
       }
 
-      for (const replacement of change.replacements) {
-        code = code.replace(replacement.search, replacement.replace);
+      if (change.change_type === 'whole_file' && change.whole_file_content) {
+        code = change.whole_file_content;
+      } else if (change.replacements) {
+        for (const replacement of change.replacements) {
+          code = code.replace(replacement.search, replacement.replace);
+        }
       }
     }
 
@@ -243,11 +247,15 @@ export class AgentRefactoringService {
     ];
   }
 
-  private static cleanup(workDir: string): void {
-    try {
-      fs.rmSync(workDir, { recursive: true, force: true });
-    } catch (err) {
-      logOutputChannel.warn(`Failed to cleanup work directory ${workDir}: ${err}`);
+  private static cleanup(inputPath: string, outputPath: string): void {
+    for (const filePath of [inputPath, outputPath]) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        logOutputChannel.warn(`Failed to cleanup file ${filePath}: ${err}`);
+      }
     }
   }
 }
