@@ -120,12 +120,6 @@ const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
 function handleWindowStateChange(state: vscode.WindowState): void {
   const previousState = isWindowFocused;
   isWindowFocused = state.focused;
-
-  if (state.focused && !previousState) {
-    logOutputChannel.debug('VSCode window gained focus');
-  } else if (!state.focused && previousState) {
-    logOutputChannel.debug('VSCode window lost focus');
-  }
 }
 
 async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
