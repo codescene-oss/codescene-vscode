@@ -9,6 +9,16 @@ export function buildAgentConfigWithToken(token: string): AgentConfig {
   return {
     codescene_access_token: token,
     plugins: ['render-code-fix-reporter'],
+    opencode_config: {
+      provider: {
+        'amazon-bedrock': {
+          options: {
+            profile: 'codescene-dev',
+            region: 'eu-west-1',
+          },
+        },
+      },
+    },
   };
 }
 
