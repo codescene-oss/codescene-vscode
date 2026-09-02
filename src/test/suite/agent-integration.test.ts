@@ -43,6 +43,11 @@ aceSuite('Agent Integration Test Suite', () => {
     }
     fs.mkdirSync(testDir, { recursive: true });
 
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: testDir });
+    execSync('git config user.email "test@test.com"', { cwd: testDir });
+    execSync('git config user.name "Test"', { cwd: testDir });
+
     mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
 
     originalGetAuthToken = configModule.getAuthToken;
@@ -117,7 +122,16 @@ aceSuite('Agent Integration Test Suite', () => {
       vscodeRange: new vscode.Range(0, 0, 12, 1),
     };
 
-    const response = await AgentRefactoringService.runRefactoring(doc, fnToRefactor);
+    const outputFilePath = path.join(testDir, 'render-code-fix-output.json');
+
+    const response = await AgentRefactoringService.runRefactoring(doc, fnToRefactor, undefined, true);
+
+    assert.ok(fs.existsSync(outputFilePath), 'Agent should have written output file');
+    const outputContent = fs.readFileSync(outputFilePath, 'utf-8');
+    const output = JSON.parse(outputContent);
+    assert.ok(output.fix_result, 'Output file should contain fix_result');
+    assert.ok(output.changes, 'Output file should contain changes');
+    assert.ok(output.schema_version, 'Output file should contain schema_version');
 
     assert.ok(response, 'Response should be defined');
     assert.ok(response.code, 'Response should have code');
