@@ -45,4 +45,14 @@ export interface AgentOutput {
 export interface AgentConfig {
   codescene_access_token: string;
   plugins: string[];
+  opencode_config?: {
+    provider: {
+      'amazon-bedrock': {
+        options: {
+          profile: string;
+          region: string;
+        };
+      };
+    };
+  };
 }

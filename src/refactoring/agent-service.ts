@@ -12,6 +12,11 @@ import { getExtensionPath } from '../cs-extension-state';
 import { getEffectiveToken } from '../devtools-api';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 const INPUT_FILE = 'render-code-fix-input.json';
 const OUTPUT_FILE = 'render-code-fix-output.json';
 
@@ -84,7 +89,7 @@ export class AgentRefactoringService {
       const config = buildAgentConfigWithToken(token);
       const configJson = JSON.stringify(config);
 
-      const args: string[] = ['run', 'skill:render-code-fix'];
+      const args: string[] = ['run', 'skill:render-code-fix', '--model', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6'];
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         CS_AGENT_CONFIG: configJson,
@@ -104,6 +109,10 @@ export class AgentRefactoringService {
       let stderr = '';
       proc.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
+        const lines = data.toString().split('\n').filter((line) => line.trim());
+        for (const line of lines) {
+          logOutputChannel.debug(`[cs-agent:err] ${stripAnsi(line)}`);
+        }
       });
 
       proc.stdout?.on('data', (data: Buffer) => {
