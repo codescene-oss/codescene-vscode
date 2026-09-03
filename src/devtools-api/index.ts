@@ -20,7 +20,7 @@ import { getAuthToken } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
-import { AgentRefactoringService } from '../refactoring/agent-service';
+import { AgentRefactoringService, ProgressCallback } from '../refactoring/agent-service';
 import { vscodeRange } from '../review/utils';
 import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
@@ -396,7 +396,7 @@ export class DevtoolsAPI {
    * @param request refactoring request
    * @returns refactoring response
    */
-  static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
+  static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
     this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;
 
@@ -406,7 +406,7 @@ export class DevtoolsAPI {
     try {
       this.logRefactorRequested(fnToRefactor, skipCache);
 
-      const response = await this.executeRefactor(document, fnToRefactor, signal);
+      const response = await this.executeRefactor(document, fnToRefactor, signal, onProgress);
 
       this.logRefactorDone(fnToRefactor, skipCache, response);
 
@@ -444,9 +444,10 @@ export class DevtoolsAPI {
   private static async executeRefactor(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
-    signal: AbortSignal
+    signal: AbortSignal,
+    onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
-    return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal);
+    return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal, undefined, onProgress);
   }
 
   private static logRefactorDone(fnToRefactor: any, skipCache: boolean, response: RefactorResponse): void {

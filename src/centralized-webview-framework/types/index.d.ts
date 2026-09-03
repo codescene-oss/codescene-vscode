@@ -115,6 +115,7 @@ export interface AceContextViewProps {
     error?: string;
     isStale: boolean;
     loading: boolean;
+    progressMessage?: string;
   };
 }
 

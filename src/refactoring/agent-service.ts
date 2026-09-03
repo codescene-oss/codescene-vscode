@@ -19,6 +19,8 @@ function stripAnsi(str: string): string {
 const INPUT_FILE = 'render-code-fix-input.json';
 const OUTPUT_FILE = 'render-code-fix-output.json';
 
+export type ProgressCallback = (message: string) => void;
+
 export class AgentRefactoringService {
   private static getAgentBinaryPath(): string {
     const extensionPath = getExtensionPath();
@@ -33,7 +35,8 @@ export class AgentRefactoringService {
     document: TextDocument,
     fnToRefactor: FnToRefactor,
     signal?: AbortSignal,
-    skipCleanup?: boolean
+    skipCleanup?: boolean,
+    onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
     const taskId = `refactor-${uuidv4()}`;
     const gitApi = acquireGitApi();
@@ -48,7 +51,7 @@ export class AgentRefactoringService {
 
       logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      await AgentRefactoringService.invokeAgent(workDir, signal);
+      await AgentRefactoringService.invokeAgent(workDir, signal, onProgress);
 
       if (!fs.existsSync(outputPath)) {
         throw new Error('Agent did not produce output file');
@@ -82,7 +85,7 @@ export class AgentRefactoringService {
     };
   }
 
-  private static invokeAgent(workDir: string, signal?: AbortSignal): Promise<void> {
+  private static invokeAgent(workDir: string, signal?: AbortSignal, onProgress?: ProgressCallback): Promise<void> {
     return new Promise((resolve, reject) => {
       const binaryPath = AgentRefactoringService.getAgentBinaryPath();
       const token = getEffectiveToken();
@@ -116,7 +119,14 @@ export class AgentRefactoringService {
       });
 
       proc.stdout?.on('data', (data: Buffer) => {
-        logOutputChannel.debug(`Agent stdout: ${data.toString()}`);
+        const output = data.toString();
+        logOutputChannel.debug(`Agent stdout: ${output}`);
+        if (onProgress) {
+          const lines = output.split('\n').filter((line) => line.trim());
+          if (lines.length > 0) {
+            onProgress(lines[lines.length - 1]);
+          }
+        }
       });
 
       const abortHandler = () => {
