@@ -70,7 +70,7 @@ function refreshAssets(tokenEnv) {
     return;
   }
   execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
-  execSync('npm run updatecwf', { stdio: 'inherit', env: tokenEnv });
+  execSync('make updatecwf', { stdio: 'inherit', env: tokenEnv });
 }
 
 function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
