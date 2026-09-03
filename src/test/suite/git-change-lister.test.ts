@@ -19,6 +19,7 @@ import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
 
 suite('GitChangeLister Test Suite', () => {
   const testRepoPath = path.join(__dirname, '../../../test-git-repo');
+  const integrationRepoPath = path.join(__dirname, '../../../test-git-repo-integration');
   let gitChangeLister: GitChangeLister;
   let mockExecutor: MockExecutor;
 
@@ -174,12 +175,14 @@ suite('GitChangeLister Test Suite', () => {
   });
 
   suite('DeltaAnalysisTreeProvider integration', () => {
-    const integrationRepoPath = path.join(__dirname, '../../../test-git-repo-integration');
     let treeProvider: DeltaAnalysisTreeProvider;
     let deltaSubscription: { dispose: () => void };
 
     suiteSetup(async function () {
       this.timeout(60000);
+      if (fs.existsSync(integrationRepoPath)) {
+        fs.rmSync(integrationRepoPath, { recursive: true, force: true });
+      }
       const binaryPath = await ensureBinary();
       const mockContext = createMockExtensionContext(integrationRepoPath);
       if (!CsExtensionState.hasInstance) {
@@ -187,17 +190,6 @@ suite('GitChangeLister Test Suite', () => {
       }
       Reviewer.init(mockContext, () => new Map());
       DevtoolsAPI.init(binaryPath, mockContext, async () => false);
-    });
-
-    suiteTeardown(async function () {
-      this.timeout(20000);
-      try {
-        if (fs.existsSync(integrationRepoPath)) {
-          fs.rmSync(integrationRepoPath, { recursive: true, force: true });
-        }
-      } catch (error) {
-        console.error('Failed to clean up test-git-repo-integration:', error);
-      }
     });
 
     setup(async function () {
@@ -230,29 +222,13 @@ suite('GitChangeLister Test Suite', () => {
       });
     });
 
-    teardown(async function () {
-      this.timeout(20000);
-      try {
-        deltaSubscription?.dispose();
-        treeProvider.clearTree();
-        Reviewer.instance.clearCache();
-        setGitApiForTesting(undefined);
-        restoreDefaultWorkspaceFolders();
-        clearMockGitRepositories();
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        if (fs.existsSync(integrationRepoPath)) {
-          fs.rmSync(integrationRepoPath, { recursive: true, force: true });
-        }
-      } catch (error) {
-        console.error('Error during test teardown:', error);
-        if (fs.existsSync(integrationRepoPath)) {
-          try {
-            fs.rmSync(integrationRepoPath, { recursive: true, force: true });
-          } catch (cleanupError) {
-            console.error('Failed to clean up test-git-repo-integration in error handler:', cleanupError);
-          }
-        }
-      }
+    teardown(function () {
+      deltaSubscription?.dispose();
+      treeProvider.clearTree();
+      Reviewer.instance.clearCache();
+      setGitApiForTesting(undefined);
+      restoreDefaultWorkspaceFolders();
+      clearMockGitRepositories();
     });
 
     const testCases = [
