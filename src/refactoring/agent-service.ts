@@ -85,76 +85,76 @@ export class AgentRefactoringService {
     };
   }
 
+  private static spawnAgentProcess(workDir: string): { proc: ChildProcess; binaryPath: string } {
+    const binaryPath = AgentRefactoringService.getAgentBinaryPath();
+    const token = getEffectiveToken();
+    if (!token) {
+      throw new Error('No authentication token available for agent');
+    }
+    const config = buildAgentConfigWithToken(token);
+    const configJson = JSON.stringify(config);
+
+    const args: string[] = ['run', 'skill:render-code-fix', '--model', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6'];
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      CS_AGENT_CONFIG: configJson,
+    };
+
+    logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
+
+    const proc = spawn(binaryPath, args, { cwd: workDir, env });
+    return { proc, binaryPath };
+  }
+
+  private static setupStderrHandler(proc: ChildProcess): { getStderr: () => string } {
+    let stderr = '';
+    proc.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString();
+      const lines = data.toString().split('\n').filter((line) => line.trim());
+      for (const line of lines) {
+        logOutputChannel.debug(`[cs-agent:err] ${stripAnsi(line)}`);
+      }
+    });
+    return { getStderr: () => stderr };
+  }
+
+  private static setupStdoutHandler(proc: ChildProcess, onProgress?: ProgressCallback): void {
+    proc.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      logOutputChannel.debug(`Agent stdout: ${output}`);
+      if (!onProgress) return;
+      const lines = output.split('\n').filter((line) => line.trim());
+      const lastLine = lines[lines.length - 1];
+      if (lastLine) onProgress(lastLine);
+    });
+  }
+
   private static invokeAgent(workDir: string, signal?: AbortSignal, onProgress?: ProgressCallback): Promise<void> {
     return new Promise((resolve, reject) => {
-      const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-      const token = getEffectiveToken();
-      if (!token) {
-        reject(new Error('No authentication token available for agent'));
-        return;
-      }
-      const config = buildAgentConfigWithToken(token);
-      const configJson = JSON.stringify(config);
-
-      const args: string[] = ['run', 'skill:render-code-fix', '--model', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6'];
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-        CS_AGENT_CONFIG: configJson,
-      };
-
-      logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
-
-      const proc: ChildProcess = spawn(binaryPath, args, {
-        cwd: workDir,
-        env,
-      });
-
-      let stderr = '';
-      proc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
-        const lines = data.toString().split('\n').filter((line) => line.trim());
-        for (const line of lines) {
-          logOutputChannel.debug(`[cs-agent:err] ${stripAnsi(line)}`);
-        }
-      });
-
-      proc.stdout?.on('data', (data: Buffer) => {
-        const output = data.toString();
-        logOutputChannel.debug(`Agent stdout: ${output}`);
-        if (onProgress) {
-          const lines = output.split('\n').filter((line) => line.trim());
-          if (lines.length > 0) {
-            onProgress(lines[lines.length - 1]);
-          }
-        }
-      });
+      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir);
+      const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
+      AgentRefactoringService.setupStdoutHandler(proc, onProgress);
 
       const abortHandler = () => {
         proc.kill('SIGTERM');
         reject(new Error('Agent invocation aborted'));
       };
 
-      if (signal) {
-        signal.addEventListener('abort', abortHandler);
-      }
+      signal?.addEventListener('abort', abortHandler);
 
       proc.on('close', (code: number | null) => {
-        if (signal) {
-          signal.removeEventListener('abort', abortHandler);
-        }
-
+        signal?.removeEventListener('abort', abortHandler);
         if (code === 0) {
           resolve();
         } else {
+          const stderr = getStderr();
           logOutputChannel.error(`Agent exited with code ${code}: ${stderr}`);
           reject(new Error(`Agent exited with code ${code}: ${stderr}`));
         }
       });
 
       proc.on('error', (err: Error) => {
-        if (signal) {
-          signal.removeEventListener('abort', abortHandler);
-        }
+        signal?.removeEventListener('abort', abortHandler);
         reject(err);
       });
     });
@@ -184,28 +184,26 @@ export class AgentRefactoringService {
     };
   }
 
+  private static applyChange(code: string, change: AgentChange): string {
+    if (change.change_type === 'whole_file' && change.whole_file_content) {
+      return change.whole_file_content;
+    }
+    if (!change.replacements) return code;
+    return change.replacements.reduce((c, r) => c.replace(r.search, r.replace), code);
+  }
+
   private static applyChanges(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
     changes: AgentChange[]
   ): string {
-    let code = fnToRefactor.body;
-
-    for (const change of changes) {
-      if (path.basename(change.file) !== path.basename(document.fileName)) {
-        continue;
-      }
-
-      if (change.change_type === 'whole_file' && change.whole_file_content) {
-        code = change.whole_file_content;
-      } else if (change.replacements) {
-        for (const replacement of change.replacements) {
-          code = code.replace(replacement.search, replacement.replace);
-        }
-      }
-    }
-
-    return code;
+    const relevantChanges = changes.filter(
+      (change) => path.basename(change.file) === path.basename(document.fileName)
+    );
+    return relevantChanges.reduce(
+      (code, change) => AgentRefactoringService.applyChange(code, change),
+      fnToRefactor.body
+    );
   }
 
   private static mapConfidence(output: AgentOutput): Confidence {
