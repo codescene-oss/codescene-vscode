@@ -1,13 +1,13 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs updatecwf benchmark
 
 .DEFAULT_GOAL := build
 
-build:
+build: updatecwf
 	npm run build
 
 package: lint pretest
 	npm i
-	npm run updatecwf
+	$(MAKE) updatecwf
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
@@ -61,6 +61,18 @@ test-release:
 
 updatedocs:
 	npm run updatedocs
+
+updatecwf:
+	@if [ "$$(whoami)" = "vemv" ] && [ -d "../cs-webview" ]; then \
+		echo "Building CWF locally from ../cs-webview..."; \
+		(cd ../cs-webview && npm run build); \
+		rm -rf ./cs-cwf; \
+		cp -r ../cs-webview/build ./cs-cwf; \
+		echo "CWF built and copied to ./cs-cwf"; \
+	else \
+		echo "Downloading CWF from GitHub releases..."; \
+		npm run updatecwf; \
+	fi
 
 clean:
 	npm run clean
