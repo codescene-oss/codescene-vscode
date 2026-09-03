@@ -16,16 +16,16 @@ package: lint pretest
 
 package-darwin-arm64: lint pretest
 	npm i
-	cd ~/refactoring-agent/agent && $(MAKE) build-all
+	cd ~/cs-agent/agent && $(MAKE) build-all
 	mkdir -p ./bin
-	cp ~/refactoring-agent/agent/target/aarch64-apple-darwin/release/cs-agent ./bin/cs-agent
+	cp ~/cs-agent/agent/target/aarch64-apple-darwin/release/cs-agent ./bin/cs-agent
 	node ./scripts/package-platform.js darwin arm64
 
 package-darwin-x64: lint pretest
 	npm i
-	cd ~/refactoring-agent/agent && $(MAKE) build-all
+	cd ~/cs-agent/agent && $(MAKE) build-all
 	mkdir -p ./bin
-	cp ~/refactoring-agent/agent/target/x86_64-apple-darwin/release/cs-agent ./bin/cs-agent
+	cp ~/cs-agent/agent/target/x86_64-apple-darwin/release/cs-agent ./bin/cs-agent
 	node ./scripts/package-platform.js darwin x64
 
 package-linux-arm64: lint pretest
