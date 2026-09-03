@@ -89,7 +89,7 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   console.log('\nStep 4: Updating docs and webview...');
   const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
   execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
-  execSync('npm run updatecwf', { stdio: 'inherit', env: tokenEnv });
+  execSync('make updatecwf', { stdio: 'inherit', env: tokenEnv });
 
   console.log('\nStep 5: Building extension...');
   execSync('npm run build', {

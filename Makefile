@@ -80,7 +80,7 @@ updatedocs:
 	npm run updatedocs
 
 updatecwf:
-	@if [ "$$(whoami)" = "vemv" ] && [ -d "../cs-webview" ]; then \
+	@if [ -d "../cs-webview" ] && [ -z "$${CI}" ]; then \
 		echo "Building CWF locally from ../cs-webview..."; \
 		(cd ../cs-webview && npm run build); \
 		rm -rf ./cs-cwf; \
