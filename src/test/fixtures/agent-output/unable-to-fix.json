@@ -4,8 +4,8 @@
   "task_id": "refactor-test-456",
   "fix_result": "unable_to_fix",
   "confidence": "low",
-  "summary": "Cannot refactor: code complexity is essential",
-  "reasoning": "The complexity in this function stems from essential business logic that cannot be simplified without changing the behavior. The nested conditions handle edge cases that must be preserved.",
+  "summary": "Code improvement guide",
+  "reasoning": "CodeScene Refactoring Agent was unable to generate a refactoring recommendation. Please refer to the manual steps for improving your code.",
   "changes": [],
   "generated_at": "2026-08-31T12:00:00Z"
 }

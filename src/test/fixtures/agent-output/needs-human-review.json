@@ -4,8 +4,8 @@
   "task_id": "refactor-test-789",
   "fix_result": "needs_human_review",
   "confidence": "medium",
-  "summary": "Partial refactoring suggested - review recommended",
-  "reasoning": "The suggested refactoring simplifies the structure but may change error handling behavior. Please verify that the new error handling approach meets your requirements.",
+  "summary": "Refactoring results",
+  "reasoning": "The code needs to be inspected and verified carefully.",
   "changes": [
     {
       "file": "test.ts",

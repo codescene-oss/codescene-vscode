@@ -4,8 +4,8 @@
   "task_id": "refactor-test-123",
   "fix_result": "fix_proposed",
   "confidence": "high",
-  "summary": "Extracted helper function to reduce complexity",
-  "reasoning": "The original function had deep nesting which made it hard to read. By extracting the inner logic into a helper function, we reduce the cognitive load and improve maintainability.",
+  "summary": "Refactoring suggestion",
+  "reasoning": "The refactoring improves code health.",
   "changes": [
     {
       "file": "test.ts",
