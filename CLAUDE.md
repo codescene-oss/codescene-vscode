@@ -11,3 +11,8 @@ Testing practices: see [TESTING.md](.claude/TESTING.md).
 Validate your work using `make lint`. Satifying all linter faults is mandatory - they must be addressed before proceeding with other work.
 
 If you find an issue at any stage, you must fix it immediately, regardless of whether you think it's pre-existing.
+
+This project uses CWF for rendering views, and can typically be found at `../cs-webview`.
+This project uses cs-agent for performing refactorings, and can typically be found at `../cs-agent`.
+This project uses the CodeScene CLI for performing various code analysis tasks, and can typically be found at `../codescene/cli`.
+This project used in the past ACE where cs-agent is now used, and can typically be found at `../automated-refactoring`.
