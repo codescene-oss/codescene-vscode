@@ -12,6 +12,7 @@ Validate your work using `make lint`. Satifying all linter faults is mandatory -
 
 If you find an issue at any stage, you must fix it immediately, regardless of whether you think it's pre-existing.
 
+This project is a VS Code extension. You might need to study the VS Code accordingly. It might be cloned at `../vscode`.
 This project uses CWF for rendering views, and can typically be found at `../cs-webview`.
 This project uses cs-agent for performing refactorings, and can typically be found at `../cs-agent`.
 This project uses the CodeScene CLI for performing various code analysis tasks, and can typically be found at `../codescene/cli`.
