@@ -145,6 +145,20 @@
           "description": "Enable CodeScene Refactoring Agent",
           "order": 15
         },
+        "codescene.agentModel": {
+          "type": "string",
+          "default": "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
+          "enum": ["amazon-bedrock/eu.anthropic.claude-sonnet-4-6"],
+          "enumDescriptions": ["Claude Sonnet 4.6 via Amazon Bedrock (EU)"],
+          "description": "Model to use for the Refactoring Agent.",
+          "order": 16
+        },
+        "codescene.agentModelOverride": {
+          "type": "string",
+          "default": "",
+          "description": "Custom model identifier. If set, overrides the dropdown selection above.",
+          "order": 17
+        },
         "codescene.authToken": {
           "type": "string",
           "default": "",

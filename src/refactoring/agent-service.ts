@@ -10,6 +10,7 @@ import { buildAgentConfigWithToken } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
 import { getEffectiveToken } from '../devtools-api';
+import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 
 function stripAnsi(str: string): string {
@@ -96,7 +97,7 @@ export class AgentRefactoringService {
     const config = buildAgentConfigWithToken(token, ioDir);
     const configJson = JSON.stringify(config);
 
-    const args: string[] = ['run', 'skill:render-code-fix', '--model', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6'];
+    const args: string[] = ['run', 'skill:render-code-fix', '--model', getAgentModel()];
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       CS_AGENT_CONFIG: configJson,
