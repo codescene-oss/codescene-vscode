@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
@@ -42,8 +43,9 @@ export class AgentRefactoringService {
     const gitApi = acquireGitApi();
     const repo = gitApi?.getRepository(document.uri);
     const workDir = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
-    const inputPath = path.join(workDir, INPUT_FILE);
-    const outputPath = path.join(workDir, OUTPUT_FILE);
+    const ioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agent-io-'));
+    const inputPath = path.join(ioDir, INPUT_FILE);
+    const outputPath = path.join(ioDir, OUTPUT_FILE);
 
     try {
       const input = AgentRefactoringService.buildInput(document, fnToRefactor, taskId);
@@ -51,7 +53,7 @@ export class AgentRefactoringService {
 
       logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      await AgentRefactoringService.invokeAgent(workDir, signal, onProgress);
+      await AgentRefactoringService.invokeAgent(workDir, ioDir, signal, onProgress);
 
       if (!fs.existsSync(outputPath)) {
         throw new Error('Agent did not produce output file');
@@ -65,7 +67,7 @@ export class AgentRefactoringService {
       return AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
     } finally {
       if (!skipCleanup) {
-        AgentRefactoringService.cleanup(inputPath, outputPath);
+        AgentRefactoringService.cleanup(ioDir);
       }
     }
   }
@@ -85,13 +87,13 @@ export class AgentRefactoringService {
     };
   }
 
-  private static spawnAgentProcess(workDir: string): { proc: ChildProcess; binaryPath: string } {
+  private static spawnAgentProcess(workDir: string, ioDir: string): { proc: ChildProcess; binaryPath: string } {
     const binaryPath = AgentRefactoringService.getAgentBinaryPath();
     const token = getEffectiveToken();
     if (!token) {
       throw new Error('No authentication token available for agent');
     }
-    const config = buildAgentConfigWithToken(token);
+    const config = buildAgentConfigWithToken(token, ioDir);
     const configJson = JSON.stringify(config);
 
     const args: string[] = ['run', 'skill:render-code-fix', '--model', 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6'];
@@ -129,9 +131,9 @@ export class AgentRefactoringService {
     });
   }
 
-  private static invokeAgent(workDir: string, signal?: AbortSignal, onProgress?: ProgressCallback): Promise<void> {
+  private static invokeAgent(workDir: string, ioDir: string, signal?: AbortSignal, onProgress?: ProgressCallback): Promise<void> {
     return new Promise((resolve, reject) => {
-      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir);
+      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir, ioDir);
       const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
       AgentRefactoringService.setupStdoutHandler(proc, onProgress);
 
@@ -255,15 +257,13 @@ export class AgentRefactoringService {
     ];
   }
 
-  private static cleanup(inputPath: string, outputPath: string): void {
-    for (const filePath of [inputPath, outputPath]) {
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (err) {
-        logOutputChannel.warn(`Failed to cleanup file ${filePath}: ${err}`);
+  private static cleanup(ioDir: string): void {
+    try {
+      if (fs.existsSync(ioDir)) {
+        fs.rmSync(ioDir, { recursive: true });
       }
+    } catch (err) {
+      logOutputChannel.warn(`Failed to cleanup directory ${ioDir}: ${err}`);
     }
   }
 }
