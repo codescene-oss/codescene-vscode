@@ -200,6 +200,19 @@ aceSuite('Agent Integration Test Suite', () => {
     const outputContent = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
     assert.ok(outputContent.fix_result, 'Output file should contain fix_result');
     assert.ok(outputContent.changes, 'Output file should contain changes');
+    assert.strictEqual(
+      outputContent.task_id,
+      inputContent.task_id,
+      'Output task_id should match input task_id (proves agent read from temp directory)'
+    );
+    if (outputContent.fix_result === 'fix_proposed') {
+      assert.ok(outputContent.changes.length > 0, 'fix_proposed should have at least one change');
+      const changedFiles = outputContent.changes.map((c: { file: string }) => c.file);
+      assert.ok(
+        changedFiles.some((f: string) => f.includes('simple.cpp')),
+        `Changes should reference the input file (got: ${changedFiles.join(', ')})`
+      );
+    }
 
     fs.rmSync(ioDir, { recursive: true });
   });
