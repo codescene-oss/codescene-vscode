@@ -159,6 +159,23 @@
           "description": "Custom model identifier. If set, overrides the dropdown selection above.",
           "order": 17
         },
+        "codescene.providerOptions": {
+          "type": "object",
+          "properties": {
+            "amazon-bedrock:profile": {
+              "type": "string",
+              "description": "AWS profile name for Amazon Bedrock"
+            },
+            "amazon-bedrock:region": {
+              "type": "string",
+              "description": "AWS region for Amazon Bedrock"
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "description": "Provider-specific options for the Refactoring Agent. Keys must be in 'provider:option' format.",
+          "order": 18
+        },
         "codescene.authToken": {
           "type": "string",
           "default": "",
