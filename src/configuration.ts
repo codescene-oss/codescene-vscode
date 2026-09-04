@@ -71,3 +71,13 @@ export function toggleReviewCodeLenses() {
 export function getAuthToken() {
   return getConfiguration<string>('authToken', '');
 }
+
+const DEFAULT_AGENT_MODEL = 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6';
+
+export function getAgentModel(): string {
+  const override = getConfiguration<string>('agentModelOverride', '')?.trim();
+  if (override) {
+    return override;
+  }
+  return getConfiguration<string>('agentModel', DEFAULT_AGENT_MODEL)!;
+}
