@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as vscode from 'vscode';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { TestTextDocument } from '../mocks/test-text-document';
@@ -122,16 +123,12 @@ aceSuite('Agent Integration Test Suite', () => {
       vscodeRange: new vscode.Range(0, 0, 12, 1),
     };
 
+    const response = await AgentRefactoringService.runRefactoring(doc, fnToRefactor);
+
+    const inputFilePath = path.join(testDir, 'render-code-fix-input.json');
     const outputFilePath = path.join(testDir, 'render-code-fix-output.json');
-
-    const response = await AgentRefactoringService.runRefactoring(doc, fnToRefactor, undefined, true);
-
-    assert.ok(fs.existsSync(outputFilePath), 'Agent should have written output file');
-    const outputContent = fs.readFileSync(outputFilePath, 'utf-8');
-    const output = JSON.parse(outputContent);
-    assert.ok(output.fix_result, 'Output file should contain fix_result');
-    assert.ok(output.changes, 'Output file should contain changes');
-    assert.ok(output.schema_version, 'Output file should contain schema_version');
+    assert.ok(!fs.existsSync(inputFilePath), 'Input JSON file should NOT be in the repo directory');
+    assert.ok(!fs.existsSync(outputFilePath), 'Output JSON file should NOT be in the repo directory');
 
     assert.ok(response, 'Response should be defined');
     assert.ok(response.code, 'Response should have code');
@@ -141,5 +138,115 @@ aceSuite('Agent Integration Test Suite', () => {
     assert.ok(response.confidence['recommended-action'], 'Confidence should have recommended action');
     assert.ok(response['trace-id'], 'Response should have trace-id');
     assert.ok(response['refactoring-properties'], 'Response should have refactoring-properties');
+  });
+
+  test('runRefactoring writes JSON files to temp directory', async function () {
+    this.timeout(120000);
+
+    const simpleContent = `int g(int x) {
+  if (x > 0) {
+    if (x > 1) {
+      if (x > 2) {
+        return x;
+      }
+    }
+  }
+  return 0;
+}
+`;
+
+    const doc = createTestFile('simple.cpp', simpleContent);
+
+    const fnToRefactor: FnToRefactor = {
+      'file-type': 'cpp',
+      name: 'g',
+      body: simpleContent,
+      'refactoring-targets': [
+        {
+          category: 'Deep, Nested Complexity',
+          line: 2,
+        },
+      ],
+      range: {
+        'start-line': 1,
+        'start-column': 1,
+        'end-line': 11,
+        'end-column': 2,
+      },
+      vscodeRange: new vscode.Range(0, 0, 10, 1),
+    };
+
+    for (const dir of fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('cs-agent-io-'))) {
+      fs.rmSync(path.join(os.tmpdir(), dir), { recursive: true });
+    }
+
+    await AgentRefactoringService.runRefactoring(doc, fnToRefactor, undefined, true);
+
+    const tmpDirsAfter = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('cs-agent-io-'));
+    assert.strictEqual(tmpDirsAfter.length, 1, 'Exactly one temp directory should exist');
+
+    const ioDir = path.join(os.tmpdir(), tmpDirsAfter[0]);
+    const inputFile = path.join(ioDir, 'render-code-fix-input.json');
+    const outputFile = path.join(ioDir, 'render-code-fix-output.json');
+
+    assert.ok(fs.existsSync(inputFile), 'Input JSON file should exist in temp directory');
+    assert.ok(fs.existsSync(outputFile), 'Output JSON file should exist in temp directory');
+
+    const inputContent = JSON.parse(fs.readFileSync(inputFile, 'utf-8'));
+    assert.ok(inputContent.task_id, 'Input file should contain task_id');
+    assert.ok(inputContent.file, 'Input file should contain file path');
+    assert.strictEqual(inputContent.smell, 'Deep, Nested Complexity', 'Input file should contain smell');
+
+    const outputContent = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
+    assert.ok(outputContent.fix_result, 'Output file should contain fix_result');
+    assert.ok(outputContent.changes, 'Output file should contain changes');
+
+    fs.rmSync(ioDir, { recursive: true });
+  });
+
+  test('runRefactoring cleans up temp directory after completion', async function () {
+    this.timeout(120000);
+
+    const simpleContent = `int h(int x) {
+  if (x > 0) {
+    if (x > 1) {
+      if (x > 2) {
+        return x;
+      }
+    }
+  }
+  return 0;
+}
+`;
+
+    const doc = createTestFile('cleanup.cpp', simpleContent);
+
+    const fnToRefactor: FnToRefactor = {
+      'file-type': 'cpp',
+      name: 'h',
+      body: simpleContent,
+      'refactoring-targets': [
+        {
+          category: 'Deep, Nested Complexity',
+          line: 2,
+        },
+      ],
+      range: {
+        'start-line': 1,
+        'start-column': 1,
+        'end-line': 11,
+        'end-column': 2,
+      },
+      vscodeRange: new vscode.Range(0, 0, 10, 1),
+    };
+
+    for (const dir of fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('cs-agent-io-'))) {
+      fs.rmSync(path.join(os.tmpdir(), dir), { recursive: true });
+    }
+
+    await AgentRefactoringService.runRefactoring(doc, fnToRefactor);
+
+    const tmpDirsAfter = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith('cs-agent-io-'));
+    assert.strictEqual(tmpDirsAfter.length, 0, 'Temp directory should be cleaned up after refactoring');
   });
 });

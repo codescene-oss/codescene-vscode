@@ -1,7 +1,7 @@
 import { getAuthToken } from '../configuration';
 import { AgentConfig } from './agent-types';
 
-export function buildAgentConfigWithToken(token: string): AgentConfig {
+export function buildAgentConfigWithToken(token: string, ioDir?: string): AgentConfig {
   if (!token) {
     throw new Error('No authentication token available for agent');
   }
@@ -9,6 +9,7 @@ export function buildAgentConfigWithToken(token: string): AgentConfig {
   return {
     codescene_access_token: token,
     plugins: ['render-code-fix-reporter'],
+    ...(ioDir && { io_json_dir: ioDir }),
     opencode_config: {
       provider: {
         'amazon-bedrock': {
