@@ -81,3 +81,7 @@ export function getAgentModel(): string {
   }
   return getConfiguration<string>('agentModel', DEFAULT_AGENT_MODEL)!;
 }
+
+export function getProviderOptions(): Record<string, string> {
+  return getConfiguration<Record<string, string>>('providerOptions') ?? {};
+}

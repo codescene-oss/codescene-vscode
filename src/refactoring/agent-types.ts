@@ -48,13 +48,6 @@ export interface AgentConfig {
   plugins: string[];
   io_json_dir?: string;
   opencode_config?: {
-    provider: {
-      'amazon-bedrock': {
-        options: {
-          profile: string;
-          region: string;
-        };
-      };
-    };
+    provider: Record<string, { options: Record<string, string> }>;
   };
 }
