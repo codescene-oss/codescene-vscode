@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.28.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.0...v0.28.1) (2026-09-07)
+
 ## [0.28.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.8...v0.28.0) (2026-08-11)
 
 ### [0.27.8](https://github.com/codescene-oss/codescene-vscode/compare/v0.27.7...v0.27.8) (2026-08-06)
