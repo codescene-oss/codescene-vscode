@@ -57,13 +57,12 @@ aceSuite('AgentRefactoringService Test Suite', () => {
       name: 'mapOutputToResponse maps unable_to_fix correctly',
       fixture: 'unable-to-fix.json',
       fnBody: 'function complex() { return 42; }',
-      assertions: (response: any, output: AgentOutput) => {
-        assert.strictEqual(response['trace-id'], output.task_id);
+      assertions: (response: any) => {
         assert.strictEqual(response.confidence.level, 1);
         assert.strictEqual(response.confidence.title, 'Unable to refactor');
         assert.strictEqual(response.confidence['review-header'], 'Review required');
         assert.strictEqual(response.reasons.length, 1);
-        assert.strictEqual(response.reasons[0].summary, output.summary);
+        assert.strictEqual(response.reasons[0].summary, 'No changes proposed');
       },
     },
     {
@@ -100,6 +99,7 @@ aceSuite('AgentRefactoringService Test Suite', () => {
 
   for (const tc of confidenceLevelCases) {
     test(`mapOutputToResponse maps confidence level ${tc.confidence} to ${tc.expectedLevel}`, () => {
+      const fnBody = 'function test() { oldCode; }';
       const output: AgentOutput = {
         '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
         schema_version: '1.0',
@@ -108,12 +108,19 @@ aceSuite('AgentRefactoringService Test Suite', () => {
         confidence: tc.confidence,
         summary: 'Test summary',
         reasoning: 'Test reasoning',
-        changes: [],
+        changes: [
+          {
+            file: 'test.ts',
+            change_type: 'partial',
+            description: 'Test change',
+            replacements: [{ search: 'oldCode', replace: 'newCode' }],
+          },
+        ],
         generated_at: '2026-08-31T12:00:00Z',
       };
 
-      const fnToRefactor = createMockFnToRefactor('function test() {}');
-      const document = createMockDocument('/test/test.ts', 'function test() {}');
+      const fnToRefactor = createMockFnToRefactor(fnBody);
+      const document = createMockDocument('/test/test.ts', fnBody);
 
       const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
 
@@ -198,5 +205,30 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
 
     assert.strictEqual(response.metadata['cached?'], false);
+  });
+
+  test('mapOutputToResponse marks content-identical refactoring as unable_to_fix', () => {
+    const fnBody = 'function test() { return 42; }';
+    const output: AgentOutput = {
+      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      schema_version: '1.0',
+      task_id: 'test-identical',
+      fix_result: 'fix_proposed',
+      confidence: 'high',
+      summary: 'Refactoring suggestion',
+      reasoning: 'The refactoring improves code health.',
+      changes: [],
+      generated_at: '2026-08-31T12:00:00Z',
+    };
+
+    const fnToRefactor = createMockFnToRefactor(fnBody);
+    const document = createMockDocument('/test/test.ts', fnBody);
+
+    const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
+
+    assert.strictEqual(response.confidence.level, 1);
+    assert.strictEqual(response.confidence.title, 'Unable to refactor');
+    assert.strictEqual(response.confidence['review-header'], 'Review required');
+    assert.strictEqual(response.reasons.length, 1);
   });
 });

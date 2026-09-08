@@ -169,8 +169,14 @@ export class AgentRefactoringService {
     fnToRefactor: FnToRefactor
   ): RefactorResponse {
     const code = AgentRefactoringService.applyChanges(document, fnToRefactor, output.changes);
-    const confidence = AgentRefactoringService.mapConfidence(output);
-    const reasons = AgentRefactoringService.mapReasons(output);
+
+    const effectiveOutput =
+      code === fnToRefactor.body
+        ? { ...output, fix_result: 'unable_to_fix' as const, confidence: 'low' as const, summary: 'No changes proposed' }
+        : output;
+
+    const confidence = AgentRefactoringService.mapConfidence(effectiveOutput);
+    const reasons = AgentRefactoringService.mapReasons(effectiveOutput);
 
     return {
       code,
