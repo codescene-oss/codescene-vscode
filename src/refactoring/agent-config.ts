@@ -1,12 +1,16 @@
 import { getAuthToken, getProviderOptions } from '../configuration';
 import { AgentConfig, BedrockOpencodeProvider, ProviderCredentials } from './agent-types';
 
+function hasAnyApiKey(anthropicApiKey: string | undefined, openaiApiKey: string | undefined, googleApiKey: string | undefined): boolean {
+  return Boolean(anthropicApiKey || openaiApiKey || googleApiKey);
+}
+
 export function buildProviderCredentials(opts: Record<string, string>): ProviderCredentials | undefined {
   const anthropicApiKey = opts['anthropic:api-key'];
   const openaiApiKey = opts['openai:api-key'];
   const googleApiKey = opts['google:api-key'];
 
-  if (!anthropicApiKey && !openaiApiKey && !googleApiKey) {
+  if (!hasAnyApiKey(anthropicApiKey, openaiApiKey, googleApiKey)) {
     return undefined;
   }
 
