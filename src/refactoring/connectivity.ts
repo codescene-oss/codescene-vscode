@@ -12,6 +12,11 @@ export interface ConnectivityResult {
   error?: string;
 }
 
+export interface ConnectivityOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 function getAgentBinaryPath(): string {
   const extensionPath = getExtensionPath();
   if (!extensionPath) {
@@ -21,7 +26,9 @@ function getAgentBinaryPath(): string {
   return path.join(extensionPath, 'bin', binaryName);
 }
 
-export async function testConnectivity(): Promise<ConnectivityResult> {
+const DEFAULT_TIMEOUT_MS = 60000;
+
+export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
   const token = getEffectiveToken();
   if (!token) {
     return { success: false, error: 'No authentication token available' };
@@ -41,10 +48,38 @@ export async function testConnectivity(): Promise<ConnectivityResult> {
   logOutputChannel.debug(`Testing connectivity: ${binaryPath} ${args.join(' ')}`);
 
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return new Promise((resolve) => {
-    const proc = spawn(binaryPath, args, { cwd: workspaceFolder, env });
+    const proc = spawn(binaryPath, args, { cwd: workspaceFolder, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
+    let resolved = false;
+
+    const resolveOnce = (result: ConnectivityResult) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abortHandler);
+      resolve(result);
+    };
+
+    const timeoutId = setTimeout(() => {
+      proc.kill('SIGTERM');
+      logOutputChannel.warn('Connectivity test timed out');
+      resolveOnce({ success: false, error: 'Connectivity test timed out' });
+    }, timeoutMs);
+
+    const abortHandler = () => {
+      proc.kill('SIGTERM');
+      logOutputChannel.info('Connectivity test cancelled');
+      resolveOnce({ success: false, error: 'Connectivity test cancelled' });
+    };
+
+    options?.signal?.addEventListener('abort', abortHandler);
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      logOutputChannel.debug(`Connectivity stdout: ${data.toString().trim()}`);
+    });
 
     proc.stderr?.on('data', (data: Buffer) => {
       stderr += data.toString();
@@ -52,17 +87,17 @@ export async function testConnectivity(): Promise<ConnectivityResult> {
 
     proc.on('error', (err) => {
       logOutputChannel.error(`Connectivity test spawn error: ${err.message}`);
-      resolve({ success: false, error: err.message });
+      resolveOnce({ success: false, error: err.message });
     });
 
     proc.on('close', (code) => {
       if (code === 0) {
         logOutputChannel.info('Connectivity test successful');
-        resolve({ success: true });
+        resolveOnce({ success: true });
       } else {
         const errorMsg = stderr.trim() || `Process exited with code ${code}`;
         logOutputChannel.error(`Connectivity test failed: ${errorMsg}`);
-        resolve({ success: false, error: errorMsg });
+        resolveOnce({ success: false, error: errorMsg });
       }
     });
   });
