@@ -44,6 +44,7 @@ import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
 import { ACE_ENABLED } from './build-flags';
+import { testConnectivity } from './refactoring/connectivity';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 
@@ -331,6 +332,29 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
+  registerTestConnectivityCommand(context);
+}
+
+function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
+  const cmd = vscode.commands.registerCommand('codescene.testConnectivity', async () => {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Testing provider connectivity...',
+        cancellable: false,
+      },
+      async () => {
+        const result = await testConnectivity();
+        if (result.success) {
+          void vscode.window.showInformationMessage('Provider connectivity test successful.');
+        } else {
+          void vscode.window.showErrorMessage(`Provider connectivity test failed: ${result.error}`);
+        }
+      }
+    );
+  });
+  DISPOSABLES.push(cmd);
+  context.subscriptions.push(cmd);
 }
 
 function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {
