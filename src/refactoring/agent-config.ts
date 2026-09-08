@@ -1,27 +1,45 @@
 import { getAuthToken, getProviderOptions } from '../configuration';
-import { AgentConfig } from './agent-types';
+import { AgentConfig, ProviderConfig } from './agent-types';
 
 export function buildOpencodeConfig(opts: Record<string, string>): AgentConfig['opencode_config'] | undefined {
   const bedrockProfile = opts['amazon-bedrock:profile'];
   const bedrockRegion = opts['amazon-bedrock:region'];
   const hasBedrockOptions = bedrockProfile || bedrockRegion;
 
-  if (!hasBedrockOptions) {
+  const anthropicApiKey = opts['anthropic:api-key'];
+  const openaiApiKey = opts['openai:api-key'];
+  const googleApiKey = opts['google:api-key'];
+
+  const hasAnyOptions = hasBedrockOptions || anthropicApiKey || openaiApiKey || googleApiKey;
+
+  if (!hasAnyOptions) {
     return undefined;
   }
 
-  return {
-    provider: {
-      ...(hasBedrockOptions && {
-        'amazon-bedrock': {
-          options: {
-            ...(bedrockProfile && { profile: bedrockProfile }),
-            ...(bedrockRegion && { region: bedrockRegion }),
-          },
-        },
-      }),
-    },
-  };
+  const provider: ProviderConfig = {};
+
+  if (hasBedrockOptions) {
+    provider['amazon-bedrock'] = {
+      options: {
+        ...(bedrockProfile && { profile: bedrockProfile }),
+        ...(bedrockRegion && { region: bedrockRegion }),
+      },
+    };
+  }
+
+  if (anthropicApiKey) {
+    provider.anthropic_api_key = anthropicApiKey;
+  }
+
+  if (openaiApiKey) {
+    provider.openai_api_key = openaiApiKey;
+  }
+
+  if (googleApiKey) {
+    provider.google_api_key = googleApiKey;
+  }
+
+  return { provider };
 }
 
 export function buildAgentConfigWithToken(token: string, ioDir?: string): AgentConfig {

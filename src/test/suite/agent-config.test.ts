@@ -84,6 +84,71 @@ const testCases = [
       assert.deepStrictEqual(result.opencode_config, expectedOpencodeConfig);
     },
   },
+  {
+    name: 'buildAgentConfigWithToken builds opencode_config with Anthropic API key',
+    config: {
+      providerOptions: {
+        'anthropic:api-key': 'sk-ant-test-key-123',
+      },
+    },
+    token: 'test-token-anthropic',
+    ioDir: undefined,
+    assertions: (result: any) => {
+      assert.ok(result.opencode_config, 'opencode_config should be present');
+      assert.strictEqual(result.opencode_config.provider.anthropic_api_key, 'sk-ant-test-key-123');
+      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+    },
+  },
+  {
+    name: 'buildAgentConfigWithToken builds opencode_config with OpenAI API key',
+    config: {
+      providerOptions: {
+        'openai:api-key': 'sk-openai-test-key-456',
+      },
+    },
+    token: 'test-token-openai',
+    ioDir: undefined,
+    assertions: (result: any) => {
+      assert.ok(result.opencode_config, 'opencode_config should be present');
+      assert.strictEqual(result.opencode_config.provider.openai_api_key, 'sk-openai-test-key-456');
+      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+    },
+  },
+  {
+    name: 'buildAgentConfigWithToken builds opencode_config with Google API key',
+    config: {
+      providerOptions: {
+        'google:api-key': 'google-test-key-789',
+      },
+    },
+    token: 'test-token-google',
+    ioDir: undefined,
+    assertions: (result: any) => {
+      assert.ok(result.opencode_config, 'opencode_config should be present');
+      assert.strictEqual(result.opencode_config.provider.google_api_key, 'google-test-key-789');
+      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+    },
+  },
+  {
+    name: 'buildAgentConfigWithToken combines multiple provider options',
+    config: {
+      providerOptions: {
+        'amazon-bedrock:profile': 'my-profile',
+        'anthropic:api-key': 'sk-ant-key',
+        'openai:api-key': 'sk-openai-key',
+        'google:api-key': 'google-key',
+      },
+    },
+    token: 'test-token-multi',
+    ioDir: undefined,
+    assertions: (result: any) => {
+      assert.ok(result.opencode_config, 'opencode_config should be present');
+      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'].options.profile, 'my-profile');
+      assert.strictEqual(result.opencode_config.provider.anthropic_api_key, 'sk-ant-key');
+      assert.strictEqual(result.opencode_config.provider.openai_api_key, 'sk-openai-key');
+      assert.strictEqual(result.opencode_config.provider.google_api_key, 'google-key');
+    },
+  },
 ];
 
 aceSuite('AgentConfig Test Suite', () => {
@@ -136,6 +201,56 @@ aceSuite('AgentConfig Test Suite', () => {
             region: 'us-west-2',
           },
         },
+      },
+    });
+  });
+
+  test('buildOpencodeConfig builds Anthropic provider config', () => {
+    const result = buildOpencodeConfig({ 'anthropic:api-key': 'sk-ant-test-key' });
+    assert.deepStrictEqual(result, {
+      provider: {
+        anthropic_api_key: 'sk-ant-test-key',
+      },
+    });
+  });
+
+  test('buildOpencodeConfig builds OpenAI provider config', () => {
+    const result = buildOpencodeConfig({ 'openai:api-key': 'sk-openai-test-key' });
+    assert.deepStrictEqual(result, {
+      provider: {
+        openai_api_key: 'sk-openai-test-key',
+      },
+    });
+  });
+
+  test('buildOpencodeConfig builds Google provider config', () => {
+    const result = buildOpencodeConfig({ 'google:api-key': 'google-test-key' });
+    assert.deepStrictEqual(result, {
+      provider: {
+        google_api_key: 'google-test-key',
+      },
+    });
+  });
+
+  test('buildOpencodeConfig combines all providers', () => {
+    const result = buildOpencodeConfig({
+      'amazon-bedrock:profile': 'dev-profile',
+      'amazon-bedrock:region': 'eu-west-1',
+      'anthropic:api-key': 'sk-ant-key',
+      'openai:api-key': 'sk-openai-key',
+      'google:api-key': 'google-key',
+    });
+    assert.deepStrictEqual(result, {
+      provider: {
+        'amazon-bedrock': {
+          options: {
+            profile: 'dev-profile',
+            region: 'eu-west-1',
+          },
+        },
+        anthropic_api_key: 'sk-ant-key',
+        openai_api_key: 'sk-openai-key',
+        google_api_key: 'google-key',
       },
     });
   });
