@@ -4,6 +4,7 @@ import {
   buildOpencodeConfig,
   buildProviderCredentials,
 } from '../../refactoring/agent-config';
+import { getAgentModel } from '../../configuration';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
 import { aceSuite } from '../ace-test-suite';
 
@@ -258,5 +259,52 @@ aceSuite('AgentConfig Test Suite', () => {
       openai_api_key: 'sk-openai-key',
       google_api_key: 'google-key',
     });
+  });
+
+  test('getAgentModel returns override when set', () => {
+    mockConfiguration('codescene', { agentModelOverride: 'custom/model-override' });
+    assert.strictEqual(getAgentModel(), 'custom/model-override');
+  });
+
+  test('getAgentModel returns configured agentModel when set', () => {
+    mockConfiguration('codescene', { agentModel: 'anthropic/claude-opus-4' });
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-opus-4');
+  });
+
+  test('getAgentModel infers OpenAI model from providerOptions', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'openai:api-key': 'sk-test-key' },
+    });
+    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+  });
+
+  test('getAgentModel infers Anthropic model from providerOptions', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'anthropic:api-key': 'sk-ant-test' },
+    });
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-sonnet-4-0');
+  });
+
+  test('getAgentModel prefers OpenAI over Anthropic when both set', () => {
+    mockConfiguration('codescene', {
+      providerOptions: {
+        'openai:api-key': 'sk-openai',
+        'anthropic:api-key': 'sk-ant',
+      },
+    });
+    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+  });
+
+  test('getAgentModel returns Bedrock default when no provider keys', () => {
+    mockConfiguration('codescene', { providerOptions: {} });
+    assert.strictEqual(getAgentModel(), 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6');
+  });
+
+  test('getAgentModel override takes precedence over inferred model', () => {
+    mockConfiguration('codescene', {
+      agentModelOverride: 'custom/override',
+      providerOptions: { 'openai:api-key': 'sk-test' },
+    });
+    assert.strictEqual(getAgentModel(), 'custom/override');
   });
 });
