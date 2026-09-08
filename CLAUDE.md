@@ -17,3 +17,5 @@ This project uses CWF for rendering views, and can typically be found at `../cs-
 This project uses cs-agent for performing refactorings, and can typically be found at `../cs-agent`.
 This project uses the CodeScene CLI for performing various code analysis tasks, and can typically be found at `../codescene/cli`.
 This project used in the past ACE where cs-agent is now used, and can typically be found at `../automated-refactoring`.
+
+When querying external projects, please use subagents.
