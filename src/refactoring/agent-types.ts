@@ -50,8 +50,11 @@ export interface BedrockProviderOptions {
   };
 }
 
-export interface ProviderConfig {
+export interface BedrockOpencodeProvider {
   'amazon-bedrock'?: BedrockProviderOptions;
+}
+
+export interface ProviderCredentials {
   anthropic_api_key?: string;
   openai_api_key?: string;
   google_api_key?: string;
@@ -65,8 +68,9 @@ export interface AgentConfig {
   codescene_access_token: string;
   plugins: string[];
   io_json_dir?: string;
+  provider?: ProviderCredentials;
   opencode_config?: {
-    provider: ProviderConfig;
+    provider: BedrockOpencodeProvider;
   };
   tracking?: TrackingConfig;
 }
