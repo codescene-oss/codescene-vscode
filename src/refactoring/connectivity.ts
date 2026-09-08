@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import * as path from 'path';
+import vscode from 'vscode';
 import { getExtensionPath } from '../cs-extension-state';
 import { getEffectiveToken } from '../devtools-api';
 import { buildAgentConfigWithToken } from './agent-config';
@@ -39,8 +40,10 @@ export async function testConnectivity(): Promise<ConnectivityResult> {
 
   logOutputChannel.debug(`Testing connectivity: ${binaryPath} ${args.join(' ')}`);
 
+  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
   return new Promise((resolve) => {
-    const proc = spawn(binaryPath, args, { env });
+    const proc = spawn(binaryPath, args, { cwd: workspaceFolder, env });
     let stderr = '';
 
     proc.stderr?.on('data', (data: Buffer) => {
