@@ -79,6 +79,10 @@
       {
         "command": "codescene.copyDeviceId",
         "title": "CodeScene: copy Device ID"
+      },
+      {
+        "command": "codescene.testConnectivity",
+        "title": "CodeScene: test provider connectivity"
       }
     ],
     "viewsContainers": {
@@ -189,7 +193,7 @@
           },
           "additionalProperties": false,
           "default": {},
-          "description": "Provider-specific options for the Refactoring Agent. Keys must be in 'provider:option' format.",
+          "markdownDescription": "Provider-specific options for the Refactoring Agent. Keys must be in 'provider:option' format.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
           "order": 18
         },
         "codescene.authToken": {
