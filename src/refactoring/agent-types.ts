@@ -43,11 +43,25 @@ export interface AgentOutput {
   generated_at: string;
 }
 
+export interface BedrockProviderOptions {
+  options: {
+    profile?: string;
+    region?: string;
+  };
+}
+
+export interface ProviderConfig {
+  'amazon-bedrock'?: BedrockProviderOptions;
+  anthropic_api_key?: string;
+  openai_api_key?: string;
+  google_api_key?: string;
+}
+
 export interface AgentConfig {
   codescene_access_token: string;
   plugins: string[];
   io_json_dir?: string;
   opencode_config?: {
-    provider: Record<string, { options: Record<string, string> }>;
+    provider: ProviderConfig;
   };
 }

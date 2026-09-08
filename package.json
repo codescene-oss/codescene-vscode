@@ -159,7 +159,15 @@
             "amazon-bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "amazon-bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0",
             "amazon-bedrock/us.anthropic.claude-opus-5",
-            "amazon-bedrock/us.anthropic.claude-sonnet-4-6"
+            "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+            "anthropic/claude-sonnet-4-0",
+            "anthropic/claude-opus-4",
+            "anthropic/claude-haiku-3-5-sonnet",
+            "openai/gpt-4o",
+            "openai/gpt-4-turbo",
+            "openai/o3",
+            "google/gemini-2.5-pro",
+            "google/gemini-2.5-flash"
           ],
           "enumDescriptions": [
             "Claude Sonnet 4.6 via Amazon Bedrock (EU)",
@@ -168,7 +176,15 @@
             "Claude Sonnet 4.5 via Amazon Bedrock (EU) - Optimized for agents",
             "Claude Haiku 4.5 via Amazon Bedrock (EU) - Fast and lightweight",
             "Claude Opus 5 via Amazon Bedrock (US) - Most advanced",
-            "Claude Sonnet 4.6 via Amazon Bedrock (US)"
+            "Claude Sonnet 4.6 via Amazon Bedrock (US)",
+            "Claude Sonnet 4.0 via Anthropic API",
+            "Claude Opus 4 via Anthropic API",
+            "Claude Haiku 3.5 via Anthropic API - Fast and lightweight",
+            "GPT-4o via OpenAI API",
+            "GPT-4 Turbo via OpenAI API",
+            "o3 via OpenAI API - Advanced reasoning",
+            "Gemini 2.5 Pro via Google API",
+            "Gemini 2.5 Flash via Google API - Fast and efficient"
           ],
           "description": "Model to use for the Refactoring Agent.",
           "order": 16
@@ -189,11 +205,23 @@
             "amazon-bedrock:region": {
               "type": "string",
               "description": "AWS region for Amazon Bedrock"
+            },
+            "anthropic:api-key": {
+              "type": "string",
+              "description": "API key for Anthropic"
+            },
+            "openai:api-key": {
+              "type": "string",
+              "description": "API key for OpenAI"
+            },
+            "google:api-key": {
+              "type": "string",
+              "description": "API key for Google (Gemini)"
             }
           },
           "additionalProperties": false,
           "default": {},
-          "markdownDescription": "Provider-specific options for the Refactoring Agent. Keys must be in 'provider:option' format.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
+          "markdownDescription": "Provider-specific options for the Refactoring Agent. Use this to authenticate into your preferred model.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
           "order": 18
         },
         "codescene.authToken": {
