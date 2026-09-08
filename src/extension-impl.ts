@@ -337,17 +337,24 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
 
 function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
   const cmd = vscode.commands.registerCommand('codescene.testConnectivity', async () => {
+    const abortController = new AbortController();
+
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Testing provider connectivity...',
-        cancellable: false,
+        cancellable: true,
       },
-      async () => {
-        const result = await testConnectivity();
+      async (progress, cancelToken) => {
+        void progress;
+        cancelToken.onCancellationRequested(() => {
+          abortController.abort();
+        });
+
+        const result = await testConnectivity({ signal: abortController.signal });
         if (result.success) {
           void vscode.window.showInformationMessage('Provider connectivity test successful.');
-        } else {
+        } else if (!result.error?.includes('cancelled')) {
           void vscode.window.showErrorMessage(`Provider connectivity test failed: ${result.error}`);
         }
       }
