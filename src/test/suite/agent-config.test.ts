@@ -1,5 +1,9 @@
 import * as assert from 'assert';
-import { buildAgentConfigWithToken, buildOpencodeConfig } from '../../refactoring/agent-config';
+import {
+  buildAgentConfigWithToken,
+  buildOpencodeConfig,
+  buildProviderCredentials,
+} from '../../refactoring/agent-config';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
 import { aceSuite } from '../ace-test-suite';
 
@@ -14,7 +18,8 @@ const testCases = [
       assert.deepStrictEqual(result.plugins, ['render-code-fix-reporter']);
       assert.deepStrictEqual(result.tracking, { environment: 'codescene-vscode' });
       assert.strictEqual(result.io_json_dir, undefined, 'io_json_dir should not be present when not provided');
-      assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no provider options');
+      assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
+      assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no bedrock options');
     },
   },
   {
@@ -29,7 +34,7 @@ const testCases = [
     },
   },
   {
-    name: 'buildAgentConfigWithToken builds opencode_config from providerOptions',
+    name: 'buildAgentConfigWithToken builds opencode_config from bedrock providerOptions',
     config: {
       providerOptions: {
         'amazon-bedrock:profile': 'my-profile',
@@ -39,6 +44,7 @@ const testCases = [
     token: 'test-token-789',
     ioDir: undefined,
     assertions: (result: any) => {
+      assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
       assert.ok(result.opencode_config, 'opencode_config should be present');
       assert.ok(result.opencode_config.provider['amazon-bedrock'], 'amazon-bedrock provider should be present');
       assert.strictEqual(result.opencode_config.provider['amazon-bedrock'].options.profile, 'my-profile');
@@ -46,7 +52,7 @@ const testCases = [
     },
   },
   {
-    name: 'buildAgentConfigWithToken handles partial providerOptions',
+    name: 'buildAgentConfigWithToken handles partial bedrock providerOptions',
     config: {
       providerOptions: {
         'amazon-bedrock:profile': 'only-profile',
@@ -55,6 +61,7 @@ const testCases = [
     token: 'test-token-partial',
     ioDir: undefined,
     assertions: (result: any) => {
+      assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
       assert.ok(result.opencode_config, 'opencode_config should be present');
       assert.ok(result.opencode_config.provider['amazon-bedrock'], 'amazon-bedrock provider should be present');
       assert.strictEqual(result.opencode_config.provider['amazon-bedrock'].options.profile, 'only-profile');
@@ -62,7 +69,7 @@ const testCases = [
     },
   },
   {
-    name: 'buildAgentConfigWithToken produces exact structure as previously hardcoded',
+    name: 'buildAgentConfigWithToken produces exact bedrock structure',
     config: {
       providerOptions: {
         'amazon-bedrock:profile': 'codescene-dev',
@@ -72,6 +79,7 @@ const testCases = [
     token: 'test-token-exact',
     ioDir: undefined,
     assertions: (result: any) => {
+      assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
       const expectedOpencodeConfig = {
         provider: {
           'amazon-bedrock': {
@@ -86,7 +94,7 @@ const testCases = [
     },
   },
   {
-    name: 'buildAgentConfigWithToken builds opencode_config with Anthropic API key',
+    name: 'buildAgentConfigWithToken builds provider with Anthropic API key',
     config: {
       providerOptions: {
         'anthropic:api-key': 'sk-ant-test-key-123',
@@ -95,13 +103,13 @@ const testCases = [
     token: 'test-token-anthropic',
     ioDir: undefined,
     assertions: (result: any) => {
-      assert.ok(result.opencode_config, 'opencode_config should be present');
-      assert.strictEqual(result.opencode_config.provider.anthropic_api_key, 'sk-ant-test-key-123');
-      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+      assert.ok(result.provider, 'provider should be present');
+      assert.strictEqual(result.provider.anthropic_api_key, 'sk-ant-test-key-123');
+      assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no bedrock options');
     },
   },
   {
-    name: 'buildAgentConfigWithToken builds opencode_config with OpenAI API key',
+    name: 'buildAgentConfigWithToken builds provider with OpenAI API key',
     config: {
       providerOptions: {
         'openai:api-key': 'sk-openai-test-key-456',
@@ -110,13 +118,13 @@ const testCases = [
     token: 'test-token-openai',
     ioDir: undefined,
     assertions: (result: any) => {
-      assert.ok(result.opencode_config, 'opencode_config should be present');
-      assert.strictEqual(result.opencode_config.provider.openai_api_key, 'sk-openai-test-key-456');
-      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+      assert.ok(result.provider, 'provider should be present');
+      assert.strictEqual(result.provider.openai_api_key, 'sk-openai-test-key-456');
+      assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no bedrock options');
     },
   },
   {
-    name: 'buildAgentConfigWithToken builds opencode_config with Google API key',
+    name: 'buildAgentConfigWithToken builds provider with Google API key',
     config: {
       providerOptions: {
         'google:api-key': 'google-test-key-789',
@@ -125,9 +133,9 @@ const testCases = [
     token: 'test-token-google',
     ioDir: undefined,
     assertions: (result: any) => {
-      assert.ok(result.opencode_config, 'opencode_config should be present');
-      assert.strictEqual(result.opencode_config.provider.google_api_key, 'google-test-key-789');
-      assert.strictEqual(result.opencode_config.provider['amazon-bedrock'], undefined);
+      assert.ok(result.provider, 'provider should be present');
+      assert.strictEqual(result.provider.google_api_key, 'google-test-key-789');
+      assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no bedrock options');
     },
   },
   {
@@ -143,11 +151,12 @@ const testCases = [
     token: 'test-token-multi',
     ioDir: undefined,
     assertions: (result: any) => {
-      assert.ok(result.opencode_config, 'opencode_config should be present');
+      assert.ok(result.provider, 'provider should be present');
+      assert.strictEqual(result.provider.anthropic_api_key, 'sk-ant-key');
+      assert.strictEqual(result.provider.openai_api_key, 'sk-openai-key');
+      assert.strictEqual(result.provider.google_api_key, 'google-key');
+      assert.ok(result.opencode_config, 'opencode_config should be present for bedrock');
       assert.strictEqual(result.opencode_config.provider['amazon-bedrock'].options.profile, 'my-profile');
-      assert.strictEqual(result.opencode_config.provider.anthropic_api_key, 'sk-ant-key');
-      assert.strictEqual(result.opencode_config.provider.openai_api_key, 'sk-openai-key');
-      assert.strictEqual(result.opencode_config.provider.google_api_key, 'google-key');
     },
   },
 ];
@@ -170,7 +179,7 @@ aceSuite('AgentConfig Test Suite', () => {
     assert.throws(() => buildAgentConfigWithToken(''), /No authentication token/);
   });
 
-  test('buildOpencodeConfig produces exact structure as previously hardcoded', () => {
+  test('buildOpencodeConfig produces exact bedrock structure', () => {
     const opts = {
       'amazon-bedrock:profile': 'codescene-dev',
       'amazon-bedrock:region': 'eu-west-1',
@@ -189,11 +198,17 @@ aceSuite('AgentConfig Test Suite', () => {
     assert.deepStrictEqual(result, expected);
   });
 
-  test('buildOpencodeConfig returns undefined when no options', () => {
+  test('buildOpencodeConfig returns undefined when no bedrock options', () => {
     assert.strictEqual(buildOpencodeConfig({}), undefined);
   });
 
-  test('buildOpencodeConfig handles partial options', () => {
+  test('buildOpencodeConfig returns undefined for API keys (not bedrock)', () => {
+    assert.strictEqual(buildOpencodeConfig({ 'openai:api-key': 'sk-test' }), undefined);
+    assert.strictEqual(buildOpencodeConfig({ 'anthropic:api-key': 'sk-ant-test' }), undefined);
+    assert.strictEqual(buildOpencodeConfig({ 'google:api-key': 'google-test' }), undefined);
+  });
+
+  test('buildOpencodeConfig handles partial bedrock options', () => {
     const result = buildOpencodeConfig({ 'amazon-bedrock:region': 'us-west-2' });
     assert.deepStrictEqual(result, {
       provider: {
@@ -206,53 +221,42 @@ aceSuite('AgentConfig Test Suite', () => {
     });
   });
 
-  test('buildOpencodeConfig builds Anthropic provider config', () => {
-    const result = buildOpencodeConfig({ 'anthropic:api-key': 'sk-ant-test-key' });
+  test('buildProviderCredentials builds Anthropic credentials', () => {
+    const result = buildProviderCredentials({ 'anthropic:api-key': 'sk-ant-test-key' });
     assert.deepStrictEqual(result, {
-      provider: {
-        anthropic_api_key: 'sk-ant-test-key',
-      },
+      anthropic_api_key: 'sk-ant-test-key',
     });
   });
 
-  test('buildOpencodeConfig builds OpenAI provider config', () => {
-    const result = buildOpencodeConfig({ 'openai:api-key': 'sk-openai-test-key' });
+  test('buildProviderCredentials builds OpenAI credentials', () => {
+    const result = buildProviderCredentials({ 'openai:api-key': 'sk-openai-test-key' });
     assert.deepStrictEqual(result, {
-      provider: {
-        openai_api_key: 'sk-openai-test-key',
-      },
+      openai_api_key: 'sk-openai-test-key',
     });
   });
 
-  test('buildOpencodeConfig builds Google provider config', () => {
-    const result = buildOpencodeConfig({ 'google:api-key': 'google-test-key' });
+  test('buildProviderCredentials builds Google credentials', () => {
+    const result = buildProviderCredentials({ 'google:api-key': 'google-test-key' });
     assert.deepStrictEqual(result, {
-      provider: {
-        google_api_key: 'google-test-key',
-      },
+      google_api_key: 'google-test-key',
     });
   });
 
-  test('buildOpencodeConfig combines all providers', () => {
-    const result = buildOpencodeConfig({
-      'amazon-bedrock:profile': 'dev-profile',
-      'amazon-bedrock:region': 'eu-west-1',
+  test('buildProviderCredentials returns undefined when no API keys', () => {
+    assert.strictEqual(buildProviderCredentials({}), undefined);
+    assert.strictEqual(buildProviderCredentials({ 'amazon-bedrock:profile': 'test' }), undefined);
+  });
+
+  test('buildProviderCredentials combines all API keys', () => {
+    const result = buildProviderCredentials({
       'anthropic:api-key': 'sk-ant-key',
       'openai:api-key': 'sk-openai-key',
       'google:api-key': 'google-key',
     });
     assert.deepStrictEqual(result, {
-      provider: {
-        'amazon-bedrock': {
-          options: {
-            profile: 'dev-profile',
-            region: 'eu-west-1',
-          },
-        },
-        anthropic_api_key: 'sk-ant-key',
-        openai_api_key: 'sk-openai-key',
-        google_api_key: 'google-key',
-      },
+      anthropic_api_key: 'sk-ant-key',
+      openai_api_key: 'sk-openai-key',
+      google_api_key: 'google-key',
     });
   });
 });
