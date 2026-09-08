@@ -148,8 +148,24 @@
         "codescene.agentModel": {
           "type": "string",
           "default": "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
-          "enum": ["amazon-bedrock/eu.anthropic.claude-sonnet-4-6"],
-          "enumDescriptions": ["Claude Sonnet 4.6 via Amazon Bedrock (EU)"],
+          "enum": [
+            "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
+            "amazon-bedrock/eu.anthropic.claude-opus-5",
+            "amazon-bedrock/eu.anthropic.claude-opus-4-8",
+            "amazon-bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "amazon-bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "amazon-bedrock/us.anthropic.claude-opus-5",
+            "amazon-bedrock/us.anthropic.claude-sonnet-4-6"
+          ],
+          "enumDescriptions": [
+            "Claude Sonnet 4.6 via Amazon Bedrock (EU)",
+            "Claude Opus 5 via Amazon Bedrock (EU) - Most advanced",
+            "Claude Opus 4.8 via Amazon Bedrock (EU) - Optimized for coding",
+            "Claude Sonnet 4.5 via Amazon Bedrock (EU) - Optimized for agents",
+            "Claude Haiku 4.5 via Amazon Bedrock (EU) - Fast and lightweight",
+            "Claude Opus 5 via Amazon Bedrock (US) - Most advanced",
+            "Claude Sonnet 4.6 via Amazon Bedrock (US)"
+          ],
           "description": "Model to use for the Refactoring Agent.",
           "order": 16
         },
