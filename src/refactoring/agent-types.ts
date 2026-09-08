@@ -57,6 +57,10 @@ export interface ProviderConfig {
   google_api_key?: string;
 }
 
+export interface TrackingConfig {
+  environment?: string;
+}
+
 export interface AgentConfig {
   codescene_access_token: string;
   plugins: string[];
@@ -64,4 +68,5 @@ export interface AgentConfig {
   opencode_config?: {
     provider: ProviderConfig;
   };
+  tracking?: TrackingConfig;
 }

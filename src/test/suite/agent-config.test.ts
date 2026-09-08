@@ -12,6 +12,7 @@ const testCases = [
     assertions: (result: any) => {
       assert.strictEqual(result.codescene_access_token, 'test-token-123');
       assert.deepStrictEqual(result.plugins, ['render-code-fix-reporter']);
+      assert.deepStrictEqual(result.tracking, { environment: 'codescene-vscode' });
       assert.strictEqual(result.io_json_dir, undefined, 'io_json_dir should not be present when not provided');
       assert.strictEqual(result.opencode_config, undefined, 'opencode_config should not be present when no provider options');
     },

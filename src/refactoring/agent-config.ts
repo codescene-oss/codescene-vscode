@@ -52,6 +52,7 @@ export function buildAgentConfigWithToken(token: string, ioDir?: string): AgentC
   return {
     codescene_access_token: token,
     plugins: ['render-code-fix-reporter'],
+    tracking: { environment: 'codescene-vscode' },
     ...(ioDir && { io_json_dir: ioDir }),
     ...(opencodeConfig && { opencode_config: opencodeConfig }),
   };
