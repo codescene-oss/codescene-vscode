@@ -307,4 +307,20 @@ aceSuite('AgentConfig Test Suite', () => {
     });
     assert.strictEqual(getAgentModel(), 'custom/override');
   });
+
+  test('getAgentModel infers OpenAI even when agentModel has Bedrock default', () => {
+    mockConfiguration('codescene', {
+      agentModel: 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6',
+      providerOptions: { 'openai:api-key': 'sk-test-key' },
+    });
+    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+  });
+
+  test('getAgentModel respects explicit non-default agentModel over inferred', () => {
+    mockConfiguration('codescene', {
+      agentModel: 'openai/gpt-4-turbo',
+      providerOptions: { 'anthropic:api-key': 'sk-ant-key' },
+    });
+    assert.strictEqual(getAgentModel(), 'openai/gpt-4-turbo');
+  });
 });
