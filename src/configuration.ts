@@ -90,11 +90,19 @@ export function getAgentModel(): string {
   if (override) {
     return override;
   }
+
   const configured = getConfiguration<string>('agentModel', '');
-  if (configured) {
+  const inferred = inferModelFromProviderOptions();
+
+  if (configured && configured !== DEFAULT_AGENT_MODEL) {
     return configured;
   }
-  return inferModelFromProviderOptions() ?? DEFAULT_AGENT_MODEL;
+
+  if (inferred) {
+    return inferred;
+  }
+
+  return configured || DEFAULT_AGENT_MODEL;
 }
 
 export function getProviderOptions(): Record<string, string> {
