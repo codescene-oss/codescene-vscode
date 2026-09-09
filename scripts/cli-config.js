@@ -10,15 +10,15 @@ const requiredDevtoolsVersion = '8a7257420cc2dec1cf6ff7866db4da8c58f67602';
 
 const artifacts = {
   darwin: {
-    x64: `cs-ide-macos-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-macos-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-macos-amd64-${requiredDevtoolsVersion}.zip`,
+    arm64: `cs-ide-jre-macos-aarch64-${requiredDevtoolsVersion}.zip`,
   },
   linux: {
-    x64: `cs-ide-linux-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-linux-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-linux-amd64-${requiredDevtoolsVersion}.zip`,
+    arm64: `cs-ide-jre-linux-aarch64-${requiredDevtoolsVersion}.zip`,
   },
   win32: {
-    x64: `cs-ide-windows-amd64-${requiredDevtoolsVersion}.zip`,
+    x64: `cs-ide-jre-windows-amd64-${requiredDevtoolsVersion}.zip`,
   },
 };
 

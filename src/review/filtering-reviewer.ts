@@ -26,11 +26,7 @@ export class FilteringReviewer {
       return;
     }
 
-    if (reviewOpts.baseline) {
-      return DevtoolsAPI.reviewBaseline(reviewOpts.baseline, document);
-    } else {
-      return DevtoolsAPI.reviewContent(document);
-    }
+    return DevtoolsAPI.reviewWithServer(document, reviewOpts);
   }
 
   async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean): Promise<void> {
