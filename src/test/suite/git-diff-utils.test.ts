@@ -583,5 +583,73 @@ suite('Git Diff Utils Test Suite', () => {
         assert.ok(fs.existsSync(filePath), `File should exist: ${fileName}`);
       }
     });
+
+    test('excludes files introduced only by merging baseline into feature branch', async function () {
+      this.timeout(20000);
+
+      execSync('git branch -M main', { cwd: testRepoPath, stdio: 'pipe' });
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      execSync('git checkout -b feature', { cwd: testRepoPath, stdio: 'pipe' });
+      fs.writeFileSync(path.join(testRepoPath, 'feature.ts'), 'export const feature = true;');
+      execSync('git add feature.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add feature file"', { cwd: testRepoPath });
+
+      execSync('git checkout -b upstream main', { cwd: testRepoPath, stdio: 'pipe' });
+      const upstreamOnlyFiles = ['upstream-a.ts', 'upstream-b.ts', 'upstream-c.ts'];
+      for (const fileName of upstreamOnlyFiles) {
+        fs.writeFileSync(path.join(testRepoPath, fileName), `export const ${fileName.replace(/[.-]/g, '_')} = 1;`);
+      }
+      execSync('git add .', { cwd: testRepoPath });
+      execSync('git commit -m "Advance upstream baseline"', { cwd: testRepoPath });
+
+      execSync('git checkout feature', { cwd: testRepoPath, stdio: 'pipe' });
+      execSync('git merge upstream -m "Merge upstream into feature"', { cwd: testRepoPath, stdio: 'pipe' });
+
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('feature.ts'), `Should include feature.ts. Found: ${JSON.stringify(fileNames)}`);
+      for (const fileName of upstreamOnlyFiles) {
+        assert.ok(
+          !fileNames.includes(fileName),
+          `Should exclude merge-introduced file ${fileName}. Found: ${JSON.stringify(fileNames)}`
+        );
+      }
+    });
+
+    test('includes feature commits made after merging baseline', async function () {
+      this.timeout(20000);
+
+      execSync('git branch -M main', { cwd: testRepoPath, stdio: 'pipe' });
+      const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
+
+      execSync('git checkout -b feature', { cwd: testRepoPath, stdio: 'pipe' });
+      fs.writeFileSync(path.join(testRepoPath, 'feature.ts'), 'export const feature = true;');
+      execSync('git add feature.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Add feature file"', { cwd: testRepoPath });
+
+      execSync('git checkout -b upstream main', { cwd: testRepoPath, stdio: 'pipe' });
+      fs.writeFileSync(path.join(testRepoPath, 'upstream-only.ts'), 'export const upstream = 1;');
+      execSync('git add upstream-only.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Advance upstream baseline"', { cwd: testRepoPath });
+
+      execSync('git checkout feature', { cwd: testRepoPath, stdio: 'pipe' });
+      execSync('git merge upstream -m "Merge upstream into feature"', { cwd: testRepoPath, stdio: 'pipe' });
+
+      fs.writeFileSync(path.join(testRepoPath, 'after-merge.ts'), 'export const after = true;');
+      execSync('git add after-merge.ts', { cwd: testRepoPath });
+      execSync('git commit -m "Feature work after merge"', { cwd: testRepoPath });
+
+      const changes = await getCommittedChanges(testRepoPath, baseCommit, testRepoPath);
+      const fileNames = Array.from(changes);
+
+      assert.ok(fileNames.includes('feature.ts'), `Should include feature.ts. Found: ${JSON.stringify(fileNames)}`);
+      assert.ok(fileNames.includes('after-merge.ts'), `Should include after-merge.ts. Found: ${JSON.stringify(fileNames)}`);
+      assert.ok(
+        !fileNames.includes('upstream-only.ts'),
+        `Should exclude merge-introduced upstream-only.ts. Found: ${JSON.stringify(fileNames)}`
+      );
+    });
   });
 });
