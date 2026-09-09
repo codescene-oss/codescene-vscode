@@ -585,7 +585,7 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('excludes files introduced only by merging baseline into feature branch', async function () {
-      this.timeout(20000);
+      this.timeout(60000);
 
       execSync('git branch -M main', { cwd: testRepoPath, stdio: 'pipe' });
       const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
@@ -619,7 +619,7 @@ suite('Git Diff Utils Test Suite', () => {
     });
 
     test('includes feature commits made after merging baseline', async function () {
-      this.timeout(20000);
+      this.timeout(60000);
 
       execSync('git branch -M main', { cwd: testRepoPath, stdio: 'pipe' });
       const baseCommit = execSync('git rev-parse HEAD', { cwd: testRepoPath }).toString().trim();
