@@ -20,7 +20,7 @@ import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { AbortError } from './abort-error';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CsIdeServerClient, RefactorParams } from './ide-server-client';
+import { CsIdeServerClient, DeltaResult, RefactorParams, ServerStartEvent, WatchInventory } from './ide-server-client';
 import { v4 as uuid } from 'uuid';
 import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
 import { CsReview } from '../review/cs-review';
@@ -53,6 +53,19 @@ export class DevtoolsAPI {
   static stopWatchFiles(repoRoot: string): void {
     DevtoolsAPI.ideServer.stopWatchFiles(repoRoot);
   }
+
+  static getWatchInventory(repoRoot: string): Promise<WatchInventory> {
+    return DevtoolsAPI.ideServer.getWatchInventory(repoRoot);
+  }
+
+  static readonly onDidWatchInventory: vscode.Event<WatchInventory> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidWatchInventory(listener, thisArgs, disposables);
+
+  static readonly onDidServerStart: vscode.Event<ServerStartEvent> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidServerStart(listener, thisArgs, disposables);
+
+  static readonly onDidServerDelta: vscode.Event<DeltaResult> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidDelta(listener, thisArgs, disposables);
 
   static invalidateReviewEpoch(): void {
     DevtoolsAPI.pipeline?.invalidate();

@@ -6,7 +6,7 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '8a7257420cc2dec1cf6ff7866db4da8c58f67602';
+const requiredDevtoolsVersion = 'f684da3cf1a80871a69fa01d287faee1c574ad78';
 
 const artifacts = {
   darwin: {

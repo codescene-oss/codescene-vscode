@@ -1,10 +1,10 @@
-import * as path from 'path';
+import { normalizeFsPath } from '../utils/fs-paths';
 
 export class StaleFileRemover {
   private isPathInSet(filePath: string, pathSet: Set<string>): boolean {
-    const normalized = path.normalize(filePath);
+    const normalized = normalizeFsPath(filePath);
     for (const p of pathSet) {
-      if (path.normalize(p) === normalized) return true;
+      if (normalizeFsPath(p) === normalized) return true;
     }
     return false;
   }

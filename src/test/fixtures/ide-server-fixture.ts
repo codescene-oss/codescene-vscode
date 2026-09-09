@@ -70,8 +70,17 @@ let lastStop: unknown;
 connection.onRequest('test/lastWatch', () => lastWatch);
 connection.onRequest('test/lastStop', () => lastStop);
 
+connection.onRequest('cs-ide/getWatchInventory', (params) => ({
+  'repo-root': params['repo-root'],
+  files: ['requested.ts'],
+}));
+
 connection.onNotification('cs-ide/watchFiles', (params) => {
   lastWatch = params;
+  void connection.sendNotification('cs-ide/watchInventoryChanged', {
+    'repo-root': params['repo-root'],
+    files: ['watched.ts'],
+  });
   void connection.sendNotification('cs-ide/fileReview', {
     path: 'watched.ts',
     repoRoot: params['repo-root'],

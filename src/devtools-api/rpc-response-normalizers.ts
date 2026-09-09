@@ -176,3 +176,10 @@ export function deviceIdResponse(value: WireObject): { 'device-id': string } {
 export function notificationRepoRoot(value: WireObject): string | undefined {
   return field(value, 'repoRoot', 'repo-root');
 }
+
+export function watchInventoryResponse(value: WireObject): { repoRoot?: string; files: string[] } {
+  return {
+    repoRoot: notificationRepoRoot(value),
+    files: (value.files ?? []) as string[],
+  };
+}

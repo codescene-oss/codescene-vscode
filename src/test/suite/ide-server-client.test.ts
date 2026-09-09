@@ -123,6 +123,30 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), { 'repo-root': '/repo' });
   });
 
+  test('forwards watch inventory notifications and on-demand inventory requests', async () => {
+    const inventory = new Promise<{ repoRoot: string; files: string[] }>((resolve) => {
+      client.onDidWatchInventory((event) => resolve(event));
+    });
+
+    client.watchFiles('/repo');
+
+    assert.deepStrictEqual(await inventory, { repoRoot: '/repo', files: ['watched.ts'] });
+    assert.deepStrictEqual(await client.getWatchInventory('/repo'), {
+      repoRoot: '/repo',
+      files: ['requested.ts'],
+    });
+  });
+
+  test('reports whether a server start is a restart', async () => {
+    const starts: boolean[] = [];
+    client.onDidServerStart((event) => starts.push(event.restart));
+
+    await client.start();
+    await client.restart();
+
+    assert.deepStrictEqual(starts, [false, true]);
+  });
+
   test('omits optional reviewFiles id and content on the wire', async () => {
     const review = new Promise<{ id?: string; path: string }>((resolve) => {
       client.onDidReview((event) => resolve({ id: event.id, path: event.path }));

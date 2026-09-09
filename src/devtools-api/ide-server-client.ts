@@ -17,6 +17,7 @@ import {
   preflightResponse,
   refactorResponse,
   reviewResponse,
+  watchInventoryResponse,
 } from './rpc-response-normalizers';
 
 const STARTUP_TIMEOUT_MS = 30000;
@@ -24,6 +25,20 @@ const STARTUP_TIMEOUT_MS = 30000;
 export interface ServerMetadata {
   sha: string;
   version: string;
+}
+
+export interface ServerStartEvent {
+  metadata: ServerMetadata;
+  restart: boolean;
+}
+
+/**
+ * The set of files the CLI considers changed against the baseline for a repo. The CLI never
+ * reports individual removals, so this is the only signal that a file left the change set.
+ */
+export interface WatchInventory {
+  repoRoot: string;
+  files: string[];
 }
 
 export interface ReviewFile {
@@ -101,15 +116,20 @@ export class CsIdeServerClient implements vscode.Disposable {
   private resolveStart?: (metadata: ServerMetadata) => void;
   private rejectStart?: (error: Error) => void;
   private startupTimeout?: ReturnType<typeof setTimeout>;
+  private startCount = 0;
   private readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
   private readonly deltaEmitter = new vscode.EventEmitter<DeltaResult>();
   private readonly reviewFailedEmitter = new vscode.EventEmitter<ReviewFailed>();
   private readonly errorEmitter = new vscode.EventEmitter<Error>();
+  private readonly watchInventoryEmitter = new vscode.EventEmitter<WatchInventory>();
+  private readonly serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
 
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
   readonly onDidReviewFailed = this.reviewFailedEmitter.event;
   readonly onDidError = this.errorEmitter.event;
+  readonly onDidWatchInventory = this.watchInventoryEmitter.event;
+  readonly onDidServerStart = this.serverStartEmitter.event;
 
   constructor(
     readonly binaryPath: string,
@@ -159,6 +179,8 @@ export class CsIdeServerClient implements vscode.Disposable {
         this.handleDelta(notification));
       connection.onNotification('cs-ide/reviewFailed', (notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string }) =>
         this.handleReviewFailure(notification));
+      connection.onNotification('cs-ide/watchInventoryChanged', (notification: Record<string, any>) =>
+        this.handleWatchInventory(notification));
       connection.onError(([error]) => this.handleError(error));
       connection.listen();
     } catch (error) {
@@ -219,6 +241,12 @@ export class CsIdeServerClient implements vscode.Disposable {
     return checkRulesResponse(await this.sendRequest('cs-ide/check-rules', { 'repo-root': repoRoot, path }));
   }
 
+  async getWatchInventory(repoRoot: string): Promise<WatchInventory> {
+    const response = await this.sendRequest<Record<string, any>>('cs-ide/getWatchInventory', { 'repo-root': repoRoot });
+    const inventory = watchInventoryResponse(response);
+    return { repoRoot: inventory.repoRoot ?? repoRoot, files: inventory.files };
+  }
+
   reviewFiles(repoRoot: string, files: ReviewFile[]): void {
     void this.sendReviewFiles(repoRoot, files).catch((error) => {
       this.handleError(error instanceof Error ? error : new Error(String(error)));
@@ -246,6 +274,8 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.deltaEmitter.dispose();
     this.reviewFailedEmitter.dispose();
     this.errorEmitter.dispose();
+    this.watchInventoryEmitter.dispose();
+    this.serverStartEmitter.dispose();
   }
 
   private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {
@@ -277,9 +307,18 @@ export class CsIdeServerClient implements vscode.Disposable {
   private handleStart(metadata: ServerMetadata): void {
     if (this.startupTimeout) clearTimeout(this.startupTimeout);
     this.startupTimeout = undefined;
+    this.startCount++;
     this.resolveStart?.(metadata);
     this.resolveStart = undefined;
     this.rejectStart = undefined;
+    this.serverStartEmitter.fire({ metadata, restart: this.startCount > 1 });
+  }
+
+  private handleWatchInventory(notification: Record<string, any>): void {
+    const { repoRoot, files } = watchInventoryResponse(notification);
+    if (!repoRoot) return;
+    logOutputChannel.info(`[cs-ide] received watchInventoryChanged repo=${repoRoot} count=${files.length}`);
+    this.watchInventoryEmitter.fire({ repoRoot, files });
   }
 
   private handleReview(notification: ResultNotification<Record<string, any>>): void {

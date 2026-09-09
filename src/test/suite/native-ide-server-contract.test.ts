@@ -1,7 +1,8 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
+import { CsIdeServerClient, WatchInventory } from '../../devtools-api/ide-server-client';
+import { pathsEqual } from '../../utils/fs-paths';
 
 const localDistribution = process.env.CS_IDE_DISTRIBUTION_PATH;
 
@@ -78,6 +79,25 @@ function nativeContractComplexity(value: number) {
     client.watchFiles(repoRoot);
     client.stopWatchFiles(repoRoot);
     assert.strictEqual(await error, undefined);
+  });
+
+  test('pushes the watch inventory and serves the same set on request', async () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    await client.start();
+    const pushed = new Promise<WatchInventory>((resolve) => {
+      client.onDidWatchInventory((event) => resolve(event));
+    });
+
+    client.watchFiles(repoRoot);
+
+    const notified = await pushed;
+    const requested = await client.getWatchInventory(repoRoot);
+    client.stopWatchFiles(repoRoot);
+
+    assert.ok(pathsEqual(notified.repoRoot, repoRoot), `notified ${notified.repoRoot} is not ${repoRoot}`);
+    assert.ok(pathsEqual(requested.repoRoot, repoRoot), `requested ${requested.repoRoot} is not ${repoRoot}`);
+    assert.deepStrictEqual(new Set(requested.files), new Set(notified.files));
+    assert.ok(notified.files.every((file) => !file.includes('\\')), 'inventory paths are repo-relative posix paths');
   });
 
   test('normalizes native device ID', async () => {

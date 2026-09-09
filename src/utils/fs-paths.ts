@@ -16,3 +16,11 @@ export function relativePosix(from: string, to: string): string {
 export function pathsEqual(left: string, right: string): boolean {
   return normalizeFsPath(left) === normalizeFsPath(right);
 }
+
+/**
+ * Both arguments must already be normalized with `normalizeFsPath`.
+ */
+export function isPathUnderRoot(normalizedRoot: string, normalizedPath: string): boolean {
+  if (normalizedPath === normalizedRoot) return true;
+  return normalizedPath.startsWith(normalizedRoot + path.sep) || normalizedPath.startsWith(`${normalizedRoot}/`);
+}

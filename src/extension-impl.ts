@@ -299,7 +299,14 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
     return;
   }
   workspaceWatchInstance = new WorkspaceWatch(
-    { watchFiles: DevtoolsAPI.watchFiles, stopWatchFiles: DevtoolsAPI.stopWatchFiles },
+    {
+      watchFiles: DevtoolsAPI.watchFiles,
+      stopWatchFiles: DevtoolsAPI.stopWatchFiles,
+      getWatchInventory: DevtoolsAPI.getWatchInventory,
+      onDidWatchInventory: DevtoolsAPI.onDidWatchInventory,
+      onDidServerStart: DevtoolsAPI.onDidServerStart,
+      onDidDelta: DevtoolsAPI.onDidServerDelta,
+    },
     DevtoolsAPI.reviewPipeline,
     createWorkspaceWatchDependencies(() => gitApi.repositories)
   );
