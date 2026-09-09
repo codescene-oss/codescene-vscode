@@ -6,8 +6,6 @@ export type MessageType = {
   payload: IdeContextType;
 };
 
-export type CommitBaselineType = 'default' | 'HEAD' | 'branchCreate';
-
 export type OpenDocsMessage = {
   messageType: 'open-docs-for-function';
   payload: {
@@ -19,7 +17,6 @@ export type OpenDocsMessage = {
 
 export type MessageToIDEType =
   | { messageType: 'init'; payload: WebViewPropsType['view'] }
-  | { messageType: 'commitBaseline'; payload: CommitBaselineType }
   | {
       messageType: 'goto-function-location';
       payload: { fileName: string; fn?: FunctionInfoExternal };

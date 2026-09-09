@@ -31,13 +31,6 @@ export function isSafeRefName(ref: string): boolean {
   return /^[A-Za-z0-9._/\-]+$/.test(ref);
 }
 
-interface RepoState {
-  branch: string | undefined;
-  commit: string | undefined;
-}
-
-let repoState: RepoState;
-
 export function acquireGitApi() {
   try {
     const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;
@@ -179,101 +172,6 @@ export async function isMainBranch(currentBranch: string | undefined, repoPath: 
 
   const localMainBranches = await getMainBranchCandidates(normalizedPath);
   return localMainBranches.some((branch) => branchesEqual(branch, currentBranch));
-}
-
-/**
-   Attempts a single `git merge-base currentBranch mainBranch` call.
-   Returns the resolved commit, or undefined if the candidate could not produce one
-   (invalid name, non-zero exit, empty output, or thrown error).
- */
-async function tryMergeBaseWithCandidate(
-  repoPath: string,
-  currentBranch: string,
-  mainBranch: string
-): Promise<string | undefined> {
-  if (!isSafeRefName(mainBranch)) {
-    logOutputChannel.warn(`Skipping unsafe main branch candidate: ${mainBranch}`);
-    return undefined;
-  }
-
-  try {
-    const { stdout: mergeBase, stderr, exitCode } = await gitExecutor.execute(
-      { command: 'git', args: ['merge-base', currentBranch, mainBranch], taskId: GIT_TASK_ID },
-      { cwd: repoPath }
-    );
-
-    if (exitCode !== 0) {
-      if (exitCode === "ENOENT") {
-        markGitAsUnavailable();
-      }
-      logOutputChannel.error(`Could not get merge-base for ${currentBranch} and ${mainBranch} (exit code ${exitCode}): ${stderr}`);
-      return undefined;
-    }
-
-    const commit = mergeBase.trim();
-    return commit || undefined;
-  } catch (err) {
-    if (isEnoentError(err)) {
-      markGitAsUnavailable();
-    }
-    logOutputChannel.error(`${err}`);
-    return undefined;
-  }
-}
-
-/**
- * Determines the merge-base commit.
- *
- * If we're on the main branch, returns the HEAD commit.
- * If we're on a non-main branch, returns the merge-base commit between the current branch and the main branch.
- */
-export async function getMergeBaseCommit(repo: Repository): Promise<string> {
-  const currentBranch = repo.state.HEAD?.name;
-  const repoPath = getRepoRootPath(repo);
-
-  if (!currentBranch || !repoPath) {
-    return '';
-  }
-
-  if (!isSafeRefName(currentBranch)) {
-    logOutputChannel.warn(`Refusing to use unsafe branch name: ${currentBranch}`);
-    return '';
-  }
-
-  if (await isMainBranch(currentBranch, repoPath)) {
-    return repo.state.HEAD?.commit || '';
-  }
-
-  const localMainBranches = await getMainBranchCandidates(repoPath);
-  for (const mainBranch of localMainBranches) {
-    const commit = await tryMergeBaseWithCandidate(repoPath, currentBranch, mainBranch);
-    if (commit) {
-      return commit;
-    }
-  }
-
-  return '';
-}
-
-export interface GitStateChange {
-  commitChanged: boolean,
-  branchChanged: boolean
-}
-
-export function updateGitState(repo: Repository) : GitStateChange {
-  const head = repo.state.HEAD;
-  if (!head) return {commitChanged: false, branchChanged: false};
-
-  const gitStateChange: GitStateChange = {
-    commitChanged: repoState?.commit !== head.commit,
-    branchChanged: repoState?.branch !== head.name
-  };
-
-  repoState = {
-    commit: head.commit,
-    branch: head.name,
-  };
-  return gitStateChange;
 }
 
 export function deactivate() {

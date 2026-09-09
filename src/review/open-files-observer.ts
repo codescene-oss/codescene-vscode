@@ -2,7 +2,6 @@ import vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
-import { getMergeBaseCommitForWorkspace } from '../code-health-monitor/addon';
 import { logOutputChannel } from '../log';
 
 let openFilesObserverInstance: OpenFilesObserver | undefined;
@@ -34,20 +33,20 @@ export class OpenFilesObserver {
     openFilesObserverInstance = this;
   }
 
-  private reviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {
+  private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
-    logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason}, baseline: ${baselineCommit || 'none'})`);
-    void this.filteringReviewer.reviewDiagnostics(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
+    logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason})`);
+    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
     return true;
   }
 
-  private trackAndReviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string): void {
+  private trackAndReviewDocument(document: vscode.TextDocument, reason: string): void {
     const fileName = document.fileName;
     if (!this.visibleDocuments.has(fileName)) {
       this.visibleDocuments.add(fileName);
-      this.reviewDocument(document, baselineCommit, reason);
+      this.reviewDocument(document, reason);
     }
   }
 
@@ -107,13 +106,10 @@ export class OpenFilesObserver {
     const allVisibleFileNames = this.getAllVisibleFileNames();
     if (allVisibleFileNames.size === 0) return;
     this.hasInitialized = true;
-    void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-      const baseline = baselineCommit ?? '';
-      allVisibleFileNames.forEach((filePath) => {
-        const fileUri = vscode.Uri.file(filePath);
-        void vscode.workspace.openTextDocument(fileUri).then((document) => {
-          this.trackAndReviewDocument(document, baseline, reason);
-        });
+    allVisibleFileNames.forEach((filePath) => {
+      const fileUri = vscode.Uri.file(filePath);
+      void vscode.workspace.openTextDocument(fileUri).then((document) => {
+        this.trackAndReviewDocument(document, reason);
       });
     });
   }
@@ -130,9 +126,7 @@ export class OpenFilesObserver {
     this.context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
         if (!editor) return;
-        void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-          this.trackAndReviewDocument(editor.document, baselineCommit ?? '', 'editor changed');
-        });
+        this.trackAndReviewDocument(editor.document, 'editor changed');
       })
     );
   }
@@ -185,9 +179,7 @@ export class OpenFilesObserver {
     this.reviewTimers.set(
       filePath,
       setTimeout(() => {
-        void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-          this.reviewDocument(e.document, baselineCommit ?? '', 'text changed', false);
-        });
+        this.reviewDocument(e.document, 'text changed', false);
       }, 1000)
     );
   }

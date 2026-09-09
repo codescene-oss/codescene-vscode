@@ -52,31 +52,9 @@ export class CachingReviewer implements Disposable {
 
     const csReview = new CsReview(document, reviewPromise);
 
-    this.updateOrAdd(document, csReview, skipMonitorUpdateForDelta ?? skipMonitorUpdate, reviewOpts.updateDiagnosticsPane, reviewOpts.baselineCommit);
+    this.updateOrAdd(document, csReview, skipMonitorUpdateForDelta ?? skipMonitorUpdate);
 
     return csReview;
-  }
-
-  refreshDeltas() {
-    this.reviewCache.refreshDeltas();
-  }
-
-  setBaseline(fileFilter: (fileUri: vscode.Uri) => boolean, baselineCommit: string) {
-    this.reviewCache.setBaseline(fileFilter, baselineCommit);
-  }
-
-  /**
-   * Review a baseline score and return the raw score - to be used by the delta analysis
-   * @param document
-   * @returns
-   */
-  async baselineScore(baselineCommit: string, document: vscode.TextDocument, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
-    return this.reviewer
-      .review(document, { baseline: baselineCommit, baselineCommit, skipMonitorUpdate, updateDiagnosticsPane })
-      .then((reviewResult) => {
-        return reviewResult && reviewResult['raw-score'];
-      })
-      .catch((e) => this.handleReviewError(e, document));
   }
 
   /**
@@ -86,9 +64,9 @@ export class CachingReviewer implements Disposable {
    * @param skipMonitorUpdate
    * @param updateDiagnosticsPane
    */
-  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean, baselineCommit: string) {
-    if (!this.reviewCache.update(document, review, skipMonitorUpdate, updateDiagnosticsPane)) {
-      this.reviewCache.add(document, review, skipMonitorUpdate, updateDiagnosticsPane, baselineCommit);
+  updateOrAdd(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
+    if (!this.reviewCache.update(document, review, skipMonitorUpdate)) {
+      this.reviewCache.add(document, review, skipMonitorUpdate);
     }
   }
 

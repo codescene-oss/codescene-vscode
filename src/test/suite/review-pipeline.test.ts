@@ -18,14 +18,14 @@ class FakeReviewClient {
   readonly deltaEmitter = new vscode.EventEmitter<DeltaResult>();
   readonly failureEmitter = new vscode.EventEmitter<ReviewFailed>();
   readonly errorEmitter = new vscode.EventEmitter<Error>();
-  readonly batches: Array<{ repoRoot: string; baseline?: string; files: Array<{ id?: string; relPath: string; content?: string }> }> = [];
+  readonly batches: Array<{ repoRoot: string; files: Array<{ id?: string; relPath: string; content?: string }> }> = [];
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
   readonly onDidReviewFailed = this.failureEmitter.event;
   readonly onDidError = this.errorEmitter.event;
 
-  reviewFiles(repoRoot: string, files: Array<{ id?: string; relPath: string; content?: string }>, baseline?: string): void {
-    this.batches.push({ repoRoot, baseline, files });
+  reviewFiles(repoRoot: string, files: Array<{ id?: string; relPath: string; content?: string }>): void {
+    this.batches.push({ repoRoot, files });
   }
 }
 
@@ -88,43 +88,37 @@ suite('ReviewPipeline Test Suite', () => {
 
   teardown(() => pipeline.dispose());
 
-  test('submits one batch and deduplicates repo, path, content, and baseline epoch', () => {
+  test('submits one batch and deduplicates repo, path and content', () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    void pipeline.submitBatch(repoRoot, 'base', 'epoch', [submission(document), submission(document)]);
+    void pipeline.submitBatch(repoRoot, [submission(document), submission(document)]);
 
     assert.strictEqual(client.batches.length, 1);
-    assert.strictEqual(client.batches[0].baseline, 'base');
     assert.deepStrictEqual(client.batches[0].files.map(({ relPath }) => relPath), ['src/file.ts']);
   });
 
-  test('does not resubmit completed reviews when repository state changes without content or baseline changes', async () => {
+  test('omits baseline-revision so the CLI resolves the baseline itself', () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    const firstReview = pipeline.submit(repoRoot, 'base', 'epoch', submission(document));
-    completeReview(client, 'review-1', repoRoot);
-    await firstReview;
+    void pipeline.submitBatch(repoRoot, [submission(document)]);
 
-    await pipeline.submit(repoRoot, 'base', 'epoch', submission(document));
-
-    assert.strictEqual(client.batches.length, 1);
+    assert.deepStrictEqual(Object.keys(client.batches[0]!).sort(), ['files', 'repoRoot']);
   });
 
-  test('resubmits completed reviews when the baseline changes', async () => {
+  test('does not resubmit completed reviews when the content is unchanged', async () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    const firstReview = pipeline.submit(repoRoot, 'base-1', 'epoch-1', submission(document));
+    const firstReview = pipeline.submit(repoRoot, submission(document));
     completeReview(client, 'review-1', repoRoot);
     await firstReview;
 
-    void pipeline.submit(repoRoot, 'base-2', 'epoch-2', submission(document));
+    await pipeline.submit(repoRoot, submission(document));
 
-    assert.strictEqual(client.batches.length, 2);
-    assert.strictEqual(client.batches[1].baseline, 'base-2');
+    assert.strictEqual(client.batches.length, 1);
   });
 
   test('only presents the latest generation for a path', async () => {
     const oldDocument = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
     const newDocument = new TestTextDocument('/repo/src/file.ts', 'const value = 2;', 'typescript');
-    const oldPromise = pipeline.submit(repoRoot, 'base', 'epoch', submission(oldDocument));
-    const newPromise = pipeline.submit(repoRoot, 'base', 'epoch', submission(newDocument));
+    const oldPromise = pipeline.submit(repoRoot, submission(oldDocument));
+    const newPromise = pipeline.submit(repoRoot, submission(newDocument));
 
     client.reviewEmitter.fire({ id: 'review-1', repoRoot, path: 'src/file.ts', result: emptyReview() });
     client.deltaEmitter.fire({ id: 'review-1', repoRoot, path: 'src/file.ts', result: null });
@@ -139,7 +133,7 @@ suite('ReviewPipeline Test Suite', () => {
 
   test('tombstones removed paths and ignores late responses', async () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    const reviewPromise = pipeline.submit(repoRoot, 'base', 'epoch', submission(document));
+    const reviewPromise = pipeline.submit(repoRoot, submission(document));
     pipeline.remove(repoRoot, [document]);
 
     client.reviewEmitter.fire({ id: 'review-1', repoRoot, path: 'src/file.ts', result: emptyReview() });
@@ -153,7 +147,7 @@ suite('ReviewPipeline Test Suite', () => {
 
   test('ignores notifications from another repository', async () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    const reviewPromise = pipeline.submit(repoRoot, 'base', 'epoch', submission(document));
+    const reviewPromise = pipeline.submit(repoRoot, submission(document));
 
     client.reviewEmitter.fire({ id: 'review-1', repoRoot: '/other', path: 'src/file.ts', result: emptyReview() });
     client.deltaEmitter.fire({ id: 'review-1', repoRoot: '/other', path: 'src/file.ts', result: null });
@@ -166,8 +160,8 @@ suite('ReviewPipeline Test Suite', () => {
   test('keeps identical relative paths isolated by repository', async () => {
     const firstDocument = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
     const secondDocument = new TestTextDocument('/other/src/file.ts', 'const value = 2;', 'typescript');
-    const firstPromise = pipeline.submit('/repo', 'base-1', 'epoch-1', submission(firstDocument));
-    const secondPromise = pipeline.submit('/other', 'base-2', 'epoch-2', submission(secondDocument));
+    const firstPromise = pipeline.submit('/repo', submission(firstDocument));
+    const secondPromise = pipeline.submit('/other', submission(secondDocument));
 
     client.reviewEmitter.fire({ id: 'review-1', repoRoot: '/repo', path: 'src/file.ts', result: emptyReview() });
     client.deltaEmitter.fire({ id: 'review-1', repoRoot: '/repo', path: 'src/file.ts', result: null });
@@ -180,7 +174,7 @@ suite('ReviewPipeline Test Suite', () => {
 
   test('finishes and reports review failures', async () => {
     const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-    const reviewPromise = pipeline.submit(repoRoot, 'base', 'epoch', submission(document));
+    const reviewPromise = pipeline.submit(repoRoot, submission(document));
 
     client.failureEmitter.fire({ id: 'review-1', repoRoot, path: 'src/file.ts', message: 'Review failed' });
 
@@ -193,8 +187,6 @@ suite('ReviewPipeline Test Suite', () => {
     const document = new TestTextDocument('c:\\Git\\codescene\\CSharp\\Example.cs', 'class Example {}', 'csharp');
     const reviewPromise = pipeline.submit(
       windowsRoot,
-      'base',
-      'epoch',
       {
         document,
         relPath: 'CSharp\\Example.cs',
@@ -212,7 +204,7 @@ suite('ReviewPipeline Test Suite', () => {
   });
 
   test('submits disk files without id or content', () => {
-    void pipeline.submitBatch(repoRoot, 'base', 'epoch', [{
+    void pipeline.submitBatch(repoRoot, [{
       relPath: 'src/file.ts',
       updateDiagnosticsPane: false,
       updateMonitor: true,
@@ -258,6 +250,58 @@ suite('ReviewPipeline Test Suite', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.strictEqual(events.reviews.length, 0);
+  });
+
+  suite('watch result reuse', () => {
+    const content = 'const value = 1;';
+    let document: vscode.TextDocument;
+
+    setup(async () => {
+      document = new TestTextDocument('/repo/src/file.ts', content, 'typescript');
+      pipeline.dispose();
+      pipeline = new ReviewPipeline(client as any, createPresentation(events), () => 'review-1', fileAccess(document, false));
+      client.reviewEmitter.fire({
+        repoRoot,
+        path: 'src/file.ts',
+        result: { ...emptyReview(), 'git-blob-sha': gitBlobSha(content) },
+      });
+      await waitUntil(() => events.reviews.length === 1);
+    });
+
+    test('serves a diagnostics-only submission from the watch result without resubmitting', async () => {
+      const review = await pipeline.submit(repoRoot, {
+        ...submission(document),
+        updateMonitor: false,
+      });
+
+      assert.strictEqual(client.batches.length, 0, 'Should not send a review request to the CLI');
+      assert.strictEqual(events.reviews.length, 2, 'Should present the cached review for the Problems pane');
+      assert.ok(review, 'Should resolve with the cached review');
+    });
+
+    test('still submits when the monitor needs a delta', async () => {
+      void pipeline.submit(repoRoot, { ...submission(document), updateMonitor: true });
+
+      assert.strictEqual(client.batches.length, 1);
+    });
+
+    test('still submits when the buffer content differs from the watch result', async () => {
+      const edited = new TestTextDocument('/repo/src/file.ts', 'const value = 2;', 'typescript');
+      void pipeline.submit(repoRoot, {
+        ...submission(edited),
+        updateMonitor: false,
+      });
+
+      assert.strictEqual(client.batches.length, 1);
+    });
+
+    test('still submits after the review epoch is invalidated', async () => {
+      pipeline.invalidate();
+
+      void pipeline.submit(repoRoot, { ...submission(document), updateMonitor: false });
+
+      assert.strictEqual(client.batches.length, 1);
+    });
   });
 });
 

@@ -24,13 +24,11 @@ export interface ReviewSubmission {
 
 export interface PresentedReview extends ReviewSubmission {
   document: vscode.TextDocument;
-  baselineRevision: string;
   result: Review;
 }
 
 export interface PresentedDelta extends ReviewSubmission {
   document: vscode.TextDocument;
-  baselineRevision: string;
   result: Delta | null;
 }
 
@@ -57,7 +55,6 @@ interface PendingReview extends ReviewSubmission {
   content: string;
   id: string;
   repoRoot: string;
-  baselineRevision: string;
   dedupKey: string;
   pathKey: string;
   contentHash: string;
@@ -71,6 +68,23 @@ interface PendingReview extends ReviewSubmission {
   reject: (error: Error) => void;
   promise: Promise<Review | void>;
 }
+
+type BufferSubmission = ReviewSubmission & { content: string; document: vscode.TextDocument };
+
+interface SubmissionContext {
+  repoRoot: string;
+  pathKey: string;
+  contentHash: string;
+  dedupKey: string;
+}
+
+interface WatchReviewEntry {
+  contentHash: string;
+  dedupEpoch: number;
+  result: Review;
+}
+
+const MAX_WATCH_REVIEWS = 250;
 
 function defaultFileAccess(): ReviewPipelineFileAccess {
   return {
@@ -112,6 +126,7 @@ export class ReviewPipeline implements vscode.Disposable {
   private readonly latestByPath = new Map<string, PendingReview>();
   private readonly tombstones = new Map<string, number>();
   private readonly generations = new Map<string, number>();
+  private readonly watchReviews = new Map<string, WatchReviewEntry>();
   private dedupEpoch = 0;
   private readonly disposables: vscode.Disposable[];
   private readonly fileAccess: ReviewPipelineFileAccess;
@@ -131,12 +146,7 @@ export class ReviewPipeline implements vscode.Disposable {
     ];
   }
 
-  submitBatch(
-    repoRoot: string,
-    baselineRevision: string,
-    baselineEpoch: string,
-    submissions: ReviewSubmission[]
-  ): Promise<Array<Review | void>> {
+  submitBatch(repoRoot: string, submissions: ReviewSubmission[]): Promise<Array<Review | void>> {
     const newReviews: PendingReview[] = [];
     const diskFiles: ReviewFile[] = [];
     const promises = submissions.map((submission) => {
@@ -145,7 +155,7 @@ export class ReviewPipeline implements vscode.Disposable {
         diskFiles.push({ relPath: toPosixRelPath(submission.relPath) });
         return Promise.resolve();
       }
-      const pending = this.prepareSubmission(repoRoot, baselineRevision, baselineEpoch, { ...submission, content });
+      const pending = this.prepareSubmission(repoRoot, { ...submission, content });
       if (!pending.submitted) {
         this.pendingById.set(pending.id, pending);
         pending.submitted = true;
@@ -159,18 +169,13 @@ export class ReviewPipeline implements vscode.Disposable {
       ...diskFiles,
     ];
     if (files.length > 0) {
-      this.client.reviewFiles(repoRoot, files, baselineRevision || undefined);
+      this.client.reviewFiles(repoRoot, files);
     }
     return Promise.all(promises);
   }
 
-  submit(
-    repoRoot: string,
-    baselineRevision: string,
-    baselineEpoch: string,
-    submission: ReviewSubmission
-  ): Promise<Review | void> {
-    return this.submitBatch(repoRoot, baselineRevision, baselineEpoch, [submission]).then(([review]) => review);
+  submit(repoRoot: string, submission: ReviewSubmission): Promise<Review | void> {
+    return this.submitBatch(repoRoot, [submission]).then(([review]) => review);
   }
 
   remove(repoRoot: string, documents: vscode.TextDocument[]): void {
@@ -181,6 +186,7 @@ export class ReviewPipeline implements vscode.Disposable {
       const generation = this.nextGeneration(pathKey);
       this.tombstones.set(pathKey, generation);
       this.latestByPath.delete(pathKey);
+      this.watchReviews.delete(pathKey);
       this.presentation.remove(document);
     }
   }
@@ -194,14 +200,10 @@ export class ReviewPipeline implements vscode.Disposable {
     this.disposables.forEach((disposable) => disposable.dispose());
     this.latestByPath.clear();
     this.tombstones.clear();
+    this.watchReviews.clear();
   }
 
-  private prepareSubmission(
-    repoRoot: string,
-    baselineRevision: string,
-    baselineEpoch: string,
-    submission: ReviewSubmission & { content: string }
-  ): PendingReview {
+  private prepareSubmission(repoRoot: string, submission: ReviewSubmission & { content: string }): PendingReview {
     const document = submission.document;
     if (!document) {
       throw new Error('Buffer reviews require a document');
@@ -213,15 +215,26 @@ export class ReviewPipeline implements vscode.Disposable {
     };
     const pathKey = this.pathKey(repoRoot, normalizedSubmission.relPath);
     const contentHash = gitBlobSha(normalizedSubmission.content);
-    const dedupKey = `${pathKey}\0${contentHash}\0${baselineEpoch}\0${this.dedupEpoch}`;
+    const dedupKey = `${pathKey}\0${contentHash}\0${this.dedupEpoch}`;
+    const context = { repoRoot, pathKey, contentHash, dedupKey };
     const latest = this.latestByPath.get(pathKey);
     if (latest?.dedupKey === dedupKey) {
       this.mergePresentation(latest, normalizedSubmission);
       return latest;
     }
+    const reused = this.reusedWatchReview(context, normalizedSubmission, latest);
+    if (reused) return reused;
     if (latest) this.ignorePending(latest);
 
-    const generation = this.nextGeneration(pathKey);
+    const pending = this.createPending(context, normalizedSubmission);
+    this.tombstones.delete(pathKey);
+    this.latestByPath.set(pathKey, pending);
+    this.presentation.reviewStarted(normalizedSubmission.document);
+    this.presentation.deltaStarted(normalizedSubmission.document);
+    return pending;
+  }
+
+  private createPending(context: SubmissionContext, submission: BufferSubmission): PendingReview {
     let resolve!: (review: Review | void) => void;
     let reject!: (error: Error) => void;
     const promise = new Promise<Review | void>((promiseResolve, promiseReject) => {
@@ -229,15 +242,14 @@ export class ReviewPipeline implements vscode.Disposable {
       reject = promiseReject;
     });
     void promise.catch(() => undefined);
-    const pending: PendingReview = {
-      ...normalizedSubmission,
+    return {
+      ...submission,
       id: this.createId(),
-      repoRoot: normalizeFsPath(repoRoot),
-      baselineRevision,
-      dedupKey,
-      pathKey,
-      contentHash,
-      generation,
+      repoRoot: normalizeFsPath(context.repoRoot),
+      dedupKey: context.dedupKey,
+      pathKey: context.pathKey,
+      contentHash: context.contentHash,
+      generation: this.nextGeneration(context.pathKey),
       reviewDone: false,
       deltaDone: false,
       submitted: false,
@@ -245,11 +257,36 @@ export class ReviewPipeline implements vscode.Disposable {
       reject,
       promise,
     };
-    this.tombstones.delete(pathKey);
-    this.latestByPath.set(pathKey, pending);
-    this.presentation.reviewStarted(normalizedSubmission.document);
-    this.presentation.deltaStarted(normalizedSubmission.document);
+  }
+
+  private reusedWatchReview(
+    context: SubmissionContext,
+    submission: BufferSubmission,
+    latest: PendingReview | undefined
+  ): PendingReview | undefined {
+    if (latest) return undefined;
+    if (submission.updateMonitor) return undefined;
+    const cached = this.cachedWatchReview(context);
+    if (!cached) return undefined;
+
+    const pending = this.createPending(context, submission);
+    pending.submitted = true;
+    pending.reviewDone = true;
+    pending.deltaDone = true;
+    pending.reviewResult = cached;
+    pending.resolve(cached);
+    if (submission.updateDiagnosticsPane) {
+      this.presentation.presentReview({ ...pending, result: cached });
+    }
     return pending;
+  }
+
+  private cachedWatchReview(context: SubmissionContext): Review | undefined {
+    const cached = this.watchReviews.get(context.pathKey);
+    if (!cached) return undefined;
+    if (cached.contentHash !== context.contentHash) return undefined;
+    if (cached.dedupEpoch !== this.dedupEpoch) return undefined;
+    return cached.result;
   }
 
   private mergePresentation(pending: PendingReview, submission: ReviewSubmission): void {
@@ -338,11 +375,21 @@ export class ReviewPipeline implements vscode.Disposable {
   private async presentWatchReview(event: ReviewResult): Promise<void> {
     const presented = await this.watchPresentation(event.repoRoot, event.path, event.result['git-blob-sha']);
     if (!presented) return;
+    this.cacheWatchReview(this.pathKey(event.repoRoot, presented.relPath), presented.content, event.result);
     this.presentation.presentReview({
       ...presented,
-      baselineRevision: '',
       result: event.result,
     });
+  }
+
+  private cacheWatchReview(pathKey: string, content: string | undefined, result: Review): void {
+    if (content === undefined) return;
+    this.watchReviews.delete(pathKey);
+    this.watchReviews.set(pathKey, { contentHash: gitBlobSha(content), dedupEpoch: this.dedupEpoch, result });
+    if (this.watchReviews.size > MAX_WATCH_REVIEWS) {
+      const oldest = this.watchReviews.keys().next().value;
+      if (oldest !== undefined) this.watchReviews.delete(oldest);
+    }
   }
 
   private async presentWatchDelta(event: DeltaResult): Promise<void> {
@@ -350,7 +397,6 @@ export class ReviewPipeline implements vscode.Disposable {
     if (!presented) return;
     this.presentation.presentDelta({
       ...presented,
-      baselineRevision: '',
       result: event.result,
     });
   }

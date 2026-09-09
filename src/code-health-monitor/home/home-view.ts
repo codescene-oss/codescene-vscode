@@ -6,13 +6,10 @@ import { getHomeData, getLoginData } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../file-with-issues';
-import {
-  convertFileIssueToCWFDeltaItem,
-  convertVSCodeCommitBaselineToCWF,
-} from '../../centralized-webview-framework/cwf-parsers';
+import { convertFileIssueToCWFDeltaItem } from '../../centralized-webview-framework/cwf-parsers';
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
-import { CommitBaselineType, MessageToIDEType } from '../../centralized-webview-framework/types/messages';
+import { MessageToIDEType } from '../../centralized-webview-framework/types/messages';
 import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
@@ -43,7 +40,6 @@ export function getHomeViewInstance(): HomeView | undefined {
 interface IdeContextData {
   showOnboarding: boolean;
   fileDeltaData: FileDeltaData[];
-  commitBaseline: CommitBaselineType;
   autoRefactor: AutoRefactorConfig;
   jobs: Job[];
 }
@@ -62,7 +58,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private ideContextData: IdeContextData = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
-    commitBaseline: convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline),
     autoRefactor: getAutoRefactorConfig(),
     jobs: [],
   };
@@ -76,7 +71,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
-      CsExtensionState.onBaselineChanged(() => this.handleBaseLineChange()), // Detect change to commit baseline
       CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
@@ -110,7 +104,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
         jobs: this.ideContextData.jobs,
         autoRefactor: this.ideContextData.autoRefactor,
         showOnboarding: false,
-        commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),
         user: { name: this.session?.account.label || 'Not set' },
       })
@@ -213,11 +206,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.update();
   }
 
-  private handleBaseLineChange() {
-    this.ideContextData.commitBaseline = convertVSCodeCommitBaselineToCWF(CsExtensionState.baseline);
-    this.update();
-  }
-
   private refreshAceState() {
     this.ideContextData.autoRefactor = getAutoRefactorConfig();
     this.update();
@@ -297,7 +285,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
         jobs: this.ideContextData.jobs,
         autoRefactor: this.ideContextData.autoRefactor,
         showOnboarding: false,
-        commitBaseline: this.ideContextData.commitBaseline,
         signedIn: this.isSignedIn(),
         user: { name: getUserName(this.session?.account.label) },
       }),

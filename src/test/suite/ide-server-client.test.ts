@@ -112,11 +112,10 @@ suite('CsIdeServerClient Test Suite', () => {
     });
     const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
 
-    client.watchFiles('/repo', 'abc123');
+    client.watchFiles('/repo');
     assert.deepStrictEqual(await review, { id: undefined, path: 'watched.ts' });
     assert.deepStrictEqual(await rpc.sendRequest('test/lastWatch', {}), {
       'repo-root': '/repo',
-      'baseline-revision': 'abc123',
     });
 
     client.stopWatchFiles('/repo');

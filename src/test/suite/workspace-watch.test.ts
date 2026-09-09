@@ -10,15 +10,14 @@ import { ReviewPipeline, ReviewSubmission } from '../../review/review-pipeline';
 
 suite('WorkspaceWatch Test Suite', () => {
   const repoRoot = path.normalize('/repo');
-  let submitted: Array<{ repoRoot: string; baseline: string; submissions: ReviewSubmission[] }>;
-  let watches: Array<{ repoRoot: string; baseline?: string }>;
+  let submitted: Array<{ repoRoot: string; submissions: ReviewSubmission[] }>;
+  let watches: string[];
   let stops: string[];
   let pipeline: Pick<ReviewPipeline, 'submitBatch'>;
   let dirtyDoc: vscode.TextDocument;
   let dependencies: WorkspaceWatchDependencies;
   let watch: WorkspaceWatch;
   let shouldSkip: boolean;
-  let baseline: string;
   let headCommit: string;
 
   setup(() => {
@@ -26,13 +25,11 @@ suite('WorkspaceWatch Test Suite', () => {
     watches = [];
     stops = [];
     shouldSkip = false;
-    baseline = 'baseline-sha';
     headCommit = 'head-sha';
     dirtyDoc = fakeDocument(path.join(repoRoot, 'dirty.ts'), 'const dirty = 1;', true);
     pipeline = {
-      submitBatch: async (root, baselineRevision, epoch, submissions) => {
-        void epoch;
-        submitted.push({ repoRoot: root, baseline: baselineRevision, submissions });
+      submitBatch: async (root, submissions) => {
+        submitted.push({ repoRoot: root, submissions });
         return submissions.map(() => undefined);
       },
     };
@@ -53,11 +50,10 @@ suite('WorkspaceWatch Test Suite', () => {
       textDocuments: () => [dirtyDoc],
       isExcluded: () => false,
       shouldSkipRepo: async () => shouldSkip,
-      getBaselineRevision: async () => baseline,
     };
     watch = new WorkspaceWatch(
       {
-        watchFiles: (root, baselineRevision) => watches.push({ repoRoot: root, baseline: baselineRevision }),
+        watchFiles: (root) => void watches.push(root),
         stopWatchFiles: (root) => stops.push(root),
       },
       pipeline as ReviewPipeline,
@@ -71,7 +67,6 @@ suite('WorkspaceWatch Test Suite', () => {
     await watch.syncAll();
 
     assert.strictEqual(watches.length, 1);
-    assert.strictEqual(watches[0].baseline, 'baseline-sha');
     assert.strictEqual(submitted.length, 1);
     assert.deepStrictEqual(
       submitted[0].submissions.map((submission) => submission.relPath),
@@ -87,26 +82,28 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(submitted.length, 0);
   });
 
-  test('does not re-watch or re-seed when baseline and HEAD are unchanged', async () => {
+  test('does not re-watch or re-seed while HEAD is unchanged', async () => {
     await watch.syncAll();
     await watch.syncAll();
     assert.strictEqual(watches.length, 1);
     assert.strictEqual(submitted.length, 1);
   });
 
-  test('re-watches without stopping when the baseline changes', async () => {
+  test('keeps the CLI watch but re-seeds dirty buffers when HEAD moves', async () => {
     await watch.syncAll();
-    baseline = 'baseline-2';
+    headCommit = 'head-sha-2';
     await watch.syncAll();
-    assert.deepStrictEqual(watches.map((entry) => entry.baseline), ['baseline-sha', 'baseline-2']);
+
+    assert.strictEqual(watches.length, 1, 'The CLI reacts to HEAD itself, so the watch is never restarted');
     assert.deepStrictEqual(stops, []);
+    assert.strictEqual(submitted.length, 2, 'Dirty buffers are invisible to the CLI and must be resent');
   });
 
   test('stops watch on the default branch and does not seed', async () => {
     await watch.syncAll();
     shouldSkip = true;
     await watch.syncAll();
-    assert.deepStrictEqual(stops, [watches[0].repoRoot]);
+    assert.deepStrictEqual(stops, [watches[0]]);
     assert.strictEqual(submitted.length, 1);
   });
 

@@ -17,12 +17,6 @@ export interface CsFeature {
   error?: Error;
 }
 
-export enum Baseline {
-  head = 1,
-  branchCreation = 2,
-  default = 3,
-}
-
 export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
 type RunnerState = 'running' | 'idle';
 
@@ -37,7 +31,6 @@ export interface CsStateProperties {
 }
 
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
-const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
 /**
@@ -49,9 +42,6 @@ export class CsExtensionState {
   readonly stateProperties: CsStateProperties;
   readonly statusBar: CsStatusBar;
   readonly extensionUri: Uri;
-
-  private baselineChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onBaselineChanged = this.baselineChangedEmitter.event;
 
   private sessionChangedEmitter = new vscode.EventEmitter<void>();
   readonly onSessionChanged = this.sessionChangedEmitter.event;
@@ -78,7 +68,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
+    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -97,19 +87,6 @@ export class CsExtensionState {
 
   static async setAcknowledgedAceUsage(value?: boolean) {
     await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
-  }
-
-  static get baseline(): Baseline {
-    return this._instance.context.globalState.get<Baseline>(baselineKey) || Baseline.default;
-  }
-
-  static async setBaseline(value: Baseline) {
-    await this._instance.context.globalState.update(baselineKey, value);
-    this._instance.baselineChangedEmitter.fire();
-  }
-
-  static get onBaselineChanged() {
-    return this._instance.onBaselineChanged;
   }
 
   static get telemetryNoticeShown() {

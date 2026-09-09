@@ -7,15 +7,10 @@ import { DeltaTreeViewItem, refactoringsCount } from './tree-model';
 import { DeltaFunctionInfo } from './delta-function-info';
 import { DeltaInfoItem } from './delta-info-item';
 import { FileWithIssues } from './file-with-issues';
-import { Baseline, CsExtensionState } from '../cs-extension-state';
 
 interface SortOption extends vscode.QuickPickItem {
   label: string;
   sortFn: (a: FileWithIssues, b: FileWithIssues) => number;
-}
-
-interface BaselineOption extends vscode.QuickPickItem, Pick<SortOption, 'label'> {
-  value: Baseline;
 }
 
 export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaTreeViewItem> {
@@ -46,48 +41,10 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
     },
   ];
 
-  private baselineOptions: BaselineOption[] = [
-    {
-      label: 'Automatic (default)',
-      description:
-        'Compare changes against the most recent commit for default branch, and branch creation commit for other branches. Fallback comparison is perfect score (10.0).',
-      value: Baseline.default,
-    },
-    {
-      label: 'Branch creation commit',
-      description: 'Compare changes since the branch was created. Fallback comparison is perfect score (10.0).',
-      value: Baseline.branchCreation,
-    },
-    {
-      label: 'HEAD commit',
-      description: 'Compare changes made in the most recent commit. Fallback comparison is perfect score (10.0).',
-      value: Baseline.head,
-    },
-  ];
-
   constructor() {}
 
   setParentView(view: vscode.TreeView<DeltaTreeViewItem>) {
     this.parentView = view;
-  }
-
-  public async selectBaseline() {
-    const currentBaseline = CsExtensionState.baseline;
-
-    const optionsWithStatus = this.baselineOptions.map((option) => ({
-      ...option,
-      picked: option.value === currentBaseline,
-      iconPath: option.value === currentBaseline ? new vscode.ThemeIcon('check') : undefined,
-    }));
-
-    const selected = await vscode.window.showQuickPick(optionsWithStatus, {
-      placeHolder: 'Select the comparison baseline for the Code Health Monitor',
-    });
-
-    if (selected && selected.value !== currentBaseline) {
-      await CsExtensionState.setBaseline(selected.value);
-      this.update();
-    }
   }
 
   public async selectSortFn() {
@@ -101,20 +58,6 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
     }
   }
 
-  private addBaselineInfo() {
-    const baseline = CsExtensionState.baseline;
-
-    const data = this.baselineOptions.find((option) => option.value === baseline);
-    const label = `Baseline: ${data?.label}`;
-
-    const treeItem = new vscode.TreeItem(label);
-    treeItem.iconPath = new vscode.ThemeIcon('info');
-    treeItem.tooltip = data?.description;
-    treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
-
-    return new DeltaInfoItem(treeItem);
-  }
-
   private update() {
     if (this.fileIssueMap.size > 0) {
       // const statusItem = this.statusTreeItem();
@@ -125,9 +68,8 @@ export class DeltaAnalysisTreeProvider implements vscode.TreeDataProvider<DeltaT
       }
 
       // const summaryItem = this.issueSummaryItem(filesWithIssues);
-      const baselineInfoItem = this.addBaselineInfo();
       const aceInfoItem = this.aceSummaryItem(filesWithIssues);
-      this.tree = [baselineInfoItem, ...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
+      this.tree = [...(aceInfoItem ? [aceInfoItem] : []), ...filesWithIssues];
     } else {
       this.tree = [];
     }

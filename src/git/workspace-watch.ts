@@ -5,7 +5,7 @@ import type { CsIdeServerClient } from '../devtools-api/ide-server-client';
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
-import { getMergeBaseCommit, getRepoRootPath, isMainBranch } from '../git-utils';
+import { getRepoRootPath, isMainBranch } from '../git-utils';
 import { normalizeFsPath, relativePosix, toPosixRelPath } from '../utils/fs-paths';
 
 export interface WorkspaceWatchDependencies {
@@ -13,11 +13,9 @@ export interface WorkspaceWatchDependencies {
   textDocuments(): readonly vscode.TextDocument[];
   isExcluded(uri: vscode.Uri): boolean;
   shouldSkipRepo(repo: Repository): Promise<boolean>;
-  getBaselineRevision(repo: Repository): Promise<string>;
 }
 
 interface WatchedRepo {
-  baselineRevision: string;
   headName?: string;
   headCommit?: string;
 }
@@ -77,28 +75,36 @@ export class WorkspaceWatch implements vscode.Disposable {
       this.stopWatching(repoRoot);
       return;
     }
-    await this.ensureWatch(repo, repoRoot);
+    this.ensureWatch(repo, repoRoot);
   }
 
-  private async ensureWatch(repo: Repository, repoRoot: string): Promise<void> {
-    const baselineRevision = await this.dependencies.getBaselineRevision(repo);
-    const previous = this.watched.get(normalizeFsPath(repoRoot));
-    if (this.isCurrentWatch(previous, repo, baselineRevision)) return;
-    this.startWatch(repo, repoRoot, baselineRevision);
-    this.seed(repoRoot, baselineRevision);
+  /**
+   * The CLI owns the baseline and reacts to HEAD, refs and .codescene/config.json changes itself,
+   * so an established watch is never restarted. A moved HEAD only re-seeds dirty buffers, which the
+   * CLI cannot see.
+   */
+  private ensureWatch(repo: Repository, repoRoot: string): void {
+    const normalizedRoot = normalizeFsPath(repoRoot);
+    const previous = this.watched.get(normalizedRoot);
+    if (previous && this.headUnchanged(previous, repo)) return;
+    if (previous) {
+      this.rememberHead(normalizedRoot, repo);
+    } else {
+      this.startWatch(repo, repoRoot);
+    }
+    this.seed(repoRoot);
   }
 
-  private startWatch(repo: Repository, repoRoot: string, baselineRevision: string): void {
-    this.client.watchFiles(repoRoot, baselineRevision || undefined);
-    this.watched.set(normalizeFsPath(repoRoot), {
-      baselineRevision,
+  private startWatch(repo: Repository, repoRoot: string): void {
+    this.client.watchFiles(repoRoot);
+    this.rememberHead(normalizeFsPath(repoRoot), repo);
+  }
+
+  private rememberHead(normalizedRoot: string, repo: Repository): void {
+    this.watched.set(normalizedRoot, {
       headName: repo.state.HEAD?.name,
       headCommit: repo.state.HEAD?.commit,
     });
-  }
-
-  private isCurrentWatch(previous: WatchedRepo | undefined, repo: Repository, baselineRevision: string): boolean {
-    return !!previous && previous.baselineRevision === baselineRevision && this.headUnchanged(previous, repo);
   }
 
   private headUnchanged(watched: WatchedRepo, repo: Repository): boolean {
@@ -112,14 +118,14 @@ export class WorkspaceWatch implements vscode.Disposable {
     this.watched.delete(normalizedRoot);
   }
 
-  private seed(repoRoot: string, baselineRevision: string): void {
+  private seed(repoRoot: string): void {
     const dirtyDocuments = this.dirtyDocuments(repoRoot);
     const submissions: ReviewSubmission[] = Array.from(dirtyDocuments, ([relPath, document]) =>
       this.bufferSubmission(relPath, document)
     );
     if (submissions.length === 0) return;
     logOutputChannel.info(`[watch] seeding reviewFiles count=${submissions.length} repo=${repoRoot}`);
-    void this.pipeline.submitBatch(repoRoot, baselineRevision, baselineRevision || 'unborn', submissions).catch((error) => {
+    void this.pipeline.submitBatch(repoRoot, submissions).catch((error) => {
       logOutputChannel.warn(`Watch seed failed for ${repoRoot}: ${error}`);
     });
   }
@@ -161,7 +167,6 @@ export function createWorkspaceWatchDependencies(
     textDocuments: () => vscode.workspace.textDocuments,
     isExcluded: (uri) => isExcludedByConfiguration(uri),
     shouldSkipRepo: async (repo) => isMainBranch(repo.state.HEAD?.name, getRepoRootPath(repo)),
-    getBaselineRevision: async (repo) => (await getMergeBaseCommit(repo)) ?? '',
   };
 }
 

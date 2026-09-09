@@ -1,10 +1,6 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
-import {
-  activate as activateCHMonitor,
-  deactivate as deactivateAddon,
-  refreshMergeBaseBaselines,
-} from './code-health-monitor/addon';
+import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -58,7 +54,11 @@ const onCodeHealthFileVersionChange = debounce(() => {
   DevtoolsAPI.invalidateReviewEpoch();
 }, 350);
 
-const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
+/**
+ * The CLI reacts to .codescene/config.json itself. The extension only drops its cached
+ * main-branch lookup, which decides whether a repo is watched at all.
+ */
+const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
   const gitRoot = gitRootFromCodesceneConfigUri(uri);
   if (gitRoot) {
     clearMainBranchCandidatesCache(gitRoot);
@@ -66,9 +66,7 @@ const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
     clearMainBranchCandidatesCache();
   }
 
-  await refreshMergeBaseBaselines();
-  DevtoolsAPI.invalidateReviewEpoch();
-  await workspaceWatchInstance?.syncAll();
+  void workspaceWatchInstance?.syncAll();
 }, 350);
 
 function handleWindowStateChange(state: vscode.WindowState): void {
@@ -312,11 +310,8 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
   const closeListener = gitApi.onDidCloseRepository((repo) => {
     workspaceWatchInstance?.stopWatching(getRepoRootPath(repo));
   });
-  const baselineListener = CsExtensionState.onBaselineChanged(() => {
-    void workspaceWatchInstance?.syncAll();
-  });
-  DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener, baselineListener);
-  context.subscriptions.push(workspaceWatchInstance, openListener, closeListener, baselineListener);
+  DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener);
+  context.subscriptions.push(workspaceWatchInstance, openListener, closeListener);
   workspaceWatchInstance.start();
 }
 

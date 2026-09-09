@@ -219,16 +219,15 @@ export class CsIdeServerClient implements vscode.Disposable {
     return checkRulesResponse(await this.sendRequest('cs-ide/check-rules', { 'repo-root': repoRoot, path }));
   }
 
-  reviewFiles(repoRoot: string, files: ReviewFile[], baselineRevision?: string): void {
-    void this.sendReviewFiles(repoRoot, files, baselineRevision).catch((error) => {
+  reviewFiles(repoRoot: string, files: ReviewFile[]): void {
+    void this.sendReviewFiles(repoRoot, files).catch((error) => {
       this.handleError(error instanceof Error ? error : new Error(String(error)));
     });
   }
 
-  watchFiles(repoRoot: string, baselineRevision?: string): void {
+  watchFiles(repoRoot: string): void {
     void this.sendNotification('cs-ide/watchFiles', {
       'repo-root': repoRoot,
-      ...(baselineRevision ? { 'baseline-revision': baselineRevision } : {}),
     }).catch((error) => {
       this.handleError(error instanceof Error ? error : new Error(String(error)));
     });
@@ -263,11 +262,10 @@ export class CsIdeServerClient implements vscode.Disposable {
     await this.connection.sendNotification(method, params);
   }
 
-  private async sendReviewFiles(repoRoot: string, files: ReviewFile[], baselineRevision?: string): Promise<void> {
+  private async sendReviewFiles(repoRoot: string, files: ReviewFile[]): Promise<void> {
     logOutputChannel.info(`[cs-ide] sending reviewFiles count=${files.length}`);
     await this.sendNotification('cs-ide/reviewFiles', {
       'repo-root': repoRoot,
-      ...(baselineRevision ? { 'baseline-revision': baselineRevision } : {}),
       files: files.map((file) => ({
         'rel-path': file.relPath,
         ...(file.id ? { id: file.id } : {}),

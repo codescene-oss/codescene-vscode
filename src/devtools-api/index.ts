@@ -46,8 +46,8 @@ export class DevtoolsAPI {
     return DevtoolsAPI.pipeline;
   }
 
-  static watchFiles(repoRoot: string, baselineRevision?: string): void {
-    DevtoolsAPI.ideServer.watchFiles(repoRoot, baselineRevision);
+  static watchFiles(repoRoot: string): void {
+    DevtoolsAPI.ideServer.watchFiles(repoRoot);
   }
 
   static stopWatchFiles(repoRoot: string): void {
@@ -108,8 +108,7 @@ export class DevtoolsAPI {
 
   static reviewWithServer(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<Review | void> {
     const repoRoot = DevtoolsAPI.repoRootFor(document);
-    const baselineRevision = reviewOpts?.baselineCommit ?? '';
-    return DevtoolsAPI.pipeline.submit(repoRoot, baselineRevision, baselineRevision, {
+    return DevtoolsAPI.pipeline.submit(repoRoot, {
       document,
       relPath: relativePosix(repoRoot, document.fileName),
       content: document.getText(),
@@ -120,27 +119,6 @@ export class DevtoolsAPI {
 
   static reviewContent(document: vscode.TextDocument): Promise<Review | void> {
     return DevtoolsAPI.reviewWithServer(document);
-  }
-
-  static reviewBaseline(baselineCommit: string, document: vscode.TextDocument): Promise<Review | void> {
-    return DevtoolsAPI.reviewWithServer(document, {
-      baselineCommit,
-      skipMonitorUpdate: false,
-      updateDiagnosticsPane: false,
-    });
-  }
-
-  static async delta(
-    document: vscode.TextDocument,
-    updateMonitor: boolean,
-    oldScore?: string | void,
-    newScore?: string | void
-  ): Promise<Delta | undefined> {
-    void document;
-    void updateMonitor;
-    void oldScore;
-    void newScore;
-    return undefined;
   }
 
   static abortReviews(document: TextDocument): void {
@@ -169,9 +147,9 @@ export class DevtoolsAPI {
     };
   }
 
-  private static presentServerReview({ document, result, updateDiagnosticsPane, updateMonitor, baselineRevision }: PresentedReview): void {
+  private static presentServerReview({ document, result, updateDiagnosticsPane, updateMonitor }: PresentedReview): void {
     const review = new CsReview(document, Promise.resolve(result));
-    Reviewer.instance.updateOrAdd(document, review, !updateMonitor, updateDiagnosticsPane, baselineRevision);
+    Reviewer.instance.updateOrAdd(document, review, !updateMonitor);
     if (updateDiagnosticsPane) {
       void review.diagnostics.then((diagnostics) => CsDiagnostics.set(
         document.uri,
