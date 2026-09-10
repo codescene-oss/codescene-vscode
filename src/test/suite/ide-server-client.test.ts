@@ -123,6 +123,23 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), { 'repo-root': '/repo' });
   });
 
+  test('sends relative-paths only when the watch is narrowed to sub-directories', async () => {
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await client.start();
+
+    client.watchFiles('/repo', ['packages/app', 'packages/lib']);
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastWatch', {}), {
+      'repo-root': '/repo',
+      'relative-paths': ['packages/app', 'packages/lib'],
+    });
+
+    client.stopWatchFiles('/repo', ['packages/lib']);
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), {
+      'repo-root': '/repo',
+      'relative-paths': ['packages/lib'],
+    });
+  });
+
   test('forwards watch inventory notifications and on-demand inventory requests', async () => {
     const inventory = new Promise<{ repoRoot: string; files: string[] }>((resolve) => {
       client.onDidWatchInventory((event) => resolve(event));

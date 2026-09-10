@@ -25,8 +25,7 @@ import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { OpenFilesObserver } from './review/open-files-observer';
-import { acquireGitApi, clearMainBranchCandidatesCache, deactivate as deactivateGitUtils, getRepoRootPath } from './git-utils';
-import { gitRootFromCodesceneConfigUri } from './git/codescene-repo-config';
+import { acquireGitApi, deactivate as deactivateGitUtils, getRepoRootPath } from './git-utils';
 import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
 import { createWorkspaceWatchDependencies, WorkspaceWatch } from './git/workspace-watch';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
@@ -55,17 +54,10 @@ const onCodeHealthFileVersionChange = debounce(() => {
 }, 350);
 
 /**
- * The CLI reacts to .codescene/config.json itself. The extension only drops its cached
- * main-branch lookup, which decides whether a repo is watched at all.
+ * The CLI reacts to .codescene/config.json itself, rebuilding its analysis settings and rescanning.
+ * The extension only reconciles its cached inventory against that rescan.
  */
-const onCodesceneConfigChange = debounce((uri: vscode.Uri) => {
-  const gitRoot = gitRootFromCodesceneConfigUri(uri);
-  if (gitRoot) {
-    clearMainBranchCandidatesCache(gitRoot);
-  } else {
-    clearMainBranchCandidatesCache();
-  }
-
+const onCodesceneConfigChange = debounce(() => {
   void workspaceWatchInstance?.syncAll();
 }, 350);
 
@@ -285,9 +277,9 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   context.subscriptions.push(rulesFileWatcher);
 
   const configFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/config.json');
-  configFileWatcher.onDidChange((uri) => onCodesceneConfigChange(uri));
-  configFileWatcher.onDidCreate((uri) => onCodesceneConfigChange(uri));
-  configFileWatcher.onDidDelete((uri) => onCodesceneConfigChange(uri));
+  configFileWatcher.onDidChange(() => onCodesceneConfigChange());
+  configFileWatcher.onDidCreate(() => onCodesceneConfigChange());
+  configFileWatcher.onDidDelete(() => onCodesceneConfigChange());
   DISPOSABLES.push(configFileWatcher);
   context.subscriptions.push(configFileWatcher);
 }
@@ -317,8 +309,11 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
   const closeListener = gitApi.onDidCloseRepository((repo) => {
     workspaceWatchInstance?.stopWatching(getRepoRootPath(repo));
   });
-  DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener);
-  context.subscriptions.push(workspaceWatchInstance, openListener, closeListener);
+  const folderListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    void workspaceWatchInstance?.syncAll();
+  });
+  DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener, folderListener);
+  context.subscriptions.push(workspaceWatchInstance, openListener, closeListener, folderListener);
   workspaceWatchInstance.start();
 }
 

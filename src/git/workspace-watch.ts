@@ -5,9 +5,10 @@ import type { CsIdeServerClient, DeltaResult, ServerStartEvent, WatchInventory }
 import { supportedExtensions } from '../language-support';
 import { logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
-import { getRepoRootPath, isMainBranch } from '../git-utils';
+import { getRepoRootPath, resolveGitRoot } from '../git-utils';
 import { pruneMonitorToPaths } from '../code-health-monitor/monitor-prune';
 import { isPathUnderRoot, normalizeFsPath, relativePosix, toPosixRelPath } from '../utils/fs-paths';
+import { WatchScope, watchScopeKey, watchScopePaths, watchScopes } from './watch-scope';
 
 export type WatchClient = Pick<
   CsIdeServerClient,
@@ -26,15 +27,26 @@ export const INVENTORY_REFRESH_DELAY_MS = 250;
 
 export interface WorkspaceWatchDependencies {
   repositories(): readonly Repository[];
+  workspaceFolders(): readonly vscode.WorkspaceFolder[];
+  gitRootFor(directory: string): Promise<string | undefined>;
   textDocuments(): readonly vscode.TextDocument[];
   isExcluded(uri: vscode.Uri): boolean;
-  shouldSkipRepo(repo: Repository): Promise<boolean>;
   pruneMonitor(repoRoots: string[], keepPaths: Set<string>): void;
 }
 
 interface WatchedRepo {
   headName?: string;
   headCommit?: string;
+  scopeKey: string;
+}
+
+/**
+ * A repository VS Code has not opened has no Repository object, so HEAD cannot be tracked for it.
+ * The CLI reacts to HEAD itself; only the re-seeding of dirty buffers is lost.
+ */
+interface WatchTarget {
+  repoRoot: string;
+  repo?: Repository;
 }
 
 interface RepoInventory {
@@ -47,6 +59,8 @@ export class WorkspaceWatch implements vscode.Disposable {
   private readonly inventories = new Map<string, RepoInventory>();
   private readonly refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly disposables: vscode.Disposable[] = [];
+  private readonly rootCache = new Map<string, string | undefined>();
+  private readonly knownRoots = new Map<string, string>();
   private disposed = false;
 
   constructor(
@@ -74,11 +88,16 @@ export class WorkspaceWatch implements vscode.Disposable {
 
   async syncAll(): Promise<void> {
     if (this.disposed) return;
-    for (const repo of this.dependencies.repositories()) {
+    const targets = await this.watchTargets();
+    const resolved = targets.filter((target) => !target.repo).length;
+    logOutputChannel.debug(
+      `[watch] syncing ${targets.length} repositories reached by the workspace, ${resolved} of them resolved without the git extension`
+    );
+    for (const target of targets) {
       try {
-        await this.syncRepository(repo);
+        await this.syncTarget(target);
       } catch (error) {
-        logOutputChannel.warn(`Workspace watch sync failed for ${getRepoRootPath(repo)}: ${error}`);
+        logOutputChannel.warn(`Workspace watch sync failed for ${target.repoRoot}: ${error}`);
       }
     }
   }
@@ -96,55 +115,114 @@ export class WorkspaceWatch implements vscode.Disposable {
   }
 
   private async onRepositoryStateChange(repo: Repository): Promise<void> {
-    const watched = this.watched.get(normalizeFsPath(getRepoRootPath(repo)));
+    const repoRoot = getRepoRootPath(repo);
+    const watched = this.watched.get(normalizeFsPath(repoRoot));
     if (watched && this.headUnchanged(watched, repo)) return;
-    await this.syncRepository(repo);
+    await this.syncTarget({ repoRoot, repo });
   }
 
-  private async syncRepository(repo: Repository): Promise<void> {
+  private async syncTarget(target: WatchTarget): Promise<void> {
     if (this.disposed) return;
-    const repoRoot = getRepoRootPath(repo);
-    if (await this.dependencies.shouldSkipRepo(repo)) {
-      this.stopWatching(repoRoot);
+    const scope = await this.scopeFor(target.repoRoot);
+    if (!scope) {
+      logOutputChannel.debug(`[watch] not watching ${target.repoRoot}: no workspace folder reaches into it`);
+      this.stopWatching(target.repoRoot);
       return;
     }
-    if (this.ensureWatch(repo, repoRoot)) return;
-    await this.refreshInventory(repoRoot);
+    if (this.ensureWatch(target, scope)) return;
+    await this.refreshInventory(target.repoRoot);
+  }
+
+  /**
+   * The git extension leaves a repository unopened when its root sits above every workspace folder,
+   * which is exactly the monorepo case the watch is narrowed for, so the root is resolved directly
+   * as well. Repositories the workspace does not reach into are left alone, so opening a file from
+   * outside the workspace never pulls its whole repository into the watch.
+   */
+  private async watchTargets(): Promise<WatchTarget[]> {
+    const folders = this.dependencies.workspaceFolders();
+    this.forgetClosedFolders(folders);
+    const targets = new Map<string, WatchTarget>();
+    for (const repo of this.dependencies.repositories()) {
+      const repoRoot = getRepoRootPath(repo);
+      targets.set(normalizeFsPath(repoRoot), { repoRoot, repo });
+    }
+    for (const folder of folders) {
+      const repoRoot = await this.gitRootFor(folder.uri.fsPath);
+      if (!repoRoot) continue;
+      const key = normalizeFsPath(repoRoot);
+      if (!targets.has(key)) targets.set(key, { repoRoot });
+    }
+    this.knownRoots.clear();
+    for (const [key, target] of targets) {
+      this.knownRoots.set(key, target.repoRoot);
+    }
+    return Array.from(targets.values());
+  }
+
+  /**
+   * Repository state changes are frequent, so the lookup is cached. A root can only appear above a
+   * folder that VS Code already declined to open, never below it, so a repository created later is
+   * picked up by the git extension rather than by an expired cache entry.
+   */
+  private async gitRootFor(directory: string): Promise<string | undefined> {
+    const key = normalizeFsPath(directory);
+    if (this.rootCache.has(key)) return this.rootCache.get(key);
+    const repoRoot = await this.dependencies.gitRootFor(directory);
+    this.rootCache.set(key, repoRoot);
+    return repoRoot;
+  }
+
+  private forgetClosedFolders(folders: readonly vscode.WorkspaceFolder[]): void {
+    const open = new Set(folders.map((folder) => normalizeFsPath(folder.uri.fsPath)));
+    for (const key of this.rootCache.keys()) {
+      if (!open.has(key)) this.rootCache.delete(key);
+    }
+  }
+
+  private async scopeFor(repoRoot: string): Promise<WatchScope | undefined> {
+    const targets = await this.watchTargets();
+    const repoRoots = targets.map((target) => target.repoRoot);
+    return watchScopes(repoRoots, this.dependencies.workspaceFolders()).get(normalizeFsPath(repoRoot));
   }
 
   /**
    * The CLI owns the baseline and reacts to HEAD, refs and .codescene/config.json changes itself,
    * so an established watch is never restarted. A moved HEAD only re-seeds dirty buffers, which the
-   * CLI cannot see. Returns whether the CLI was asked to (re)scan, which makes it push a fresh
-   * inventory on its own.
+   * CLI cannot see. A changed scope is the exception: watchFiles replaces the watched roots rather
+   * than adding to them, so the full list has to be resent. Returns whether the CLI was asked to
+   * (re)scan, which makes it push a fresh inventory on its own.
    */
-  private ensureWatch(repo: Repository, repoRoot: string): boolean {
-    const normalizedRoot = normalizeFsPath(repoRoot);
+  private ensureWatch(target: WatchTarget, scope: WatchScope): boolean {
+    const normalizedRoot = normalizeFsPath(target.repoRoot);
+    const scopeKey = watchScopeKey(scope);
     const previous = this.watched.get(normalizedRoot);
-    if (previous && this.headUnchanged(previous, repo)) return false;
-    if (previous) {
-      this.rememberHead(normalizedRoot, repo);
+    const established = previous?.scopeKey === scopeKey ? previous : undefined;
+    if (established && this.headUnchanged(established, target.repo)) return false;
+    if (established) {
+      this.rememberHead(normalizedRoot, target.repo, scopeKey);
     } else {
-      this.startWatch(repo, repoRoot);
+      this.startWatch(target, scope);
     }
-    this.seed(repoRoot);
+    this.seed(target.repoRoot);
     return true;
   }
 
-  private startWatch(repo: Repository, repoRoot: string): void {
-    this.client.watchFiles(repoRoot);
-    this.rememberHead(normalizeFsPath(repoRoot), repo);
+  private startWatch(target: WatchTarget, scope: WatchScope): void {
+    this.client.watchFiles(target.repoRoot, watchScopePaths(scope));
+    this.rememberHead(normalizeFsPath(target.repoRoot), target.repo, watchScopeKey(scope));
   }
 
-  private rememberHead(normalizedRoot: string, repo: Repository): void {
+  private rememberHead(normalizedRoot: string, repo: Repository | undefined, scopeKey: string): void {
     this.watched.set(normalizedRoot, {
-      headName: repo.state.HEAD?.name,
-      headCommit: repo.state.HEAD?.commit,
+      headName: repo?.state.HEAD?.name,
+      headCommit: repo?.state.HEAD?.commit,
+      scopeKey,
     });
   }
 
-  private headUnchanged(watched: WatchedRepo, repo: Repository): boolean {
-    return watched.headName === repo.state.HEAD?.name && watched.headCommit === repo.state.HEAD?.commit;
+  private headUnchanged(watched: WatchedRepo, repo: Repository | undefined): boolean {
+    return watched.headName === repo?.state.HEAD?.name && watched.headCommit === repo?.state.HEAD?.commit;
   }
 
   stopWatching(repoRoot: string): void {
@@ -232,11 +310,7 @@ export class WorkspaceWatch implements vscode.Disposable {
    * The CLI canonicalises repo roots, which can differ from the form VS Code reports.
    */
   private resolveRepoRoot(reported: string): string {
-    const normalized = normalizeFsPath(reported);
-    const known = this.dependencies
-      .repositories()
-      .find((repo) => normalizeFsPath(getRepoRootPath(repo)) === normalized);
-    return known ? getRepoRootPath(known) : path.normalize(reported);
+    return this.knownRoots.get(normalizeFsPath(reported)) ?? path.normalize(reported);
   }
 
   /**
@@ -296,9 +370,10 @@ export function createWorkspaceWatchDependencies(
 ): WorkspaceWatchDependencies {
   return {
     repositories,
+    workspaceFolders: () => vscode.workspace.workspaceFolders ?? [],
+    gitRootFor: (directory) => resolveGitRoot(directory),
     textDocuments: () => vscode.workspace.textDocuments,
     isExcluded: (uri) => isExcludedByConfiguration(uri),
-    shouldSkipRepo: async (repo) => isMainBranch(repo.state.HEAD?.name, getRepoRootPath(repo)),
     pruneMonitor: (repoRoots, keepPaths) => pruneMonitorToPaths(repoRoots, keepPaths),
   };
 }

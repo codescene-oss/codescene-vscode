@@ -109,6 +109,10 @@ interface NotificationIdentity {
   repoRoot: string;
 }
 
+function relativePathsParam(relativePaths?: string[]): { 'relative-paths'?: string[] } {
+  return relativePaths ? { 'relative-paths': relativePaths } : {};
+}
+
 export class CsIdeServerClient implements vscode.Disposable {
   private process?: ChildProcess;
   private connection?: MessageConnection;
@@ -253,19 +257,26 @@ export class CsIdeServerClient implements vscode.Disposable {
     });
   }
 
-  watchFiles(repoRoot: string): void {
-    void this.sendNotification('cs-ide/watchFiles', {
-      'repo-root': repoRoot,
-    }).catch((error) => {
+  watchFiles(repoRoot: string, relativePaths?: string[]): void {
+    const params = { 'repo-root': repoRoot, ...relativePathsParam(relativePaths) };
+    logOutputChannel.debug(
+      `[cs-ide] sending watchFiles repo-root=${repoRoot} relative-paths=${relativePaths?.join(', ') ?? '(whole repository)'}`
+    );
+    void this.sendNotification('cs-ide/watchFiles', params).catch((error) => {
       this.handleError(error instanceof Error ? error : new Error(String(error)));
     });
   }
 
-  stopWatchFiles(repoRoot: string): void {
+  stopWatchFiles(repoRoot: string, relativePaths?: string[]): void {
     if (!this.connection) return;
-    void this.connection.sendNotification('cs-ide/stopWatchFiles', { 'repo-root': repoRoot }).catch((error) => {
-      this.handleError(error instanceof Error ? error : new Error(String(error)));
-    });
+    void this.connection
+      .sendNotification('cs-ide/stopWatchFiles', {
+        'repo-root': repoRoot,
+        ...relativePathsParam(relativePaths),
+      })
+      .catch((error) => {
+        this.handleError(error instanceof Error ? error : new Error(String(error)));
+      });
   }
 
   dispose(): void {

@@ -15,8 +15,12 @@ suite('WorkspaceWatch Test Suite', () => {
   const repoRoot = path.normalize('/repo');
   const bumpyRoad = path.join(repoRoot, 'CSharp', 'BumpyRoadExample2.cs');
   let submitted: Array<{ repoRoot: string; submissions: ReviewSubmission[] }>;
-  let watches: string[];
+  let watches: Array<{ repoRoot: string; relativePaths?: string[] }>;
   let stops: string[];
+  let workspaceFolders: string[];
+  let openedRepositories: string[];
+  let gitRoots: string[];
+  let rootLookups: string[];
   let pruned: Array<{ repoRoots: string[]; keepPaths: Set<string> }>;
   let inventoryRequests: string[];
   let inventoryFiles: string[];
@@ -28,7 +32,7 @@ suite('WorkspaceWatch Test Suite', () => {
   let dirtyDoc: vscode.TextDocument;
   let dependencies: WorkspaceWatchDependencies;
   let watch: WorkspaceWatch;
-  let shouldSkip: boolean;
+  let headName: string;
   let headCommit: string;
 
   const lastPruned = () => pruned[pruned.length - 1].keepPaths;
@@ -41,8 +45,12 @@ suite('WorkspaceWatch Test Suite', () => {
     inventoryRequests = [];
     inventoryFiles = [];
     inventoryError = undefined;
-    shouldSkip = false;
+    headName = 'feature';
     headCommit = 'head-sha';
+    workspaceFolders = [repoRoot];
+    openedRepositories = [repoRoot];
+    gitRoots = [repoRoot];
+    rootLookups = [];
     inventoryEmitter = new vscode.EventEmitter<WatchInventory>();
     serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
     deltaEmitter = new vscode.EventEmitter<DeltaResult>();
@@ -54,26 +62,37 @@ suite('WorkspaceWatch Test Suite', () => {
       },
     };
     dependencies = {
-      repositories: () => [
-        {
-          rootUri: vscode.Uri.file(repoRoot),
-          state: {
-            HEAD: { name: 'feature', commit: headCommit },
-            workingTreeChanges: [],
-            indexChanges: [],
-            untrackedChanges: [],
-            mergeChanges: [],
-            onDidChange: () => ({ dispose: () => undefined }),
-          },
-        } as any,
-      ],
+      repositories: () =>
+        openedRepositories.map(
+          (root) =>
+            ({
+              rootUri: vscode.Uri.file(root),
+              state: {
+                HEAD: { name: headName, commit: headCommit },
+                workingTreeChanges: [],
+                indexChanges: [],
+                untrackedChanges: [],
+                mergeChanges: [],
+                onDidChange: () => ({ dispose: () => undefined }),
+              },
+            } as any)
+        ),
+      workspaceFolders: () =>
+        workspaceFolders.map((fsPath, index) => ({
+          uri: vscode.Uri.file(fsPath),
+          name: `folder-${index}`,
+          index,
+        })),
+      gitRootFor: async (directory) => {
+        rootLookups.push(directory);
+        return gitRoots.find((root) => directory === root || directory.startsWith(root + path.sep));
+      },
       textDocuments: () => [dirtyDoc],
       isExcluded: () => false,
-      shouldSkipRepo: async () => shouldSkip,
       pruneMonitor: (repoRoots, keepPaths) => pruned.push({ repoRoots, keepPaths }),
     };
     const client: WatchClient = {
-      watchFiles: (root) => void watches.push(root),
+      watchFiles: (repoRoot, relativePaths) => void watches.push({ repoRoot, relativePaths }),
       stopWatchFiles: (root) => void stops.push(root),
       getWatchInventory: async (root) => {
         inventoryRequests.push(root);
@@ -106,6 +125,103 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(submitted[0].submissions[0].content, 'const dirty = 1;');
   });
 
+  test('watches the whole repository when a workspace folder is the git root', async () => {
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
+  });
+
+  test('narrows the watch to the workspace folder inside a monorepo', async () => {
+    workspaceFolders = [path.join(repoRoot, 'packages', 'app')];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: ['packages/app'] }]);
+  });
+
+  test('sends every workspace folder of a repository in one call, since the call replaces the roots', async () => {
+    workspaceFolders = [path.join(repoRoot, 'packages', 'app'), path.join(repoRoot, 'packages', 'lib')];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: ['packages/app', 'packages/lib'] }]);
+  });
+
+  test('resends the full root list when the workspace folders change but HEAD does not', async () => {
+    workspaceFolders = [path.join(repoRoot, 'packages', 'app')];
+    await watch.syncAll();
+
+    workspaceFolders = [path.join(repoRoot, 'packages', 'app'), path.join(repoRoot, 'packages', 'lib')];
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [
+      { repoRoot, relativePaths: ['packages/app'] },
+      { repoRoot, relativePaths: ['packages/app', 'packages/lib'] },
+    ]);
+  });
+
+  test('watches a repository the git extension declined to open for a folder inside it', async () => {
+    openedRepositories = [];
+    workspaceFolders = [path.join(repoRoot, 'CSharp')];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: ['CSharp'] }]);
+  });
+
+  test('does not watch a workspace folder that lies outside any repository', async () => {
+    openedRepositories = [];
+    workspaceFolders = [path.normalize('/elsewhere')];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, []);
+  });
+
+  test('reuses one root lookup per folder across syncs, since repository state changes are frequent', async () => {
+    openedRepositories = [];
+    workspaceFolders = [path.join(repoRoot, 'CSharp')];
+
+    await watch.syncAll();
+    await watch.syncAll();
+
+    assert.deepStrictEqual(rootLookups, [path.join(repoRoot, 'CSharp')]);
+  });
+
+  test('forgets the root of a folder that left the workspace', async () => {
+    openedRepositories = [];
+    const folder = path.join(repoRoot, 'CSharp');
+    workspaceFolders = [folder];
+    await watch.syncAll();
+
+    workspaceFolders = [];
+    await watch.syncAll();
+    workspaceFolders = [folder];
+    await watch.syncAll();
+
+    assert.deepStrictEqual(rootLookups, [folder, folder]);
+  });
+
+  test('keeps tracking HEAD through the repository the git extension did open', async () => {
+    workspaceFolders = [path.join(repoRoot, 'CSharp')];
+    await watch.syncAll();
+    headCommit = 'head-sha-2';
+
+    await watch.syncAll();
+
+    assert.strictEqual(watches.length, 1, 'The CLI reacts to HEAD itself, so the watch is never restarted');
+    assert.strictEqual(submitted.length, 2, 'Dirty buffers are invisible to the CLI and must be resent');
+  });
+
+  test('does not watch a repository the workspace does not reach into', async () => {
+    workspaceFolders = [];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, []);
+    assert.strictEqual(submitted.length, 0);
+  });
+
   test('does not seed when there are no dirty buffers', async () => {
     dirtyDoc = fakeDocument(path.join(repoRoot, 'clean.ts'), 'const clean = 1;', false);
     await watch.syncAll();
@@ -130,12 +246,13 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(submitted.length, 2, 'Dirty buffers are invisible to the CLI and must be resent');
   });
 
-  test('stops watch on the default branch and does not seed', async () => {
+  test('watches the default branch too, where the change set is the uncommitted work', async () => {
+    headName = 'main';
+
     await watch.syncAll();
-    shouldSkip = true;
-    await watch.syncAll();
-    assert.deepStrictEqual(stops, [watches[0]]);
-    assert.strictEqual(submitted.length, 1);
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
+    assert.deepStrictEqual(stops, []);
   });
 
   test('prunes the monitor to the reported inventory, keeping dirty buffers the CLI cannot see', async () => {
@@ -154,17 +271,18 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.deepStrictEqual(pruned[pruned.length - 1].repoRoots, [repoRoot]);
   });
 
-  test('drops a repository from the monitor when it returns to the default branch', async () => {
+  test('drops a repository from the monitor when the workspace stops reaching into it', async () => {
     await watch.syncAll();
     inventoryEmitter.fire({ repoRoot, files: ['CSharp/BumpyRoadExample2.cs'] });
 
-    shouldSkip = true;
+    workspaceFolders = [];
     await watch.syncAll();
 
+    assert.deepStrictEqual(stops, [repoRoot]);
     assert.deepStrictEqual(
       new Set(lastPruned()),
       new Set([dirtyDoc.uri.fsPath]),
-      'Switching back to the default branch leaves nothing in the change set'
+      'A repository the workspace no longer reaches into has nothing left in the change set'
     );
   });
 

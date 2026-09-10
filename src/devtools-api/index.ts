@@ -46,12 +46,12 @@ export class DevtoolsAPI {
     return DevtoolsAPI.pipeline;
   }
 
-  static watchFiles(repoRoot: string): void {
-    DevtoolsAPI.ideServer.watchFiles(repoRoot);
+  static watchFiles(repoRoot: string, relativePaths?: string[]): void {
+    DevtoolsAPI.ideServer.watchFiles(repoRoot, relativePaths);
   }
 
-  static stopWatchFiles(repoRoot: string): void {
-    DevtoolsAPI.ideServer.stopWatchFiles(repoRoot);
+  static stopWatchFiles(repoRoot: string, relativePaths?: string[]): void {
+    DevtoolsAPI.ideServer.stopWatchFiles(repoRoot, relativePaths);
   }
 
   static getWatchInventory(repoRoot: string): Promise<WatchInventory> {
