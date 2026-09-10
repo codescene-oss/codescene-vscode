@@ -13,6 +13,8 @@
     "**/setup.ts",
     "**/setup.js",
     "out/test/**",
+    "**/benchmark/**",
+    "out/benchmark/**",
     "**/types/**",
     "scripts/**",
     "out/**/*.test.js"

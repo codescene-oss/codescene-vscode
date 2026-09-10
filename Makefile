@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs benchmark
 
 .DEFAULT_GOAL := build
 
@@ -41,6 +41,10 @@ pretest-e2e:
 # Add "CLEAN=1" to force re-download of VS Code and extension.
 test-e2e: pretest-e2e
 	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
+
+# Performance benchmarks. Add "ITERATIONS=n" to override the per scenario iteration count.
+benchmark: pretest
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )npm run benchmark
 
 # Runs just one test.
 # Example: make test1 TEST='GitChangeObserver Test Suite'
