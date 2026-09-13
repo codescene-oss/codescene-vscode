@@ -40,7 +40,6 @@ function removeStaleFilesFromMonitors(changedFiles: Set<string>): void {
 
 export async function runScheduledGitChangeReview(): Promise<void> {
   if (!isVSCodeWindowFocused()) {
-    logOutputChannel.debug('Skipping scheduled git change review: window not focused');
     return;
   }
   if (!isGitAvailable()) return;
@@ -48,15 +47,12 @@ export async function runScheduledGitChangeReview(): Promise<void> {
     logOutputChannel.info('Skipping scheduled git change review: analysis in progress');
     return;
   }
-  logOutputChannel.info('Starting scheduled git change review');
 
   const startTime = Date.now();
   const changedFiles = await gitChangeListerInstance!.start();
   removeStaleFilesFromMonitors(changedFiles);
   const elapsedMs = Date.now() - startTime;
   const elapsedSeconds = Math.ceil(elapsedMs / 1000);
-
-  logOutputChannel.debug(`Scheduled git change review completed in ${elapsedSeconds}s`);
 
   if (elapsedSeconds > GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS && scheduledExecutorInstance) {
     const newPeriod = GIT_CHANGE_LISTER_BASE_PERIOD_SECONDS * 2 + elapsedSeconds;

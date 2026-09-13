@@ -66,11 +66,6 @@ export class SimpleExecutor implements Executor {
     const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
     const allOptions = { maxBuffer: MAX_BUFFER, ...options };
 
-    if (command.command === 'git') { // These can be frequently executed, so demote their log level
-      logOutputChannel.debug(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
-    } else {
-      logOutputChannel.info(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
-    }
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
@@ -82,9 +77,6 @@ export class SimpleExecutor implements Executor {
           return;
         }
         const end = Date.now();
-        logOutputChannel.trace(
-          `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
-        );
 
         this.stats.addRun(command, end - start);
 
@@ -95,7 +87,6 @@ export class SimpleExecutor implements Executor {
         this.writeInput(childProcess, input);
       }
 
-      logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" started`);
     });
   }
 

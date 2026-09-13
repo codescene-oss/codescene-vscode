@@ -23,9 +23,17 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
   let errorListener: vscode.Disposable;
   let refactoringErrorListener: vscode.Disposable;
   let originalGetAuthToken: any;
+  let originalGetExtensionPath: any;
+  const projectRoot = path.join(__dirname, '..', '..', '..');
 
   if (!testToken) {
     console.log('Skipping PostRefactoring tests: CODESCENE_TEST_TOKEN environment variable not set');
+    return;
+  }
+
+  const agentBinaryPath = path.join(__dirname, '..', '..', '..', 'bin', 'cs-agent');
+  if (!fs.existsSync(agentBinaryPath)) {
+    console.log('Skipping PostRefactoring tests: cs-agent binary not found at ' + agentBinaryPath);
     return;
   }
 
@@ -54,6 +62,11 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     }
     fs.mkdirSync(testDir, { recursive: true });
 
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: testDir });
+    execSync('git config user.email "test@test.com"', { cwd: testDir });
+    execSync('git config user.name "Test"', { cwd: testDir });
+
     mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
 
     const binaryPath = await ensureBinary();
@@ -61,6 +74,9 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     originalGetAuthToken = configModule.getAuthToken;
     (configModule as any).getAuthToken = () => testToken;
+
+    originalGetExtensionPath = csExtensionState.getExtensionPath;
+    (csExtensionState as any).getExtensionPath = () => projectRoot;
 
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
@@ -95,6 +111,10 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     if (originalGetAuthToken) {
       (configModule as any).getAuthToken = originalGetAuthToken;
+    }
+
+    if (originalGetExtensionPath) {
+      (csExtensionState as any).getExtensionPath = originalGetExtensionPath;
     }
 
     if (fs.existsSync(testDir)) {

@@ -17,6 +17,9 @@ out/test/**
 cs-*
 *.zip
 
+## Include the agent binary
+!bin/
+
 ## Misc dotfiles
 .mocharc.json
 Makefile

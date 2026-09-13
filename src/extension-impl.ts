@@ -44,6 +44,7 @@ import { SimpleExecutor } from './simple-executor';
 import { getHomeViewInstance } from './code-health-monitor/home/home-view';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
 import { ACE_ENABLED } from './build-flags';
+import { testConnectivity } from './refactoring/connectivity';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 
@@ -120,12 +121,6 @@ const onCodesceneConfigChange = debounce(async (uri: vscode.Uri) => {
 function handleWindowStateChange(state: vscode.WindowState): void {
   const previousState = isWindowFocused;
   isWindowFocused = state.focused;
-
-  if (state.focused && !previousState) {
-    logOutputChannel.debug('VSCode window gained focus');
-  } else if (!state.focused && previousState) {
-    logOutputChannel.debug('VSCode window lost focus');
-  }
 }
 
 async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
@@ -337,6 +332,36 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
   registerCHRulesCommands(context);
+  registerTestConnectivityCommand(context);
+}
+
+function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
+  const cmd = vscode.commands.registerCommand('codescene.testConnectivity', async () => {
+    const abortController = new AbortController();
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Testing provider connectivity...',
+        cancellable: true,
+      },
+      async (progress, cancelToken) => {
+        void progress;
+        cancelToken.onCancellationRequested(() => {
+          abortController.abort();
+        });
+
+        const result = await testConnectivity({ signal: abortController.signal });
+        if (result.success) {
+          void vscode.window.showInformationMessage('Provider connectivity test successful.');
+        } else if (!result.error?.includes('cancelled')) {
+          void vscode.window.showErrorMessage(`Provider connectivity test failed: ${result.error}`);
+        }
+      }
+    );
+  });
+  DISPOSABLES.push(cmd);
+  context.subscriptions.push(cmd);
 }
 
 function registerOpenCsSettingsCommand(context: vscode.ExtensionContext) {

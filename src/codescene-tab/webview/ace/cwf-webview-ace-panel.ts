@@ -25,6 +25,7 @@ export interface CwfAceTabParams {
   request: RefactoringRequest;
   cwfProps?: AceContextViewProps;
   isStale?: boolean;
+  progressMessage?: string;
 }
 
 export class CodeSceneCWFAceTabPanel implements Disposable {
@@ -53,7 +54,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceTabPanel.viewType,
-      'CodeScene ACE',
+      'CodeScene Agent',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -97,7 +98,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleAceMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'An error occurred in the CodeScene ACE panel', e });
+      reportError({ context: 'An error occurred in the CodeScene Agent panel', e });
     }
   }
 
@@ -230,6 +231,13 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
   private async updateWebView(request: RefactoringRequest) {
     const isStale = this.state?.isStale ?? false;
+
+    request.onProgress = (message: string) => {
+      if (this.state?.request === request) {
+        this.state.progressMessage = message;
+        void this.renderAce(request, getAceData({ request, isStale, loading: true, progressMessage: message }));
+      }
+    };
 
     await this.renderAce(request, getAceData({ request, isStale, loading: true }));
 

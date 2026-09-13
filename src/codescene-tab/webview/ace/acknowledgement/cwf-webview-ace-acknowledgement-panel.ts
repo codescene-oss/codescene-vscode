@@ -8,6 +8,7 @@ import { highlightCode } from '../../../../refactoring/utils';
 import Telemetry from '../../../../telemetry';
 import { showDocAtPosition } from '../../../../utils';
 import { commonResourceRoots } from '../../../../webview-utils';
+import { handleOpenSettings } from '../../../../code-health-monitor/home/cwf-message-handlers';
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { getAceAcknowledgeData } from './ace-acknowledgement-mapper';
 
@@ -35,7 +36,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
   constructor() {
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceAcknowledgementTabPanel.viewType,
-      'CodeScene ACE - AI-Powered Refactoring',
+      'CodeScene Refactoring Agent - AI-Powered Refactoring',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -61,7 +62,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'An error occurred in the CodeScene ACE Acknowledgement panel', e });
+      reportError({ context: 'An error occurred in the CodeScene Agent Acknowledgement panel', e });
     }
   }
 
@@ -72,6 +73,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
         await showDocAtPosition(request.document, request.fnToRefactor.vscodeRange.start);
         void highlightCode(request, false);
       },
+      'open-settings': handleOpenSettings,
       acknowledged: async () => {
         const document = this.state?.request.document;
         const fnToRefactor = this.state?.request.fnToRefactor;

@@ -227,3 +227,8 @@ function featureState(feature: CsFeature) {
   if (isDefined(feature.error)) return 'error';
   return feature.state;
 }
+
+export function getExtensionPath(): string | undefined {
+  if (!CsExtensionState.hasInstance) return undefined;
+  return CsExtensionState.extensionUri.fsPath;
+}

@@ -71,3 +71,40 @@ export function toggleReviewCodeLenses() {
 export function getAuthToken() {
   return getConfiguration<string>('authToken', '');
 }
+
+const DEFAULT_AGENT_MODEL = 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6';
+
+function inferModelFromProviderOptions(): string | undefined {
+  const opts = getProviderOptions();
+  if (opts['openai:api-key']) {
+    return 'openai/gpt-4o';
+  }
+  if (opts['anthropic:api-key']) {
+    return 'anthropic/claude-sonnet-4-0';
+  }
+  return undefined;
+}
+
+export function getAgentModel(): string {
+  const override = getConfiguration<string>('agentModelOverride', '')?.trim();
+  if (override) {
+    return override;
+  }
+
+  const configured = getConfiguration<string>('agentModel', '');
+  const inferred = inferModelFromProviderOptions();
+
+  if (configured && configured !== DEFAULT_AGENT_MODEL) {
+    return configured;
+  }
+
+  if (inferred) {
+    return inferred;
+  }
+
+  return configured || DEFAULT_AGENT_MODEL;
+}
+
+export function getProviderOptions(): Record<string, string> {
+  return getConfiguration<Record<string, string>>('providerOptions') ?? {};
+}

@@ -1,18 +1,46 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs
+.PHONY: build package package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64 package-all tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs updatecwf
 
 .DEFAULT_GOAL := build
 
-build:
+build: updatecwf
 	npm run build
 
 package: lint pretest
 	npm i
-	npm run updatecwf
+	$(MAKE) updatecwf
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
 	npx @vscode/vsce@3.7.1 package; \
 	git checkout .vscodeignore; \
+
+package-darwin-arm64: lint pretest
+	npm i
+	cd ~/cs-agent/agent && $(MAKE) build-all
+	mkdir -p ./bin
+	cp ~/cs-agent/agent/target/aarch64-apple-darwin/release/cs-agent ./bin/cs-agent
+	node ./scripts/package-platform.js darwin arm64
+
+package-darwin-x64: lint pretest
+	npm i
+	cd ~/cs-agent/agent && $(MAKE) build-all
+	mkdir -p ./bin
+	cp ~/cs-agent/agent/target/x86_64-apple-darwin/release/cs-agent ./bin/cs-agent
+	node ./scripts/package-platform.js darwin x64
+
+package-linux-arm64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux arm64
+
+package-linux-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux x64
+
+package-win32-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js win32 x64
+
+package-all: package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64
 
 tsc:
 	npx tsc --noEmit
@@ -50,6 +78,18 @@ test1: pretest
 
 updatedocs:
 	npm run updatedocs
+
+updatecwf:
+	@if [ -d "../cs-webview" ] && [ -z "$${CI}" ]; then \
+		echo "Building CWF locally from ../cs-webview..."; \
+		(cd ../cs-webview && npm run build); \
+		rm -rf ./cs-cwf; \
+		cp -r ../cs-webview/build ./cs-cwf; \
+		echo "CWF built and copied to ./cs-cwf"; \
+	else \
+		echo "Downloading CWF from GitHub releases..."; \
+		npm run updatecwf; \
+	fi
 
 clean:
 	npm run clean

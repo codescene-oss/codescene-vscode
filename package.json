@@ -79,6 +79,10 @@
       {
         "command": "codescene.copyDeviceId",
         "title": "CodeScene: copy Device ID"
+      },
+      {
+        "command": "codescene.testConnectivity",
+        "title": "CodeScene: test provider connectivity"
       }
     ],
     "viewsContainers": {
@@ -142,13 +146,88 @@
         "codescene.enableAutoRefactor": {
           "type": "boolean",
           "default": true,
-          "description": "Enable CodeScene ACE",
+          "description": "Enable CodeScene Refactoring Agent",
           "order": 15
+        },
+        "codescene.agentModel": {
+          "type": "string",
+          "default": "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
+          "enum": [
+            "amazon-bedrock/eu.anthropic.claude-sonnet-4-6",
+            "amazon-bedrock/eu.anthropic.claude-opus-5",
+            "amazon-bedrock/eu.anthropic.claude-opus-4-8",
+            "amazon-bedrock/eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "amazon-bedrock/eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "amazon-bedrock/us.anthropic.claude-opus-5",
+            "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+            "anthropic/claude-sonnet-4-0",
+            "anthropic/claude-opus-4",
+            "anthropic/claude-haiku-3-5-sonnet",
+            "openai/gpt-4o",
+            "openai/gpt-4-turbo",
+            "openai/o3",
+            "google/gemini-2.5-pro",
+            "google/gemini-2.5-flash"
+          ],
+          "enumDescriptions": [
+            "Claude Sonnet 4.6 via Amazon Bedrock (EU)",
+            "Claude Opus 5 via Amazon Bedrock (EU) - Most advanced",
+            "Claude Opus 4.8 via Amazon Bedrock (EU) - Optimized for coding",
+            "Claude Sonnet 4.5 via Amazon Bedrock (EU) - Optimized for agents",
+            "Claude Haiku 4.5 via Amazon Bedrock (EU) - Fast and lightweight",
+            "Claude Opus 5 via Amazon Bedrock (US) - Most advanced",
+            "Claude Sonnet 4.6 via Amazon Bedrock (US)",
+            "Claude Sonnet 4.0 via Anthropic API",
+            "Claude Opus 4 via Anthropic API",
+            "Claude Haiku 3.5 via Anthropic API - Fast and lightweight",
+            "GPT-4o via OpenAI API",
+            "GPT-4 Turbo via OpenAI API",
+            "o3 via OpenAI API - Advanced reasoning",
+            "Gemini 2.5 Pro via Google API",
+            "Gemini 2.5 Flash via Google API - Fast and efficient"
+          ],
+          "description": "Model to use for the Refactoring Agent.",
+          "order": 16
+        },
+        "codescene.agentModelOverride": {
+          "type": "string",
+          "default": "",
+          "description": "Custom model identifier. If set, overrides the dropdown selection above.",
+          "order": 17
+        },
+        "codescene.providerOptions": {
+          "type": "object",
+          "properties": {
+            "amazon-bedrock:profile": {
+              "type": "string",
+              "description": "AWS profile name for Amazon Bedrock"
+            },
+            "amazon-bedrock:region": {
+              "type": "string",
+              "description": "AWS region for Amazon Bedrock"
+            },
+            "anthropic:api-key": {
+              "type": "string",
+              "description": "API key for Anthropic"
+            },
+            "openai:api-key": {
+              "type": "string",
+              "description": "API key for OpenAI"
+            },
+            "google:api-key": {
+              "type": "string",
+              "description": "API key for Google (Gemini)"
+            }
+          },
+          "additionalProperties": false,
+          "default": {},
+          "markdownDescription": "Provider-specific options for the Refactoring Agent. Use this to authenticate into your preferred model.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
+          "order": 18
         },
         "codescene.authToken": {
           "type": "string",
           "default": "",
-          "description": "Authentication token for CodeScene ACE. Has priority over the Sign In with CodeScene command.",
+          "description": "Authentication token for CodeScene Refactoring Agent.",
           "order": 19.5
         },
         "codescene.enableTelemetry": {

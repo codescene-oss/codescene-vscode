@@ -1,5 +1,6 @@
 import Module from 'module';
 import * as fs from 'fs';
+import * as path from 'path';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
@@ -498,4 +499,19 @@ const originalRequire = Module.prototype.require;
     return { ...vscodeStub, default: vscodeStub };
   }
   return originalRequire.apply(this, arguments as any);
+};
+
+const testDirsToCleanup = [
+  path.join(__dirname, '../../test-git-repo'),
+  path.join(__dirname, '../../test-git-repo-integration'),
+];
+
+export const mochaHooks = {
+  afterAll() {
+    for (const dir of testDirsToCleanup) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  },
 };
