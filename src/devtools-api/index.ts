@@ -180,13 +180,13 @@ export class DevtoolsAPI {
     }
     Reviewer.instance.reviewCache.get(document, 'any')?.setDelta(normalized);
     DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: normalized, updateMonitor });
-    if (normalized) void DevtoolsAPI.enrichServerDelta(document, normalized);
+    if (normalized) void DevtoolsAPI.enrichServerDelta(document, normalized, updateMonitor);
   }
 
-  private static async enrichServerDelta(document: TextDocument, result: Delta): Promise<void> {
+  private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
     try {
       await addRefactorableFunctionsToDeltaResult(document, result);
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor: true });
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor });
     } catch (error) {
       logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);
     }

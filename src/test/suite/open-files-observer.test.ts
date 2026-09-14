@@ -5,6 +5,7 @@ import { TestTextDocument } from '../mocks/test-text-document';
 import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-event';
 import { MockEditor } from '../mocks/mock-editor';
 import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow } from '../setup';
+import { ReviewOpts } from '../../review/reviewer';
 
 suite('OpenFilesObserver Test Suite', () => {
   let observer: OpenFilesObserver;
@@ -111,6 +112,42 @@ suite('OpenFilesObserver Test Suite', () => {
     });
   });
 
+  suite('monitor updates', () => {
+    const filePath = '/test/monitor.ts';
+    let capturedOpts: ReviewOpts[];
+
+    setup(() => {
+      capturedOpts = [];
+      (observer as any).filteringReviewer = {
+        reviewDiagnostics: (document: any, reviewOpts: ReviewOpts) => {
+          capturedOpts.push(reviewOpts);
+          return Promise.resolve();
+        },
+        dispose: () => {},
+      };
+    });
+
+    test('leaves the monitor to the CLI watch when a file becomes visible', () => {
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript');
+
+      (observer as any).trackAndReviewDocument(document, 'startup');
+
+      assert.deepStrictEqual(capturedOpts.map(({ skipMonitorUpdate }) => skipMonitorUpdate), [true]);
+    });
+
+    test('updates the monitor when an unsaved edit is reviewed', async function () {
+      this.timeout(5000);
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      setMockVisibleTextEditors([new MockEditor(document)]);
+      (observer as any).visibleDocuments.add(filePath);
+
+      (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
+
+      await waitForReview(() => capturedOpts.length === 1);
+      assert.strictEqual(capturedOpts[0].skipMonitorUpdate, false);
+    });
+  });
+
   suite('scheme filtering', () => {
     const testCases = [
       {
@@ -160,3 +197,11 @@ suite('OpenFilesObserver Test Suite', () => {
     });
   });
 });
+
+async function waitForReview(predicate: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('timed out waiting for a review request');
+}

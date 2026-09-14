@@ -11,7 +11,10 @@ export function getOpenFilesObserverInstance(): OpenFilesObserver | undefined {
 }
 
 /**
- * Observes open file events, and triggers reviews accordingly (only meant for Problems, not for the Code Health Monitor).
+ * Observes open file events, and triggers reviews accordingly. Reviews of a file as it is on disk
+ * only feed Problems, since the CLI watch already reports those to the Code Health Monitor. An
+ * unsaved edit is invisible to the CLI, so a review triggered by one owns the monitor entry for
+ * that file until it is saved.
  */
 export class OpenFilesObserver {
   private reviewTimers = new Map<string, NodeJS.Timeout>();
@@ -33,12 +36,12 @@ export class OpenFilesObserver {
     openFilesObserverInstance = this;
   }
 
-  private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {
+  private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdate = true): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
       return false;
     }
     logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason})`);
-    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
+    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate, updateDiagnosticsPane: true });
     return true;
   }
 
