@@ -5,8 +5,114 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release
+  cancel-in-progress: false
+  queue: max
+
 jobs:
+  metadata:
+    name: 'Resolve Release Metadata'
+    runs-on: 'ubuntu-latest'
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      is_test: ${{ steps.release.outputs.is_test }}
+      notes_start_tag: ${{ steps.release.outputs.notes_start_tag }}
+      stable_tag: ${{ steps.release.outputs.stable_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and resolve release notes range
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          releases_file="${RUNNER_TEMP}/published-releases.tsv"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false) | [.tag_name, .prerelease] | @tsv' \
+            > "$releases_file"
+
+          find_previous_stable() {
+            while IFS=$'\t' read -r candidate prerelease; do
+              if [[ "$prerelease" == "false" &&
+                    "$candidate" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ &&
+                    "$candidate" != "$TAG" ]] &&
+                 git merge-base --is-ancestor "${candidate}^{commit}" HEAD; then
+                echo "$candidate"
+                return
+              fi
+            done < "$releases_file"
+          }
+
+          find_previous_test() {
+            local base_version="$1"
+            while IFS=$'\t' read -r candidate prerelease; do
+              if [[ "$prerelease" == "true" &&
+                    "$candidate" =~ ^v${base_version}-test\.[0-9a-f]{7,40}$ &&
+                    "$candidate" != "$TAG" ]] &&
+                 git merge-base --is-ancestor "${candidate}^{commit}" HEAD; then
+                echo "$candidate"
+                return
+              fi
+            done < "$releases_file"
+          }
+
+          current_version=$(jq -r '.version' package.json)
+          version="${TAG#v}"
+          is_test=false
+          notes_start_tag=
+          stable_tag=
+
+          if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-test\.([0-9a-f]{7,40})$ ]]; then
+            is_test=true
+            base_version="${BASH_REMATCH[1]}"
+            tag_sha="${BASH_REMATCH[2]}"
+            actual_sha=$(git rev-parse --short="${#tag_sha}" HEAD)
+            if [[ "$tag_sha" != "$actual_sha" ]]; then
+              echo "Test tag SHA $tag_sha does not match tagged commit $actual_sha." >&2
+              exit 1
+            fi
+            node - "$current_version" "$base_version" <<'NODE'
+          const { isNextVersion } = require('./scripts/create-test-release');
+          if (!isNextVersion(process.argv[2], process.argv[3])) {
+            console.error(`Test base ${process.argv[3]} is not the next patch, minor, or major after ${process.argv[2]}.`);
+            process.exit(1);
+          }
+          NODE
+            stable_tag=$(find_previous_stable)
+            notes_start_tag=$(find_previous_test "$base_version")
+            if [[ -z "$notes_start_tag" ]]; then
+              notes_start_tag="$stable_tag"
+            fi
+          elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            if [[ "$version" != "$current_version" ]]; then
+              echo "Stable tag version $version does not match package.json version $current_version." >&2
+              exit 1
+            fi
+            notes_start_tag=$(find_previous_stable)
+          else
+            echo "Expected vX.Y.Z or vX.Y.Z-test.<commit-sha>, got $TAG." >&2
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "is_test=$is_test"
+            echo "notes_start_tag=$notes_start_tag"
+            echo "stable_tag=$stable_tag"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: metadata
     strategy:
       matrix:
         include:
@@ -69,6 +175,18 @@ jobs:
 
       - uses: './.github/actions/setup'
 
+      - name: Set test version
+        if: needs.metadata.outputs.is_test == 'true'
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          packageJson.version = process.env.VERSION;
+          fs.writeFileSync('package.json', `${JSON.stringify(packageJson, null, 2)}\n`);
+          NODE
+
       - name: Install vsce
         run: npm install --global @vscode/vsce
 
@@ -91,6 +209,18 @@ jobs:
             echo ".cs-prod-build marker not found in VSIX!"
             exit 1
           fi
+
+      - name: Verify version in VSIX
+        env:
+          EXPECTED_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          VSIX_FILE=$(ls ${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
+          ACTUAL_VERSION=$(unzip -p "$VSIX_FILE" extension/package.json | jq -r '.version')
+          if [ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Expected VSIX version $EXPECTED_VERSION, got $ACTUAL_VERSION."
+            exit 1
+          fi
+          echo "VSIX version $ACTUAL_VERSION verified."
 
       - name: Verify no-ACE settings absent from VSIX
         if: matrix.variant == 'noace'
@@ -116,7 +246,7 @@ jobs:
   release:
     name: 'Create Release'
     runs-on: 'ubuntu-latest'
-    needs: build
+    needs: [metadata, build]
 
     steps:
       - name: Checkout
@@ -130,5 +260,21 @@ jobs:
       - name: GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_TEST: ${{ needs.metadata.outputs.is_test }}
+          NOTES_START_TAG: ${{ needs.metadata.outputs.notes_start_tag }}
+          STABLE_TAG: ${{ needs.metadata.outputs.stable_tag }}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release create ${{ github.ref_name }} ./artifacts/**/*.vsix --generate-notes --verify-tag
+          set -euo pipefail
+
+          release_args=("$TAG" ./artifacts/**/*.vsix --title "$TAG" --generate-notes --verify-tag)
+          if [[ -n "$NOTES_START_TAG" ]]; then
+            release_args+=(--notes-start-tag "$NOTES_START_TAG")
+          fi
+          if [[ "$IS_TEST" == "true" ]]; then
+            release_args+=(--prerelease --latest=false)
+            if [[ -n "$STABLE_TAG" ]]; then
+              release_args+=(--notes "Full comparison since [$STABLE_TAG](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${STABLE_TAG}...${TAG})")
+            fi
+          fi
+          gh release create "${release_args[@]}"
