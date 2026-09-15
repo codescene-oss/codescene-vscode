@@ -33,10 +33,9 @@ export class DevtoolsAPI {
   private static pipeline: ReviewPipeline;
   private static lastNetworkError = false;
 
-  static init(binaryPath: string, context: ExtensionContext, unused?: unknown, ideServer?: CsIdeServerClient) {
+  static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
     DevtoolsAPI.pipeline?.dispose();
     DevtoolsAPI.ideServer?.dispose();
-    void unused;
     DevtoolsAPI.reviewCache = new ReviewCache(context);
     DevtoolsAPI.ideServer = ideServer ?? new CsIdeServerClient(binaryPath);
     DevtoolsAPI.pipeline = new ReviewPipeline(DevtoolsAPI.ideServer, DevtoolsAPI.pipelinePresentation(), uuid);
@@ -94,12 +93,6 @@ export class DevtoolsAPI {
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
-  public static get isAnalysisRunning(): boolean {
-    return DevtoolsAPI.analysesRunning > 0;
-  }
-  public static setAnalysesRunningForTesting(count: number): void {
-    DevtoolsAPI.analysesRunning = count;
-  }
   public static jobs = new Set<string>();
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
@@ -130,21 +123,9 @@ export class DevtoolsAPI {
     });
   }
 
-  static reviewContent(document: vscode.TextDocument): Promise<Review | void> {
-    return DevtoolsAPI.reviewWithServer(document);
-  }
-
-  static abortReviews(document: TextDocument): void {
-    void document;
-  }
-
   private static repoRootFor(document: vscode.TextDocument): string {
     const repo = acquireGitApi()?.getRepository(document.uri);
     return repo ? getRepoRootPath(repo) : getWorkspaceCwd();
-  }
-
-  static usesIdeServer(): boolean {
-    return true;
   }
 
   private static pipelinePresentation(): ReviewPipelinePresentation {

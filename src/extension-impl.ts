@@ -120,7 +120,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   ensureCompatibleIdeServer(context.extensionPath).then(
     async (ideServer) => {
-      DevtoolsAPI.init(ideServer.binaryPath, context, undefined, ideServer);
+      DevtoolsAPI.init(ideServer.binaryPath, context, ideServer);
       await Telemetry.init(context);
 
       try {

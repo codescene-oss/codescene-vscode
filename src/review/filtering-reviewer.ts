@@ -39,10 +39,6 @@ export class FilteringReviewer {
     CsDiagnostics.review(document, reviewOpts);
   }
 
-  abort(document: vscode.TextDocument): void {
-    DevtoolsAPI.abortReviews(document);
-  }
-
   dispose() {
     this.gitIgnoreChecker.dispose();
   }

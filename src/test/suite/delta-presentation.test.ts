@@ -58,7 +58,7 @@ suite('Delta presentation Test Suite', () => {
   setup(() => {
     const context = createMockExtensionContext(__dirname);
     server = new FakeIdeServer();
-    DevtoolsAPI.init(process.execPath, context, undefined, server as any);
+    DevtoolsAPI.init(process.execPath, context, server as any);
     Reviewer.init(context, () => new Map());
     events = [];
     listener = DevtoolsAPI.onDidDeltaAnalysisComplete((event) => events.push(event));

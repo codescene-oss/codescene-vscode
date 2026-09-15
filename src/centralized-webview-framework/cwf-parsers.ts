@@ -16,20 +16,6 @@ export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDelta
   };
 }
 
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/**
- * Convert docsType format to something the old docsPanel can understand
- * "docs_issues_complex_method" => "Complex Method"
- * @param docType
- * @returns
- */
-export function convertCWFDocTypeToVSCode(docType: string) {
-  return capitalize(docType.replace('docs_', '').replace('issues_', '').replace(/_/g, ' '));
-}
-
 /**
  * Searches the native fileIssueMap for file and function to be able to get native objects needed (document + Position)
  * @param fileIssueMap

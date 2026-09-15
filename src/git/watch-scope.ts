@@ -2,7 +2,7 @@ import { isPathUnderRoot, normalizeFsPath, relativePosix } from '../utils/fs-pat
 
 export type WatchScope = { kind: 'whole-repo' } | { kind: 'paths'; relativePaths: string[] };
 
-export interface WatchScopeFolder {
+interface WatchScopeFolder {
   uri: { fsPath: string };
 }
 

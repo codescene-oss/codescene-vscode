@@ -4,12 +4,6 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
 import { logOutputChannel } from '../log';
 
-let openFilesObserverInstance: OpenFilesObserver | undefined;
-
-export function getOpenFilesObserverInstance(): OpenFilesObserver | undefined {
-  return openFilesObserverInstance;
-}
-
 /**
  * Observes open file events, and triggers reviews accordingly. Reviews of a file as it is on disk
  * only feed Problems, since the CLI watch already reports those to the Code Health Monitor. An
@@ -33,7 +27,6 @@ export class OpenFilesObserver {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.docSelector = reviewDocumentSelector();
-    openFilesObserverInstance = this;
   }
 
   private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdate = true): boolean {

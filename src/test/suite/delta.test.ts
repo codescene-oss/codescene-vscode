@@ -39,7 +39,7 @@ suite('Delta Integration Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
 
     analysisError = undefined;
 
@@ -65,7 +65,7 @@ suite('Delta Integration Test Suite', () => {
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
     const doc = createTestFile('test7.cpp', complexContent);
 
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const review = await DevtoolsAPI.reviewWithServer(doc);
     assertNoAnalysisError();
     assert.ok(review, 'Review should be defined');
 

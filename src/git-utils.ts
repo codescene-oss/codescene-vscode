@@ -11,12 +11,6 @@ const gitFileDeleteEvent = new vscode.EventEmitter<string>();
 export const onFileDeletedFromGit = gitFileDeleteEvent.event;
 export const fireFileDeletedFromGit = (filePath: string) => gitFileDeleteEvent.fire(filePath);
 
-export function isSafeRefName(ref: string): boolean {
-  if (!ref || !ref.trim()) return false;
-  if (ref.startsWith('-')) return false;
-  return /^[A-Za-z0-9._/\-]+$/.test(ref);
-}
-
 export function acquireGitApi() {
   try {
     const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports as GitExtension;

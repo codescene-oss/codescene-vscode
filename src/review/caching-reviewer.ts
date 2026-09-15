@@ -10,7 +10,6 @@ import { ReviewOpts } from './reviewer';
 export class CachingReviewer implements Disposable {
   private reviewer = new FilteringReviewer();
 
-  private disposables: vscode.Disposable[] = [];
   readonly reviewCache: ReviewCache;
 
   constructor(
@@ -31,12 +30,9 @@ export class CachingReviewer implements Disposable {
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts): CsReview {
     const {skipMonitorUpdate} = reviewOpts;
-    if (!reviewOpts.skipCache) {
-      // If we have a cached CsReview for this document/version combination, return it.
-      const reviewCacheItem = this.reviewCache.getExactVersion(document, skipMonitorUpdate);
-      if (reviewCacheItem) {
-        return reviewCacheItem.review;
-      }
+    const reviewCacheItem = this.reviewCache.getExactVersion(document, skipMonitorUpdate);
+    if (reviewCacheItem) {
+      return reviewCacheItem.review;
     }
 
     const reviewPromise = this.reviewer
@@ -70,17 +66,7 @@ export class CachingReviewer implements Disposable {
     }
   }
 
-  abort(document: vscode.TextDocument): void {
-    this.reviewCache.delete(document.uri.fsPath);
-    this.reviewer.abort(document);
-  }
-
-  clearCache() {
-    this.reviewCache.clear();
-  }
-
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
     this.reviewer.dispose();
   }
 }

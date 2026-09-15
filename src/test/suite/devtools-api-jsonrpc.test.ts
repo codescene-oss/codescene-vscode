@@ -10,7 +10,7 @@ suite('DevtoolsAPI JSON-RPC Test Suite', () => {
 
   setup(() => {
     client = new CsIdeServerClient(process.execPath, [fixture]);
-    DevtoolsAPI.init(process.execPath, createMockExtensionContext(__dirname), async () => false, client);
+    DevtoolsAPI.init(process.execPath, createMockExtensionContext(__dirname), client);
   });
 
   teardown(() => client.dispose());
