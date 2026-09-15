@@ -63,4 +63,4 @@ jobs:
         CS_TOKEN:  ${{ secrets.CODESCENE_CODE_COVERAGE_API_TOKEN }}
         CS_PROJECT_ID:  36131
       run: |
-        curl --fail -X POST -H "Authorization: Bearer $CS_TOKEN" https://api.codescene.io/v2/projects/${CS_PROJECT_ID}/run-analysis
+        curl --fail -X POST -H "Authorization: Bearer $CS_TOKEN" "https://api.codescene.io/v2/projects/${CS_PROJECT_ID}/run-analysis"

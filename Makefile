@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs benchmark
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark
 
 .DEFAULT_GOAL := build
 
@@ -51,6 +51,9 @@ benchmark: pretest
 test1: pretest
 	@test -n "$(TEST)" || (echo "TEST parameter is required. Usage: make test1 TEST='test name'" && exit 1)
 	npm run test -- --grep '$(TEST)'
+
+test-release:
+	npm run release:test -- $(if $(BUMP),$(BUMP),patch)
 
 updatedocs:
 	npm run updatedocs

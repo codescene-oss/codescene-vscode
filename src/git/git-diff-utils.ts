@@ -91,7 +91,20 @@ export async function getCommittedChanges(gitRootPath: string, baseCommit: strin
   }
 
   const result = await gitExecutor.execute(
-    { command: 'git', args: ['diff', '--name-only', `${baseCommit}...HEAD`], ignoreError: true, taskId: 'git' },
+    {
+      command: 'git',
+      args: [
+        'log',
+        '--first-parent',
+        '--diff-merges=off',
+        '--name-only',
+        '--pretty=format:',
+        '--diff-filter=ACMR',
+        `${baseCommit}..HEAD`,
+      ],
+      ignoreError: true,
+      taskId: 'git',
+    },
     { cwd: gitRootPath, env: GIT_ENV_NO_OPTIONAL_LOCKS }
   );
 
