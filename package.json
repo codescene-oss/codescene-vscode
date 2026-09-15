@@ -73,10 +73,6 @@
         "title": "CodeScene: show output logs"
       },
       {
-        "command": "codescene.printDevtoolsApiStats",
-        "title": "CodeScene: print Devtools API stats"
-      },
-      {
         "command": "codescene.copyDeviceId",
         "title": "CodeScene: copy Device ID"
       }
@@ -114,20 +110,7 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "codescene.codeHealthMonitorView",
-        "contents": "The Code Health Monitor view compares the current state of your code and presents any introduced code smells."
-      }
-    ],
     "menus": {
-      "view/title": [
-        {
-          "command": "codescene.codeHealthMonitorHelp",
-          "when": "view === codescene.codeHealthMonitorView",
-          "group": "navigation@2"
-        }
-      ],
       "commandPalette": []
     },
     "configuration": {
@@ -209,6 +192,7 @@
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
     "@terascope/fetch-github-release": "^1.0.0",
+    "@types/follow-redirects": "^1.14.1",
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
@@ -221,6 +205,8 @@
     "esbuild": "^0.25.1",
     "esbuild-plugin-copy": "^2.1.1",
     "eslint": "^8.33.0",
+    "extract-zip": "^2.0.1",
+    "follow-redirects": "^1.15.6",
     "glob": "^8.0.3",
     "mocha": "^10.8.2",
     "pidusage": "^4.0.1",
@@ -228,15 +214,12 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@types/follow-redirects": "^1.14.1",
     "@types/lodash.debounce": "^4.0.7",
     "@types/lodash.throttle": "^4.1.9",
     "@types/vscode-webview": "^1.57.5",
     "@vscode-elements/elements": "^1.8.0",
     "@vscode/codicons": "^0.0.44",
     "axios": "^1.12.0",
-    "extract-zip": "^2.0.1",
-    "follow-redirects": "^1.15.6",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
     "uuid": "^9.0.0",
