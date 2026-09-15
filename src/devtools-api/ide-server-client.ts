@@ -23,6 +23,14 @@ import {
 
 const STARTUP_TIMEOUT_MS = 30000;
 
+export function distributionServerCommand(
+  distributionPath: string,
+  serverArgs: string[] = ['server']
+): { path: string; args: string[] } {
+  const exe = path.join(distributionPath, process.platform === 'win32' ? 'cs-ide.exe' : 'cs-ide');
+  return { path: exe, args: serverArgs };
+}
+
 export interface ServerMetadata {
   sha: string;
   version: string;
@@ -148,9 +156,7 @@ export class CsIdeServerClient implements vscode.Disposable {
 
   private get command(): { path: string; args: string[] } {
     if (this.args) return { path: this.binaryPath, args: this.args };
-    const java = path.join(this.binaryPath, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
-    const jar = path.join(this.binaryPath, 'cs-ide.jar');
-    return { path: java, args: ['--enable-native-access=ALL-UNNAMED', '-jar', jar, ...this.serverArgs] };
+    return distributionServerCommand(this.binaryPath, this.serverArgs);
   }
 
   start(): Promise<ServerMetadata> {

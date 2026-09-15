@@ -12,7 +12,7 @@ const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const extractZip = require('extract-zip');
-const { artifacts } = require('./cli-config.js');
+const { artifacts, nativeBinaryFileName } = require('./cli-config.js');
 
 const execFileAsync = promisify(execFile);
 
@@ -62,19 +62,25 @@ function downloadBinary(artifactName) {
   });
 }
 
-async function extractedDistributionPath(tempExtractDir) {
-  if (fs.existsSync(path.join(tempExtractDir, 'cs-ide.jar'))) return tempExtractDir;
-  const entries = await fs.promises.readdir(tempExtractDir, { withFileTypes: true });
+function locateNativeBinary(extractDir, platform) {
+  const fileName = nativeBinaryFileName(platform);
+  const atRoot = path.join(extractDir, fileName);
+  if (fs.existsSync(atRoot)) return atRoot;
+
+  const entries = fs.readdirSync(extractDir, { withFileTypes: true });
   const directories = entries.filter((entry) => entry.isDirectory());
-  if (directories.length !== 1) return tempExtractDir;
-  return path.join(tempExtractDir, directories[0].name);
+  if (directories.length === 1) {
+    const nested = path.join(extractDir, directories[0].name, fileName);
+    if (fs.existsSync(nested)) return nested;
+  }
+
+  throw new Error(`Expected native ${fileName} not found after extraction: ${extractDir}`);
 }
 
 function validateDistribution(distributionPath, platform) {
-  const java = path.join(distributionPath, 'jre', 'bin', platform === 'win32' ? 'java.exe' : 'java');
-  const jar = path.join(distributionPath, 'cs-ide.jar');
-  if (!fs.existsSync(java) || !fs.existsSync(jar)) {
-    throw new Error(`Expected cs-ide distribution not found after extraction: ${distributionPath}`);
+  const exe = path.join(distributionPath, nativeBinaryFileName(platform));
+  if (!fs.existsSync(exe)) {
+    throw new Error(`Expected native ${nativeBinaryFileName(platform)} not found: ${distributionPath}`);
   }
 }
 
@@ -86,15 +92,28 @@ function useLocalDistribution(platform, arch) {
   return true;
 }
 
-async function installDistribution(distributionFromZip, targetDistribution, platform) {
-  validateDistribution(distributionFromZip, platform);
+async function installNativeDistribution(extractDir, targetDistribution, platform) {
+  const binaryPath = locateNativeBinary(extractDir, platform);
+  const staging = `${targetDistribution}.new`;
   const backupDistribution = `${targetDistribution}.old`;
+  const fileName = nativeBinaryFileName(platform);
+  await removePath(staging);
+  await fs.promises.mkdir(staging, { recursive: true });
+  await fs.promises.copyFile(binaryPath, path.join(staging, fileName));
+  const runtimeDll = path.join(path.dirname(binaryPath), 'vcruntime140.dll');
+  if (fs.existsSync(runtimeDll)) {
+    await fs.promises.copyFile(runtimeDll, path.join(staging, 'vcruntime140.dll'));
+  }
+  if (platform !== 'win32') {
+    await fs.promises.chmod(path.join(staging, fileName), '755');
+  }
+
   await removePath(backupDistribution);
   if (fs.existsSync(targetDistribution)) {
     await fs.promises.rename(targetDistribution, backupDistribution);
   }
   try {
-    await fs.promises.rename(distributionFromZip, targetDistribution);
+    await fs.promises.rename(staging, targetDistribution);
   } catch (error) {
     if (fs.existsSync(backupDistribution) && !fs.existsSync(targetDistribution)) {
       await fs.promises.rename(backupDistribution, targetDistribution);
@@ -102,9 +121,6 @@ async function installDistribution(distributionFromZip, targetDistribution, plat
     throw error;
   }
   await removePath(backupDistribution);
-  if (platform !== 'win32') {
-    await fs.promises.chmod(path.join(targetDistribution, 'jre', 'bin', 'java'), '755');
-  }
   console.log(`✓ Extracted to ${path.basename(targetDistribution)}`);
 }
 
@@ -136,9 +152,8 @@ async function extractDistribution(zipPath, platform, arch) {
     await fs.promises.mkdir(tempExtractDir, { recursive: true });
     await extractZipArchive(zipPath, tempExtractDir);
 
-    const distributionFromZip = await extractedDistributionPath(tempExtractDir);
     const targetDistribution = path.join(projectRoot, getDistributionName(platform, arch));
-    await installDistribution(distributionFromZip, targetDistribution, platform);
+    await installNativeDistribution(tempExtractDir, targetDistribution, platform);
   } finally {
     await removePath(tempExtractDir);
     await removePath(zipPath);
@@ -183,4 +198,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform };
+module.exports = { bundleBinaryForPlatform, locateNativeBinary };

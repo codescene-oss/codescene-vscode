@@ -29,7 +29,7 @@ This is the fastest way to test changes during development.
 
 ### 1. Bundle CLI Distribution for Your Platform
 
-The extension needs a local `cs-ide` distribution (bundled JRE + `cs-ide.jar`) for your current platform:
+The extension needs a local native `cs-ide` binary for your current platform:
 
 ```bash
 npm run bundle-cli-test
@@ -44,10 +44,8 @@ Expected layout:
 
 ```text
 cs-<platform>-<arch>/
-  cs-ide.jar
-  jre/
-    bin/
-      java          # java.exe on Windows
+  cs-ide          # cs-ide.exe on Windows
+  vcruntime140.dll  # Windows only, if present in the published zip
 ```
 
 **Note:** You only need to run this once, or when switching platforms / CLI versions.
@@ -61,7 +59,7 @@ Use this when you have built `cs-ide` yourself (for example from the `cli-server
    - Windows x64: `cs-win32-x64/`
    - Linux x64: `cs-linux-x64/`
 
-   It must contain `cs-ide.jar` and `jre/bin/java` (or `java.exe`).
+   It must contain `cs-ide` (or `cs-ide.exe` on Windows).
 
 2. Skip the download when bundling / packaging:
 
@@ -83,10 +81,10 @@ Get the SHA from your distribution:
 
 ```bash
 # Windows
-cs-win32-x64\jre\bin\java.exe --enable-native-access=ALL-UNNAMED -jar cs-win32-x64\cs-ide.jar version --sha
+cs-win32-x64\cs-ide.exe version --sha
 
 # macOS / Linux
-cs-darwin-arm64/jre/bin/java --enable-native-access=ALL-UNNAMED -jar cs-darwin-arm64/cs-ide.jar version --sha
+cs-darwin-arm64/cs-ide version --sha
 ```
 
 **Important for F5:** a shell `export` / `$env:...` only affects that terminal. The Extension Development Host needs the variable in [`.vscode/launch.json`](.vscode/launch.json):
@@ -102,7 +100,7 @@ Without that, activation fails if the server's `sha` does not match the pin in `
 4. Build and press F5 as usual. The extension starts:
 
 ```text
-jre/bin/java --enable-native-access=ALL-UNNAMED -jar cs-ide.jar server --threads <N>
+cs-ide server --threads <N>
 ```
 
 For the opt-in native contract test (talks to a real distribution):
@@ -244,7 +242,7 @@ Or manually:
 
 2. **Verify Distribution Path:**
    - In the output, check it found the distribution at the correct path
-   - Path should match: `.../codescene-vscode-X.X.X/cs-<platform>-<arch>/` (directory containing `cs-ide.jar` and `jre/`)
+   - Path should match: `.../codescene-vscode-X.X.X/cs-<platform>-<arch>/` (directory containing `cs-ide` or `cs-ide.exe`)
 
 ## Common Commands
 
@@ -319,7 +317,7 @@ export CS_IDE_REQUIRED_VERSION=<sha-from-cs-ide-start>
 #### Extension Doesn't Activate
 
 **Check:**
-1. Distribution is present: `cs-<platform>-<arch>/cs-ide.jar` and `cs-<platform>-<arch>/jre/bin/java` exist
+1. Distribution is present: `cs-<platform>-<arch>/cs-ide` (or `cs-ide.exe` on Windows) exists
 2. Extension is built: `ls -lh out/main.js` should exist
 3. Check Output panel for errors
 4. Check Developer Console: Help → Toggle Developer Tools
@@ -363,8 +361,7 @@ nvm use 20
 unzip -l codescene-vscode-*-<platform>-<arch>.vsix | grep "cs-"
 
 # Should show your platform's distribution directory, e.g.:
-# extension/cs-darwin-arm64/cs-ide.jar
-# extension/cs-darwin-arm64/jre/bin/java
+# extension/cs-darwin-arm64/cs-ide
 ```
 
 ## Clean Up

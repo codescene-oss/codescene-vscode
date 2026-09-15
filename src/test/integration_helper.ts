@@ -13,8 +13,7 @@ export async function ensureBinary(): Promise<string> {
   const artifact = new ArtifactInfo(extensionPath);
   const binaryPath = artifact.absoluteBinaryPath;
 
-  const distributionReady =
-    fs.existsSync(binaryPath) && fs.existsSync(artifact.absoluteJavaPath) && fs.existsSync(artifact.absoluteJarPath);
+  const distributionReady = fs.existsSync(binaryPath) && fs.existsSync(artifact.absoluteExecutablePath);
 
   if (!distributionReady) {
     console.log(`CLI distribution not found at ${binaryPath}, attempting to download...`);
@@ -30,10 +29,10 @@ export async function ensureBinary(): Promise<string> {
     }
   }
 
-  if (!fs.existsSync(artifact.absoluteJavaPath) || !fs.existsSync(artifact.absoluteJarPath)) {
+  if (!fs.existsSync(artifact.absoluteExecutablePath)) {
     throw new Error(
       `CLI distribution still incomplete after download attempt. ` +
-        `Expected java/jar under: ${binaryPath}. ` +
+        `Expected native binary at: ${artifact.absoluteExecutablePath}. ` +
         `Please ensure the distribution is available for platform: ${process.platform}-${process.arch}`
     );
   }

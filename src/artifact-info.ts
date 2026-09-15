@@ -18,12 +18,8 @@ export class ArtifactInfo {
     return path.join(this.extensionPath, this.binaryName);
   }
 
-  get absoluteJavaPath() {
-    return path.join(this.absoluteBinaryPath, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
-  }
-
-  get absoluteJarPath() {
-    return path.join(this.absoluteBinaryPath, 'cs-ide.jar');
+  get absoluteExecutablePath() {
+    return path.join(this.absoluteBinaryPath, cliConfig.nativeBinaryFileName(process.platform));
   }
 
   get artifactName() {

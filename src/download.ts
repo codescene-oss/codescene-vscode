@@ -13,7 +13,7 @@ function getBundledBinaryPath(extensionPath: string): string {
 
 function bundledDistributionExists(extensionPath: string, binaryPath: string): boolean {
   const artifact = new ArtifactInfo(extensionPath);
-  return fs.existsSync(binaryPath) && fs.existsSync(artifact.absoluteJavaPath) && fs.existsSync(artifact.absoluteJarPath);
+  return fs.existsSync(binaryPath) && fs.existsSync(artifact.absoluteExecutablePath);
 }
 
 async function verifyBinaryVersion(client: CsIdeServerClient): Promise<boolean> {
