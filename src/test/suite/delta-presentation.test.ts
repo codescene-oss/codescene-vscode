@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import vscode from 'vscode';
 import { DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { Delta } from '../../devtools-api/delta-model';
-import { DeltaResult, ReviewFailed, ReviewResult } from '../../devtools-api/ide-server-client';
+import { DeltaResult, ReviewFailed, ReviewQueue, ReviewResult } from '../../devtools-api/ide-server-client';
 import { Review } from '../../devtools-api/review-model';
 import Reviewer from '../../review/reviewer';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
@@ -13,11 +13,13 @@ class FakeIdeServer {
   readonly deltaEmitter = new vscode.EventEmitter<DeltaResult>();
   readonly failureEmitter = new vscode.EventEmitter<ReviewFailed>();
   readonly errorEmitter = new vscode.EventEmitter<Error>();
+  readonly queueEmitter = new vscode.EventEmitter<ReviewQueue>();
   readonly batches: Array<{ repoRoot: string; files: Array<{ id?: string; relPath: string; content?: string }> }> = [];
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
   readonly onDidReviewFailed = this.failureEmitter.event;
   readonly onDidError = this.errorEmitter.event;
+  readonly onDidQueue = this.queueEmitter.event;
 
   reviewFiles(repoRoot: string, files: Array<{ id?: string; relPath: string; content?: string }>): void {
     this.batches.push({ repoRoot, files });
@@ -28,6 +30,7 @@ class FakeIdeServer {
     this.deltaEmitter.dispose();
     this.failureEmitter.dispose();
     this.errorEmitter.dispose();
+    this.queueEmitter.dispose();
   }
 }
 
