@@ -8,10 +8,7 @@ export class Stats {
     const { args, command: binaryPath } = command;
     if (args.length < 1) return;
 
-    let csCommand = args[0];
-    if (args[0] === 'refactor') { // keep actual refactoring command as well (i.e. preflight/fns-to-refactor/post)
-      csCommand = args.slice(0, 2).join(' ');
-    }
+    const csCommand = args[0];
     const shortCmd = binaryPath.substring(binaryPath.lastIndexOf('/') + 1, binaryPath.length);
     const cmdKey = `${shortCmd} ${csCommand}`;
     if (!this.stats.has(cmdKey)) {

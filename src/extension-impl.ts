@@ -17,7 +17,6 @@ import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
-import { setupStatsCollector } from './stats';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
 import { CsWorkspace } from './workspace';
@@ -46,7 +45,6 @@ const codeHealthFileVersion = new Map<string, number>();
 
 let openFilesObserverInstance: OpenFilesObserver | undefined;
 let workspaceWatchInstance: WorkspaceWatch | undefined;
-let isWindowFocused: boolean = true;
 
 const onCodeHealthFileVersionChange = debounce(() => {
   DevtoolsAPI.invalidateReviewEpoch();
@@ -59,17 +57,6 @@ const onCodeHealthFileVersionChange = debounce(() => {
 const onCodesceneConfigChange = debounce(() => {
   void workspaceWatchInstance?.syncAll();
 }, 350);
-
-function handleWindowStateChange(state: vscode.WindowState): void {
-  const previousState = isWindowFocused;
-  isWindowFocused = state.focused;
-
-  if (state.focused && !previousState) {
-    logOutputChannel.debug('VSCode window gained focus');
-  } else if (!state.focused && previousState) {
-    logOutputChannel.debug('VSCode window lost focus');
-  }
-}
 
 async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
   try {
@@ -199,8 +186,6 @@ async function startExtension(context: vscode.ExtensionContext) {
 
   addReviewListeners(context);
 
-  setupStatsCollector(context);
-
   activateCHMonitor(context);
 
   setupCodeLensProviders(context);
@@ -257,12 +242,6 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   DISPOSABLES.push(openFilesObserverInstance);
   context.subscriptions.push(openFilesObserverInstance);
 
-  isWindowFocused = vscode.window.state.focused;
-
-  const windowStateListener = vscode.window.onDidChangeWindowState(handleWindowStateChange);
-  DISPOSABLES.push(windowStateListener);
-  context.subscriptions.push(windowStateListener);
-
   setupWorkspaceWatch(context);
 
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
@@ -316,13 +295,6 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
   workspaceWatchInstance.start();
 }
 
-/**
- * Activate functionality that requires signing in to a CodeScene server.
- */
-function enableRemoteFeatures(context: vscode.ExtensionContext, csContext: CsContext) {}
-
-function disableRemoteFeatures() {}
-
 async function handleSignOut(authProvider: CsAuthenticationProvider) {
   if (CsExtensionState.session?.id) {
     await authProvider.removeSession(CsExtensionState.session.id);
@@ -337,7 +309,7 @@ function registerSignInCommand(context: vscode.ExtensionContext, csContext: CsCo
     const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
     vscode.authentication
       .getSession(AUTH_TYPE, [], { createIfNone: true })
-      .then(onGetSessionSuccess(context, csContext, !!existingSession), onGetSessionError());
+      .then(onGetSessionSuccess(!!existingSession), onGetSessionError());
   });
   DISPOSABLES.push(signInCmd);
   context.subscriptions.push(signInCmd);
@@ -366,7 +338,7 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
   // sign in in the accounts menu - see AuthenticationGetSessionOptions
   vscode.authentication
     .getSession(AUTH_TYPE, [], { silent: true })
-    .then(onGetSessionSuccess(context, csContext), onGetSessionError());
+    .then(onGetSessionSuccess(), onGetSessionError());
 
   // Handle login/logout session changes
   authProvider.onDidChangeSessions((e) => {
@@ -374,11 +346,11 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       // Without the following getSession call, the login option in the accounts picker will not reappear!
       // This is probably refreshing the account picker under the hood
       void vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
-      onGetSessionSuccess(context, csContext)(undefined); // removed a session
+      onGetSessionSuccess()(undefined); // removed a session
     }
     if (e.added && e.added.length > 0) {
       // We only have one session in this extension currently, so grabbing the first one is ok.
-      onGetSessionSuccess(context, csContext)(e.added[0]);
+      onGetSessionSuccess()(e.added[0]);
     }
     CodeSceneTabPanel.refreshIfExists();
   });
@@ -408,16 +380,11 @@ export function deactivate() {
   DevtoolsAPI.dispose();
 }
 
-function onGetSessionSuccess(context: vscode.ExtensionContext, csContext: CsContext, showAlreadySignedIn = false) {
+function onGetSessionSuccess(showAlreadySignedIn = false) {
   return (session: vscode.AuthenticationSession | undefined) => {
     CsExtensionState.setSession(session);
-    if (session) {
-      if (showAlreadySignedIn) {
-        void vscode.window.showInformationMessage('Already signed in to CodeScene.');
-      }
-      enableRemoteFeatures(context, csContext);
-    } else {
-      disableRemoteFeatures();
+    if (session && showAlreadySignedIn) {
+      void vscode.window.showInformationMessage('Already signed in to CodeScene.');
     }
   };
 }
