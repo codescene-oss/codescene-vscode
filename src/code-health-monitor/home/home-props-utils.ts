@@ -1,5 +1,25 @@
-import { HomeContextViewProps, IdeContextType, LoginViewProps } from '../../centralized-webview-framework/types';
+import { HomeContextViewProps, IdeContextType, Job, LoginViewProps } from '../../centralized-webview-framework/types';
 import { devmode, featureFlags, ideType } from '../../centralized-webview-framework/cwf-html-utils';
+import { normalizeFsPath } from '../../utils/fs-paths';
+
+export function analysisJobsToCwf(running?: Iterable<string>, queued?: string[]): Job[] {
+  const runningList = running ? [...running] : [];
+  const runningKeys = new Set(runningList.map(normalizeFsPath));
+  const jobs: Job[] = runningList.map((fileName) => ({
+    file: { fileName },
+    type: 'deltaAnalysis',
+    state: 'running',
+  }));
+  for (const fileName of queued ?? []) {
+    if (runningKeys.has(normalizeFsPath(fileName))) continue;
+    jobs.push({
+      file: { fileName },
+      type: 'deltaAnalysis',
+      state: 'queued',
+    });
+  }
+  return jobs;
+}
 
 /**
  * Generate all needed props for CWF HomeView

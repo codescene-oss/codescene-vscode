@@ -2,7 +2,7 @@ import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscod
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, getLoginData } from './home-props-utils';
+import { getHomeData, getLoginData, analysisJobsToCwf } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../file-with-issues';
@@ -174,14 +174,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   // Convert VSCode jobs to CWF Jobs for rendering
   private updateJobsData(event: AnalysisEvent) {
-    const eventArray = event.jobs ? Array.from(event.jobs) : [];
-    this.ideContextData.jobs = eventArray.map(
-      (fileName): Job => ({
-        file: { fileName: fileName },
-        type: 'deltaAnalysis',
-        state: 'running',
-      })
-    );
+    this.ideContextData.jobs = analysisJobsToCwf(event.jobs, event.queued);
   }
 
   // ### VSCode state handlers ###

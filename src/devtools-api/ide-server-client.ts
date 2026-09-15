@@ -17,6 +17,7 @@ import {
   notificationRepoRoot,
   preflightResponse,
   refactorResponse,
+  queueResponse,
   reviewResponse,
   watchInventoryResponse,
 } from './rpc-response-normalizers';
@@ -77,6 +78,11 @@ export interface ReviewFailed {
   message: string;
 }
 
+export interface ReviewQueue {
+  count: number;
+  files: string[];
+}
+
 export interface ReviewParams {
   path: string;
   'file-content'?: string;
@@ -110,6 +116,7 @@ interface ResultNotification<T> {
   repoRoot?: string;
   'repo-root'?: string;
   result: T;
+  queue?: unknown;
 }
 
 interface NotificationIdentity {
@@ -136,6 +143,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private readonly errorEmitter = new vscode.EventEmitter<Error>();
   private readonly watchInventoryEmitter = new vscode.EventEmitter<WatchInventory>();
   private readonly serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
+  private readonly queueEmitter = new vscode.EventEmitter<ReviewQueue>();
 
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
@@ -143,6 +151,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   readonly onDidError = this.errorEmitter.event;
   readonly onDidWatchInventory = this.watchInventoryEmitter.event;
   readonly onDidServerStart = this.serverStartEmitter.event;
+  readonly onDidQueue = this.queueEmitter.event;
 
   constructor(
     readonly binaryPath: string,
@@ -307,6 +316,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.errorEmitter.dispose();
     this.watchInventoryEmitter.dispose();
     this.serverStartEmitter.dispose();
+    this.queueEmitter.dispose();
   }
 
   private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {
@@ -356,6 +366,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     const identity = this.notificationIdentity(notification);
     if (!identity) return;
     logOutputChannel.info(`[cs-ide] received fileReview id=${identity.id ?? '(none)'} path=${identity.path}`);
+    this.emitQueue(notification, identity.repoRoot);
     this.reviewEmitter.fire({
       ...identity,
       result: reviewResponse(notification.result),
@@ -366,6 +377,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     const identity = this.notificationIdentity(notification);
     if (!identity) return;
     logOutputChannel.info(`[cs-ide] received deltaReview id=${identity.id ?? '(none)'} path=${identity.path}`);
+    this.emitQueue(notification, identity.repoRoot);
     this.deltaEmitter.fire({
       ...identity,
       result: notification.result ? deltaResponse(notification.result) : null,
@@ -373,13 +385,23 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   private handleReviewFailure(
-    notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string }
+    notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string; queue?: unknown }
   ): void {
     const identity = this.notificationIdentity(notification);
     if (!identity) return;
+    this.emitQueue(notification, identity.repoRoot);
     this.reviewFailedEmitter.fire({
       ...identity,
       message: notification.message,
+    });
+  }
+
+  private emitQueue(notification: { queue?: unknown }, repoRoot: string): void {
+    const queue = queueResponse(notification);
+    if (!queue) return;
+    this.queueEmitter.fire({
+      count: queue.count,
+      files: queue.files.map((relPath) => path.join(repoRoot, ...toPosixRelPath(relPath).split('/'))),
     });
   }
 

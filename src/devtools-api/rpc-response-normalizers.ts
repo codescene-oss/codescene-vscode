@@ -183,3 +183,12 @@ export function watchInventoryResponse(value: WireObject): { repoRoot?: string; 
     files: (value.files ?? []) as string[],
   };
 }
+
+export function queueResponse(value: WireObject): { count: number; files: string[] } | undefined {
+  const queue = value.queue;
+  if (!queue || typeof queue !== 'object') return;
+  return {
+    count: typeof queue.count === 'number' ? queue.count : 0,
+    files: Array.isArray(queue.files) ? queue.files : [],
+  };
+}
