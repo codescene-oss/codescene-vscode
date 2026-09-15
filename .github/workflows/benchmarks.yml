@@ -1,0 +1,58 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  benchmarks:
+    name: Review pipeline benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: './.github/actions/setup'
+
+      - name: Configure Git
+        run: git config --global advice.defaultBranchName false
+
+      - name: Cache benchmark fixture repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.codescene-bench-data
+          key: bench-fixture-spring-framework-68338aa8
+
+      - run: npm run pretest
+        env:
+          CI: true
+
+      - run: npm run benchmark
+        env:
+          CI: true
+
+      - name: Publish benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Review pipeline
+          tool: 'customSmallerIsBetter'
+          output-file-path: bench-results/benchmark-results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@martinsafsten-codescene'
+
+      - name: Upload raw benchmark report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-report
+          path: bench-results/
+          if-no-files-found: ignore

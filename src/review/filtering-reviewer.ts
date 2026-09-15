@@ -26,25 +26,17 @@ export class FilteringReviewer {
       return;
     }
 
-    if (reviewOpts.baseline) {
-      return DevtoolsAPI.reviewBaseline(reviewOpts.baseline, document);
-    } else {
-      return DevtoolsAPI.reviewContent(document);
-    }
+    return DevtoolsAPI.reviewWithServer(document, reviewOpts);
   }
 
-  async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean): Promise<void> {
+  async reviewDiagnostics(document: vscode.TextDocument, reviewOpts: ReviewOpts): Promise<void> {
     const ignored = await this.gitIgnoreChecker.isIgnored(document);
 
     if (ignored) {
       return;
     }
 
-    CsDiagnostics.review(document, reviewOpts, skipMonitorUpdateForDelta);
-  }
-
-  abort(document: vscode.TextDocument): void {
-    DevtoolsAPI.abortReviews(document);
+    CsDiagnostics.review(document, reviewOpts);
   }
 
   dispose() {

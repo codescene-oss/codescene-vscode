@@ -1,19 +1,27 @@
 #!/usr/bin/env node
 
 /**
- * Bundle CLI binaries for a specific platform/architecture.
- * This script downloads the required CLI binary and extracts it to the project root
+ * Bundle CLI distributions for a specific platform/architecture.
+ * This script downloads the required CLI distribution and extracts it to the project root
  * so it can be included in the VSIX package.
  */
 
 const { https } = require('follow-redirects');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const extractZip = require('extract-zip');
-const { artifacts } = require('./cli-config.js');
+const { artifacts, nativeBinaryFileName } = require('./cli-config.js');
 
-function getBinaryName(platform, arch) {
-  return `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+const execFileAsync = promisify(execFile);
+
+function getDistributionName(platform, arch) {
+  return `cs-${platform}-${arch}`;
+}
+
+function localDistributionPath(platform, arch) {
+  return path.join(__dirname, '..', getDistributionName(platform, arch));
 }
 
 function downloadBinary(artifactName) {
@@ -54,53 +62,101 @@ function downloadBinary(artifactName) {
   });
 }
 
-async function extractBinary(zipPath, platform, arch) {
+function locateNativeBinary(extractDir, platform) {
+  const fileName = nativeBinaryFileName(platform);
+  const atRoot = path.join(extractDir, fileName);
+  if (fs.existsSync(atRoot)) return atRoot;
+
+  const entries = fs.readdirSync(extractDir, { withFileTypes: true });
+  const directories = entries.filter((entry) => entry.isDirectory());
+  if (directories.length === 1) {
+    const nested = path.join(extractDir, directories[0].name, fileName);
+    if (fs.existsSync(nested)) return nested;
+  }
+
+  throw new Error(`Expected native ${fileName} not found after extraction: ${extractDir}`);
+}
+
+function validateDistribution(distributionPath, platform) {
+  const exe = path.join(distributionPath, nativeBinaryFileName(platform));
+  if (!fs.existsSync(exe)) {
+    throw new Error(`Expected native ${nativeBinaryFileName(platform)} not found: ${distributionPath}`);
+  }
+}
+
+function useLocalDistribution(platform, arch) {
+  if (process.env.CS_IDE_USE_LOCAL_DISTRIBUTION !== 'true') return false;
+  const distributionPath = localDistributionPath(platform, arch);
+  validateDistribution(distributionPath, platform);
+  console.log(`✓ Using local ${path.basename(distributionPath)} distribution`);
+  return true;
+}
+
+async function installNativeDistribution(extractDir, targetDistribution, platform) {
+  const binaryPath = locateNativeBinary(extractDir, platform);
+  const staging = `${targetDistribution}.new`;
+  const backupDistribution = `${targetDistribution}.old`;
+  const fileName = nativeBinaryFileName(platform);
+  await removePath(staging);
+  await fs.promises.mkdir(staging, { recursive: true });
+  await fs.promises.copyFile(binaryPath, path.join(staging, fileName));
+  const runtimeDll = path.join(path.dirname(binaryPath), 'vcruntime140.dll');
+  if (fs.existsSync(runtimeDll)) {
+    await fs.promises.copyFile(runtimeDll, path.join(staging, 'vcruntime140.dll'));
+  }
+  if (platform !== 'win32') {
+    await fs.promises.chmod(path.join(staging, fileName), '755');
+  }
+
+  await removePath(backupDistribution);
+  if (fs.existsSync(targetDistribution)) {
+    await fs.promises.rename(targetDistribution, backupDistribution);
+  }
+  try {
+    await fs.promises.rename(staging, targetDistribution);
+  } catch (error) {
+    if (fs.existsSync(backupDistribution) && !fs.existsSync(targetDistribution)) {
+      await fs.promises.rename(backupDistribution, targetDistribution);
+    }
+    throw error;
+  }
+  await removePath(backupDistribution);
+  console.log(`✓ Extracted to ${path.basename(targetDistribution)}`);
+}
+
+async function removePath(filePath) {
+  try {
+    await fs.promises.rm(filePath, { recursive: true, force: true });
+  } catch (e) {}
+}
+
+async function extractZipArchive(zipPath, destinationDir) {
+  // Windows CI publishes zips via Compress-Archive; extract-zip/yauzl can stop early on those.
+  if (process.platform === 'win32') {
+    await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destinationDir.replace(/'/g, "''")}' -Force`],
+      { windowsHide: true, maxBuffer: 10 * 1024 * 1024 }
+    );
+    return;
+  }
+  await extractZip(zipPath, { dir: destinationDir });
+}
+
+async function extractDistribution(zipPath, platform, arch) {
   const projectRoot = path.join(__dirname, '..');
-  // Extract to a unique temporary directory to avoid race conditions when extracting in parallel
   const tempExtractDir = path.join(projectRoot, `.temp-extract-${platform}-${arch}`);
   console.log(`Extracting ${path.basename(zipPath)}...`);
 
   try {
-    // Create temporary directory
     await fs.promises.mkdir(tempExtractDir, { recursive: true });
+    await extractZipArchive(zipPath, tempExtractDir);
 
-    // Extract zip to temporary directory
-    await extractZip(zipPath, { dir: tempExtractDir });
-
-    // Find the extracted binary (should be cs-ide or cs-ide.exe)
-    const execFromZip = path.join(tempExtractDir, 'cs-ide' + (platform === 'win32' ? '.exe' : ''));
-    const targetBinary = path.join(projectRoot, getBinaryName(platform, arch));
-
-    if (!fs.existsSync(execFromZip)) {
-      throw new Error(`Expected binary not found after extraction: ${execFromZip}`);
-    }
-
-    // Move binary to final location
-    await fs.promises.rename(execFromZip, targetBinary);
-    console.log(`✓ Extracted to ${path.basename(targetBinary)}`);
-
-    // Make executable on Unix systems
-    if (platform !== 'win32') {
-      await fs.promises.chmod(targetBinary, '755');
-    }
+    const targetDistribution = path.join(projectRoot, getDistributionName(platform, arch));
+    await installNativeDistribution(tempExtractDir, targetDistribution, platform);
   } finally {
-    // Clean up temporary directory
-    try {
-      // Use rm with recursive option (Node 14.14.0+), fallback to rmdir for older versions
-      if (fs.promises.rm) {
-        await fs.promises.rm(tempExtractDir, { recursive: true, force: true });
-      } else {
-        await fs.promises.rmdir(tempExtractDir, { recursive: true });
-      }
-    } catch (e) {
-      // Ignore cleanup errors
-    }
-    // Clean up zip file
-    try {
-      await fs.promises.unlink(zipPath);
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+    await removePath(tempExtractDir);
+    await removePath(zipPath);
   }
 }
 
@@ -113,20 +169,19 @@ async function bundleBinaryForPlatform(platform, arch) {
   console.log(`Bundling CLI binary for ${platform}/${arch}...\n`);
 
   try {
+    if (useLocalDistribution(platform, arch)) return;
     const zipPath = await downloadBinary(artifactName);
-    await extractBinary(zipPath, platform, arch);
-    console.log(`\n✓ Successfully bundled ${platform}/${arch} binary!`);
+    await extractDistribution(zipPath, platform, arch);
+    console.log(`\n✓ Successfully bundled ${platform}/${arch} distribution!`);
   } catch (error) {
     console.error(`\n✗ Failed to bundle ${platform}/${arch}:`, error.message);
     throw error;
   }
 }
 
-// Run if called directly
 if (require.main === module) {
   const args = process.argv.slice(2);
-  
-  // Check if platform and arch are provided as arguments
+
   if (args.length >= 2) {
     const platform = args[0];
     const arch = args[1];
@@ -143,8 +198,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform };
-
-
-
-
+module.exports = { bundleBinaryForPlatform, locateNativeBinary };

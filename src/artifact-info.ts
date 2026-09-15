@@ -18,6 +18,10 @@ export class ArtifactInfo {
     return path.join(this.extensionPath, this.binaryName);
   }
 
+  get absoluteExecutablePath() {
+    return path.join(this.absoluteBinaryPath, cliConfig.nativeBinaryFileName(process.platform));
+  }
+
   get artifactName() {
     const artifactName = artifacts[process.platform]?.[process.arch];
     if (!artifactName) {
@@ -27,7 +31,6 @@ export class ArtifactInfo {
   }
 
   get binaryName(): string {
-    // E.g. cs-darwin-x64/arm64, cs-linux-x64, cs-win32-x64.exe
-    return `cs-${process.platform}-${process.arch}${process.platform === 'win32' ? '.exe' : ''}`;
+    return `cs-${process.platform}-${process.arch}`;
   }
 }

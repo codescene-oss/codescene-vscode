@@ -10,7 +10,7 @@ function deleteFilesOlderThan(days: number, folderPath: string) {
   files.forEach((file) => {
     const filePath = path.join(folderPath, file);
     const stats = fs.statSync(filePath);
-    const fileAge = now.getMilliseconds() - stats.mtime.getMilliseconds();
+    const fileAge = now.getTime() - stats.mtime.getTime();
     if (fileAge >= daysInMilliseconds) {
       fs.unlinkSync(filePath);
     }

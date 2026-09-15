@@ -21,7 +21,7 @@ suite('Telemetry Integration Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
   });
 
   teardown(() => {

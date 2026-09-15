@@ -325,6 +325,11 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
+    onDidChangeWorkspaceFolders: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    textDocuments: [],
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
@@ -498,4 +503,11 @@ const originalRequire = Module.prototype.require;
     return { ...vscodeStub, default: vscodeStub };
   }
   return originalRequire.apply(this, arguments as any);
+};
+
+export const mochaHooks = {
+  async afterAll() {
+    const api = await import('../devtools-api');
+    api.DevtoolsAPI.dispose();
+  },
 };

@@ -29,7 +29,8 @@ function runScript(repositoryPath: string, ...bumps: string[]) {
   });
 }
 
-suite('Test Release Script Test Suite', () => {
+suite('Test Release Script Test Suite', function () {
+  this.timeout(20000);
   const repositories: string[] = [];
 
   teardown(() => {

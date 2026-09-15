@@ -1,5 +1,5 @@
 import * as path from 'path';
-import vscode, { Uri } from 'vscode';
+import vscode from 'vscode';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { ReviewCacheItem } from './review-cache-item';
@@ -36,12 +36,14 @@ export class ReviewCache {
     }
   }
 
-  refreshDeltas() {
+  /**
+   * Drops cache entries whose file no longer exists on disk.
+   */
+  pruneDeletedFiles() {
     this._cache.forEach((innerMap, fileName) => {
       innerMap.forEach(async (entry, snapshot) => {
         try {
           await vscode.workspace.fs.stat(entry.item.document.uri);
-          void entry.item.runDeltaAnalysis({ skipMonitorUpdate: entry.skipMonitorUpdate });
         } catch { // File doesn't exist
           innerMap.delete(snapshot);
           if (innerMap.size === 0) {
@@ -83,7 +85,7 @@ export class ReviewCache {
     return cachedValue === false ? false : newValue;
   }
 
-  add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean, baselineCommit: string) {
+  add(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     const item = new ReviewCacheItem(document, review);
 
     let innerMap = this._cache.get(document.fileName);
@@ -112,12 +114,9 @@ export class ReviewCache {
     innerMap.set(snapshot, { item, skipMonitorUpdate: finalSkipMonitorUpdate });
 
     logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
-    if (baselineCommit) {
-      item.setBaseline(baselineCommit, finalSkipMonitorUpdate, updateDiagnosticsPane);
-    }
   }
 
-  update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean, updateDiagnosticsPane: boolean) {
+  update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
     const innerMap = this._cache.get(document.fileName);
     if (!innerMap) return false;
 
@@ -126,11 +125,8 @@ export class ReviewCache {
       if (this.snapshotsEqual(snapshot, currentSnapshot)) {
         logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
 
-        const finalSkipMonitorUpdate = this.resolveSkipMonitorUpdate(skipMonitorUpdate, entry.skipMonitorUpdate);
-
-        entry.item.setReview(document, review, finalSkipMonitorUpdate);
-        entry.skipMonitorUpdate = finalSkipMonitorUpdate;
-        void entry.item.runDeltaAnalysis({ skipMonitorUpdate: finalSkipMonitorUpdate });
+        entry.item.setReview(document, review);
+        entry.skipMonitorUpdate = this.resolveSkipMonitorUpdate(skipMonitorUpdate, entry.skipMonitorUpdate);
         return true;
       }
     }
@@ -138,28 +134,10 @@ export class ReviewCache {
   }
 
   delete(fsPath: string) {
-    const innerMap = this._cache.get(fsPath);
-    if (innerMap) {
-      for (const entry of innerMap.values()) {
-        void entry.item.deleteDelta(entry.skipMonitorUpdate);
-      }
-      this._cache.delete(fsPath);
-    }
+    this._cache.delete(fsPath);
   }
 
   clear() {
     this._cache.clear();
-  }
-
-  setBaseline(fileFilter: (fileUri: Uri) => boolean, baselineCommit: string) {
-    this._cache.forEach((innerMap) => {
-      innerMap.forEach((entry) => {
-        if (fileFilter(entry.item.document.uri)) {
-          if (baselineCommit) {
-            void entry.item.setBaseline(baselineCommit, false, false);
-          }
-        }
-      });
-    });
   }
 }

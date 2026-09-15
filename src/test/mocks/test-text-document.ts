@@ -6,6 +6,7 @@ export class TestTextDocument implements vscode.TextDocument {
   private _content: string;
   private _languageId: string;
   private _version: number;
+  private _isDirty = false;
 
   constructor(filePath: string, content: string, languageId: string, version: number = 1) {
     this._fileName = filePath;
@@ -20,7 +21,11 @@ export class TestTextDocument implements vscode.TextDocument {
   get isUntitled() { return false; }
   get languageId() { return this._languageId; }
   get version() { return this._version; }
-  get isDirty() { return false; }
+  get isDirty() { return this._isDirty; }
+  setDirty(dirty: boolean): this {
+    this._isDirty = dirty;
+    return this;
+  }
   get isClosed() { return false; }
   get eol() { return vscode.EndOfLine.LF; }
   get lineCount() { return this._content.split('\n').length; }

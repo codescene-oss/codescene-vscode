@@ -6,23 +6,40 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '8a7257420cc2dec1cf6ff7866db4da8c58f67602';
+const requiredDevtoolsVersion = '71112122d98c0589e680c937eddcaa2daa0e7030';
+
+const nativeOsNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
+const nativeArchNames = { x64: 'amd64', arm64: 'aarch64' };
+
+function nativeBinaryFileName(platform) {
+  return platform === 'win32' ? 'cs-ide.exe' : 'cs-ide';
+}
+
+function nativeArtifactName(platform, arch) {
+  const osName = nativeOsNames[platform];
+  const archName = nativeArchNames[arch];
+  if (!osName || !archName) {
+    throw new Error(`Unsupported platform/arch combination: ${platform}/${arch}`);
+  }
+  return `cs-ide-${osName}-${archName}-${requiredDevtoolsVersion}.zip`;
+}
 
 const artifacts = {
   darwin: {
-    x64: `cs-ide-macos-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-macos-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: nativeArtifactName('darwin', 'x64'),
+    arm64: nativeArtifactName('darwin', 'arm64'),
   },
   linux: {
-    x64: `cs-ide-linux-amd64-${requiredDevtoolsVersion}.zip`,
-    arm64: `cs-ide-linux-aarch64-${requiredDevtoolsVersion}.zip`,
+    x64: nativeArtifactName('linux', 'x64'),
+    arm64: nativeArtifactName('linux', 'arm64'),
   },
   win32: {
-    x64: `cs-ide-windows-amd64-${requiredDevtoolsVersion}.zip`,
+    x64: nativeArtifactName('win32', 'x64'),
   },
 };
 
 module.exports = {
   requiredDevtoolsVersion,
   artifacts,
+  nativeBinaryFileName,
 };

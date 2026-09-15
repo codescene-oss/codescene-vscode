@@ -1,35 +1,14 @@
 import vscode from 'vscode';
-import { CsExtensionState } from '../../cs-extension-state';
-import {
-  convertCWFCommitBaselineToVSCode,
-  getFileAndFunctionFromState,
-  getFunctionPosition,
-} from '../../centralized-webview-framework/cwf-parsers';
+import { getFileAndFunctionFromState, getFunctionPosition } from '../../centralized-webview-framework/cwf-parsers';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
 import { findOrOpenDocument, toDocsParamsRanged } from '../../documentation/commands';
 import Telemetry from '../../telemetry';
 import { getExtensionSettingsFilter } from '../../extension-id';
 import { getMessageCategory } from './cwf-message-categories';
-import {
-  CommitBaselineType,
-  MessageToIDEType,
-  OpenDocsMessage,
-} from '../../centralized-webview-framework/types/messages';
+import { MessageToIDEType, OpenDocsMessage } from '../../centralized-webview-framework/types/messages';
 import { FileMetaType } from '../../centralized-webview-framework/types';
 import { CodeSmell } from '../../devtools-api/review-model';
-
-/**
- * Changes the commit baseline
- * @param commitBaseLineString
- */
-async function handleSelectCommitBaseLineMessage(commitBaseLineString: CommitBaselineType) {
-  const currentBaseline = CsExtensionState.baseline;
-  const newBaseline = convertCWFCommitBaselineToVSCode(commitBaseLineString);
-  if (newBaseline !== currentBaseline) {
-    await CsExtensionState.setBaseline(newBaseline);
-  }
-}
 
 /**
  * Finds position data fora. function and opens the function in editor
@@ -218,20 +197,6 @@ async function handleEditorMessage(homeView: HomeView, message: MessageToIDEType
 }
 
 /**
- * Handling messages related to CodeScene global state
- * @param homeView
- * @param message
- * @returns
- */
-async function handleStateChangeMessage(homeView: HomeView, message: MessageToIDEType) {
-  switch (message.messageType) {
-    case 'commitBaseline':
-      await handleSelectCommitBaseLineMessage(message.payload);
-      return;
-  }
-}
-
-/**
  * Handles all messages from the home view panel
  * @param homeView
  * @param message
@@ -250,9 +215,6 @@ export async function handleCWFMessage(homeView: HomeView, message: MessageToIDE
       return;
     case 'editor':
       await handleEditorMessage(homeView, message);
-      return;
-    case 'stateChange':
-      await handleStateChangeMessage(homeView, message);
       return;
     default:
       console.warn(message.messageType, 'not supported yet');

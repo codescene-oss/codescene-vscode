@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark
 
 .DEFAULT_GOAL := build
 
@@ -20,14 +20,14 @@ tsc:
 lint:
 	npx commitlint --from main --to HEAD --verbose
 	npm run lint
-	@(command -v cs >/dev/null 2>&1 && cs delta main) || true
+	-cs delta main
 
 watch:
 	npm run watch
 
 pretest:
-	rm -rf out/
-	chronic npm run pretest
+	node -e "require('fs').rmSync('out',{recursive:true,force:true})"
+	npm run pretest
 
 test: pretest
 	npm run test
@@ -42,11 +42,19 @@ pretest-e2e:
 test-e2e: pretest-e2e
 	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
 
+# Performance benchmarks. Add "ITERATIONS=n" to override the per scenario iteration count.
+benchmark: pretest
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )npm run benchmark
+
 # Runs just one test.
-# Example: make test1 TEST='GitChangeObserver Test Suite'
+# Example: make test1 TEST='workspace-watch'
+ifndef TEST
+test1:
+	$(error TEST parameter is required. Usage: make test1 TEST='test name')
+else
 test1: pretest
-	@test -n "$(TEST)" || (echo "TEST parameter is required. Usage: make test1 TEST='test name'" && exit 1)
-	npm run test -- --grep '$(TEST)'
+	npm run test -- --grep "$(TEST)"
+endif
 
 test-release:
 	npm run release:test -- $(if $(BUMP),$(BUMP),patch)

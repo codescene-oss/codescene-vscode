@@ -2,7 +2,6 @@ import { RefactorResponse } from './ace';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
 
-import { CommitBaselineType } from './messages';
 export type IdeTypes = 'VSCode';
 
 //View Props
@@ -40,7 +39,6 @@ export interface HomeContextViewProps {
   data: {
     showOnboarding?: boolean;
     fileDeltaData: FileDeltaData[];
-    commitBaseline?: CommitBaselineType;
     autoRefactor?: AutoRefactorConfig;
     /**jobs allows the UI to act on running och queued native jobs such as runnign deltaAnalysis or autoRefacotr */
     jobs?: Job[];
