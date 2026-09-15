@@ -112,6 +112,48 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await failure, { id: 'file-2', message: 'fixture review failed' });
   });
 
+  test('forwards queue progress from review, delta, and failure notifications', async () => {
+    const queues: Array<{ count: number; files: string[] }> = [];
+    client.onDidQueue((queue) => queues.push(queue));
+    const review = new Promise<void>((resolve) => {
+      client.onDidReview(() => resolve());
+    });
+    const delta = new Promise<void>((resolve) => {
+      client.onDidDelta(() => resolve());
+    });
+    const failure = new Promise<void>((resolve) => {
+      client.onDidReviewFailed(() => resolve());
+    });
+
+    client.reviewFiles('/repo', [
+      { id: 'file-1', relPath: 'file.ts', content: 'const x = 1;' },
+      { id: 'file-2', relPath: 'broken.ts', content: 'fail' },
+    ]);
+
+    await review;
+    await delta;
+    await failure;
+
+    assert.deepStrictEqual(queues, [
+      { count: 2, files: [path.join('/repo', 'b.ts'), path.join('/repo', 'c.ts')] },
+      { count: 1, files: [path.join('/repo', 'c.ts')] },
+      { count: 0, files: [] },
+    ]);
+  });
+
+  test('does not emit queue when the notification omits it', async () => {
+    const queues: Array<{ count: number; files: string[] }> = [];
+    client.onDidQueue((queue) => queues.push(queue));
+    const review = new Promise<void>((resolve) => {
+      client.onDidReview(() => resolve());
+    });
+
+    client.watchFiles('/repo');
+    await review;
+
+    assert.deepStrictEqual(queues, []);
+  });
+
   test('sends kebab-case watch payloads and forwards id-less notifications', async () => {
     const review = new Promise<{ id?: string; path: string }>((resolve) => {
       client.onDidReview((event) => resolve({ id: event.id, path: event.path }));

@@ -17,7 +17,7 @@ export interface CsFeature {
   error?: Error;
 }
 
-export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
+export type AnalysisFeature = CsFeature & { analysisState?: RunnerState; queueCount?: number };
 type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
@@ -141,6 +141,7 @@ export class CsExtensionState {
     CsExtensionState.setAnalysisState({
       ...CsExtensionState.stateProperties.features.analysis,
       analysisState: event.state,
+      queueCount: event.queueCount,
     });
   }
 
@@ -181,10 +182,10 @@ export class CsExtensionState {
     return this._instance.onAceStateChanged;
   }
 
-  static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
+  static setAnalysisState({ analysisState, error, state, queueCount }: AnalysisFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      analysis: { state: featureState({ state, error }), error, analysisState },
+      analysis: { state: featureState({ state, error }), error, analysisState, queueCount },
     };
     CsExtensionState._instance.updateStatusViews();
   }

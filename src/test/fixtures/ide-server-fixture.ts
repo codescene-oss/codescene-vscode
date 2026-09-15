@@ -115,6 +115,7 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         path: file['rel-path'],
         repoRoot,
         message: 'fixture review failed',
+        queue: { count: 0, files: [] },
       });
       continue;
     }
@@ -142,6 +143,7 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         score: 9.68,
         gitBlobSha,
       },
+      queue: { count: 2, files: ['b.ts', 'c.ts'] },
     });
     void connection.sendNotification('cs-ide/deltaReview', {
       ...(file.id ? { id: file.id } : {}),
@@ -156,6 +158,7 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         oldGitBlobSha: 'old-sha',
         newGitBlobSha: gitBlobSha,
       },
+      queue: { count: 1, files: ['c.ts'] },
     });
   }
 });

@@ -20,25 +20,34 @@ import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { AbortError } from './abort-error';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CsIdeServerClient, DeltaResult, RefactorParams, ServerStartEvent, WatchInventory } from './ide-server-client';
+import { CsIdeServerClient, DeltaResult, RefactorParams, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
 import { v4 as uuid } from 'uuid';
 import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
 import { CsReview } from '../review/cs-review';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { relativePosix } from '../utils/fs-paths';
+import { ReviewQueueProgress } from './review-queue-progress';
 
 export class DevtoolsAPI {
   private static reviewCache: ReviewCache;
   private static ideServer: CsIdeServerClient;
   private static pipeline: ReviewPipeline;
+  private static queueProgress?: ReviewQueueProgress;
+  private static queueSubscription?: vscode.Disposable;
   private static lastNetworkError = false;
 
   static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
     DevtoolsAPI.pipeline?.dispose();
+    DevtoolsAPI.queueProgress?.dispose();
+    DevtoolsAPI.queueSubscription?.dispose();
     DevtoolsAPI.ideServer?.dispose();
     DevtoolsAPI.reviewCache = new ReviewCache(context);
     DevtoolsAPI.ideServer = ideServer ?? new CsIdeServerClient(binaryPath);
     DevtoolsAPI.pipeline = new ReviewPipeline(DevtoolsAPI.ideServer, DevtoolsAPI.pipelinePresentation(), uuid);
+    DevtoolsAPI.queueCount = 0;
+    DevtoolsAPI.queued = [];
+    DevtoolsAPI.queueProgress = new ReviewQueueProgress((snapshot) => DevtoolsAPI.applyQueue(snapshot));
+    DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.queueProgress?.update(queue));
   }
 
   static get reviewPipeline(): ReviewPipeline {
@@ -94,19 +103,37 @@ export class DevtoolsAPI {
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
   public static jobs = new Set<string>();
+  private static queueCount = 0;
+  private static queued: string[] = [];
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
 
   private static startAnalysisEvent(fileName: string, delta?: boolean) {
     if (delta) DevtoolsAPI.jobs.add(fileName);
     DevtoolsAPI.analysesRunning++;
-    DevtoolsAPI.analysisStateEmitter.fire({ state: 'running', jobs: DevtoolsAPI.jobs });
+    DevtoolsAPI.fireAnalysisState();
   }
 
   private static endAnalysisEvent(fileName: string, delta?: boolean) {
     if (delta) DevtoolsAPI.jobs.delete(fileName);
     DevtoolsAPI.analysesRunning--;
-    if (DevtoolsAPI.analysesRunning === 0) DevtoolsAPI.analysisStateEmitter.fire({ state: 'idle' });
+    DevtoolsAPI.fireAnalysisState();
+  }
+
+  private static applyQueue(snapshot: ReviewQueue): void {
+    DevtoolsAPI.queueCount = snapshot.count;
+    DevtoolsAPI.queued = snapshot.files;
+    DevtoolsAPI.fireAnalysisState();
+  }
+
+  private static fireAnalysisState(): void {
+    const running = DevtoolsAPI.analysesRunning > 0 || DevtoolsAPI.queueCount > 0;
+    DevtoolsAPI.analysisStateEmitter.fire({
+      state: running ? 'running' : 'idle',
+      jobs: DevtoolsAPI.jobs,
+      queued: DevtoolsAPI.queued,
+      queueCount: DevtoolsAPI.queueCount,
+    });
   }
 
   private static readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
@@ -334,6 +361,8 @@ export class DevtoolsAPI {
 
   static dispose() {
     DevtoolsAPI.pipeline?.dispose();
+    DevtoolsAPI.queueProgress?.dispose();
+    DevtoolsAPI.queueSubscription?.dispose();
     DevtoolsAPI.ideServer?.dispose();
     try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
@@ -384,6 +413,6 @@ export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
   return `[traceId ${traceId ?? 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 
-export type AnalysisEvent = { state: 'running' | 'idle'; jobs?: Set<string> };
+export type AnalysisEvent = { state: 'running' | 'idle'; jobs?: Set<string>; queued?: string[]; queueCount?: number };
 export type ReviewEvent = { document: vscode.TextDocument; result?: Review };
 export type DeltaAnalysisEvent = { document: vscode.TextDocument; result?: Delta; updateMonitor: boolean };

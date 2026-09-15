@@ -13,6 +13,13 @@ interface StatusBarOptions {
   background?: string;
 }
 
+export function analysisProgressTooltip(queueCount?: number): string {
+  if (queueCount && queueCount > 0) {
+    return `CodeScene analysis in progress (${queueCount} remaining)...`;
+  }
+  return 'CodeScene analysis in progress...';
+}
+
 export class CsStatusBar implements Disposable {
   private disposables: Disposable[] = [];
 
@@ -56,7 +63,7 @@ export class CsStatusBar implements Disposable {
       case 'running':
         this.setStatus(item, {
           text: '$(loading~spin) Analyzing...',
-          tooltip: 'CodeScene analysis in progress...',
+          tooltip: analysisProgressTooltip(analysis.queueCount),
           command: 'codescene.showLogOutput',
         });
         return;
