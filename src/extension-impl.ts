@@ -1,7 +1,6 @@
 import vscode from 'vscode';
 import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
-import { refreshCodeHealthDetailsView } from './code-health-monitor/details/view';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
 import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
@@ -381,12 +380,10 @@ function createAuthProvider(context: vscode.ExtensionContext, csContext: CsConte
       // We only have one session in this extension currently, so grabbing the first one is ok.
       onGetSessionSuccess(context, csContext)(e.added[0]);
     }
-    refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
   });
 
   const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
-    refreshCodeHealthDetailsView();
     CodeSceneTabPanel.refreshIfExists();
     // TODO: refresh CWF view(s)
   });

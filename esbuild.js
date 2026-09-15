@@ -62,7 +62,6 @@ const extensionConfig = {
 
 function webviewConfig(watch = false) {
   const entryPoints = [
-    './src/code-health-monitor/details/webview-script.ts',
     './src/control-center/webview-script.ts',
     './src/codescene-tab/webview/script.ts',
     './src/codescene-tab/webview/documentation-script.ts',
