@@ -185,6 +185,12 @@ suite('CsIdeServerClient Test Suite', () => {
     await assert.rejects(client.start(), /ENOENT|spawn/i);
   });
 
+  test('includes stderr when the server exits during startup', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(process.execPath, ['-e', 'process.stderr.write("could not open jvm.cfg\\n"); process.exit(1)']);
+    await assert.rejects(client.start(), /exited with code 1: could not open jvm.cfg/);
+  });
+
   test('can restart after the server exits', async () => {
     await client.start();
     const connection = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };

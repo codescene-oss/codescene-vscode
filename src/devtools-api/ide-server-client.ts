@@ -168,10 +168,22 @@ export class CsIdeServerClient implements vscode.Disposable {
       const command = this.command;
       const process = spawn(command.path, command.args, { stdio: ['pipe', 'pipe', 'pipe'] });
       this.process = process;
+      let stderr = '';
       process.on('error', (error) => this.handleProcessFailure(error, process));
-      process.stderr?.on('data', (data) => logOutputChannel.debug(`[cs-ide] ${data.toString().trim()}`));
+      process.stderr?.on('data', (data) => {
+        const text = data.toString();
+        if (stderr.length < 4000) stderr += text.slice(0, 4000 - stderr.length);
+        const trimmed = text.trim();
+        if (trimmed) logOutputChannel.debug(`[cs-ide] ${trimmed}`);
+      });
       process.on('exit', (code, signal) => {
-        this.handleProcessFailure(new Error(`cs-ide server exited${code === null ? '' : ` with code ${code}`}${signal ? ` (${signal})` : ''}`), process);
+        const detail = stderr.trim();
+        this.handleProcessFailure(
+          new Error(
+            `cs-ide server exited${code === null ? '' : ` with code ${code}`}${signal ? ` (${signal})` : ''}${detail ? `: ${detail}` : ''}`
+          ),
+          process
+        );
       });
 
       const connection = createMessageConnection(process.stdout!, process.stdin!);

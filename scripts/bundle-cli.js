@@ -88,8 +88,20 @@ function useLocalDistribution(platform, arch) {
 
 async function installDistribution(distributionFromZip, targetDistribution, platform) {
   validateDistribution(distributionFromZip, platform);
-  await fs.promises.rm(targetDistribution, { recursive: true, force: true });
-  await fs.promises.rename(distributionFromZip, targetDistribution);
+  const backupDistribution = `${targetDistribution}.old`;
+  await removePath(backupDistribution);
+  if (fs.existsSync(targetDistribution)) {
+    await fs.promises.rename(targetDistribution, backupDistribution);
+  }
+  try {
+    await fs.promises.rename(distributionFromZip, targetDistribution);
+  } catch (error) {
+    if (fs.existsSync(backupDistribution) && !fs.existsSync(targetDistribution)) {
+      await fs.promises.rename(backupDistribution, targetDistribution);
+    }
+    throw error;
+  }
+  await removePath(backupDistribution);
   if (platform !== 'win32') {
     await fs.promises.chmod(path.join(targetDistribution, 'jre', 'bin', 'java'), '755');
   }
