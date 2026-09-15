@@ -13,6 +13,11 @@ suite('fs-paths Test Suite', () => {
     assert.strictEqual(normalizeFsPath('C:\\Git\\Foo'), normalizeFsPath('c:\\git\\foo'));
   });
 
+  test('pathsEqual treats Windows-style roots as equal across separators and drive case', () => {
+    assert.strictEqual(pathsEqual('c:\\Git\\codescene', 'C:\\Git\\codescene'), true);
+    assert.strictEqual(pathsEqual('c:\\Git\\codescene', 'C:/Git/codescene'), true);
+  });
+
   test('relativePosix returns forward-slash relative paths', function () {
     if (process.platform !== 'win32') {
       assert.strictEqual(relativePosix('/repo', '/repo/src/file.ts'), 'src/file.ts');

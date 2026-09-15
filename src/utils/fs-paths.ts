@@ -1,8 +1,14 @@
 import * as path from 'path';
 
+function isWindowsStylePath(filePath: string): boolean {
+  return /^[a-zA-Z]:[\\/]/.test(filePath);
+}
+
 export function normalizeFsPath(filePath: string): string {
-  const normalized = path.normalize(filePath);
-  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  if (process.platform === 'win32' || isWindowsStylePath(filePath)) {
+    return path.win32.normalize(filePath).toLowerCase();
+  }
+  return path.normalize(filePath);
 }
 
 export function toPosixRelPath(relPath: string): string {

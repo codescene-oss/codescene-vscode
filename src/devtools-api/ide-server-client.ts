@@ -3,6 +3,7 @@ import * as path from 'path';
 import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
 import { logOutputChannel } from '../log';
+import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
 import { Delta } from './delta-model';
 import { CheckRulesResponse, CodeHealthRulesTemplateResponse } from './model';
 import { FnToRefactor, PreFlightResponse, RefactorResponse } from './refactor-models';
@@ -253,8 +254,9 @@ export class CsIdeServerClient implements vscode.Disposable {
     return this.sendRequest('cs-ide/code-health-rules-template', {});
   }
 
-  async checkRules(repoRoot: string, path: string): Promise<CheckRulesResponse> {
-    return checkRulesResponse(await this.sendRequest('cs-ide/check-rules', { 'repo-root': repoRoot, path }));
+  async checkRules(repoRoot: string, filePath: string): Promise<CheckRulesResponse> {
+    const relativePath = path.isAbsolute(filePath) ? relativePosix(repoRoot, filePath) : toPosixRelPath(filePath);
+    return checkRulesResponse(await this.sendRequest('cs-ide/check-rules', { 'repo-root': repoRoot, path: relativePath }));
   }
 
   async getWatchInventory(repoRoot: string): Promise<WatchInventory> {

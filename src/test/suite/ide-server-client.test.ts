@@ -82,6 +82,15 @@ suite('CsIdeServerClient Test Suite', () => {
     });
   });
 
+  test('sends check-rules path relative to the repo root', async () => {
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await client.checkRules('/repo', '/repo/src/file.ts');
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastCheckRules', {}), {
+      'repo-root': '/repo',
+      path: 'src/file.ts',
+    });
+  });
+
   test('receives correlated review, delta, and failure notifications', async () => {
     const review = new Promise<{ id?: string; sha: string | undefined }>((resolve) => {
       client.onDidReview((event) => resolve({ id: event.id, sha: event.result['git-blob-sha'] }));

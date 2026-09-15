@@ -58,7 +58,11 @@ connection.onRequest('cs-ide/refactor', () => ({
 connection.onRequest('cs-ide/telemetry', (params) => ({ status: 202, params }));
 connection.onRequest('cs-ide/device-id', () => ({ deviceId: 'device-42' }));
 connection.onRequest('cs-ide/code-health-rules-template', () => ({ template: '{"rule_sets":[]}' }));
-connection.onRequest('cs-ide/check-rules', () => ({ result: 'matched' }));
+let lastCheckRules: unknown;
+connection.onRequest('cs-ide/check-rules', (params) => {
+  lastCheckRules = params;
+  return { result: 'matched' };
+});
 connection.onRequest('test/exit', () => {
   setTimeout(() => process.exit(12), 10);
   return new Promise(() => {});
@@ -69,6 +73,7 @@ let lastWatch: unknown;
 let lastStop: unknown;
 connection.onRequest('test/lastWatch', () => lastWatch);
 connection.onRequest('test/lastStop', () => lastStop);
+connection.onRequest('test/lastCheckRules', () => lastCheckRules);
 
 connection.onRequest('cs-ide/getWatchInventory', (params) => ({
   'repo-root': params['repo-root'],

@@ -44,6 +44,7 @@ aceSuite('Preflight Integration Test Suite', () => {
     const mockContext = createMockExtensionContext(testDir);
 
     DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.disableAce();
 
     preflightStateChangeFired = false;
     lastPreflightState = undefined;

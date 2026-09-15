@@ -504,3 +504,10 @@ const originalRequire = Module.prototype.require;
   }
   return originalRequire.apply(this, arguments as any);
 };
+
+export const mochaHooks = {
+  async afterAll() {
+    const api = await import('../devtools-api');
+    api.DevtoolsAPI.dispose();
+  },
+};
