@@ -162,7 +162,7 @@ return 0;
 
     try {
       CsDiagnostics.review(document, reviewOpts);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await Reviewer.instance.review(document, reviewOpts).diagnostics;
 
       if (analysisError) {
         assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);

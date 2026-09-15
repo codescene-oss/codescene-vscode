@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as path from 'path';
 import { DevtoolsAPI } from '../../devtools-api';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
+import { aceTest } from '../ace-test-suite';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 
 suite('DevtoolsAPI JSON-RPC Test Suite', () => {
@@ -24,8 +25,11 @@ suite('DevtoolsAPI JSON-RPC Test Suite', () => {
 
     assert.strictEqual(await DevtoolsAPI.codeHealthRulesTemplate(), '{"rule_sets":[]}');
     assert.deepStrictEqual(await DevtoolsAPI.checkRules('/repo', 'src/file.ts'), { rulesMsg: 'matched' });
-    assert.strictEqual((await DevtoolsAPI.preflight())?.version, 2);
     assert.deepStrictEqual(await DevtoolsAPI.postTelemetry(event), { status: 202, params: { event } });
     assert.strictEqual(await DevtoolsAPI.getDeviceId(), 'device-42');
+  });
+
+  aceTest('uses the shared server for preflight', async () => {
+    assert.strictEqual((await DevtoolsAPI.preflight())?.version, 2);
   });
 });
