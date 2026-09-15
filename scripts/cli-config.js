@@ -22,7 +22,38 @@ const artifacts = {
   },
 };
 
+const nativeOsNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
+const nativeArchNames = { x64: 'amd64', arm64: 'aarch64' };
+const supportedNativeArtifacts = {
+  'macos-amd64': true,
+  'macos-aarch64': true,
+  'linux-amd64': true,
+  'linux-aarch64': true,
+  'windows-amd64': true,
+};
+
+function nativeArtifactName(platform, arch) {
+  const osName = nativeOsNames[platform];
+  const archName = nativeArchNames[arch];
+  const artifact = osName && archName && `${osName}-${archName}`;
+  if (!supportedNativeArtifacts[artifact]) {
+    throw new Error(`Unsupported platform/arch combination: ${platform}/${arch}`);
+  }
+  return `cs-ide-${artifact}-${requiredDevtoolsVersion}.zip`;
+}
+
+function nativeDistributionName(platform, arch) {
+  return `cs-native-${platform}-${arch}`;
+}
+
+function nativeBinaryFileName(platform) {
+  return platform === 'win32' ? 'cs-ide.exe' : 'cs-ide';
+}
+
 module.exports = {
   requiredDevtoolsVersion,
   artifacts,
+  nativeArtifactName,
+  nativeDistributionName,
+  nativeBinaryFileName,
 };

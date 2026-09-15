@@ -32,6 +32,8 @@ export interface BenchmarkEnvironment {
 export interface BenchmarkReport {
   adapter: string;
   createdAt: string;
+  sha?: string;
+  startupMs?: number;
   environment: BenchmarkEnvironment;
   scenarios: ScenarioReport[];
 }

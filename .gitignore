@@ -10,6 +10,7 @@ node_modules
 cs-darwin-*
 cs-linux-*
 cs-win32-*
+cs-native-*
 cs-ide-*
 cs-cwf/
 *.zip

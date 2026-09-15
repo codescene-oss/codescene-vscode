@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
@@ -22,6 +23,21 @@ import {
 } from './rpc-response-normalizers';
 
 const STARTUP_TIMEOUT_MS = 30000;
+
+export function jarServerCommand(
+  distributionPath: string,
+  serverArgs: string[] = ['server'],
+  extraJvmArgs: string[] = ['--enable-native-access=ALL-UNNAMED']
+): { path: string; args: string[] } {
+  const java = path.join(distributionPath, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
+  const jar = path.join(distributionPath, 'cs-ide.jar');
+  const cache = path.join(distributionPath, 'cs-ide.aot');
+  const jvmArgs = extraJvmArgs.includes('--enable-native-access=ALL-UNNAMED')
+    ? extraJvmArgs
+    : [...extraJvmArgs, '--enable-native-access=ALL-UNNAMED'];
+  const aotArgs = fs.existsSync(cache) ? [`-XX:AOTCache=${cache}`] : [];
+  return { path: java, args: [...jvmArgs, ...aotArgs, '-jar', jar, ...serverArgs] };
+}
 
 export interface ServerMetadata {
   sha: string;
@@ -148,9 +164,7 @@ export class CsIdeServerClient implements vscode.Disposable {
 
   private get command(): { path: string; args: string[] } {
     if (this.args) return { path: this.binaryPath, args: this.args };
-    const java = path.join(this.binaryPath, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
-    const jar = path.join(this.binaryPath, 'cs-ide.jar');
-    return { path: java, args: ['--enable-native-access=ALL-UNNAMED', '-jar', jar, ...this.serverArgs] };
+    return jarServerCommand(this.binaryPath, this.serverArgs);
   }
 
   start(): Promise<ServerMetadata> {

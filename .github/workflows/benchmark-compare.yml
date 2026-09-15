@@ -1,0 +1,73 @@
+name: Benchmark compare
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'bench/**'
+
+permissions:
+  contents: read
+
+jobs:
+  compare-windows:
+    name: JAR+AOT vs native (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: './.github/actions/setup'
+
+      - name: Configure Git
+        run: git config --global advice.defaultBranchName false
+
+      - name: Cache benchmark fixture repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.codescene-bench-data
+          key: bench-fixture-spring-framework-68338aa8
+
+      - name: Build, lint, and bundle CLI
+        run: npm run pretest
+        env:
+          CI: true
+
+      - name: Bundle native CLI
+        run: node ./scripts/bundle-native-cli.js
+
+      - name: Train AOT cache on the runner
+        run: node ./scripts/train-aot-cache.js
+
+      - name: Confirm AOT cache exists
+        shell: pwsh
+        run: |
+          $cache = Get-Item "cs-win32-x64/cs-ide.aot"
+          if ($cache.Length -lt 1MB) { throw "AOT cache too small: $($cache.Length)" }
+          Write-Host "AOT cache $($cache.FullName) $([math]::Round($cache.Length / 1MB, 1)) MB"
+
+      - name: JAR+AOT benchmark
+        run: npm run benchmark
+        env:
+          CI: true
+          CS_BENCH_OUTPUT: bench-results/jar
+          CS_BENCH_JAVA_XMX: 512m
+
+      - name: Native benchmark
+        run: npm run benchmark
+        env:
+          CI: true
+          CS_BENCH_CLI: native
+          CS_BENCH_OUTPUT: bench-results/native
+
+      - name: Compare
+        run: node ./scripts/compare-benchmarks.js bench-results/jar/ide-server.json bench-results/native/native-ide-server.json
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-compare-windows
+          path: bench-results/
+          if-no-files-found: ignore

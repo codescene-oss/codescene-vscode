@@ -1,4 +1,4 @@
-import { IdeServerAdapter } from '../adapters/ide-server-adapter';
+import { createBenchmarkAdapter } from '../adapters/ide-server-adapter';
 import { FixtureRepo } from '../fixture-repo';
 import { ProcessMetrics } from '../process-metrics';
 import { ScenarioReport, writeReport } from '../report';
@@ -8,7 +8,7 @@ import { benchmarkScenarios } from '../scenarios';
 suite('Review Pipeline Benchmarks', () => {
   const repo = new FixtureRepo();
   const metrics = new ProcessMetrics();
-  const adapter = new IdeServerAdapter();
+  const adapter = createBenchmarkAdapter();
   const reports: ScenarioReport[] = [];
 
   suiteSetup(async () => {
@@ -21,7 +21,14 @@ suite('Review Pipeline Benchmarks', () => {
     await adapter.stop();
     metrics.dispose();
     writeReport(
-      { adapter: adapter.name, createdAt: new Date().toISOString(), environment: environmentInfo(), scenarios: reports },
+      {
+        adapter: adapter.name,
+        createdAt: new Date().toISOString(),
+        sha: adapter.sha,
+        startupMs: adapter.startupMs,
+        environment: environmentInfo(),
+        scenarios: reports,
+      },
       outputDir()
     );
   });

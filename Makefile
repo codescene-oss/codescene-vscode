@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark benchmark-compare
 
 .DEFAULT_GOAL := build
 
@@ -43,8 +43,16 @@ test-e2e: pretest-e2e
 	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
 
 # Performance benchmarks. Add "ITERATIONS=n" to override the per scenario iteration count.
+# Add "CLI=native" to spawn the Graal native JSON-RPC server instead of java -jar.
+# JAR peak RSS is capped for a fair comparison; override with CS_BENCH_JAVA_XMX (default 512m).
 benchmark: pretest
-	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )npm run benchmark
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )$(if $(CLI),CS_BENCH_CLI=$(CLI) )npm run benchmark
+
+benchmark-compare: pretest
+	node ./scripts/bundle-native-cli.js
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )CS_BENCH_OUTPUT=bench-results/jar npm run benchmark
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )CS_BENCH_CLI=native CS_BENCH_OUTPUT=bench-results/native npm run benchmark
+	node ./scripts/compare-benchmarks.js bench-results/jar/ide-server.json bench-results/native/native-ide-server.json
 
 # Runs just one test.
 # Example: make test1 TEST='workspace-watch'

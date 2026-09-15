@@ -30,6 +30,38 @@ function describeEnvironment(label, report) {
   return `${label}: ${report.adapter} on ${env.platform}-${env.arch}, ${env.cpus} cpus, node ${env.nodeVersion}, ${report.createdAt}`;
 }
 
+function metricRow(scenario, label, beforeValue, afterValue, unit) {
+  return `| ${scenario} | ${label} | ${format(beforeValue)} ${unit} | ${format(afterValue)} ${unit} | ${change(
+    beforeValue,
+    afterValue
+  )} |`;
+}
+
+function formatComparison(before, after) {
+  const lines = [
+    describeEnvironment('before', before),
+    describeEnvironment('after', after),
+    '',
+    '| Scenario | Metric | Before | After | Change |',
+    '| --- | --- | ---: | ---: | ---: |',
+  ];
+  if (before.startupMs != null || after.startupMs != null) {
+    lines.push(metricRow('startup', 'startup time', before.startupMs ?? 0, after.startupMs ?? 0, 'ms'));
+  }
+  if (before.sha || after.sha) {
+    lines.push(`| startup | sha | ${before.sha ?? ''} | ${after.sha ?? ''} | |`);
+  }
+  const afterById = new Map(after.scenarios.map((scenario) => [scenario.id, scenario]));
+  for (const scenario of before.scenarios) {
+    const counterpart = afterById.get(scenario.id);
+    if (!counterpart) continue;
+    for (const [key, label, unit] of METRICS) {
+      lines.push(metricRow(scenario.id, label, scenario.median[key], counterpart.median[key], unit));
+    }
+  }
+  return lines.join('\n');
+}
+
 function main() {
   const [beforePath, afterPath] = process.argv.slice(2);
   if (!beforePath || !afterPath) {
@@ -37,29 +69,11 @@ function main() {
     process.exit(1);
   }
 
-  const before = load(beforePath);
-  const after = load(afterPath);
-  console.log(describeEnvironment('before', before));
-  console.log(describeEnvironment('after', after));
-  console.log('');
-
-  const afterById = new Map(after.scenarios.map((scenario) => [scenario.id, scenario]));
-  console.log('| Scenario | Metric | Before | After | Change |');
-  console.log('| --- | --- | ---: | ---: | ---: |');
-  for (const scenario of before.scenarios) {
-    const counterpart = afterById.get(scenario.id);
-    if (!counterpart) continue;
-    for (const [key, label, unit] of METRICS) {
-      const beforeValue = scenario.median[key];
-      const afterValue = counterpart.median[key];
-      console.log(
-        `| ${scenario.id} | ${label} | ${format(beforeValue)} ${unit} | ${format(afterValue)} ${unit} | ${change(
-          beforeValue,
-          afterValue
-        )} |`
-      );
-    }
-  }
+  console.log(formatComparison(load(beforePath), load(afterPath)));
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { formatComparison, load, change, format };

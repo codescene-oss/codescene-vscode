@@ -183,4 +183,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform };
+module.exports = { bundleBinaryForPlatform, downloadBinary, extractZipArchive, removePath };
