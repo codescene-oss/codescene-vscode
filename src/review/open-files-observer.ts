@@ -31,19 +31,27 @@ export class OpenFilesObserver {
 
   private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdate = true): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
+      logOutputChannel.debug(
+        `[OpenFilesObserver] skipped path=${document.fileName} reason=unsupported-language languageId=${document.languageId}`
+      );
       return false;
     }
-    logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason})`);
+    logOutputChannel.debug(
+      `[OpenFilesObserver] reviewing path=${document.fileName} reason=${reason} skipMonitor=${skipMonitorUpdate}`
+    );
     void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate, updateDiagnosticsPane: true });
     return true;
   }
 
   private trackAndReviewDocument(document: vscode.TextDocument, reason: string): void {
+    if (!isFileDocument(document)) return;
     const fileName = document.fileName;
-    if (!this.visibleDocuments.has(fileName)) {
-      this.visibleDocuments.add(fileName);
-      this.reviewDocument(document, reason);
+    if (this.visibleDocuments.has(fileName)) {
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${fileName} reason=already-tracked`);
+      return;
     }
+    this.visibleDocuments.add(fileName);
+    this.reviewDocument(document, reason);
   }
 
   private getVisibleTabFileNames(): Set<string> {
@@ -78,6 +86,7 @@ export class OpenFilesObserver {
   }
 
   private clearDiagnosticsAndUntrack(fileName: string): void {
+    logOutputChannel.debug(`[OpenFilesObserver] untrack path=${fileName}`);
     const uri = vscode.Uri.file(fileName);
     CsDiagnostics.set(uri, []);
     this.visibleDocuments.delete(fileName);
@@ -121,7 +130,7 @@ export class OpenFilesObserver {
   private bindActiveEditorListener(): void {
     this.context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
-        if (!editor) return;
+        if (!editor || !isFileDocument(editor.document)) return;
         this.trackAndReviewDocument(editor.document, 'editor changed');
       })
     );
@@ -166,11 +175,22 @@ export class OpenFilesObserver {
   }
 
   private scheduleTextChangeReview(e: vscode.TextDocumentChangeEvent): void {
+    if (!isFileDocument(e.document)) return;
     const filePath = e.document.fileName;
     if (!this.visibleDocuments.has(filePath)) return;
-    if (!this.getAllVisibleFileNames().has(filePath)) return;
-    if (!e.document.isDirty) return;
-    if (this.shouldSkipDocumentChange(e)) return;
+    if (!this.getAllVisibleFileNames().has(filePath)) {
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=not-visible`);
+      return;
+    }
+    if (!e.document.isDirty) {
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=clean`);
+      return;
+    }
+    if (this.shouldSkipDocumentChange(e)) {
+      const reason = e.contentChanges.length === 0 ? 'empty-change' : 'duplicate-version';
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=${reason}`);
+      return;
+    }
     clearTimeout(this.reviewTimers.get(filePath));
     this.reviewTimers.set(
       filePath,
@@ -186,4 +206,8 @@ export class OpenFilesObserver {
     this.reviewTimers.clear();
     this.filteringReviewer.dispose();
   }
+}
+
+function isFileDocument(document: vscode.TextDocument): boolean {
+  return document.uri.scheme === 'file';
 }

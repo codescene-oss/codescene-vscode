@@ -1,4 +1,5 @@
 import Module from 'module';
+import * as assert from 'assert';
 import * as fs from 'fs';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
@@ -15,6 +16,58 @@ import { TreeItemStub } from './stubs/tree-item-stub';
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
   enableTestLogging = value;
+}
+
+export type CapturedLogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+export type CapturedLog = { level: CapturedLogLevel; message: string };
+
+let capturedLogs: CapturedLog[] = [];
+
+export function resetCapturedLogs() {
+  capturedLogs = [];
+}
+
+export function getCapturedLogs(): readonly CapturedLog[] {
+  return capturedLogs;
+}
+
+export function capturedLogText(level?: CapturedLogLevel): string {
+  return capturedLogs
+    .filter((entry) => !level || entry.level === level)
+    .map((entry) => `[${entry.level}] ${entry.message}`)
+    .join('\n');
+}
+
+export function assertLogContains(level: CapturedLogLevel, snippet: string) {
+  const match = capturedLogs.find((entry) => entry.level === level && entry.message.includes(snippet));
+  assert.ok(match, `expected ${level} log containing ${JSON.stringify(snippet)}, got:\n${capturedLogText()}`);
+}
+
+export function assertLogOmits(snippet: string) {
+  const match = capturedLogs.find((entry) => entry.message.includes(snippet));
+  assert.ok(!match, `did not expect any log containing ${JSON.stringify(snippet)}: ${match?.message}`);
+}
+
+function formatLogArg(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function captureLog(name: string, level: CapturedLogLevel, message: string, extraArgs: unknown[]) {
+  const extras = extraArgs.map(formatLogArg).filter((part) => part.length > 0).join(' ');
+  const text = extras ? `${message} ${extras}` : String(message);
+  capturedLogs.push({ level, message: text });
+  if (!enableTestLogging) return;
+  const line = `[${name}] ${level.toUpperCase()}: ${text}`;
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
 }
 
 const defaultWorkspaceFolders = [
@@ -187,17 +240,17 @@ const vscodeStub = {
       return { dispose: () => {} };
     },
     createOutputChannel: (name: string) => ({
-      append: (text: string) => enableTestLogging && process.stdout.write(`[${name}] ${text}`),
-      appendLine: (text: string) => enableTestLogging && console.log(`[${name}] ${text}`),
+      append: (text: string) => captureLog(name, 'info', text, []),
+      appendLine: (text: string) => captureLog(name, 'info', text, []),
       clear: () => {},
       show: () => {},
       hide: () => {},
       dispose: () => {},
-      error: (text: string) => enableTestLogging && console.error(`[${name}] ERROR: ${text}`),
-      warn: (text: string) => enableTestLogging && console.warn(`[${name}] WARN: ${text}`),
-      info: (text: string) => enableTestLogging && console.log(`[${name}] INFO: ${text}`),
-      debug: (text: string) => enableTestLogging && console.log(`[${name}] DEBUG: ${text}`),
-      trace: (text: string) => enableTestLogging && console.log(`[${name}] TRACE: ${text}`),
+      error: (text: string, ...args: unknown[]) => captureLog(name, 'error', text, args),
+      warn: (text: string, ...args: unknown[]) => captureLog(name, 'warn', text, args),
+      info: (text: string, ...args: unknown[]) => captureLog(name, 'info', text, args),
+      debug: (text: string, ...args: unknown[]) => captureLog(name, 'debug', text, args),
+      trace: (text: string, ...args: unknown[]) => captureLog(name, 'trace', text, args),
     }),
     setStatusBarMessage: (text: string, timeout?: number) => ({ dispose: () => {} }),
     showErrorMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
@@ -506,6 +559,9 @@ const originalRequire = Module.prototype.require;
 };
 
 export const mochaHooks = {
+  beforeEach() {
+    resetCapturedLogs();
+  },
   async afterAll() {
     const api = await import('../devtools-api');
     api.DevtoolsAPI.dispose();

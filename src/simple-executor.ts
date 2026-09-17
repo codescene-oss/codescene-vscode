@@ -31,10 +31,11 @@ export class SimpleExecutor implements Executor {
     const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
     const allOptions = { maxBuffer: MAX_BUFFER, ...options };
 
+    const executeMessage = `Executing: "${logCommand}" cwd=${options.cwd}`;
     if (command.command === 'git') { // These can be frequently executed, so demote their log level
-      logOutputChannel.debug(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
+      logOutputChannel.debug(executeMessage);
     } else {
-      logOutputChannel.info(`Executing: "${logCommand}" with options: ${JSON.stringify(allOptions)}`);
+      logOutputChannel.info(executeMessage);
     }
 
     return new Promise<ExecResult>((resolve, reject) => {
@@ -42,12 +43,12 @@ export class SimpleExecutor implements Executor {
 
       const childProcess = execFile(command.command, command.args, allOptions, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`);
+          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
-        logOutputChannel.trace(
+        logOutputChannel.debug(
           `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
         );
 
@@ -60,7 +61,7 @@ export class SimpleExecutor implements Executor {
         this.writeInput(childProcess, input);
       }
 
-      logOutputChannel.trace(`[pid ${childProcess.pid}] "${logName}" started`);
+      logOutputChannel.debug(`[pid ${childProcess.pid}] "${logName}" started`);
     });
   }
 

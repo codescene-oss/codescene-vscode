@@ -9,6 +9,7 @@ import {
   mockWorkspaceFolders,
   createMockWorkspaceFolder,
   restoreDefaultWorkspaceFolders,
+  assertLogContains,
 } from '../setup';
 import { resetGitAvailability } from '../../git/git-detection';
 
@@ -109,6 +110,11 @@ suite('FilteringReviewer Test Suite', () => {
     test('should ignore files in node_modules directory', async () => {
       const dir = createNestedDirs(['node_modules']);
       const testFile = path.join(dir, 'test.js');
+      const mockDocument = createFileAndMockDocument(testFile, 'console.log("test");');
+      await reviewer.reviewDiagnostics(mockDocument, { skipMonitorUpdate: true, updateDiagnosticsPane: true });
+      assertLogContains('debug', '[review] skipped');
+      assertLogContains('debug', 'reason=gitignored');
+      assertLogContains('debug', 'reason=heuristic');
       await assertIsIgnored(testFile, 'console.log("test");', true, 'node_modules should be ignored by heuristic');
     });
 

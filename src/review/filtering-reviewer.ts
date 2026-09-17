@@ -4,6 +4,7 @@ import { Review } from '../devtools-api/review-model';
 import { ReviewOpts } from './reviewer';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { GitIgnoreChecker } from '../git/git-ignore-checker';
+import { logOutputChannel } from '../log';
 
 /**
  * A reviewer that respects .gitignore settings.
@@ -23,6 +24,7 @@ export class FilteringReviewer {
     const ignored = await this.gitIgnoreChecker.isIgnored(document);
 
     if (ignored) {
+      logOutputChannel.debug(`[review] skipped path=${document.fileName} reason=gitignored`);
       return;
     }
 
@@ -33,6 +35,7 @@ export class FilteringReviewer {
     const ignored = await this.gitIgnoreChecker.isIgnored(document);
 
     if (ignored) {
+      logOutputChannel.debug(`[review] skipped path=${document.fileName} reason=gitignored`);
       return;
     }
 

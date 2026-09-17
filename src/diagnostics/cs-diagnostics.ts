@@ -30,7 +30,7 @@ export default class CsDiagnostics {
     }
 
     if (!CsDiagnostics.reviewQueue.requestReview(document.fileName, reviewOpts)) {
-      logOutputChannel.trace(`Queued up a review of "${document.fileName}"`);
+      logOutputChannel.debug(`[diagnostics] queued review path=${document.fileName}`);
       return;
     }
 
@@ -44,7 +44,7 @@ export default class CsDiagnostics {
       const queuedReviewOpts = CsDiagnostics.reviewQueue.finishReview(document.fileName);
       if (queuedReviewOpts) {
         CsDiagnostics.review(document, queuedReviewOpts);
-        logOutputChannel.trace(`Fired a queued up review of "${document.fileName}"`);
+        logOutputChannel.debug(`[diagnostics] fired queued review path=${document.fileName}`);
       }
     });
   }
