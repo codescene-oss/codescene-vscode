@@ -12,6 +12,7 @@ import {
   gitBlobSha,
 } from '../../review/review-pipeline';
 import { TestTextDocument } from '../mocks/test-text-document';
+import { assertLogContains } from '../setup';
 
 class FakeReviewClient {
   readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
@@ -94,6 +95,9 @@ suite('ReviewPipeline Test Suite', () => {
 
     assert.strictEqual(client.batches.length, 1);
     assert.deepStrictEqual(client.batches[0].files.map(({ relPath }) => relPath), ['src/file.ts']);
+    assertLogContains('debug', '[pipeline] submit id=review-1 path=src/file.ts');
+    assertLogContains('debug', 'reason=dedup');
+    assertLogContains('debug', 'submitBatch');
   });
 
   test('omits baseline-revision so the CLI resolves the baseline itself', () => {
@@ -155,6 +159,8 @@ suite('ReviewPipeline Test Suite', () => {
     await reviewPromise;
     assert.strictEqual(events.reviews.length, 0);
     assert.strictEqual(events.deltas.length, 0);
+    assertLogContains('warn', 'ignoring fileReview');
+    assertLogContains('warn', 'reason=repo-mismatch');
   });
 
   test('keeps identical relative paths isolated by repository', async () => {
@@ -250,6 +256,7 @@ suite('ReviewPipeline Test Suite', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.strictEqual(events.reviews.length, 0);
+    assertLogContains('warn', 'reason=stale-sha');
   });
 
   suite('watch result reuse', () => {
@@ -277,6 +284,7 @@ suite('ReviewPipeline Test Suite', () => {
       assert.strictEqual(client.batches.length, 0, 'Should not send a review request to the CLI');
       assert.strictEqual(events.reviews.length, 2, 'Should present the cached review for the Problems pane');
       assert.ok(review, 'Should resolve with the cached review');
+      assertLogContains('debug', 'reused watch-cache');
     });
 
     test('still submits when the monitor needs a delta', async () => {
@@ -297,6 +305,7 @@ suite('ReviewPipeline Test Suite', () => {
 
     test('still submits after the review epoch is invalidated', async () => {
       pipeline.invalidate();
+      assertLogContains('debug', 'epochInvalidated dedupEpoch=1');
 
       void pipeline.submit(repoRoot, { ...submission(document), updateMonitor: false });
 

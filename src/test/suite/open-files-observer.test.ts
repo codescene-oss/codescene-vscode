@@ -4,7 +4,7 @@ import { OpenFilesObserver } from '../../review/open-files-observer';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-event';
 import { MockEditor } from '../mocks/mock-editor';
-import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow } from '../setup';
+import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits } from '../setup';
 import { ReviewOpts } from '../../review/reviewer';
 
 suite('OpenFilesObserver Test Suite', () => {
@@ -133,6 +133,8 @@ suite('OpenFilesObserver Test Suite', () => {
       (observer as any).trackAndReviewDocument(document, 'startup');
 
       assert.deepStrictEqual(capturedOpts.map(({ skipMonitorUpdate }) => skipMonitorUpdate), [true]);
+      assertLogContains('debug', '[OpenFilesObserver] reviewing path=');
+      assertLogContains('debug', 'reason=startup skipMonitor=true');
     });
 
     test('updates the monitor when an unsaved edit is reviewed', async function () {
@@ -145,6 +147,44 @@ suite('OpenFilesObserver Test Suite', () => {
 
       await waitForReview(() => capturedOpts.length === 1);
       assert.strictEqual(capturedOpts[0].skipMonitorUpdate, false);
+      assertLogContains('debug', 'reason=text changed skipMonitor=false');
+    });
+  });
+
+  suite('skip logging', () => {
+    test('logs unsupported language skips', () => {
+      const document = new TestTextDocument('/test/readme.md', '# hi', 'markdown');
+      (observer as any).reviewDocument(document, 'startup');
+      assertLogContains('debug', 'reason=unsupported-language');
+    });
+
+    test('logs already-tracked skips', () => {
+      const document = new TestTextDocument('/test/monitor.ts', 'const value = 1;', 'typescript');
+      (observer as any).visibleDocuments.add(document.fileName);
+      (observer as any).trackAndReviewDocument(document, 'editor changed');
+      assertLogContains('debug', 'reason=already-tracked');
+    });
+
+    test('logs empty-change skips for dirty visible files', () => {
+      const document = new TestTextDocument('/test/monitor.ts', 'const value = 1;', 'typescript', 1).setDirty(true);
+      setMockVisibleTextEditors([new MockEditor(document)]);
+      (observer as any).visibleDocuments.add(document.fileName);
+      (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [] as any));
+      assertLogContains('debug', 'reason=empty-change');
+    });
+
+    test('does not log output-channel or untracked document changes', () => {
+      const outputLog = {
+        fileName: 'CodeScene.codescene-vscode.CodeScene Log.log',
+        uri: { scheme: 'output', fsPath: 'CodeScene.codescene-vscode.CodeScene Log.log' },
+        isDirty: false,
+      } as any;
+      (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(outputLog, [{}] as any));
+      (observer as any).scheduleTextChangeReview(
+        new MockTextDocumentChangeEvent(new TestTextDocument('/test/other.ts', 'const value = 1;', 'typescript').setDirty(true), [{}] as any)
+      );
+      assertLogOmits('CodeScene Log.log');
+      assertLogOmits('reason=not-tracked');
     });
   });
 

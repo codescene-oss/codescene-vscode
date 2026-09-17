@@ -11,7 +11,7 @@ import {
   ReviewResult,
 } from '../devtools-api/ide-server-client';
 import { Review } from '../devtools-api/review-model';
-import { logOutputChannel } from '../log';
+import { formatLogFields, logOutputChannel } from '../log';
 import { normalizeFsPath, pathsEqual, relativePosix, toPosixRelPath } from '../utils/fs-paths';
 
 export interface ReviewSubmission {
@@ -153,6 +153,15 @@ export class ReviewPipeline implements vscode.Disposable {
       const content = submission.content;
       if (content === undefined) {
         diskFiles.push({ relPath: toPosixRelPath(submission.relPath) });
+        logOutputChannel.debug(
+          `[pipeline] submit ${formatLogFields({
+            path: toPosixRelPath(submission.relPath),
+            repo: repoRoot,
+            source: 'disk',
+            updateMonitor: submission.updateMonitor,
+            updateDiagnostics: submission.updateDiagnosticsPane,
+          })}`
+        );
         return Promise.resolve();
       }
       const pending = this.prepareSubmission(repoRoot, { ...submission, content });
@@ -169,6 +178,14 @@ export class ReviewPipeline implements vscode.Disposable {
       ...diskFiles,
     ];
     if (files.length > 0) {
+      logOutputChannel.debug(
+        `[pipeline] submitBatch ${formatLogFields({
+          repo: repoRoot,
+          count: files.length,
+          buffer: newReviews.length,
+          disk: diskFiles.length,
+        })}`
+      );
       this.client.reviewFiles(repoRoot, files);
     }
     return Promise.all(promises);
@@ -193,6 +210,7 @@ export class ReviewPipeline implements vscode.Disposable {
 
   invalidate(): void {
     this.dedupEpoch++;
+    logOutputChannel.debug(`[pipeline] epochInvalidated dedupEpoch=${this.dedupEpoch}`);
   }
 
   dispose(): void {
@@ -219,6 +237,14 @@ export class ReviewPipeline implements vscode.Disposable {
     const context = { repoRoot, pathKey, contentHash, dedupKey };
     const latest = this.latestByPath.get(pathKey);
     if (latest?.dedupKey === dedupKey) {
+      logOutputChannel.debug(
+        `[pipeline] submit reused pending ${formatLogFields({
+          id: latest.id,
+          path: normalizedSubmission.relPath,
+          repo: repoRoot,
+          reason: 'dedup',
+        })}`
+      );
       this.mergePresentation(latest, normalizedSubmission);
       return latest;
     }
@@ -227,6 +253,16 @@ export class ReviewPipeline implements vscode.Disposable {
     if (latest) this.ignorePending(latest);
 
     const pending = this.createPending(context, normalizedSubmission);
+    logOutputChannel.debug(
+      `[pipeline] submit ${formatLogFields({
+        id: pending.id,
+        path: pending.relPath,
+        repo: repoRoot,
+        source: 'buffer',
+        updateMonitor: pending.updateMonitor,
+        updateDiagnostics: pending.updateDiagnosticsPane,
+      })}`
+    );
     this.tombstones.delete(pathKey);
     this.latestByPath.set(pathKey, pending);
     this.presentation.reviewStarted(normalizedSubmission.document);
@@ -268,6 +304,13 @@ export class ReviewPipeline implements vscode.Disposable {
     if (submission.updateMonitor) return undefined;
     const cached = this.cachedWatchReview(context);
     if (!cached) return undefined;
+
+    logOutputChannel.debug(
+      `[pipeline] submit reused watch-cache ${formatLogFields({
+        path: submission.relPath,
+        repo: context.repoRoot,
+      })}`
+    );
 
     const pending = this.createPending(context, submission);
     pending.submitted = true;
@@ -320,15 +363,25 @@ export class ReviewPipeline implements vscode.Disposable {
     pending.reviewDone = true;
     this.presentation.reviewFinished(pending.document);
     if (!this.isCurrent(pending, event.repoRoot, event.path) || !this.matchesHash(event.result['git-blob-sha'], pending.contentHash)) {
+      const reason = this.mismatchReason(pending, event.repoRoot, event.path, event.result['git-blob-sha']);
       logOutputChannel.warn(
-        `[pipeline] ignoring fileReview id=${event.id} path=${event.path} repo=${event.repoRoot} ` +
-          `(pending path=${pending.relPath} repo=${pending.repoRoot})`
+        `[pipeline] ignoring fileReview ${formatLogFields({
+          id: event.id,
+          path: event.path,
+          repo: event.repoRoot,
+          pendingPath: pending.relPath,
+          pendingRepo: pending.repoRoot,
+          reason,
+        })}`
       );
       this.ignorePending(pending);
       return;
     }
     pending.reviewResult = event.result;
     pending.resolve(event.result);
+    logOutputChannel.debug(
+      `[pipeline] completed review ${formatLogFields({ id: pending.id, path: pending.relPath, repo: pending.repoRoot })}`
+    );
     this.presentation.presentReview({ ...pending, result: event.result });
     this.cleanup(pending);
   }
@@ -348,8 +401,14 @@ export class ReviewPipeline implements vscode.Disposable {
       this.presentation.presentDelta({ ...pending, result: event.result });
     } else {
       logOutputChannel.warn(
-        `[pipeline] ignoring deltaReview id=${event.id} path=${event.path} repo=${event.repoRoot} ` +
-          `(pending path=${pending.relPath} repo=${pending.repoRoot})`
+        `[pipeline] ignoring deltaReview ${formatLogFields({
+          id: event.id,
+          path: event.path,
+          repo: event.repoRoot,
+          pendingPath: pending.relPath,
+          pendingRepo: pending.repoRoot,
+          reason: this.mismatchReason(pending, event.repoRoot, event.path, hash),
+        })}`
       );
     }
     this.cleanup(pending);
@@ -411,11 +470,22 @@ export class ReviewPipeline implements vscode.Disposable {
     const document =
       this.fileAccess.findOpenDocument(filePath)
       ?? await Promise.resolve(this.fileAccess.openDocument(filePath)).catch(() => undefined);
-    if (!document) return;
+    if (!document) {
+      logOutputChannel.debug(
+        `[pipeline] watchPresentation skipped ${formatLogFields({ path: posixPath, repo: repoRoot, reason: 'no-document' })}`
+      );
+      return;
+    }
     const expectedSha = await this.currentSha(document, filePath);
     if (receivedSha !== undefined && receivedSha !== expectedSha) {
       logOutputChannel.warn(
-        `[pipeline] ignoring watch result path=${posixPath} repo=${repoRoot} stale sha`
+        `[pipeline] ignoring watch result ${formatLogFields({
+          path: posixPath,
+          repo: repoRoot,
+          reason: 'stale-sha',
+          receivedSha,
+          expectedSha,
+        })}`
       );
       return;
     }
@@ -464,11 +534,22 @@ export class ReviewPipeline implements vscode.Disposable {
   }
 
   private isCurrent(pending: PendingReview, repoRoot: string, relPath: string): boolean {
-    return pathsEqual(pending.repoRoot, repoRoot)
-      && toPosixRelPath(pending.relPath) === toPosixRelPath(relPath)
-      && this.latestByPath.get(pending.pathKey) === pending
-      && gitBlobSha(pending.document.getText()) === pending.contentHash
-      && (this.tombstones.get(pending.pathKey) ?? 0) < pending.generation;
+    return this.mismatchReason(pending, repoRoot, relPath) === undefined;
+  }
+
+  private mismatchReason(
+    pending: PendingReview,
+    repoRoot: string,
+    relPath: string,
+    receivedSha?: string
+  ): string | undefined {
+    if (!pathsEqual(pending.repoRoot, repoRoot)) return 'repo-mismatch';
+    if (toPosixRelPath(pending.relPath) !== toPosixRelPath(relPath)) return 'path-mismatch';
+    if (this.latestByPath.get(pending.pathKey) !== pending) return 'superseded';
+    if (gitBlobSha(pending.document.getText()) !== pending.contentHash) return 'content-changed';
+    if ((this.tombstones.get(pending.pathKey) ?? 0) >= pending.generation) return 'tombstoned';
+    if (!this.matchesHash(receivedSha, pending.contentHash)) return 'sha-mismatch';
+    return undefined;
   }
 
   private matchesHash(received: string | undefined, expected: string): boolean {

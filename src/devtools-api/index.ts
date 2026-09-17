@@ -152,7 +152,10 @@ export class DevtoolsAPI {
 
   private static repoRootFor(document: vscode.TextDocument): string {
     const repo = acquireGitApi()?.getRepository(document.uri);
-    return repo ? getRepoRootPath(repo) : getWorkspaceCwd();
+    if (repo) return getRepoRootPath(repo);
+    const cwd = getWorkspaceCwd();
+    logOutputChannel.debug(`[cs-ide] repoRoot fallback path=${document.fileName} cwd=${cwd}`);
+    return cwd;
   }
 
   private static pipelinePresentation(): ReviewPipelinePresentation {

@@ -10,6 +10,7 @@ import {
   WorkspaceWatchDependencies,
 } from '../../git/workspace-watch';
 import { ReviewPipeline, ReviewSubmission } from '../../review/review-pipeline';
+import { assertLogContains } from '../setup';
 
 suite('WorkspaceWatch Test Suite', () => {
   const repoRoot = path.normalize('/repo');
@@ -123,6 +124,8 @@ suite('WorkspaceWatch Test Suite', () => {
       ['dirty.ts']
     );
     assert.strictEqual(submitted[0].submissions[0].content, 'const dirty = 1;');
+    assertLogContains('info', 'action=startWatch');
+    assertLogContains('debug', 'syncing count=1 fromGitApi=1 fromResolveGitRoot=0');
   });
 
   test('watches the whole repository when a workspace folder is the git root', async () => {
@@ -234,6 +237,8 @@ suite('WorkspaceWatch Test Suite', () => {
     await watch.syncAll();
     assert.strictEqual(watches.length, 1);
     assert.strictEqual(submitted.length, 1);
+    assertLogContains('debug', 'action=skip');
+    assertLogContains('debug', 'reason=head-unchanged');
   });
 
   test('keeps the CLI watch but re-seeds dirty buffers when HEAD moves', async () => {
@@ -244,6 +249,7 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(watches.length, 1, 'The CLI reacts to HEAD itself, so the watch is never restarted');
     assert.deepStrictEqual(stops, []);
     assert.strictEqual(submitted.length, 2, 'Dirty buffers are invisible to the CLI and must be resent');
+    assertLogContains('info', 'action=reseed');
   });
 
   test('watches the default branch too, where the change set is the uncommitted work', async () => {
@@ -279,6 +285,7 @@ suite('WorkspaceWatch Test Suite', () => {
     await watch.syncAll();
 
     assert.deepStrictEqual(stops, [repoRoot]);
+    assertLogContains('info', 'reason=no-scope');
     assert.deepStrictEqual(
       new Set(lastPruned()),
       new Set([dirtyDoc.uri.fsPath]),
@@ -302,6 +309,8 @@ suite('WorkspaceWatch Test Suite', () => {
 
     assert.deepStrictEqual(inventoryRequests, [repoRoot]);
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
+    assertLogContains('debug', 'inventory refresh requested');
+    assertLogContains('debug', 'inventory applied');
   });
 
   test('leaves the monitor untouched when the inventory request fails', async () => {
@@ -311,6 +320,7 @@ suite('WorkspaceWatch Test Suite', () => {
     await watch.syncAll();
 
     assert.deepStrictEqual(pruned, []);
+    assertLogContains('debug', 'inventory refresh skipped');
   });
 
   test('re-establishes watches after the CLI server restarts', async () => {
@@ -355,6 +365,8 @@ suite('WorkspaceWatch Test Suite', () => {
 
       assert.deepStrictEqual(inventoryRequests, [repoRoot]);
       assert.ok(!lastPruned().has(path.join(repoRoot, 'stale.ts')), 'The CLI confirmed the file has left the change set');
+      assertLogContains('debug', 'delta reconcile scheduled');
+      assertLogContains('debug', 'reason=not-in-inventory');
     });
 
     test('keeps a file the refreshed change set has caught up with', async () => {
@@ -386,6 +398,14 @@ suite('WorkspaceWatch Test Suite', () => {
 
       assert.deepStrictEqual(inventoryRequests, []);
     });
+  });
+
+  test('logs when a dirty buffer is excluded from seeding', async () => {
+    dependencies.isExcluded = () => true;
+    await watch.syncAll();
+    assert.strictEqual(submitted.length, 0);
+    assertLogContains('debug', 'seed skipped');
+    assertLogContains('debug', 'reason=excluded');
   });
 
   test('isExcludedByConfiguration matches nested exclude patterns', () => {

@@ -47,6 +47,7 @@ let openFilesObserverInstance: OpenFilesObserver | undefined;
 let workspaceWatchInstance: WorkspaceWatch | undefined;
 
 const onCodeHealthFileVersionChange = debounce(() => {
+  logOutputChannel.debug('[config] invalidating review epoch trigger=rules-change');
   DevtoolsAPI.invalidateReviewEpoch();
 }, 350);
 
@@ -55,6 +56,7 @@ const onCodeHealthFileVersionChange = debounce(() => {
  * The extension only reconciles its cached inventory against that rescan.
  */
 const onCodesceneConfigChange = debounce(() => {
+  logOutputChannel.info('[config] .codescene/config.json changed, syncing watches');
   void workspaceWatchInstance?.syncAll();
 }, 350);
 
@@ -62,6 +64,7 @@ async function updateCodeHealthRulesVersion(uri: vscode.Uri): Promise<void> {
   try {
     const document = await vscode.workspace.openTextDocument(uri);
     codeHealthFileVersion.set(document.fileName, document.version);
+    logOutputChannel.debug(`[config] rules file changed path=${document.fileName} version=${document.version}`);
     void onCodeHealthFileVersionChange();
   } catch (e) {
     logOutputChannel.warn(`Failed to update code-health-rules.json version: ${uri.fsPath}`, e);
@@ -75,13 +78,19 @@ export function getCodeHealthFileVersions(): Map<string, number> {
 async function initializeCodeHealthFileVersions() {
   const gitApi = acquireGitApi();
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  if (!workspaceFolder) return;
+  if (!workspaceFolder) {
+    logOutputChannel.debug('[config] skipped rules init reason=no-workspace-folder');
+    return;
+  }
 
   const workspacePath = workspaceFolder.uri.fsPath;
   const repo = gitApi?.getRepository(workspaceFolder.uri);
   const gitRootPath = repo?.rootUri.fsPath;
 
   const rulesFiles = await discoverCodeHealthRulesFileUris(workspacePath, gitRootPath);
+  logOutputChannel.debug(
+    `[config] rulesFiles found count=${rulesFiles.length} gitRoot=${gitRootPath ?? '(none)'} method=${gitRootPath ? 'git' : 'findFiles'}`
+  );
 
   for (const uri of rulesFiles) {
     try {
@@ -115,6 +124,7 @@ export async function activate(context: vscode.ExtensionContext) {
         CsExtensionState.setAnalysisState({ state: 'enabled' });
         await startExtension(context);
         finalizeActivation(context);
+        logOutputChannel.info('Extension activated');
       } catch (e) {
         CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
         reportError({ context: 'Unable to start extension', e });
@@ -185,6 +195,7 @@ async function startExtension(context: vscode.ExtensionContext) {
   await initializeCodeHealthFileVersions();
 
   addReviewListeners(context);
+  logOutputChannel.info('Review listeners ready');
 
   activateCHMonitor(context);
 
@@ -268,6 +279,7 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
     logOutputChannel.warn('Git API unavailable; workspace watch not started');
     return;
   }
+  logOutputChannel.debug(`[watch] starting workspace watch repositories=${gitApi.repositories.length}`);
   workspaceWatchInstance = new WorkspaceWatch(
     {
       watchFiles: DevtoolsAPI.watchFiles,
@@ -281,13 +293,20 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
     createWorkspaceWatchDependencies(() => gitApi.repositories)
   );
   const openListener = gitApi.onDidOpenRepository((repo) => {
+    const repoRoot = getRepoRootPath(repo);
+    logOutputChannel.info(`[watch] repository opened root=${repoRoot}`);
     workspaceWatchInstance?.bindRepository(repo);
     void workspaceWatchInstance?.syncAll();
   });
   const closeListener = gitApi.onDidCloseRepository((repo) => {
-    workspaceWatchInstance?.stopWatching(getRepoRootPath(repo));
+    const repoRoot = getRepoRootPath(repo);
+    logOutputChannel.info(`[watch] repository closed root=${repoRoot}`);
+    workspaceWatchInstance?.stopWatching(repoRoot, 'repo-closed');
   });
-  const folderListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+  const folderListener = vscode.workspace.onDidChangeWorkspaceFolders((event) => {
+    logOutputChannel.info(
+      `[watch] workspaceFolders changed added=${event.added.map((folder) => folder.uri.fsPath).join(', ') || '(none)'} removed=${event.removed.map((folder) => folder.uri.fsPath).join(', ') || '(none)'}`
+    );
     void workspaceWatchInstance?.syncAll();
   });
   DISPOSABLES.push(workspaceWatchInstance, openListener, closeListener, folderListener);

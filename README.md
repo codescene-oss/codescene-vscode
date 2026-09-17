@@ -69,6 +69,8 @@ Location: `Code Health Monitor` > `Extension Settings`
 
 ### Debug logging ###
 
-CodeScene follows Visual Studio Codes Log level. To enable debug logging, in the command `Developer: Set Log Level...` to debug
+CodeScene writes diagnostics to the **CodeScene Log** output channel and follows Visual Studio Code's log level (`info`, `debug`, `warn`, and `error`). CLI process lifecycle and JSON-RPC request/response summaries are logged at **Info**. To see workspace, repository, and review decision logs as well, run `Developer: Set Log Level...` and choose **Debug**.
+
+Source code, auth tokens, encoded refactor payloads, returned refactored code, device IDs, and telemetry user identifiers are not written to the log.
 
 _* Available time-limited for non CodeScene customers._

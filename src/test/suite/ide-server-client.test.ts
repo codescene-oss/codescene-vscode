@@ -249,4 +249,104 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await client.restart(), { sha: 'fixture-sha', version: 'fixture-version', args: [] });
     assert.deepStrictEqual(await client.deviceId(), { 'device-id': 'device-42' });
   });
+
+  test('logs process lifecycle and correlated request summaries without secrets', async () => {
+    const { assertLogContains, assertLogOmits, capturedLogText } = await import('../setup');
+    await client.start();
+    assertLogContains('info', '[cs-ide] starting');
+    assertLogContains('info', '[cs-ide] started');
+    assertLogContains('info', '[cs-ide] received start version=fixture-version sha=fixture-sha restart=false');
+
+    await client.review({ path: 'file.ts' });
+    await client.delta({ 'old-score': 'old' });
+    await client.preflight({ force: true });
+    await client.fnsToRefactor({
+      'file-name': 'file.ts',
+      'file-content': 'function f() {}',
+      preflight: { version: 2, 'file-types': ['ts'], 'language-common': { 'max-input-loc': 100, 'code-smells': [] } },
+      'code-smells': [{ category: 'Complex Method' } as any],
+    });
+    await client.refactor({ token: 'secret-token', 'fn-to-refactor-nippy-b64': 'encoded', 'skip-cache': true });
+    await client.telemetry({ 'editor-type': 'VSCode', 'event-name': 'test-event', 'extension-version': '1.0.0', 'user-id': 'user-99' });
+    await client.deviceId();
+    await client.codeHealthRulesTemplate();
+    await client.checkRules('/repo', 'src/file.ts');
+    await client.getWatchInventory('/repo');
+
+    assertLogContains('info', 'sending id=1 method=cs-ide/review path=file.ts hasContent=false hasCachePath=false');
+    assertLogContains('info', 'received id=1 method=cs-ide/review durationMs=');
+    assertLogContains('info', 'method=cs-ide/review');
+    assertLogContains('info', 'score=9.68 fileSmells=0 functionSmells=0 hasRulesError=false sha=review-sha');
+    assertLogContains('info', 'method=cs-ide/delta hasOldScore=true hasNewScore=false');
+    assertLogContains('info', 'oldScore=10 newScore=9.68 scoreChange=-0.32 fileFindings=0 functionFindings=0');
+    assertLogContains('info', 'method=cs-ide/preflight force=true');
+    assertLogContains('info', 'version=2 fileTypes=ts codeSmellCount=1 maxInputLoc=100');
+    assertLogContains('info', 'method=cs-ide/fns-to-refactor fileName=file.ts input=code-smells smellCount=1');
+    assertLogContains('info', 'functions=f@1:1-1:16[Complex Method]');
+    assertLogContains('info', 'method=cs-ide/refactor format=nippy-b64 skipCache=true');
+    assertLogContains('info', 'traceId=trace-1 confidence=1 cached=false reasonCount=0');
+    assertLogContains('info', 'method=cs-ide/telemetry eventName=test-event');
+    assertLogContains('info', 'method=cs-ide/telemetry durationMs=');
+    assertLogContains('info', 'status=202');
+    assertLogContains('info', 'method=cs-ide/device-id');
+    assertLogContains('info', 'method=cs-ide/device-id durationMs=');
+    assertLogContains('info', 'ok=true');
+    assertLogContains('info', 'method=cs-ide/check-rules repoRoot=/repo path=src/file.ts');
+    assertLogContains('info', 'method=cs-ide/getWatchInventory repoRoot=/repo');
+    assertLogContains('info', 'count=1 files=requested.ts');
+
+    assertLogOmits('secret-token');
+    assertLogOmits('function f() {}');
+    assertLogOmits('encoded');
+    assertLogOmits('device-42');
+    assertLogOmits('user-99');
+    assertLogOmits('{"rule_sets":[]}');
+    assert.ok(!capturedLogText().includes('file-content'), capturedLogText());
+  });
+
+  test('caps reviewFiles path lists and omits file content', async () => {
+    const { assertLogContains, assertLogOmits, getCapturedLogs } = await import('../setup');
+    const files = Array.from({ length: 21 }, (_, index) => ({
+      relPath: `file-${index}.ts`,
+      content: 'secret-source',
+    }));
+    client.reviewFiles('/repo', files);
+    await waitForLog('[cs-ide] sending reviewFiles');
+    const sending = getCapturedLogs().find((entry) => entry.message.includes('sending reviewFiles'));
+    assert.ok(sending, 'expected a reviewFiles send log');
+    assert.ok(sending.message.includes('count=21'), sending.message);
+    assert.ok(sending.message.includes('file-0.ts'), sending.message);
+    assert.ok(sending.message.includes('file-19.ts'), sending.message);
+    assert.ok(sending.message.includes('omitted=1'), sending.message);
+    assert.ok(!sending.message.includes('file-20.ts'), sending.message);
+    assertLogContains('info', '[cs-ide] sending reviewFiles repo=/repo count=21');
+    assertLogOmits('secret-source');
+  });
+
+  test('logs inbound review, delta, failure, queue, and watch notifications', async () => {
+    const { assertLogContains } = await import('../setup');
+    const review = new Promise<void>((resolve) => client.onDidReview(() => resolve()));
+    const delta = new Promise<void>((resolve) => client.onDidDelta(() => resolve()));
+    client.reviewFiles('/repo', [{ id: 'file-1', relPath: 'file.ts', content: 'const x = 1;' }]);
+    await review;
+    await delta;
+    assertLogContains('info', 'received fileReview id=file-1 path=file.ts');
+    assertLogContains('info', 'received deltaReview id=file-1 path=file.ts');
+    assertLogContains('info', 'received queue');
+
+    const inventory = new Promise<void>((resolve) => client.onDidWatchInventory(() => resolve()));
+    client.watchFiles('/repo', ['packages/app']);
+    await inventory;
+    assertLogContains('info', 'sending watchFiles repo=/repo relativePaths=packages/app');
+    assertLogContains('info', 'received watchInventoryChanged repo=/repo count=1 files=watched.ts');
+  });
 });
+
+async function waitForLog(snippet: string): Promise<void> {
+  const { getCapturedLogs } = await import('../setup');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (getCapturedLogs().some((entry) => entry.message.includes(snippet))) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`timed out waiting for log containing ${snippet}`);
+}

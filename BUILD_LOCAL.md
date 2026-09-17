@@ -147,7 +147,7 @@ In the Extension Development Host window:
 
 1. **Check Output panel:**
    - `Cmd+Shift+U` (Mac) or `Ctrl+Shift+U` (Windows/Linux)
-   - Select "CodeScene" from dropdown
+   - Select "CodeScene Log" from dropdown
    - Should see: "⚙️ Activating extension..."
    - Should see: "Checking for bundled CodeScene devtools binary..."
    - Should see: "CodeScene devtools binary is ready."
@@ -235,7 +235,7 @@ Or manually:
 
 1. **Check Extension Activation:**
    - Open VS Code Output panel (`Cmd+Shift+U` / `Ctrl+Shift+U`)
-   - Select "CodeScene" from dropdown
+   - Select "CodeScene Log" from dropdown
    - Should see: "Checking for bundled CodeScene devtools binary..."
    - Should see: "CodeScene devtools binary is ready."
    - ❌ Should NOT see: "Downloading..." messages

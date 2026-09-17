@@ -3,7 +3,7 @@ import vscode from 'vscode';
 import type { Repository } from '../../types/git';
 import type { CsIdeServerClient, DeltaResult, ServerStartEvent, WatchInventory } from '../devtools-api/ide-server-client';
 import { supportedExtensions } from '../language-support';
-import { logOutputChannel } from '../log';
+import { formatLogFields, logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
 import { getRepoRootPath, resolveGitRoot } from '../git-utils';
 import { pruneMonitorToPaths } from '../code-health-monitor/monitor-prune';
@@ -89,9 +89,14 @@ export class WorkspaceWatch implements vscode.Disposable {
   async syncAll(): Promise<void> {
     if (this.disposed) return;
     const targets = await this.watchTargets();
-    const resolved = targets.filter((target) => !target.repo).length;
+    const fromGitApi = targets.filter((target) => target.repo).length;
+    const fromResolveGitRoot = targets.length - fromGitApi;
     logOutputChannel.debug(
-      `[watch] syncing ${targets.length} repositories reached by the workspace, ${resolved} of them resolved without the git extension`
+      `[watch] syncing ${formatLogFields({
+        count: targets.length,
+        fromGitApi,
+        fromResolveGitRoot,
+      })}`
     );
     for (const target of targets) {
       try {
@@ -105,6 +110,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   dispose(): void {
     this.disposed = true;
     for (const repoRoot of this.watched.keys()) {
+      logOutputChannel.info(`[watch] stopped ${formatLogFields({ repo: repoRoot, reason: 'dispose' })}`);
       this.client.stopWatchFiles(repoRoot);
     }
     this.watched.clear();
@@ -125,8 +131,8 @@ export class WorkspaceWatch implements vscode.Disposable {
     if (this.disposed) return;
     const scope = await this.scopeFor(target.repoRoot);
     if (!scope) {
-      logOutputChannel.debug(`[watch] not watching ${target.repoRoot}: no workspace folder reaches into it`);
-      this.stopWatching(target.repoRoot);
+      logOutputChannel.debug(`[watch] not watching ${formatLogFields({ repo: target.repoRoot, reason: 'no-scope' })}`);
+      this.stopWatching(target.repoRoot, 'no-scope');
       return;
     }
     if (this.ensureWatch(target, scope)) return;
@@ -167,9 +173,17 @@ export class WorkspaceWatch implements vscode.Disposable {
    */
   private async gitRootFor(directory: string): Promise<string | undefined> {
     const key = normalizeFsPath(directory);
-    if (this.rootCache.has(key)) return this.rootCache.get(key);
+    if (this.rootCache.has(key)) {
+      logOutputChannel.debug(
+        `[watch] gitRoot cache-hit ${formatLogFields({ directory, result: this.rootCache.get(key) ?? '(none)' })}`
+      );
+      return this.rootCache.get(key);
+    }
     const repoRoot = await this.dependencies.gitRootFor(directory);
     this.rootCache.set(key, repoRoot);
+    logOutputChannel.debug(
+      `[watch] gitRoot resolved ${formatLogFields({ directory, result: repoRoot ?? '(none)' })}`
+    );
     return repoRoot;
   }
 
@@ -198,10 +212,38 @@ export class WorkspaceWatch implements vscode.Disposable {
     const scopeKey = watchScopeKey(scope);
     const previous = this.watched.get(normalizedRoot);
     const established = previous?.scopeKey === scopeKey ? previous : undefined;
-    if (established && this.headUnchanged(established, target.repo)) return false;
+    if (established && this.headUnchanged(established, target.repo)) {
+      logOutputChannel.debug(
+        `[watch] ensureWatch ${formatLogFields({
+          action: 'skip',
+          repo: target.repoRoot,
+          reason: 'head-unchanged',
+          scopeKey,
+          head: headLabel(target.repo),
+        })}`
+      );
+      return false;
+    }
     if (established) {
+      logOutputChannel.info(
+        `[watch] ensureWatch ${formatLogFields({
+          action: 'reseed',
+          repo: target.repoRoot,
+          scopeKey,
+          head: headLabel(target.repo),
+        })}`
+      );
       this.rememberHead(normalizedRoot, target.repo, scopeKey);
     } else {
+      logOutputChannel.info(
+        `[watch] ensureWatch ${formatLogFields({
+          action: 'startWatch',
+          repo: target.repoRoot,
+          kind: scope.kind,
+          paths: watchScopePaths(scope) ?? '(whole repository)',
+          head: headLabel(target.repo),
+        })}`
+      );
       this.startWatch(target, scope);
     }
     this.seed(target.repoRoot);
@@ -225,9 +267,10 @@ export class WorkspaceWatch implements vscode.Disposable {
     return watched.headName === repo?.state.HEAD?.name && watched.headCommit === repo?.state.HEAD?.commit;
   }
 
-  stopWatching(repoRoot: string): void {
+  stopWatching(repoRoot: string, reason = 'unspecified'): void {
     const normalizedRoot = normalizeFsPath(repoRoot);
     if (!this.watched.has(normalizedRoot)) return;
+    logOutputChannel.info(`[watch] stopped ${formatLogFields({ repo: repoRoot, reason })}`);
     this.client.stopWatchFiles(repoRoot);
     this.watched.delete(normalizedRoot);
     this.applyInventory({ repoRoot, files: [] });
@@ -245,18 +288,27 @@ export class WorkspaceWatch implements vscode.Disposable {
       relPaths: new Set(inventory.files.map(toPosixRelPath)),
     });
     const reported = Array.from(this.inventories.values());
+    const keepPaths = this.pathsToKeep(reported);
+    logOutputChannel.debug(
+      `[watch] inventory applied ${formatLogFields({
+        repo: repoRoot,
+        files: inventory.files.length,
+        keepPaths: keepPaths.size,
+      })}`
+    );
     this.dependencies.pruneMonitor(
       reported.map((entry) => entry.repoRoot),
-      this.pathsToKeep(reported)
+      keepPaths
     );
   }
 
   private async refreshInventory(repoRoot: string): Promise<void> {
+    logOutputChannel.debug(`[watch] inventory refresh requested ${formatLogFields({ repo: repoRoot })}`);
     try {
       const inventory = await this.client.getWatchInventory(repoRoot);
       this.applyInventory({ repoRoot, files: inventory.files });
     } catch (error) {
-      logOutputChannel.debug(`[watch] inventory refresh skipped for ${repoRoot}: ${error}`);
+      logOutputChannel.debug(`[watch] inventory refresh skipped ${formatLogFields({ repo: repoRoot, error: String(error) })}`);
     }
   }
 
@@ -270,10 +322,19 @@ export class WorkspaceWatch implements vscode.Disposable {
     if (this.disposed || !event.result) return;
     const repoRoot = this.resolveRepoRoot(event.repoRoot);
     const inventory = this.inventories.get(normalizeFsPath(repoRoot));
-    if (!inventory) return;
+    if (!inventory) {
+      logOutputChannel.debug(`[watch] delta ignored ${formatLogFields({ repo: repoRoot, path: event.path, reason: 'no-inventory' })}`);
+      return;
+    }
     const relPath = toPosixRelPath(event.path);
     if (inventory.relPaths.has(relPath)) return;
-    if (this.dirtyDocuments(repoRoot).has(relPath)) return;
+    if (this.dirtyDocuments(repoRoot).has(relPath)) {
+      logOutputChannel.debug(`[watch] delta ignored ${formatLogFields({ repo: repoRoot, path: relPath, reason: 'dirty-buffer' })}`);
+      return;
+    }
+    logOutputChannel.debug(
+      `[watch] delta reconcile scheduled ${formatLogFields({ repo: repoRoot, path: relPath, reason: 'not-in-inventory' })}`
+    );
     this.scheduleInventoryRefresh(repoRoot);
   }
 
@@ -343,8 +404,14 @@ export class WorkspaceWatch implements vscode.Disposable {
       if (document.uri.scheme !== 'file' || !document.isDirty) continue;
       if (!isPathUnderRoot(normalizedRoot, normalizeFsPath(document.uri.fsPath))) continue;
       const relPath = relativePosix(repoRoot, document.uri.fsPath);
-      if (!this.isSupported(relPath)) continue;
-      if (this.dependencies.isExcluded(document.uri)) continue;
+      if (!this.isSupported(relPath)) {
+        logOutputChannel.debug(`[watch] seed skipped ${formatLogFields({ path: relPath, reason: 'unsupported' })}`);
+        continue;
+      }
+      if (this.dependencies.isExcluded(document.uri)) {
+        logOutputChannel.debug(`[watch] seed skipped ${formatLogFields({ path: relPath, reason: 'excluded' })}`);
+        continue;
+      }
       documents.set(relPath, document);
     }
     return documents;
@@ -399,4 +466,10 @@ function matchesExclude(pattern: string, relPath: string): boolean {
     })
     .join('');
   return new RegExp(`^(?:${escaped}|.*/${escaped})(?:/.*)?$`).test(normalized);
+}
+
+function headLabel(repo: Repository | undefined): string {
+  const name = repo?.state.HEAD?.name ?? '(unnamed)';
+  const commit = repo?.state.HEAD?.commit ?? '(none)';
+  return `${name}@${commit}`;
 }

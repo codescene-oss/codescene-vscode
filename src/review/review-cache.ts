@@ -113,7 +113,7 @@ export class ReviewCache {
 
     innerMap.set(snapshot, { item, skipMonitorUpdate: finalSkipMonitorUpdate });
 
-    logOutputChannel.trace(`ReviewCache.add: ${path.basename(document.fileName)}`);
+    logOutputChannel.debug(`ReviewCache.add: ${path.basename(document.fileName)}`);
   }
 
   update(document: vscode.TextDocument, review: CsReview, skipMonitorUpdate: boolean) {
@@ -123,7 +123,7 @@ export class ReviewCache {
     const currentSnapshot = this.createCodeHealthRulesSnapshot();
     for (const [snapshot, entry] of innerMap.entries()) {
       if (this.snapshotsEqual(snapshot, currentSnapshot)) {
-        logOutputChannel.trace(`ReviewCache.update: ${path.basename(document.fileName)}`);
+        logOutputChannel.debug(`ReviewCache.update: ${path.basename(document.fileName)}`);
 
         entry.item.setReview(document, review);
         entry.skipMonitorUpdate = this.resolveSkipMonitorUpdate(skipMonitorUpdate, entry.skipMonitorUpdate);
