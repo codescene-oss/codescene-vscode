@@ -4,7 +4,7 @@ import { OpenFilesObserver } from '../../review/open-files-observer';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-event';
 import { MockEditor } from '../mocks/mock-editor';
-import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits } from '../setup';
+import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits, fireDidSaveTextDocument, fireDidCloseTextDocument, fireDidChangeVisibleTextEditors, fireDidChangeTabs } from '../setup';
 import { ReviewOpts } from '../../review/reviewer';
 import { DevtoolsAPI } from '../../devtools-api';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
@@ -216,6 +216,7 @@ suite('OpenFilesObserver Test Suite', () => {
       };
       CsDiagnostics.cancel = (fileName) => {
         cancelledFiles.push(fileName);
+        originalCancel(fileName);
       };
       CsDiagnostics.set = () => undefined;
     });
@@ -309,6 +310,116 @@ suite('OpenFilesObserver Test Suite', () => {
 
       assert.ok((observer as any).visibleDocuments.has(filePath));
       assert.deepStrictEqual(restoreCalls, []);
+    });
+
+    test('untracks a file after its last tab is gone', () => {
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      track(document);
+      (observer as any).hasInitialized = true;
+      setMockTabGroups([]);
+
+      (observer as any).untrackHiddenDocuments();
+
+      assert.deepStrictEqual(restoreCalls, [document]);
+      assert.ok(!(observer as any).visibleDocuments.has(filePath));
+    });
+
+    suite('event wiring', () => {
+      setup(() => {
+        observer.start();
+      });
+
+      test('save releases buffer ownership', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+
+        fireDidSaveTextDocument(document);
+
+        assert.deepStrictEqual(releaseCalls, [document]);
+      });
+
+      test('save ignores non-file documents', () => {
+        fireDidSaveTextDocument({
+          fileName: 'output.log',
+          uri: { scheme: 'output', fsPath: 'output.log' },
+        });
+
+        assert.deepStrictEqual(releaseCalls, []);
+      });
+
+      test('close restores when the file has no remaining tab', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        setMockTabGroups([]);
+
+        fireDidCloseTextDocument(document);
+
+        assert.deepStrictEqual(restoreCalls, [document]);
+      });
+
+      test('close keeps the entry when another tab remains', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        setMockTabGroups([{ tabs: [{ input: new vscode.TabInputText(vscode.Uri.file(filePath)) }] }]);
+
+        fireDidCloseTextDocument(document);
+
+        assert.ok((observer as any).visibleDocuments.has(filePath));
+        assert.deepStrictEqual(restoreCalls, []);
+      });
+
+      test('close of an untracked document is a no-op', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+
+        fireDidCloseTextDocument(document);
+
+        assert.deepStrictEqual(restoreCalls, []);
+      });
+
+      test('tab change after init untracks files that left the editor', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        (observer as any).hasInitialized = true;
+        setMockTabGroups([]);
+
+        fireDidChangeTabs();
+
+        assert.deepStrictEqual(restoreCalls, [document]);
+      });
+
+      test('visible editor change untracks hidden documents', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        (observer as any).hasInitialized = true;
+        setMockTabGroups([]);
+
+        fireDidChangeVisibleTextEditors();
+
+        assert.deepStrictEqual(restoreCalls, [document]);
+      });
+
+      test('tab change before init does not untrack existing entries', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        (observer as any).hasInitialized = false;
+        setMockTabGroups([]);
+
+        fireDidChangeTabs();
+
+        assert.ok((observer as any).visibleDocuments.has(filePath));
+        assert.deepStrictEqual(restoreCalls, []);
+      });
+
+      test('visible editor change before init does not untrack existing entries', () => {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        track(document);
+        (observer as any).hasInitialized = false;
+        setMockTabGroups([]);
+
+        fireDidChangeVisibleTextEditors();
+
+        assert.ok((observer as any).visibleDocuments.has(filePath));
+        assert.deepStrictEqual(restoreCalls, []);
+      });
     });
   });
 

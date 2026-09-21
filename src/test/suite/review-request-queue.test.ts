@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import CsDiagnostics from '../../diagnostics/cs-diagnostics';
 import { ReviewRequestQueue } from '../../diagnostics/review-request-queue';
 import { ReviewOpts } from '../../review/reviewer';
 
@@ -36,5 +37,22 @@ suite('ReviewRequestQueue Test Suite', () => {
     queue.finishReview(fileName);
 
     assert.strictEqual(queue.requestReview(fileName, firstOpts), true);
+  });
+
+  test('CsDiagnostics.cancel forwards to the review queue', () => {
+    const queue = new ReviewRequestQueue();
+    const originalQueue = (CsDiagnostics as any).reviewQueue;
+    (CsDiagnostics as any).reviewQueue = queue;
+
+    try {
+      assert.strictEqual(queue.requestReview(fileName, firstOpts), true);
+      assert.strictEqual(queue.requestReview(fileName, queuedOpts), false);
+
+      CsDiagnostics.cancel(fileName);
+
+      assert.strictEqual(queue.finishReview(fileName), undefined);
+    } finally {
+      (CsDiagnostics as any).reviewQueue = originalQueue;
+    }
   });
 });

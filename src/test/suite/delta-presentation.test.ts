@@ -7,6 +7,8 @@ import { Review } from '../../devtools-api/review-model';
 import Reviewer from '../../review/reviewer';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
+import CsDiagnostics from '../../diagnostics/cs-diagnostics';
+import { setMockGitRepositories, clearMockGitRepositories } from '../setup';
 
 class FakeIdeServer {
   readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
@@ -63,13 +65,16 @@ suite('Delta presentation Test Suite', () => {
     server = new FakeIdeServer();
     DevtoolsAPI.init(process.execPath, context, server as any);
     Reviewer.init(context, () => new Map());
+    CsDiagnostics.init(context);
     events = [];
     listener = DevtoolsAPI.onDidDeltaAnalysisComplete((event) => events.push(event));
+    setMockGitRepositories([{ rootUri: { fsPath: '/repo' } }]);
   });
 
   teardown(() => {
     listener.dispose();
     DevtoolsAPI.dispose();
+    clearMockGitRepositories();
   });
 
   const testCases = [
@@ -105,6 +110,31 @@ suite('Delta presentation Test Suite', () => {
         [updateMonitor, updateMonitor]
       );
     });
+  });
+
+  test('restoreFromDiskIfBufferOwned asks the CLI for the saved file', () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript').setDirty(true);
+    void DevtoolsAPI.reviewWithServer(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
+
+    DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
+
+    assert.strictEqual(server.batches.length, 2);
+    assert.ok(server.batches[1].files.every((file) => file.content === undefined));
+  });
+
+  test('releaseBufferMonitorOwnership hands the monitor back without restoring from disk', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript').setDirty(true);
+    const review = DevtoolsAPI.reviewWithServer(document, { skipMonitorUpdate: false, updateDiagnosticsPane: false });
+    const submitted = server.batches[0];
+    const id = submitted.files[0].id;
+    server.reviewEmitter.fire({ id, repoRoot: submitted.repoRoot, path: submitted.files[0].relPath, result: emptyReview() });
+    server.deltaEmitter.fire({ id, repoRoot: submitted.repoRoot, path: submitted.files[0].relPath, result: null });
+    await review;
+
+    DevtoolsAPI.releaseBufferMonitorOwnership(document);
+    DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
+
+    assert.strictEqual(server.batches.length, 1);
   });
 });
 
