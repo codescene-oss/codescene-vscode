@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { scorePresentation } from '../code-health-monitor/presentation';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { DevtoolsAPI } from '../devtools-api';
+import { Delta } from '../devtools-api/delta-model';
 import { Review } from '../devtools-api/review-model';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { FnToRefactor } from '../devtools-api/refactor-models';
@@ -11,7 +12,14 @@ import { isDefined } from '../utils';
 import Reviewer from './reviewer';
 import { ReviewCacheItem } from './review-cache-item';
 import { CsCodeLens } from './cs-code-lens';
-import { logOutputChannel } from '../log';
+import { formatScore } from './utils';
+
+export function codeHealthCodeLensTitle(delta: Delta): string {
+  if (!isDefined(delta['old-score']) && isDefined(delta['new-score'])) {
+    return `Code Health: ${formatScore(delta['new-score'])}`;
+  }
+  return `Code Health: ${scorePresentation(delta)}`;
+}
 
 export class CsReviewCodeLensProvider
 implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposable
@@ -103,7 +111,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
     const codeLens = new vscode.CodeLens(new vscode.Range(0, 0, 0, 0));
     if (isDefined(delta)) {
       codeLens.command = {
-        title: `$(pulse) Code Health: ${scorePresentation(delta)}`,
+        title: `$(pulse) ${codeHealthCodeLensTitle(delta)}`,
         command: 'codescene.homeView.focus',
       };
       return codeLens;
