@@ -24,6 +24,10 @@ export default class CsDiagnostics {
     CsDiagnostics.collection.set(uri, diagnostics);
   }
 
+  static cancel(fileName: string): void {
+    CsDiagnostics.reviewQueue.cancel(fileName);
+  }
+
   static review(document: vscode.TextDocument, reviewOpts: ReviewOpts) {
     if (vscode.languages.match(CsDiagnostics.documentSelector, document) === 0) {
       return;

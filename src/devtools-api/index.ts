@@ -150,6 +150,14 @@ export class DevtoolsAPI {
     });
   }
 
+  static releaseBufferMonitorOwnership(document: vscode.TextDocument): void {
+    DevtoolsAPI.pipeline.releaseBufferMonitorOwnership(DevtoolsAPI.repoRootFor(document), document);
+  }
+
+  static restoreFromDiskIfBufferOwned(document: vscode.TextDocument): void {
+    DevtoolsAPI.pipeline.restoreFromDiskIfBufferOwned(DevtoolsAPI.repoRootFor(document), document);
+  }
+
   private static repoRootFor(document: vscode.TextDocument): string {
     const repo = acquireGitApi()?.getRepository(document.uri);
     if (repo) return getRepoRootPath(repo);

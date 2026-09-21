@@ -127,6 +127,7 @@ export class ReviewPipeline implements vscode.Disposable {
   private readonly tombstones = new Map<string, number>();
   private readonly generations = new Map<string, number>();
   private readonly watchReviews = new Map<string, WatchReviewEntry>();
+  private readonly bufferOwnedPaths = new Set<string>();
   private dedupEpoch = 0;
   private readonly disposables: vscode.Disposable[];
   private readonly fileAccess: ReviewPipelineFileAccess;
@@ -197,15 +198,31 @@ export class ReviewPipeline implements vscode.Disposable {
 
   remove(repoRoot: string, documents: vscode.TextDocument[]): void {
     for (const document of documents) {
-      const pathKey = this.pathKey(repoRoot, relativePosix(repoRoot, document.uri.fsPath));
+      const pathKey = this.pathKeyForDocument(repoRoot, document);
       const latest = this.latestByPath.get(pathKey);
       if (latest) this.ignorePending(latest);
       const generation = this.nextGeneration(pathKey);
       this.tombstones.set(pathKey, generation);
       this.latestByPath.delete(pathKey);
       this.watchReviews.delete(pathKey);
+      this.bufferOwnedPaths.delete(pathKey);
       this.presentation.remove(document);
     }
+  }
+
+  releaseBufferMonitorOwnership(repoRoot: string, document: vscode.TextDocument): void {
+    this.bufferOwnedPaths.delete(this.pathKeyForDocument(repoRoot, document));
+  }
+
+  restoreFromDiskIfBufferOwned(repoRoot: string, document: vscode.TextDocument): void {
+    if (!this.bufferOwnedPaths.has(this.pathKeyForDocument(repoRoot, document))) return;
+    this.remove(repoRoot, [document]);
+    void this.submit(repoRoot, {
+      document,
+      relPath: relativePosix(repoRoot, document.uri.fsPath),
+      updateDiagnosticsPane: false,
+      updateMonitor: true,
+    });
   }
 
   invalidate(): void {
@@ -219,6 +236,7 @@ export class ReviewPipeline implements vscode.Disposable {
     this.latestByPath.clear();
     this.tombstones.clear();
     this.watchReviews.clear();
+    this.bufferOwnedPaths.clear();
   }
 
   private prepareSubmission(repoRoot: string, submission: ReviewSubmission & { content: string }): PendingReview {
@@ -246,6 +264,7 @@ export class ReviewPipeline implements vscode.Disposable {
         })}`
       );
       this.mergePresentation(latest, normalizedSubmission);
+      this.rememberBufferOwnership(pathKey, latest.updateMonitor);
       return latest;
     }
     const reused = this.reusedWatchReview(context, normalizedSubmission, latest);
@@ -265,6 +284,7 @@ export class ReviewPipeline implements vscode.Disposable {
     );
     this.tombstones.delete(pathKey);
     this.latestByPath.set(pathKey, pending);
+    this.rememberBufferOwnership(pathKey, pending.updateMonitor);
     this.presentation.reviewStarted(normalizedSubmission.document);
     this.presentation.deltaStarted(normalizedSubmission.document);
     return pending;
@@ -554,6 +574,14 @@ export class ReviewPipeline implements vscode.Disposable {
 
   private matchesHash(received: string | undefined, expected: string): boolean {
     return received === undefined || received === expected;
+  }
+
+  private rememberBufferOwnership(pathKey: string, updateMonitor: boolean): void {
+    if (updateMonitor) this.bufferOwnedPaths.add(pathKey);
+  }
+
+  private pathKeyForDocument(repoRoot: string, document: vscode.TextDocument): string {
+    return this.pathKey(repoRoot, relativePosix(repoRoot, document.uri.fsPath));
   }
 
   private pathKey(repoRoot: string, relPath: string): string {

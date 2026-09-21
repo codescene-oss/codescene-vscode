@@ -99,12 +99,66 @@ export function setMockVisibleTextEditors(editors: any[]) {
 }
 
 export function setMockTabGroups(tabGroups: any[]) {
-  vscodeStub.window.tabGroups = { all: tabGroups };
+  vscodeStub.window.tabGroups.all = tabGroups;
 }
 
 export function resetMockWindow() {
   vscodeStub.window.visibleTextEditors = [];
-  vscodeStub.window.tabGroups = { all: [] };
+  vscodeStub.window.tabGroups.all = [];
+  resetMockEvents();
+}
+
+function createMockEvent<T = any>() {
+  const listeners: Array<(e: T) => any> = [];
+  return {
+    event: (listener: (e: T) => any) => {
+      listeners.push(listener);
+      return {
+        dispose: () => {
+          const index = listeners.indexOf(listener);
+          if (index >= 0) listeners.splice(index, 1);
+        },
+      };
+    },
+    fire: (data?: T) => {
+      listeners.slice().forEach((listener) => listener(data as T));
+    },
+    reset: () => {
+      listeners.length = 0;
+    },
+  };
+}
+
+const didSaveTextDocument = createMockEvent();
+const didCloseTextDocument = createMockEvent();
+const didChangeTextDocument = createMockEvent();
+const didChangeVisibleTextEditors = createMockEvent();
+const didChangeActiveTextEditor = createMockEvent();
+const didChangeTabs = createMockEvent();
+
+export function fireDidSaveTextDocument(document: any) {
+  didSaveTextDocument.fire(document);
+}
+
+export function fireDidCloseTextDocument(document: any) {
+  didCloseTextDocument.fire(document);
+}
+
+export function fireDidChangeVisibleTextEditors() {
+  didChangeVisibleTextEditors.fire(undefined);
+}
+
+export function fireDidChangeTabs() {
+  didChangeTabs.fire(undefined);
+}
+
+export function resetMockEvents() {
+  didSaveTextDocument.reset();
+  didCloseTextDocument.reset();
+  didChangeTextDocument.reset();
+  didChangeVisibleTextEditors.reset();
+  didChangeActiveTextEditor.reset();
+  didChangeTabs.reset();
 }
 
 let mockGitRepositories: any[] = [];
@@ -231,7 +285,7 @@ const vscodeStub = {
   },
   window: {
     visibleTextEditors: [] as any[],
-    tabGroups: { all: [] as any[] },
+    tabGroups: { all: [] as any[], onDidChangeTabs: didChangeTabs.event },
     state: {
       focused: true,
     },
@@ -239,6 +293,8 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
+    onDidChangeActiveTextEditor: didChangeActiveTextEditor.event,
+    onDidChangeVisibleTextEditors: didChangeVisibleTextEditors.event,
     createOutputChannel: (name: string) => ({
       append: (text: string) => captureLog(name, 'info', text, []),
       appendLine: (text: string) => captureLog(name, 'info', text, []),
@@ -374,10 +430,9 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
-    onDidCloseTextDocument: (listener: any) => {
-      void listener;
-      return { dispose: () => {} };
-    },
+    onDidCloseTextDocument: didCloseTextDocument.event,
+    onDidSaveTextDocument: didSaveTextDocument.event,
+    onDidChangeTextDocument: didChangeTextDocument.event,
     onDidChangeWorkspaceFolders: (listener: any) => {
       void listener;
       return { dispose: () => {} };
