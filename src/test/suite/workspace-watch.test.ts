@@ -301,20 +301,41 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
   });
 
+  test('reconciles the inventory as soon as the watch starts, without waiting for a git event', async () => {
+    inventoryFiles = ['a.ts'];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
+    assert.deepStrictEqual(inventoryRequests, [repoRoot]);
+    assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
+  });
+
   test('reconciles the inventory over request when an established watch is left in place', async () => {
     await watch.syncAll();
     inventoryFiles = ['a.ts'];
 
     await watch.syncAll();
 
-    assert.deepStrictEqual(inventoryRequests, [repoRoot]);
+    assert.deepStrictEqual(inventoryRequests, [repoRoot, repoRoot]);
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
     assertLogContains('debug', 'inventory refresh requested');
     assertLogContains('debug', 'inventory applied');
   });
 
-  test('leaves the monitor untouched when the inventory request fails', async () => {
+  test('reconciles the inventory when HEAD moves and the watch is re-seeded', async () => {
     await watch.syncAll();
+    headCommit = 'head-sha-2';
+    inventoryFiles = ['a.ts'];
+
+    await watch.syncAll();
+
+    assert.deepStrictEqual(inventoryRequests, [repoRoot, repoRoot]);
+    assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
+    assertLogContains('info', 'action=reseed');
+  });
+
+  test('leaves the monitor untouched when the inventory request fails', async () => {
     inventoryError = new Error('Repository is not watched');
 
     await watch.syncAll();

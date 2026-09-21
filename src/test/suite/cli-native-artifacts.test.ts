@@ -27,6 +27,12 @@ suite('CLI Native Artifacts Test Suite', () => {
     assert.strictEqual(cliConfig.nativeBinaryFileName('linux'), 'cs-ide');
     assert.strictEqual(cliConfig.nativeBinaryFileName('darwin'), 'cs-ide');
   });
+
+  test('requires the signed JNA library to travel with the macOS binary', () => {
+    assert.deepStrictEqual(cliConfig.requiredSidecarFileNames('darwin'), ['libjnidispatch.jnilib']);
+    assert.deepStrictEqual(cliConfig.requiredSidecarFileNames('linux'), []);
+    assert.deepStrictEqual(cliConfig.requiredSidecarFileNames('win32'), []);
+  });
 });
 
 suite('Native CLI Bundle Script Test Suite', () => {
@@ -60,5 +66,30 @@ suite('Native CLI Bundle Script Test Suite', () => {
     const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-native-empty-'));
     directories.push(empty);
     assert.throws(() => locateNativeBinary(empty, 'win32'), /Expected native cs-ide.exe/);
+  });
+
+  test('finds the signed JNA library beside the macOS binary', () => {
+    const { locateRequiredSidecars } = require('../../../scripts/bundle-cli');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-native-sidecar-'));
+    directories.push(root);
+
+    const binary = path.join(root, 'cs-ide');
+    const sidecar = path.join(root, 'libjnidispatch.jnilib');
+    fs.writeFileSync(binary, '');
+    fs.writeFileSync(sidecar, '');
+
+    assert.deepStrictEqual(locateRequiredSidecars(binary, 'darwin'), [sidecar]);
+    assert.deepStrictEqual(locateRequiredSidecars(binary, 'linux'), []);
+  });
+
+  test('fails when the macOS distribution omits the signed JNA library', () => {
+    const { locateRequiredSidecars } = require('../../../scripts/bundle-cli');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-native-no-sidecar-'));
+    directories.push(root);
+
+    const binary = path.join(root, 'cs-ide');
+    fs.writeFileSync(binary, '');
+
+    assert.throws(() => locateRequiredSidecars(binary, 'darwin'), /libjnidispatch.jnilib/);
   });
 });

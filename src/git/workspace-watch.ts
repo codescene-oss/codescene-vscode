@@ -135,7 +135,7 @@ export class WorkspaceWatch implements vscode.Disposable {
       this.stopWatching(target.repoRoot, 'no-scope');
       return;
     }
-    if (this.ensureWatch(target, scope)) return;
+    this.ensureWatch(target, scope);
     await this.refreshInventory(target.repoRoot);
   }
 
@@ -204,10 +204,9 @@ export class WorkspaceWatch implements vscode.Disposable {
    * The CLI owns the baseline and reacts to HEAD, refs and .codescene/config.json changes itself,
    * so an established watch is never restarted. A moved HEAD only re-seeds dirty buffers, which the
    * CLI cannot see. A changed scope is the exception: watchFiles replaces the watched roots rather
-   * than adding to them, so the full list has to be resent. Returns whether the CLI was asked to
-   * (re)scan, which makes it push a fresh inventory on its own.
+   * than adding to them, so the full list has to be resent.
    */
-  private ensureWatch(target: WatchTarget, scope: WatchScope): boolean {
+  private ensureWatch(target: WatchTarget, scope: WatchScope): void {
     const normalizedRoot = normalizeFsPath(target.repoRoot);
     const scopeKey = watchScopeKey(scope);
     const previous = this.watched.get(normalizedRoot);
@@ -222,7 +221,7 @@ export class WorkspaceWatch implements vscode.Disposable {
           head: headLabel(target.repo),
         })}`
       );
-      return false;
+      return;
     }
     if (established) {
       logOutputChannel.info(
@@ -247,7 +246,6 @@ export class WorkspaceWatch implements vscode.Disposable {
       this.startWatch(target, scope);
     }
     this.seed(target.repoRoot);
-    return true;
   }
 
   private startWatch(target: WatchTarget, scope: WatchScope): void {
