@@ -6,6 +6,8 @@ import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-
 import { MockEditor } from '../mocks/mock-editor';
 import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits } from '../setup';
 import { ReviewOpts } from '../../review/reviewer';
+import { DevtoolsAPI } from '../../devtools-api';
+import CsDiagnostics from '../../diagnostics/cs-diagnostics';
 
 suite('OpenFilesObserver Test Suite', () => {
   let observer: OpenFilesObserver;
@@ -100,7 +102,7 @@ suite('OpenFilesObserver Test Suite', () => {
         return originalGetAllVisibleFileNames();
       };
 
-      (observer as any).visibleDocuments.add(filePath);
+      (observer as any).visibleDocuments.set(filePath, new TestTextDocument(filePath, '', 'typescript', 1));
 
       const doc = new TestTextDocument(filePath, '', 'typescript', 1);
       const event = new MockTextDocumentChangeEvent(doc, [{}] as any);
@@ -141,7 +143,7 @@ suite('OpenFilesObserver Test Suite', () => {
       this.timeout(5000);
       const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
       setMockVisibleTextEditors([new MockEditor(document)]);
-      (observer as any).visibleDocuments.add(filePath);
+      (observer as any).visibleDocuments.set(filePath, new TestTextDocument(filePath, '', 'typescript', 1));
 
       (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
 
@@ -160,7 +162,7 @@ suite('OpenFilesObserver Test Suite', () => {
 
     test('logs already-tracked skips', () => {
       const document = new TestTextDocument('/test/monitor.ts', 'const value = 1;', 'typescript');
-      (observer as any).visibleDocuments.add(document.fileName);
+      (observer as any).visibleDocuments.set(document.fileName, document);
       (observer as any).trackAndReviewDocument(document, 'editor changed');
       assertLogContains('debug', 'reason=already-tracked');
     });
@@ -168,7 +170,7 @@ suite('OpenFilesObserver Test Suite', () => {
     test('logs empty-change skips for dirty visible files', () => {
       const document = new TestTextDocument('/test/monitor.ts', 'const value = 1;', 'typescript', 1).setDirty(true);
       setMockVisibleTextEditors([new MockEditor(document)]);
-      (observer as any).visibleDocuments.add(document.fileName);
+      (observer as any).visibleDocuments.set(document.fileName, document);
       (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [] as any));
       assertLogContains('debug', 'reason=empty-change');
     });
@@ -185,6 +187,128 @@ suite('OpenFilesObserver Test Suite', () => {
       );
       assertLogOmits('CodeScene Log.log');
       assertLogOmits('reason=not-tracked');
+    });
+  });
+
+  suite('dirty buffer close', () => {
+    const filePath = '/test/dirty.ts';
+    let restoreCalls: any[];
+    let releaseCalls: any[];
+    let cancelledFiles: string[];
+    let originalRestore: typeof DevtoolsAPI.restoreFromDiskIfBufferOwned;
+    let originalRelease: typeof DevtoolsAPI.releaseBufferMonitorOwnership;
+    let originalCancel: typeof CsDiagnostics.cancel;
+    let originalSet: typeof CsDiagnostics.set;
+
+    setup(() => {
+      restoreCalls = [];
+      releaseCalls = [];
+      cancelledFiles = [];
+      originalRestore = DevtoolsAPI.restoreFromDiskIfBufferOwned;
+      originalRelease = DevtoolsAPI.releaseBufferMonitorOwnership;
+      originalCancel = CsDiagnostics.cancel;
+      originalSet = CsDiagnostics.set;
+      DevtoolsAPI.restoreFromDiskIfBufferOwned = (document) => {
+        restoreCalls.push(document);
+      };
+      DevtoolsAPI.releaseBufferMonitorOwnership = (document) => {
+        releaseCalls.push(document);
+      };
+      CsDiagnostics.cancel = (fileName) => {
+        cancelledFiles.push(fileName);
+      };
+      CsDiagnostics.set = () => undefined;
+    });
+
+    teardown(() => {
+      DevtoolsAPI.restoreFromDiskIfBufferOwned = originalRestore;
+      DevtoolsAPI.releaseBufferMonitorOwnership = originalRelease;
+      CsDiagnostics.cancel = originalCancel;
+      CsDiagnostics.set = originalSet;
+      observer.dispose();
+    });
+
+    function track(document: TestTextDocument): void {
+      (observer as any).visibleDocuments.set(document.fileName, document);
+    }
+
+    test('closing the last tab restores disk state for a dirty buffer', () => {
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      track(document);
+
+      (observer as any).clearDiagnosticsAndUntrack(filePath);
+
+      assert.deepStrictEqual(restoreCalls, [document]);
+      assert.deepStrictEqual(cancelledFiles, [filePath]);
+    });
+
+    test('saving releases buffer ownership before a later close restore', () => {
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      track(document);
+
+      (observer as any).handleDocumentSaved(document);
+      (observer as any).clearDiagnosticsAndUntrack(filePath);
+
+      assert.deepStrictEqual(releaseCalls, [document]);
+      assert.deepStrictEqual(restoreCalls, [document]);
+    });
+
+    test('cancels a pending dirty review timer on untrack', async function () {
+      this.timeout(5000);
+      const capturedOpts: ReviewOpts[] = [];
+      (observer as any).filteringReviewer = {
+        reviewDiagnostics: (document: unknown, reviewOpts: ReviewOpts) => {
+          void document;
+          capturedOpts.push(reviewOpts);
+          return Promise.resolve();
+        },
+        dispose: () => {},
+      };
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      setMockVisibleTextEditors([new MockEditor(document)]);
+      track(document);
+
+      (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
+      (observer as any).clearDiagnosticsAndUntrack(filePath);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      assert.deepStrictEqual(capturedOpts, []);
+      assert.deepStrictEqual(cancelledFiles, [filePath]);
+    });
+
+    test('restores again if a review finishes after the document is untracked', async () => {
+      let finishReview: () => void = () => undefined;
+      (observer as any).filteringReviewer = {
+        reviewDiagnostics: () => new Promise<void>((resolve) => {
+          finishReview = resolve;
+        }),
+        dispose: () => {},
+      };
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      track(document);
+
+      (observer as any).reviewDocument(document, 'text changed', false);
+      (observer as any).clearDiagnosticsAndUntrack(filePath);
+      assert.strictEqual(restoreCalls.length, 1);
+
+      finishReview();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      assert.strictEqual(restoreCalls.length, 2);
+      assert.deepStrictEqual(restoreCalls, [document, document]);
+    });
+
+    test('does not untrack a file that still has a tab', () => {
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+      track(document);
+      (observer as any).hasInitialized = true;
+      setMockTabGroups([{ tabs: [{ input: new vscode.TabInputText(vscode.Uri.file(filePath)) }] }]);
+
+      (observer as any).untrackHiddenDocuments();
+
+      assert.ok((observer as any).visibleDocuments.has(filePath));
+      assert.deepStrictEqual(restoreCalls, []);
     });
   });
 

@@ -312,6 +312,99 @@ suite('ReviewPipeline Test Suite', () => {
       assert.strictEqual(client.batches.length, 1);
     });
   });
+
+  suite('buffer monitor ownership', () => {
+    const cases = [
+      {
+        name: 'a live dirty-buffer review owns the monitor',
+        submission: (document: vscode.TextDocument) => submission(document),
+      },
+      {
+        name: 'a workspace-watch dirty-buffer seed owns the monitor',
+        submission: (document: vscode.TextDocument) => ({
+          ...submission(document),
+          updateDiagnosticsPane: false,
+          updateMonitor: true,
+        }),
+      },
+    ];
+
+    cases.forEach(({ name, submission: createSubmission }) => {
+      test(`${name} and restoreFromDiskIfBufferOwned asks the CLI for the saved file`, async () => {
+        const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript').setDirty(true);
+        const reviewPromise = pipeline.submit(repoRoot, createSubmission(document));
+
+        pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+        completeReview(client, 'review-1', repoRoot);
+        await reviewPromise;
+
+        assert.strictEqual(events.removed.length, 1);
+        assert.strictEqual(events.reviews.length, 0);
+        assert.strictEqual(events.deltas.length, 0);
+        assert.strictEqual(client.batches.length, 2);
+        assert.deepStrictEqual(client.batches[1].files, [{ relPath: 'src/file.ts' }]);
+      });
+    });
+
+    test('restoreFromDiskIfBufferOwned is a no-op when the monitor is not buffer-owned', () => {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+
+      assert.strictEqual(client.batches.length, 0);
+      assert.strictEqual(events.removed.length, 0);
+    });
+
+    test('a diagnostics-only buffer review does not take monitor ownership', () => {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+      void pipeline.submit(repoRoot, { ...submission(document), updateMonitor: false });
+
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+
+      assert.strictEqual(client.batches.length, 1);
+      assert.strictEqual(events.removed.length, 0);
+    });
+
+    test('a disk review does not take buffer ownership', () => {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+      void pipeline.submit(repoRoot, {
+        document,
+        relPath: 'src/file.ts',
+        updateDiagnosticsPane: false,
+        updateMonitor: true,
+      });
+
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+
+      assert.strictEqual(client.batches.length, 1);
+      assert.strictEqual(events.removed.length, 0);
+    });
+
+    test('releaseBufferMonitorOwnership hands the monitor back without restoring from disk', async () => {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript').setDirty(true);
+      const reviewPromise = pipeline.submit(repoRoot, submission(document));
+      completeReview(client, 'review-1', repoRoot);
+      await reviewPromise;
+
+      pipeline.releaseBufferMonitorOwnership(repoRoot, document);
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+
+      assert.strictEqual(events.removed.length, 0);
+      assert.strictEqual(client.batches.length, 1);
+    });
+
+    test('restoreFromDiskIfBufferOwned is idempotent', async () => {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript').setDirty(true);
+      void pipeline.submit(repoRoot, submission(document));
+
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+      pipeline.restoreFromDiskIfBufferOwned(repoRoot, document);
+
+      assert.strictEqual(events.removed.length, 1);
+      assert.strictEqual(client.batches.length, 2);
+      assert.deepStrictEqual(client.batches[1].files, [{ relPath: 'src/file.ts' }]);
+    });
+  });
 });
 
 function fileAccess(document: vscode.TextDocument, visible: boolean): ReviewPipelineFileAccess {

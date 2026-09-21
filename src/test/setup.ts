@@ -99,12 +99,12 @@ export function setMockVisibleTextEditors(editors: any[]) {
 }
 
 export function setMockTabGroups(tabGroups: any[]) {
-  vscodeStub.window.tabGroups = { all: tabGroups };
+  vscodeStub.window.tabGroups = { all: tabGroups, onDidChangeTabs: vscodeStub.window.tabGroups.onDidChangeTabs ?? (() => ({ dispose: () => {} })) };
 }
 
 export function resetMockWindow() {
   vscodeStub.window.visibleTextEditors = [];
-  vscodeStub.window.tabGroups = { all: [] };
+  vscodeStub.window.tabGroups = { all: [], onDidChangeTabs: () => ({ dispose: () => {} }) };
 }
 
 let mockGitRepositories: any[] = [];
@@ -231,11 +231,19 @@ const vscodeStub = {
   },
   window: {
     visibleTextEditors: [] as any[],
-    tabGroups: { all: [] as any[] },
+    tabGroups: { all: [] as any[], onDidChangeTabs: () => ({ dispose: () => {} }) },
     state: {
       focused: true,
     },
     onDidChangeWindowState: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    onDidChangeActiveTextEditor: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    onDidChangeVisibleTextEditors: (listener: any) => {
       void listener;
       return { dispose: () => {} };
     },
@@ -375,6 +383,14 @@ const vscodeStub = {
       return { dispose: () => {} };
     },
     onDidCloseTextDocument: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    onDidSaveTextDocument: (listener: any) => {
+      void listener;
+      return { dispose: () => {} };
+    },
+    onDidChangeTextDocument: (listener: any) => {
       void listener;
       return { dispose: () => {} };
     },
