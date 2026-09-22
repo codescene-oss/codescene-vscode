@@ -6,13 +6,23 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '687c6058af6dd570a3a0405ec6dc0176e56c88cc';
+const requiredDevtoolsVersion = 'ac4e5b694fd7cbdeee06b292fb1ea36097216565';
 
 const nativeOsNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
 const nativeArchNames = { x64: 'amd64', arm64: 'aarch64' };
 
 function nativeBinaryFileName(platform) {
   return platform === 'win32' ? 'cs-ide.exe' : 'cs-ide';
+}
+
+/**
+ * Files that must ship next to the native binary for it to work.
+ * macOS library validation rejects the unsigned copy of the JNA library that the
+ * CLI would otherwise unpack at runtime, which leaves the file watcher dead, so
+ * the signed copy has to travel with the binary.
+ */
+function requiredSidecarFileNames(platform) {
+  return platform === 'darwin' ? ['libjnidispatch.jnilib'] : [];
 }
 
 function nativeArtifactName(platform, arch) {
@@ -42,4 +52,5 @@ module.exports = {
   requiredDevtoolsVersion,
   artifacts,
   nativeBinaryFileName,
+  requiredSidecarFileNames,
 };

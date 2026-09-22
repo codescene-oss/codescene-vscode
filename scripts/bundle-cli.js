@@ -12,7 +12,7 @@ const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
 const extractZip = require('extract-zip');
-const { artifacts, nativeBinaryFileName } = require('./cli-config.js');
+const { artifacts, nativeBinaryFileName, requiredSidecarFileNames } = require('./cli-config.js');
 
 const execFileAsync = promisify(execFile);
 
@@ -77,11 +77,23 @@ function locateNativeBinary(extractDir, platform) {
   throw new Error(`Expected native ${fileName} not found after extraction: ${extractDir}`);
 }
 
+function locateRequiredSidecars(binaryPath, platform) {
+  const directory = path.dirname(binaryPath);
+  return requiredSidecarFileNames(platform).map((fileName) => {
+    const sidecarPath = path.join(directory, fileName);
+    if (!fs.existsSync(sidecarPath)) {
+      throw new Error(`Expected ${fileName} alongside the native binary: ${directory}`);
+    }
+    return sidecarPath;
+  });
+}
+
 function validateDistribution(distributionPath, platform) {
   const exe = path.join(distributionPath, nativeBinaryFileName(platform));
   if (!fs.existsSync(exe)) {
     throw new Error(`Expected native ${nativeBinaryFileName(platform)} not found: ${distributionPath}`);
   }
+  locateRequiredSidecars(exe, platform);
 }
 
 function useLocalDistribution(platform, arch) {
@@ -94,12 +106,16 @@ function useLocalDistribution(platform, arch) {
 
 async function installNativeDistribution(extractDir, targetDistribution, platform) {
   const binaryPath = locateNativeBinary(extractDir, platform);
+  const sidecarPaths = locateRequiredSidecars(binaryPath, platform);
   const staging = `${targetDistribution}.new`;
   const backupDistribution = `${targetDistribution}.old`;
   const fileName = nativeBinaryFileName(platform);
   await removePath(staging);
   await fs.promises.mkdir(staging, { recursive: true });
   await fs.promises.copyFile(binaryPath, path.join(staging, fileName));
+  for (const sidecarPath of sidecarPaths) {
+    await fs.promises.copyFile(sidecarPath, path.join(staging, path.basename(sidecarPath)));
+  }
   const runtimeDll = path.join(path.dirname(binaryPath), 'vcruntime140.dll');
   if (fs.existsSync(runtimeDll)) {
     await fs.promises.copyFile(runtimeDll, path.join(staging, 'vcruntime140.dll'));
@@ -198,4 +214,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform, locateNativeBinary };
+module.exports = { bundleBinaryForPlatform, locateNativeBinary, locateRequiredSidecars };
