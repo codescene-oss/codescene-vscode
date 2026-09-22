@@ -71,6 +71,7 @@ jobs:
 
   build-vsix:
     name: build vsix (E2E tests)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -102,6 +103,7 @@ jobs:
 
   e2e:
     name: E2E tests (windows-latest)
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     needs: build-vsix
     steps:
