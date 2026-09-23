@@ -6,7 +6,7 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '3c5dc7a5273e66de39db29c8560d2d7f28f2e09b';
+const requiredDevtoolsVersion = 'd320c56410bca1eeecdffe5c6ae74e59badd030c';
 
 const nativeOsNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
 const nativeArchNames = { x64: 'amd64', arm64: 'aarch64' };
