@@ -10,7 +10,7 @@ export const ideType = 'VSCode';
 export const ignoreSessionStateFeatureFlag = true;
 
 // Enable Webview devmode with alot of logging
-export const devmode = false;
+export const devmode = process.env.DEVMODE === 'true';
 export const featureFlags: FeatureFlags[] = ['jobs', 'open-settings']; // CS-5597: removed 'commit-baseline'
 if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
 
