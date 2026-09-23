@@ -5,8 +5,10 @@ const fs = require('fs');
 const path = require('path');
 
 const buildNoAce = process.env.BUILD_NO_ACE === 'true';
+const isWatch = process.argv.includes('--watch');
 const esbuildDefine = {
   'process.env.BUILD_NO_ACE': JSON.stringify(buildNoAce ? 'true' : 'false'),
+  'process.env.DEVMODE': JSON.stringify(isWatch ? 'true' : 'false'),
 };
 
 const baseConfig = {
@@ -106,20 +108,41 @@ function webviewConfig(watch = false) {
 }
 
 (async () => {
-  const args = process.argv.slice(2);
-
   if (fs.existsSync(PROD_BUILD_MARKER_PATH)) {
     fs.unlinkSync(PROD_BUILD_MARKER_PATH);
   }
 
-  if (args.includes('--watch')) {
+  if (isWatch) {
     // Build and watch source code
     console.log('[watch] starting');
-    const extContext = await context(extensionConfig);
+    let pendingInitialBuilds = 2;
+    const signalInitialBuild = (name) => {
+      let signaled = false;
+      return {
+        name,
+        setup(build) {
+          build.onEnd(() => {
+            if (signaled) return;
+            signaled = true;
+            pendingInitialBuilds -= 1;
+            if (pendingInitialBuilds === 0) {
+              console.log('[watch] active');
+              console.log('[watch] watching for file changes');
+            }
+          });
+        },
+      };
+    };
+    const extensionWatchConfig = {
+      ...extensionConfig,
+      plugins: [...extensionConfig.plugins, signalInitialBuild('extension-initial-build')],
+    };
+    const webviewWatchConfig = webviewConfig(true);
+    webviewWatchConfig.plugins.push(signalInitialBuild('webview-initial-build'));
+    const extContext = await context(extensionWatchConfig);
     await extContext.watch();
-    const webviewContext = await context(webviewConfig(true));
+    const webviewContext = await context(webviewWatchConfig);
     await webviewContext.watch();
-    console.log('[watch] active');
   } else {
     console.log('[tsc] running type check...');
     execSync('npx tsc --noEmit', { stdio: 'inherit' }); // execSync throws an error on non-zero exit code
