@@ -188,8 +188,15 @@ export class HomeView implements WebviewViewProvider, Disposable {
     if (!event.updateMonitor) {
       return;
     }
+    if (event.enrichment && !this.showsDelta(event)) {
+      return;
+    }
     this.updateFileDeltaData(event);
     this.update();
+  }
+
+  private showsDelta({ document, result }: DeltaAnalysisEvent): boolean {
+    return this.fileIssueMap.get(document.uri.fsPath)?.deltaForFile === result;
   }
 
   private handleFileDelete(filePath: string) {

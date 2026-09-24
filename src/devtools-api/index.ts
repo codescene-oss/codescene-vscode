@@ -205,7 +205,7 @@ export class DevtoolsAPI {
   private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
     try {
       await addRefactorableFunctionsToDeltaResult(document, result);
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor });
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor, enrichment: true });
     } catch (error) {
       logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);
     }
@@ -426,4 +426,4 @@ export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
 
 export type AnalysisEvent = { state: 'running' | 'idle'; jobs?: Set<string>; queued?: string[]; queueCount?: number };
 export type ReviewEvent = { document: vscode.TextDocument; result?: Review };
-export type DeltaAnalysisEvent = { document: vscode.TextDocument; result?: Delta; updateMonitor: boolean };
+export type DeltaAnalysisEvent = { document: vscode.TextDocument; result?: Delta; updateMonitor: boolean; enrichment?: boolean };
