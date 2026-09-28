@@ -39,7 +39,7 @@ suite('Device ID Integration Test Suite', () => {
     assert.ok(deviceId, 'Device ID should be returned');
     assert.strictEqual(typeof deviceId, 'string', 'Device ID should be a string');
     assert.ok(deviceId.trim().length > 0, 'Device ID should not be empty');
-    assert.match(deviceId, /^[a-f0-9]{32}$/, 'Device ID should be a 32-character hexadecimal string');
+    assert.match(deviceId, /^([A-Za-z0-9_-]{43}|unknown)$/, 'Device ID should be a 43-character url-safe base64 string or "unknown"');
   });
 
   test('getDeviceId returns consistent value across calls', async function() {
