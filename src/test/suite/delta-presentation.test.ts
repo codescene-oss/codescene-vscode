@@ -9,6 +9,8 @@ import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
 import { setMockGitRepositories, clearMockGitRepositories } from '../setup';
+import { HomeView } from '../../code-health-monitor/home/home-view';
+import { CsExtensionState } from '../../cs-extension-state';
 
 class FakeIdeServer {
   readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
@@ -56,12 +58,17 @@ function degradation(): Delta {
 
 suite('Delta presentation Test Suite', () => {
   const repoRoot = '/repo';
+  let context: ReturnType<typeof createMockExtensionContext>;
   let server: FakeIdeServer;
   let events: DeltaAnalysisEvent[];
   let listener: vscode.Disposable;
+  let homeView: HomeView | undefined;
 
   setup(() => {
-    const context = createMockExtensionContext(__dirname);
+    context = createMockExtensionContext(__dirname);
+    if (!CsExtensionState.hasInstance) {
+      CsExtensionState.init(context);
+    }
     server = new FakeIdeServer();
     DevtoolsAPI.init(process.execPath, context, server as any);
     Reviewer.init(context, () => new Map());
@@ -72,10 +79,31 @@ suite('Delta presentation Test Suite', () => {
   });
 
   teardown(() => {
+    homeView?.getFileIssueMap().clear();
+    homeView = undefined;
     listener.dispose();
     DevtoolsAPI.dispose();
     clearMockGitRepositories();
   });
+
+  function createHomeView(): HomeView {
+    homeView = new HomeView(context, { updateBadge: () => {}, dispose: () => {} } as any);
+    return homeView;
+  }
+
+  async function presentDegradingDelta(document: TestTextDocument, updateMonitor: boolean): Promise<void> {
+    const review = DevtoolsAPI.reviewPipeline.submit(repoRoot, {
+      document,
+      relPath: 'src/file.ts',
+      content: document.getText(),
+      updateDiagnosticsPane: false,
+      updateMonitor,
+    });
+    const id = server.batches[server.batches.length - 1].files[0].id;
+    server.reviewEmitter.fire({ id, repoRoot, path: 'src/file.ts', result: emptyReview() });
+    server.deltaEmitter.fire({ id, repoRoot, path: 'src/file.ts', result: degradation() });
+    await review;
+  }
 
   const testCases = [
     {
@@ -91,25 +119,48 @@ suite('Delta presentation Test Suite', () => {
   testCases.forEach(({ name, updateMonitor }) => {
     test(name, async () => {
       const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
-      const review = DevtoolsAPI.reviewPipeline.submit(repoRoot, {
-        document,
-        relPath: 'src/file.ts',
-        content: document.getText(),
-        updateDiagnosticsPane: false,
-        updateMonitor,
-      });
-      const id = server.batches[0].files[0].id;
-
-      server.reviewEmitter.fire({ id, repoRoot, path: 'src/file.ts', result: emptyReview() });
-      server.deltaEmitter.fire({ id, repoRoot, path: 'src/file.ts', result: degradation() });
-      await review;
+      await presentDegradingDelta(document, updateMonitor);
 
       await waitUntil(() => events.length === 2);
       assert.deepStrictEqual(
-        events.map((event) => event.updateMonitor),
-        [updateMonitor, updateMonitor]
+        events.map((event) => ({ updateMonitor: event.updateMonitor, enrichment: event.enrichment })),
+        [
+          { updateMonitor, enrichment: undefined },
+          { updateMonitor, enrichment: true },
+        ]
       );
     });
+  });
+
+  test('does not re-add a Monitor entry when enrichment finishes after the inventory pruned it', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    const view = createHomeView();
+    let pruned = false;
+    const prune = DevtoolsAPI.onDidDeltaAnalysisComplete(() => {
+      if (pruned) return;
+      pruned = true;
+      view.removeStaleFiles(new Set(), new Set(), new Set());
+    });
+
+    try {
+      await presentDegradingDelta(document, true);
+      await waitUntil(() => events.length === 2);
+      assert.deepStrictEqual([...view.getFileIssueMap().keys()], []);
+    } finally {
+      prune.dispose();
+    }
+  });
+
+  test('refreshes a still-current Monitor entry when enrichment finishes', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    const view = createHomeView();
+
+    await presentDegradingDelta(document, true);
+    await waitUntil(() => events.length === 2);
+
+    const entry = view.getFileIssueMap().get(document.uri.fsPath);
+    assert.ok(entry);
+    assert.strictEqual(entry.deltaForFile, events[1].result);
   });
 
   test('restoreFromDiskIfBufferOwned asks the CLI for the saved file', () => {
