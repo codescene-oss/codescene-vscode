@@ -160,6 +160,7 @@
     }
   },
   "scripts": {
+    "prepare": "husky",
     "vscode:prepublish": "npm run package",
     "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
@@ -208,6 +209,7 @@
     "extract-zip": "^2.0.1",
     "follow-redirects": "^1.15.6",
     "glob": "^8.0.3",
+    "husky": "^9.1.7",
     "mocha": "^10.8.2",
     "pidusage": "^4.0.1",
     "standard-version": "^9.5.0",

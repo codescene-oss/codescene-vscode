@@ -11,3 +11,5 @@ Testing practices: see [TESTING.md](.claude/TESTING.md).
 Validate your work using `make lint`. Satifying all linter faults is mandatory - they must be addressed before proceeding with other work.
 
 If you find an issue at any stage, you must fix it immediately, regardless of whether you think it's pre-existing.
+
+Commit messages follow Conventional Commits. Keep the subject line (`type: imperative summary`) to at most 100 characters and do not end it with a period. Put the why in the body after a blank line, wrapped near 80 columns. The commit-msg hook rejects messages that fail commitlint. `make lint` checks every commit from `main` to `HEAD`.
