@@ -12,7 +12,7 @@ import {
   gitBlobSha,
 } from '../../review/review-pipeline';
 import { TestTextDocument } from '../mocks/test-text-document';
-import { assertLogContains } from '../setup';
+import { assertLogContains, mockConfiguration, restoreDefaultConfiguration } from '../setup';
 
 class FakeReviewClient {
   readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
@@ -241,6 +241,33 @@ suite('ReviewPipeline Test Suite', () => {
     assert.strictEqual(events.reviews[0].updateDiagnosticsPane, true);
     assert.strictEqual(events.reviews[0].updateMonitor, true);
     assert.strictEqual(events.deltas[0].result?.['new-git-blob-sha'], sha);
+  });
+
+  test('drops id-less watch results while automatic analysis is stopped', async () => {
+    mockConfiguration('codescene', { enableAutomaticAnalysis: false });
+    try {
+      const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+      pipeline.dispose();
+      pipeline = new ReviewPipeline(client as any, createPresentation(events), () => 'review-1', fileAccess(document, true));
+      const sha = gitBlobSha(document.getText());
+
+      client.reviewEmitter.fire({
+        repoRoot,
+        path: 'src/file.ts',
+        result: { ...emptyReview(), 'git-blob-sha': sha },
+      });
+      client.deltaEmitter.fire({
+        repoRoot,
+        path: 'src/file.ts',
+        result: { 'file-level-findings': [], 'function-level-findings': [], 'new-git-blob-sha': sha } as any,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.strictEqual(events.reviews.length, 0);
+      assert.strictEqual(events.deltas.length, 0);
+    } finally {
+      restoreDefaultConfiguration();
+    }
   });
 
   test('discards id-less watch results with a stale git-blob SHA', async () => {

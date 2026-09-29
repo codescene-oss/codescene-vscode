@@ -3,7 +3,7 @@ import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
-import { onDidChangeConfiguration, toggleReviewCodeLenses } from './configuration';
+import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
@@ -233,6 +233,15 @@ function registerCommands(context: vscode.ExtensionContext, csContext: CsContext
   DISPOSABLES.push(toggleReviewCodeLensesCmd);
   context.subscriptions.push(toggleReviewCodeLensesCmd);
 
+  const stopAutomaticAnalysisCmd = vscode.commands.registerCommand('codescene.stopAutomaticAnalysis', () => {
+    setAutomaticAnalysisEnabled(false);
+  });
+  const startAutomaticAnalysisCmd = vscode.commands.registerCommand('codescene.startAutomaticAnalysis', () => {
+    setAutomaticAnalysisEnabled(true);
+  });
+  DISPOSABLES.push(stopAutomaticAnalysisCmd, startAutomaticAnalysisCmd);
+  context.subscriptions.push(stopAutomaticAnalysisCmd, startAutomaticAnalysisCmd);
+
   registerCHRulesCommands(context);
 }
 
@@ -254,6 +263,14 @@ function addReviewListeners(context: vscode.ExtensionContext) {
   context.subscriptions.push(openFilesObserverInstance);
 
   setupWorkspaceWatch(context);
+
+  const automaticAnalysisListener = onDidChangeConfiguration('enableAutomaticAnalysis', ({ value }) => {
+    const enabled = value !== false;
+    workspaceWatchInstance?.setEnabled(enabled);
+    if (!enabled) DevtoolsAPI.clearQueue();
+  });
+  DISPOSABLES.push(automaticAnalysisListener);
+  context.subscriptions.push(automaticAnalysisListener);
 
   const rulesFileWatcher = vscode.workspace.createFileSystemWatcher('**/.codescene/code-health-rules.json');
   rulesFileWatcher.onDidChange(updateCodeHealthRulesVersion);
@@ -290,7 +307,8 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
       onDidQueue: DevtoolsAPI.onDidQueue,
     },
     DevtoolsAPI.reviewPipeline,
-    createWorkspaceWatchDependencies(() => gitApi.repositories)
+    createWorkspaceWatchDependencies(() => gitApi.repositories),
+    automaticAnalysisEnabled()
   );
   const watch = workspaceWatchInstance;
   DevtoolsAPI.reviewPipeline.setWatchDeltaFilter((repoRoot, relPath) => watch.admitsDelta(repoRoot, relPath));

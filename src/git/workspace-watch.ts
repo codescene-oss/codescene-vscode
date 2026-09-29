@@ -76,7 +76,8 @@ export class WorkspaceWatch implements vscode.Disposable {
   constructor(
     private readonly client: WatchClient,
     private readonly pipeline: ReviewPipeline,
-    private readonly dependencies: WorkspaceWatchDependencies
+    private readonly dependencies: WorkspaceWatchDependencies,
+    private enabled = true
   ) {
     this.disposables.push(
       client.onDidWatchInventory((inventory) => this.applyInventory(inventory)),
@@ -89,7 +90,19 @@ export class WorkspaceWatch implements vscode.Disposable {
     for (const repo of this.dependencies.repositories()) {
       this.bindRepository(repo);
     }
-    void this.syncAll();
+    if (this.enabled) void this.syncAll();
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    if (enabled) {
+      logOutputChannel.info('[watch] automatic analysis started');
+      void this.syncAll();
+      return;
+    }
+    logOutputChannel.info('[watch] automatic analysis stopped');
+    this.pauseWatching();
   }
 
   bindRepository(repo: Repository): void {
@@ -97,7 +110,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   }
 
   async syncAll(): Promise<void> {
-    if (this.disposed) return;
+    if (!this.isActive()) return;
     const targets = await this.watchTargets();
     const fromGitApi = targets.filter((target) => target.repo).length;
     const fromResolveGitRoot = targets.length - fromGitApi;
@@ -131,6 +144,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   }
 
   private async onRepositoryStateChange(repo: Repository): Promise<void> {
+    if (!this.enabled) return;
     const repoRoot = getRepoRootPath(repo);
     const watched = this.watched.get(normalizeFsPath(repoRoot));
     if (watched && this.headUnchanged(watched, repo)) return;
@@ -138,7 +152,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   }
 
   private async syncTarget(target: WatchTarget): Promise<void> {
-    if (this.disposed) return;
+    if (!this.isActive()) return;
     const scope = await this.scopeFor(target.repoRoot);
     if (!scope) {
       logOutputChannel.debug(`[watch] not watching ${formatLogFields({ repo: target.repoRoot, reason: 'no-scope' })}`);
@@ -281,6 +295,15 @@ export class WorkspaceWatch implements vscode.Disposable {
     return watched.headName === repo?.state.HEAD?.name && watched.headCommit === repo?.state.HEAD?.commit;
   }
 
+  private pauseWatching(): void {
+    this.cancelPendingRefreshes();
+    this.cancelQueueIdlePrune();
+    for (const [key] of this.watched) {
+      this.client.stopWatchFiles(this.knownRoots.get(key) ?? key);
+    }
+    this.watched.clear();
+  }
+
   stopWatching(repoRoot: string, reason = 'unspecified'): void {
     const normalizedRoot = normalizeFsPath(repoRoot);
     if (!this.watched.has(normalizedRoot)) return;
@@ -295,7 +318,7 @@ export class WorkspaceWatch implements vscode.Disposable {
    * is only recognisable by its absence here.
    */
   private applyInventory(inventory: WatchInventory): void {
-    if (this.disposed) return;
+    if (!this.isActive()) return;
     const repoRoot = this.resolveRepoRoot(inventory.repoRoot);
     this.inventories.set(normalizeFsPath(repoRoot), {
       repoRoot,
@@ -337,7 +360,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   }
 
   private shouldPruneWhenIdle(queue: ReviewQueue): boolean {
-    if (this.disposed) return false;
+    if (!this.isActive()) return false;
     if (queue.count > 0) return false;
     return this.inventories.size > 0;
   }
@@ -364,7 +387,7 @@ export class WorkspaceWatch implements vscode.Disposable {
    * early delta is admitted once the refreshed inventory lists it.
    */
   async admitsDelta(reportedRoot: string, relPath: string): Promise<boolean> {
-    if (this.disposed) return true;
+    if (!this.isActive()) return true;
     const repoRoot = this.resolveRepoRoot(reportedRoot);
     const posixPath = toPosixRelPath(relPath);
     if (!this.inventories.has(normalizeFsPath(repoRoot))) {
@@ -437,13 +460,18 @@ export class WorkspaceWatch implements vscode.Disposable {
    * outage. Existing inventories are kept until fresh ones arrive so the monitor does not blank out.
    */
   private handleServerStart(event: ServerStartEvent): void {
-    if (!event.restart || this.disposed) return;
+    if (!event.restart || !this.isActive()) return;
     logOutputChannel.info('[watch] cs-ide restarted, re-establishing repository watches');
     this.watched.clear();
     void this.syncAll();
   }
 
+  private isActive(): boolean {
+    return !this.disposed && this.enabled;
+  }
+
   private seed(repoRoot: string): void {
+    if (!this.enabled) return;
     const dirtyDocuments = this.dirtyDocuments(repoRoot);
     const submissions: ReviewSubmission[] = Array.from(dirtyDocuments, ([relPath, document]) =>
       this.bufferSubmission(relPath, document)

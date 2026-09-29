@@ -69,6 +69,14 @@
         "title": "CodeScene: toggle Review CodeLenses"
       },
       {
+        "command": "codescene.stopAutomaticAnalysis",
+        "title": "CodeScene: Stop Automatic Analysis"
+      },
+      {
+        "command": "codescene.startAutomaticAnalysis",
+        "title": "CodeScene: Start Automatic Analysis"
+      },
+      {
         "command": "codescene.showLogOutput",
         "title": "CodeScene: show output logs"
       },
@@ -111,7 +119,16 @@
       ]
     },
     "menus": {
-      "commandPalette": []
+      "commandPalette": [
+        {
+          "command": "codescene.stopAutomaticAnalysis",
+          "when": "config.codescene.enableAutomaticAnalysis"
+        },
+        {
+          "command": "codescene.startAutomaticAnalysis",
+          "when": "!config.codescene.enableAutomaticAnalysis"
+        }
+      ]
     },
     "configuration": {
       "title": "CodeScene",
@@ -121,6 +138,12 @@
           "default": true,
           "description": "Show CodeLenses for review diagnostics",
           "order": 1
+        },
+        "codescene.enableAutomaticAnalysis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically analyze file changes in the workspace. Open editors are still reviewed for diagnostics and CodeLenses when this is off.",
+          "order": 2
         },
         "codescene.enableAutoRefactor": {
           "type": "boolean",

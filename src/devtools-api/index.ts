@@ -7,7 +7,7 @@ import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
 import { ACE_ENABLED } from '../build-flags';
-import { getAuthToken } from '../configuration';
+import { getAuthToken, automaticAnalysisEnabled } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
@@ -121,9 +121,14 @@ export class DevtoolsAPI {
   }
 
   private static applyQueue(snapshot: ReviewQueue): void {
-    DevtoolsAPI.queueCount = snapshot.count;
-    DevtoolsAPI.queued = snapshot.files;
+    const queue = automaticAnalysisEnabled() ? snapshot : { count: 0, files: [] };
+    DevtoolsAPI.queueCount = queue.count;
+    DevtoolsAPI.queued = queue.files;
     DevtoolsAPI.fireAnalysisState();
+  }
+
+  static clearQueue(): void {
+    DevtoolsAPI.queueProgress?.update({ count: 0, files: [] });
   }
 
   private static fireAnalysisState(): void {

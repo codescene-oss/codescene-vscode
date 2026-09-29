@@ -194,6 +194,23 @@ suite('HomeView', () => {
       assert.strictEqual(badgeCount, 1, 'Expected badge count to be 1 after removing 2 files');
     });
 
+    test('clears monitored files when analysis is stopped', () => {
+      let badgeCount: number | undefined;
+      mockBackgroundServiceView.updateBadge = (count: number) => {
+        badgeCount = count;
+      };
+
+      addFileToHomeView('/workspace/fileA.ts');
+      addFileToHomeView('/workspace/fileB.ts');
+
+      (homeView as any).setStoppedAnalysis();
+
+      assert.strictEqual(homeView.getFileIssueMap().size, 0);
+      assert.deepStrictEqual((homeView as any).ideContextData.fileDeltaData, []);
+      assert.strictEqual((homeView as any).ideContextData.analysisState, 'stopped');
+      assert.strictEqual(badgeCount, 0);
+    });
+
     const enrichmentCases = [
       {
         name: 'adds a file on its first delta',
