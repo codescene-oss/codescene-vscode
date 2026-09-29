@@ -47,7 +47,7 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAceStatus(ace: CsFeature) {
-    if (!this.aceStatus) {
+    if (!this.aceStatus || !ace) {
       return;
     }
     const item = this.aceStatus;
@@ -56,6 +56,8 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
+    if (!analysis) return;
+
     const item = this.analysisStatus;
 
     if (this.handleErrorStates(analysis)) return;

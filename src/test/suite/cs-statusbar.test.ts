@@ -2,27 +2,32 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { CsStatusBar } from '../../cs-statusbar';
 import { CsExtensionState } from '../../cs-extension-state';
-import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
-import * as path from 'path';
 
 suite('CsStatusBar automatic analysis', () => {
   let originalCreate: typeof vscode.window.createStatusBarItem;
-
-  suiteSetup(() => {
-    const testRepoPath = path.join(__dirname, '../../../test-statusbar-repo');
-    if (!CsExtensionState.hasInstance) {
-      CsExtensionState.init(createMockExtensionContext(testRepoPath));
-    }
-  });
+  let originalStateProperties: PropertyDescriptor | undefined;
 
   setup(() => {
     originalCreate = vscode.window.createStatusBarItem;
+    originalStateProperties = Object.getOwnPropertyDescriptor(CsExtensionState, 'stateProperties');
+    Object.defineProperty(CsExtensionState, 'stateProperties', {
+      configurable: true,
+      get: () => ({
+        features: {
+          analysis: { state: 'enabled' },
+          ace: { state: 'enabled' },
+        },
+      }),
+    });
   });
 
   teardown(() => {
     vscode.window.createStatusBarItem = originalCreate;
     restoreDefaultConfiguration();
+    if (originalStateProperties) {
+      Object.defineProperty(CsExtensionState, 'stateProperties', originalStateProperties);
+    }
   });
 
   test('shows a stopped state that starts analysis on click', () => {

@@ -6,6 +6,7 @@ import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowled
 
 aceSuite('AceAcknowledgementMapper Test Suite', () => {
   let originalGetAuthToken: typeof configModule.getAuthToken;
+  let originalStateProperties: PropertyDescriptor | undefined;
 
   function mockToken(token: string) {
     (configModule as any).getAuthToken = () => token;
@@ -20,6 +21,7 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
 
   setup(() => {
     originalGetAuthToken = configModule.getAuthToken;
+    originalStateProperties = Object.getOwnPropertyDescriptor(csExtensionState.CsExtensionState, 'stateProperties');
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
         features: { ace: { state: 'enabled' } },
@@ -30,6 +32,9 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
 
   teardown(() => {
     (configModule as any).getAuthToken = originalGetAuthToken;
+    if (originalStateProperties) {
+      Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', originalStateProperties);
+    }
   });
 
   test('activated true when acknowledged and token present', () => {
