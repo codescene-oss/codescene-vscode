@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { analysisJobsToCwf } from '../../code-health-monitor/home/home-props-utils';
+import { analysisJobsToCwf, getHomeData } from '../../code-health-monitor/home/home-props-utils';
 import { analysisProgressTooltip } from '../../cs-statusbar';
 
 suite('analysisJobsToCwf', () => {
@@ -60,4 +60,24 @@ suite('analysisProgressTooltip', () => {
       assert.strictEqual(analysisProgressTooltip(queueCount), expected);
     });
   }
+});
+
+suite('getHomeData', () => {
+  test('forwards analysisState, totalCount and remainingCount', () => {
+    const payload = getHomeData({
+      fileDeltaData: [],
+      jobs: [],
+      showOnboarding: false,
+      analysisState: 'running',
+      totalCount: 11,
+      remainingCount: 4,
+      signedIn: true,
+      user: { name: 'Ada' },
+    });
+    assert.strictEqual(payload.view, 'home');
+    if (payload.view !== 'home') return;
+    assert.strictEqual(payload.data.analysisState, 'running');
+    assert.strictEqual(payload.data.totalCount, 11);
+    assert.strictEqual(payload.data.remainingCount, 4);
+  });
 });

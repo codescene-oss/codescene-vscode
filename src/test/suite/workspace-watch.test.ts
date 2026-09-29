@@ -429,10 +429,10 @@ suite('WorkspaceWatch Test Suite', () => {
       });
     });
 
-    test('releases a pending admission when the watch is disposed', async () => {
+    test('releases a pending admission when automatic analysis stops', async () => {
       const admission = watch.admitsDelta(repoRoot, 'stale.ts');
 
-      watch.dispose();
+      watch.setEnabled(false);
 
       await admission;
       await new Promise((resolve) => setTimeout(resolve, INVENTORY_REFRESH_DELAY_MS + 50));
@@ -445,41 +445,41 @@ suite('WorkspaceWatch Test Suite', () => {
     const settleIdle = () => new Promise((resolve) => setTimeout(resolve, queueIdleDelayMs + 30));
 
     const cases = [
-      { name: 're-prunes once the queue stays empty', queueCounts: [0], pushed: true, disposed: false, expectedPrunes: 1 },
+      { name: 're-prunes once the queue stays empty', queueCounts: [0], pushed: true, enabled: true, expectedPrunes: 1 },
       {
         name: 'collapses a burst of empty-queue results into one re-prune',
         queueCounts: [0, 0, 0],
         pushed: true,
-        disposed: false,
+        enabled: true,
         expectedPrunes: 1,
       },
-      { name: 'waits while work is still queued', queueCounts: [0, 2], pushed: true, disposed: false, expectedPrunes: 0 },
-      { name: 're-prunes after the queue drains again', queueCounts: [2, 0], pushed: true, disposed: false, expectedPrunes: 1 },
+      { name: 'waits while work is still queued', queueCounts: [0, 2], pushed: true, enabled: true, expectedPrunes: 0 },
+      { name: 're-prunes after the queue drains again', queueCounts: [2, 0], pushed: true, enabled: true, expectedPrunes: 1 },
       {
         name: 'does not re-prune before any inventory is known',
         queueCounts: [0],
         pushed: false,
-        disposed: false,
+        enabled: true,
         expectedPrunes: 0,
       },
       {
-        name: 'cancels a pending re-prune when the watch is disposed',
+        name: 'does not re-prune while automatic analysis is stopped',
         queueCounts: [0],
         pushed: true,
-        disposed: true,
+        enabled: false,
         expectedPrunes: 0,
       },
     ];
 
-    cases.forEach(({ name, queueCounts, pushed, disposed, expectedPrunes }) => {
+    cases.forEach(({ name, queueCounts, pushed, enabled, expectedPrunes }) => {
       test(name, async () => {
         await watch.syncAll();
         if (pushed) inventoryEmitter.fire({ repoRoot, files: [] });
+        if (!enabled) watch.setEnabled(false);
         const prunesBefore = pruned.length;
         inventoryRequests.length = 0;
 
         queueCounts.forEach((count) => queueEmitter.fire(queue(count)));
-        if (disposed) watch.dispose();
         await settleIdle();
 
         assert.strictEqual(pruned.length - prunesBefore, expectedPrunes);
@@ -507,6 +507,45 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(submitted.length, 0);
     assertLogContains('debug', 'seed skipped');
     assertLogContains('debug', 'reason=excluded');
+  });
+
+  test('setEnabled(false) stops watches without pruning the monitor', async () => {
+    await watch.syncAll();
+    inventoryEmitter.fire({ repoRoot, files: ['CSharp/BumpyRoadExample2.cs'] });
+    const pruneCount = pruned.length;
+
+    watch.setEnabled(false);
+
+    assert.deepStrictEqual(stops, [repoRoot]);
+    assert.strictEqual(pruned.length, pruneCount);
+    assertLogContains('info', 'automatic analysis stopped');
+  });
+
+  test('does not re-watch or seed while automatic analysis is stopped', async () => {
+    await watch.syncAll();
+    watch.setEnabled(false);
+    const watchCount = watches.length;
+    const seedCount = submitted.length;
+
+    headCommit = 'head-sha-2';
+    await watch.syncAll();
+    serverStartEmitter.fire({ metadata: { sha: 'sha', version: '1' }, restart: true });
+    await watch.syncAll();
+
+    assert.strictEqual(watches.length, watchCount);
+    assert.strictEqual(submitted.length, seedCount);
+  });
+
+  test('setEnabled(true) re-establishes watches and seeds dirty buffers', async () => {
+    await watch.syncAll();
+    watch.setEnabled(false);
+
+    watch.setEnabled(true);
+    await watch.syncAll();
+
+    assert.strictEqual(watches.length, 2);
+    assert.strictEqual(submitted.length, 2);
+    assertLogContains('info', 'automatic analysis started');
   });
 
   test('isExcludedByConfiguration matches nested exclude patterns', () => {

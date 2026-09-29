@@ -9,6 +9,7 @@ import { getMessageCategory } from './cwf-message-categories';
 import { MessageToIDEType, OpenDocsMessage } from '../../centralized-webview-framework/types/messages';
 import { FileMetaType } from '../../centralized-webview-framework/types';
 import { CodeSmell } from '../../devtools-api/review-model';
+import { setAutomaticAnalysisEnabled } from '../../configuration';
 
 /**
  * Finds position data fora. function and opens the function in editor
@@ -196,6 +197,17 @@ async function handleEditorMessage(homeView: HomeView, message: MessageToIDEType
   }
 }
 
+function handleAnalysisMessage(message: MessageToIDEType) {
+  switch (message.messageType) {
+    case 'stop-analysis':
+      setAutomaticAnalysisEnabled(false);
+      return;
+    case 'start-analysis':
+      setAutomaticAnalysisEnabled(true);
+      return;
+  }
+}
+
 /**
  * Handles all messages from the home view panel
  * @param homeView
@@ -215,6 +227,9 @@ export async function handleCWFMessage(homeView: HomeView, message: MessageToIDE
       return;
     case 'editor':
       await handleEditorMessage(homeView, message);
+      return;
+    case 'analysis':
+      handleAnalysisMessage(message);
       return;
     default:
       console.warn(message.messageType, 'not supported yet');

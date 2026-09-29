@@ -4,7 +4,7 @@ import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-sta
 import { getEffectiveToken } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
-import { onDidChangeConfiguration } from './configuration';
+import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
 
 interface StatusBarOptions {
   text: string;
@@ -31,6 +31,7 @@ export class CsStatusBar implements Disposable {
       this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
       this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
     }
+    this.disposables.push(onDidChangeConfiguration('enableAutomaticAnalysis', () => this.update()));
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
       vscode.StatusBarAlignment.Left,
@@ -46,7 +47,7 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAceStatus(ace: CsFeature) {
-    if (!this.aceStatus) {
+    if (!this.aceStatus || !ace) {
       return;
     }
     const item = this.aceStatus;
@@ -55,9 +56,21 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
+    if (!analysis) return;
+
     const item = this.analysisStatus;
 
     if (this.handleErrorStates(analysis)) return;
+
+    if (!automaticAnalysisEnabled()) {
+      this.setStatus(item, {
+        text: '$(debug-pause) Analysis stopped',
+        tooltip: 'Automatic analysis of changes is stopped. Click to start.',
+        command: 'codescene.startAutomaticAnalysis',
+        background: 'statusBarItem.warningBackground',
+      });
+      return;
+    }
 
     switch (analysis.analysisState) {
       case 'running':

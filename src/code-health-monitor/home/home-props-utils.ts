@@ -31,6 +31,9 @@ export const getHomeData = ({
   jobs,
   autoRefactor,
   showOnboarding,
+  analysisState,
+  totalCount,
+  remainingCount,
   signedIn,
   user,
 }: HomeContextViewProps['data'] & { signedIn: boolean }): IdeContextType => {
@@ -45,6 +48,9 @@ export const getHomeData = ({
       jobs,
       autoRefactor,
       showOnboarding,
+      analysisState,
+      totalCount,
+      remainingCount,
       user,
     },
   };

@@ -4,6 +4,7 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
 import { logOutputChannel } from '../log';
 import { DevtoolsAPI } from '../devtools-api';
+import { automaticAnalysisEnabled } from '../configuration';
 
 /**
  * Observes open file events, and triggers reviews accordingly. Reviews of a file as it is on disk
@@ -228,7 +229,7 @@ export class OpenFilesObserver {
     this.reviewTimers.set(
       filePath,
       setTimeout(() => {
-        this.reviewDocument(e.document, 'text changed', false);
+        this.reviewDocument(e.document, 'text changed', !automaticAnalysisEnabled());
       }, 1000)
     );
   }

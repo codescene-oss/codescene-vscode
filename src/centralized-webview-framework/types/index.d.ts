@@ -25,6 +25,8 @@ export type Job = {
   state: 'running' | 'queued';
 };
 
+export type AnalysisState = 'idle' | 'running' | 'stopped';
+
 export interface HomeContextViewProps {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
@@ -42,6 +44,9 @@ export interface HomeContextViewProps {
     autoRefactor?: AutoRefactorConfig;
     /**jobs allows the UI to act on running och queued native jobs such as runnign deltaAnalysis or autoRefacotr */
     jobs?: Job[];
+    analysisState?: AnalysisState;
+    totalCount?: number;
+    remainingCount?: number;
     user?: { name: string } | undefined | null;
   };
 }

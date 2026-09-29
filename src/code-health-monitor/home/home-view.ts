@@ -10,10 +10,11 @@ import { convertFileIssueToCWFDeltaItem } from '../../centralized-webview-framew
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { MessageToIDEType } from '../../centralized-webview-framework/types/messages';
-import { AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
+import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
-import { onDidChangeConfiguration, getServerUrl } from '../../configuration';
+import { automaticAnalysisEnabled, onDidChangeConfiguration, getServerUrl } from '../../configuration';
+import { AnalysisBatchTracker, remainingJobCount } from './analysis-batch';
 import { onFileDeletedFromGit } from '../../git-utils';
 import { logOutputChannel } from '../../log';
 import { StaleFileRemover } from '../stale-file-remover';
@@ -42,6 +43,9 @@ interface IdeContextData {
   fileDeltaData: FileDeltaData[];
   autoRefactor: AutoRefactorConfig;
   jobs: Job[];
+  analysisState?: AnalysisState;
+  totalCount?: number;
+  remainingCount?: number;
 }
 
 export class HomeView implements WebviewViewProvider, Disposable {
@@ -55,11 +59,15 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
   private loginFlowState: LoginFlowStateType;
 
+  private batch = new AnalysisBatchTracker();
+
   private ideContextData: IdeContextData = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
     autoRefactor: getAutoRefactorConfig(),
     jobs: [],
+    analysisState: automaticAnalysisEnabled() ? 'idle' : 'stopped',
+    remainingCount: 0,
   };
 
   constructor(context: vscode.ExtensionContext, backgroundServiceView: BackgroundServiceView) {
@@ -73,7 +81,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
       CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
-      onDidChangeConfiguration('authToken', () => this.refreshAceState()) // Detect change to ACE auth token in settings
+      onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
+      onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );
 
     // Limit number of re-renders
@@ -97,17 +106,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     webView.onDidReceiveMessage(this.messageHandler, this, this.disposables);
 
     this.handleVisibilityEvents(webviewView);
-    this.baseContent = initBaseContent(
-      webView,
-      getHomeData({
-        fileDeltaData: this.ideContextData.fileDeltaData,
-        jobs: this.ideContextData.jobs,
-        autoRefactor: this.ideContextData.autoRefactor,
-        showOnboarding: false,
-        signedIn: this.isSignedIn(),
-        user: { name: this.session?.account.label || 'Not set' },
-      })
-    );
+    this.baseContent = initBaseContent(webView, this.homePayload());
     this.update();
   }
 
@@ -157,7 +156,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
-    this.updateBadgeIfSignedIn();
+    this.updateActivityBadge();
 
     this.rebuildFileDeltaData();
   }
@@ -173,20 +172,63 @@ export class HomeView implements WebviewViewProvider, Disposable {
     Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.view?.visible });
   }
 
-  // Convert VSCode jobs to CWF Jobs for rendering
-  private updateJobsData(event: AnalysisEvent) {
+  private applyAnalysisEvent(event: AnalysisEvent) {
+    if (!automaticAnalysisEnabled()) {
+      this.setStoppedAnalysis();
+      return;
+    }
+    const remaining = remainingJobCount(event.jobs, event.queued, event.queueCount);
+    const { totalCount, remainingCount } = this.batch.update(remaining);
     this.ideContextData.jobs = analysisJobsToCwf(event.jobs, event.queued);
+    this.ideContextData.analysisState = remainingCount > 0 ? 'running' : 'idle';
+    this.ideContextData.totalCount = totalCount > 0 ? totalCount : undefined;
+    this.ideContextData.remainingCount = remainingCount;
+  }
+
+  private setStoppedAnalysis() {
+    this.batch.reset();
+    this.fileIssueMap.clear();
+    this.rebuildFileDeltaData();
+    this.ideContextData.jobs = [];
+    this.ideContextData.analysisState = 'stopped';
+    this.ideContextData.totalCount = undefined;
+    this.ideContextData.remainingCount = 0;
+    this.updateActivityBadge();
+  }
+
+  private handleAutomaticAnalysisSetting() {
+    if (!automaticAnalysisEnabled()) {
+      this.setStoppedAnalysis();
+    } else if (this.ideContextData.analysisState === 'stopped') {
+      this.ideContextData.analysisState = 'idle';
+      this.updateActivityBadge();
+    }
+    this.update();
+  }
+
+  private homePayload() {
+    return getHomeData({
+      fileDeltaData: this.ideContextData.fileDeltaData,
+      jobs: this.ideContextData.jobs,
+      autoRefactor: this.ideContextData.autoRefactor,
+      showOnboarding: false,
+      analysisState: this.ideContextData.analysisState,
+      totalCount: this.ideContextData.totalCount,
+      remainingCount: this.ideContextData.remainingCount,
+      signedIn: this.isSignedIn(),
+      user: { name: getUserName(this.session?.account.label) },
+    });
   }
 
   // ### VSCode state handlers ###
 
   private handleRunningsJobs(event: AnalysisEvent) {
-    this.updateJobsData(event);
+    this.applyAnalysisEvent(event);
     this.update();
   }
 
   private handleDeltaUpdate(event: DeltaAnalysisEvent) {
-    if (!event.updateMonitor) {
+    if (!event.updateMonitor || !automaticAnalysisEnabled()) {
       return;
     }
     this.updateFileDeltaData(event);
@@ -195,7 +237,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   private handleFileDelete(filePath: string) {
     this.removeTreeEntry(filePath);
-    this.updateBadgeIfSignedIn();
+    this.updateActivityBadge();
     this.rebuildFileDeltaData();
     this.update();
   }
@@ -209,7 +251,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.session = CsExtensionState.session;
     if (this.session) {
       this.loginFlowState.loginOpen = false;
-      this.updateBadgeIfSignedIn();
+      this.updateActivityBadge();
     } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
       // If the user has a pending login that fails we update the login flow state.
       this.loginFlowState.loginState = 'error';
@@ -243,10 +285,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
     return ignoreSessionStateFeatureFlag ? true : Boolean(this.session);
   }
 
-  private updateBadgeIfSignedIn() {
-    if (this.backgroundServiceView && this.isSignedIn()) {
-      this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
-    }
+  private updateActivityBadge() {
+    this.backgroundServiceView.updateBadge(this.isSignedIn() ? this.fileIssueMap.size : 0);
   }
 
   dispose() {
@@ -263,7 +303,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     }
 
     if (stalePaths.length > 0) {
-      this.updateBadgeIfSignedIn();
+      this.updateActivityBadge();
       this.rebuildFileDeltaData();
       this.update();
     }
@@ -274,14 +314,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     if (!webView) return;
     await webView.postMessage({
       messageType: 'update-renderer',
-      payload: getHomeData({
-        fileDeltaData: this.ideContextData.fileDeltaData,
-        jobs: this.ideContextData.jobs,
-        autoRefactor: this.ideContextData.autoRefactor,
-        showOnboarding: false,
-        signedIn: this.isSignedIn(),
-        user: { name: getUserName(this.session?.account.label) },
-      }),
+      payload: this.homePayload(),
     });
   }
 

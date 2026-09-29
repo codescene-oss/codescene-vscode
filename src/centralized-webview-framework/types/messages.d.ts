@@ -87,4 +87,10 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'cancel';
+    }
+  | {
+      messageType: 'stop-analysis';
+    }
+  | {
+      messageType: 'start-analysis';
     };

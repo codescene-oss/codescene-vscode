@@ -4,7 +4,7 @@ import { OpenFilesObserver } from '../../review/open-files-observer';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { MockTextDocumentChangeEvent } from '../mocks/mock-text-document-change-event';
 import { MockEditor } from '../mocks/mock-editor';
-import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits, fireDidSaveTextDocument, fireDidCloseTextDocument, fireDidChangeVisibleTextEditors, fireDidChangeTabs } from '../setup';
+import { setMockVisibleTextEditors, setMockTabGroups, resetMockWindow, assertLogContains, assertLogOmits, fireDidSaveTextDocument, fireDidCloseTextDocument, fireDidChangeVisibleTextEditors, fireDidChangeTabs, mockConfiguration, restoreDefaultConfiguration } from '../setup';
 import { ReviewOpts } from '../../review/reviewer';
 import { DevtoolsAPI } from '../../devtools-api';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
@@ -150,6 +150,23 @@ suite('OpenFilesObserver Test Suite', () => {
       await waitForReview(() => capturedOpts.length === 1);
       assert.strictEqual(capturedOpts[0].skipMonitorUpdate, false);
       assertLogContains('debug', 'reason=text changed skipMonitor=false');
+    });
+
+    test('skips monitor updates for dirty buffers while automatic analysis is stopped', async function () {
+      this.timeout(5000);
+      mockConfiguration('codescene', { enableAutomaticAnalysis: false });
+      try {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript').setDirty(true);
+        setMockVisibleTextEditors([new MockEditor(document)]);
+        (observer as any).visibleDocuments.set(filePath, new TestTextDocument(filePath, '', 'typescript', 1));
+
+        (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
+
+        await waitForReview(() => capturedOpts.length === 1);
+        assert.strictEqual(capturedOpts[0].skipMonitorUpdate, true);
+      } finally {
+        restoreDefaultConfiguration();
+      }
     });
   });
 

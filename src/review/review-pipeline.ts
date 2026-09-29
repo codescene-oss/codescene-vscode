@@ -12,6 +12,7 @@ import {
 } from '../devtools-api/ide-server-client';
 import { Review } from '../devtools-api/review-model';
 import { formatLogFields, logOutputChannel } from '../log';
+import { automaticAnalysisEnabled } from '../configuration';
 import { normalizeFsPath, pathsEqual, relativePosix, toPosixRelPath } from '../utils/fs-paths';
 
 export interface ReviewSubmission {
@@ -375,14 +376,33 @@ export class ReviewPipeline implements vscode.Disposable {
   }
 
   private presentMergedDelta(pending: PendingReview, updateMonitor: boolean): void {
-    if (updateMonitor && pending.deltaDone) {
-      this.presentation.presentDelta({ ...pending, result: pending.deltaResult ?? null });
-    }
+    if (!this.shouldPresentMergedDelta(pending, updateMonitor)) return;
+    this.presentation.presentDelta({ ...pending, result: pending.deltaResult ?? null });
+  }
+
+  private shouldPresentMergedDelta(pending: PendingReview, updateMonitor: boolean): boolean {
+    if (!updateMonitor) return false;
+    if (!pending.deltaDone) return false;
+    return automaticAnalysisEnabled();
+  }
+
+  private shouldUpdateMonitor(updateMonitor: boolean): boolean {
+    return updateMonitor && automaticAnalysisEnabled();
+  }
+
+  private handleWatchReview(event: ReviewResult): void {
+    if (!automaticAnalysisEnabled()) return;
+    void this.presentWatchReview(event);
+  }
+
+  private handleWatchDelta(event: DeltaResult): void {
+    if (!automaticAnalysisEnabled()) return;
+    void this.presentWatchDelta(event);
   }
 
   private handleReview(event: ReviewResult): void {
     if (!event.id) {
-      void this.presentWatchReview(event);
+      this.handleWatchReview(event);
       return;
     }
     const pending = this.pendingById.get(event.id);
@@ -415,7 +435,7 @@ export class ReviewPipeline implements vscode.Disposable {
 
   private handleDelta(event: DeltaResult): void {
     if (!event.id) {
-      void this.presentWatchDelta(event);
+      this.handleWatchDelta(event);
       return;
     }
     const pending = this.pendingById.get(event.id);
@@ -425,7 +445,11 @@ export class ReviewPipeline implements vscode.Disposable {
     const hash = event.result?.['new-git-blob-sha'];
     if (this.isCurrent(pending, event.repoRoot, event.path) && this.matchesHash(hash, pending.contentHash)) {
       pending.deltaResult = event.result;
-      this.presentation.presentDelta({ ...pending, result: event.result });
+      this.presentation.presentDelta({
+        ...pending,
+        result: event.result,
+        updateMonitor: this.shouldUpdateMonitor(pending.updateMonitor),
+      });
     } else {
       logOutputChannel.warn(
         `[pipeline] ignoring deltaReview ${formatLogFields({
