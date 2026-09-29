@@ -70,7 +70,7 @@ function refreshAssets(tokenEnv) {
     return;
   }
   execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
-  execSync('make updatecwf', { stdio: 'inherit', env: tokenEnv });
+  execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
 }
 
 function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
