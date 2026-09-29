@@ -69,6 +69,8 @@ interface PendingReview extends ReviewSubmission {
   promise: Promise<Review | void>;
 }
 
+export type WatchDeltaFilter = (repoRoot: string, relPath: string) => Promise<boolean>;
+
 type BufferSubmission = ReviewSubmission & { content: string; document: vscode.TextDocument };
 
 interface SubmissionContext {
@@ -129,6 +131,7 @@ export class ReviewPipeline implements vscode.Disposable {
   private readonly watchReviews = new Map<string, WatchReviewEntry>();
   private readonly bufferOwnedPaths = new Set<string>();
   private dedupEpoch = 0;
+  private watchDeltaFilter: WatchDeltaFilter = async () => true;
   private readonly disposables: vscode.Disposable[];
   private readonly fileAccess: ReviewPipelineFileAccess;
 
@@ -223,6 +226,10 @@ export class ReviewPipeline implements vscode.Disposable {
       updateDiagnosticsPane: false,
       updateMonitor: true,
     });
+  }
+
+  setWatchDeltaFilter(filter: WatchDeltaFilter): void {
+    this.watchDeltaFilter = filter;
   }
 
   invalidate(): void {
@@ -472,6 +479,16 @@ export class ReviewPipeline implements vscode.Disposable {
   }
 
   private async presentWatchDelta(event: DeltaResult): Promise<void> {
+    if (event.result && !(await this.watchDeltaFilter(event.repoRoot, event.path))) {
+      logOutputChannel.debug(
+        `[pipeline] ignoring watch delta ${formatLogFields({
+          path: toPosixRelPath(event.path),
+          repo: event.repoRoot,
+          reason: 'outside-watch-inventory',
+        })}`
+      );
+      return;
+    }
     const presented = await this.watchPresentation(event.repoRoot, event.path, event.result?.['new-git-blob-sha']);
     if (!presented) return;
     this.presentation.presentDelta({

@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { DeltaResult, ServerStartEvent, WatchInventory } from '../../devtools-api/ide-server-client';
+import type { ReviewQueue, ServerStartEvent, WatchInventory } from '../../devtools-api/ide-server-client';
 import {
   INVENTORY_REFRESH_DELAY_MS,
   isExcludedByConfiguration,
@@ -13,6 +13,7 @@ import { ReviewPipeline, ReviewSubmission } from '../../review/review-pipeline';
 import { assertLogContains } from '../setup';
 
 suite('WorkspaceWatch Test Suite', () => {
+  const queueIdleDelayMs = 20;
   const repoRoot = path.normalize('/repo');
   const bumpyRoad = path.join(repoRoot, 'CSharp', 'BumpyRoadExample2.cs');
   let submitted: Array<{ repoRoot: string; submissions: ReviewSubmission[] }>;
@@ -28,7 +29,7 @@ suite('WorkspaceWatch Test Suite', () => {
   let inventoryError: Error | undefined;
   let inventoryEmitter: vscode.EventEmitter<WatchInventory>;
   let serverStartEmitter: vscode.EventEmitter<ServerStartEvent>;
-  let deltaEmitter: vscode.EventEmitter<DeltaResult>;
+  let queueEmitter: vscode.EventEmitter<ReviewQueue>;
   let pipeline: Pick<ReviewPipeline, 'submitBatch'>;
   let dirtyDoc: vscode.TextDocument;
   let dependencies: WorkspaceWatchDependencies;
@@ -54,7 +55,7 @@ suite('WorkspaceWatch Test Suite', () => {
     rootLookups = [];
     inventoryEmitter = new vscode.EventEmitter<WatchInventory>();
     serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
-    deltaEmitter = new vscode.EventEmitter<DeltaResult>();
+    queueEmitter = new vscode.EventEmitter<ReviewQueue>();
     dirtyDoc = fakeDocument(path.join(repoRoot, 'dirty.ts'), 'const dirty = 1;', true);
     pipeline = {
       submitBatch: async (root, submissions) => {
@@ -63,6 +64,7 @@ suite('WorkspaceWatch Test Suite', () => {
       },
     };
     dependencies = {
+      queueIdleDelayMs,
       repositories: () =>
         openedRepositories.map(
           (root) =>
@@ -102,7 +104,7 @@ suite('WorkspaceWatch Test Suite', () => {
       },
       onDidWatchInventory: inventoryEmitter.event,
       onDidServerStart: serverStartEmitter.event,
-      onDidDelta: deltaEmitter.event,
+      onDidQueue: queueEmitter.event,
     };
     watch = new WorkspaceWatch(client, pipeline as ReviewPipeline, dependencies);
   });
@@ -111,7 +113,7 @@ suite('WorkspaceWatch Test Suite', () => {
     watch.dispose();
     inventoryEmitter.dispose();
     serverStartEmitter.dispose();
-    deltaEmitter.dispose();
+    queueEmitter.dispose();
   });
 
   test('watches a repo and seeds only dirty buffers, leaving disk files to the CLI watch scan', async () => {
@@ -301,13 +303,16 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
   });
 
-  test('reconciles the inventory as soon as the watch starts, without waiting for a git event', async () => {
-    inventoryFiles = ['a.ts'];
-
+  test('waits for the inventory a new watch pushes instead of racing the watch with a request', async () => {
     await watch.syncAll();
 
     assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
-    assert.deepStrictEqual(inventoryRequests, [repoRoot]);
+    assert.deepStrictEqual(inventoryRequests, [], 'The CLI sets the watch up asynchronously, so an early request fails');
+    assertLogContains('debug', 'inventory refresh deferred');
+    assertLogContains('debug', 'reason=awaiting-watch-push');
+
+    inventoryEmitter.fire({ repoRoot, files: ['a.ts'] });
+
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
   });
 
@@ -317,7 +322,7 @@ suite('WorkspaceWatch Test Suite', () => {
 
     await watch.syncAll();
 
-    assert.deepStrictEqual(inventoryRequests, [repoRoot, repoRoot]);
+    assert.deepStrictEqual(inventoryRequests, [repoRoot]);
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
     assertLogContains('debug', 'inventory refresh requested');
     assertLogContains('debug', 'inventory applied');
@@ -330,12 +335,13 @@ suite('WorkspaceWatch Test Suite', () => {
 
     await watch.syncAll();
 
-    assert.deepStrictEqual(inventoryRequests, [repoRoot, repoRoot]);
+    assert.deepStrictEqual(inventoryRequests, [repoRoot]);
     assert.ok(lastPruned().has(path.join(repoRoot, 'a.ts')));
     assertLogContains('info', 'action=reseed');
   });
 
   test('leaves the monitor untouched when the inventory request fails', async () => {
+    await watch.syncAll();
     inventoryError = new Error('Repository is not watched');
 
     await watch.syncAll();
@@ -364,60 +370,134 @@ suite('WorkspaceWatch Test Suite', () => {
   });
 
   suite('deltas outside the known change set', () => {
-    const deltaFor = (relPath: string, result: DeltaResult['result'] = {} as DeltaResult['result']): DeltaResult => ({
-      path: relPath,
-      repoRoot,
-      result,
-    });
-
-    const settleRefresh = () => new Promise((resolve) => setTimeout(resolve, INVENTORY_REFRESH_DELAY_MS + 50));
-
     setup(async () => {
       await watch.syncAll();
       inventoryEmitter.fire({ repoRoot, files: ['listed.ts'] });
       inventoryRequests.length = 0;
     });
 
-    test('reconciles with the CLI when a delta names a file the change set omits', async () => {
+    test('rejects a delta the refreshed change set confirms has left', async () => {
       inventoryFiles = ['listed.ts'];
 
-      deltaEmitter.fire(deltaFor('stale.ts'));
-      await settleRefresh();
+      const admitted = await watch.admitsDelta(repoRoot, 'stale.ts');
 
+      assert.strictEqual(admitted, false);
       assert.deepStrictEqual(inventoryRequests, [repoRoot]);
       assert.ok(!lastPruned().has(path.join(repoRoot, 'stale.ts')), 'The CLI confirmed the file has left the change set');
       assertLogContains('debug', 'delta reconcile scheduled');
+      assertLogContains('debug', 'delta rejected');
       assertLogContains('debug', 'reason=not-in-inventory');
     });
 
-    test('keeps a file the refreshed change set has caught up with', async () => {
+    test('rejects every delta once the change set has emptied', async () => {
+      inventoryEmitter.fire({ repoRoot, files: [] });
+      inventoryFiles = [];
+
+      const admitted = await Promise.all([
+        watch.admitsDelta(repoRoot, 'mm/huge_memory.c'),
+        watch.admitsDelta(repoRoot, 'drivers/net/ethernet/broadcom/bnxt/bnxt.c'),
+      ]);
+
+      assert.deepStrictEqual(admitted, [false, false]);
+    });
+
+    test('admits a delta the refreshed change set has caught up with', async () => {
       inventoryFiles = ['listed.ts', 'early.ts'];
 
-      deltaEmitter.fire(deltaFor('early.ts'));
-      await settleRefresh();
+      const admitted = await watch.admitsDelta(repoRoot, 'early.ts');
 
-      assert.ok(
-        lastPruned().has(path.join(repoRoot, 'early.ts')),
-        'A delta that outran its inventory notification must not lose its monitor entry'
-      );
+      assert.strictEqual(admitted, true, 'A delta that outran its inventory notification must still reach the monitor');
+      assert.ok(lastPruned().has(path.join(repoRoot, 'early.ts')));
     });
 
     test('collapses a burst of deltas into a single reconcile', async () => {
-      deltaEmitter.fire(deltaFor('one.ts'));
-      deltaEmitter.fire(deltaFor('two.ts'));
-      deltaEmitter.fire(deltaFor('three.ts'));
-      await settleRefresh();
+      await Promise.all(['one.ts', 'two.ts', 'three.ts'].map((relPath) => watch.admitsDelta(repoRoot, relPath)));
 
       assert.deepStrictEqual(inventoryRequests, [repoRoot]);
     });
 
-    test('ignores listed files, dirty buffers and empty deltas', async () => {
-      deltaEmitter.fire(deltaFor('listed.ts'));
-      deltaEmitter.fire(deltaFor('dirty.ts'));
-      deltaEmitter.fire(deltaFor('stale.ts', null));
-      await settleRefresh();
+    const admittedWithoutReconcile = [
+      { name: 'a listed file', root: repoRoot, relPath: 'listed.ts' },
+      { name: 'a dirty buffer the CLI cannot see', root: repoRoot, relPath: 'dirty.ts' },
+      { name: 'a repository without a reported inventory', root: path.normalize('/other'), relPath: 'any.ts' },
+    ];
 
+    admittedWithoutReconcile.forEach(({ name, root, relPath }) => {
+      test(`admits ${name} without asking the CLI`, async () => {
+        assert.strictEqual(await watch.admitsDelta(root, relPath), true);
+        assert.deepStrictEqual(inventoryRequests, []);
+      });
+    });
+
+    test('releases a pending admission when the watch is disposed', async () => {
+      const admission = watch.admitsDelta(repoRoot, 'stale.ts');
+
+      watch.dispose();
+
+      await admission;
+      await new Promise((resolve) => setTimeout(resolve, INVENTORY_REFRESH_DELAY_MS + 50));
       assert.deepStrictEqual(inventoryRequests, []);
+    });
+  });
+
+  suite('re-prune once the CLI queue goes idle', () => {
+    const queue = (count: number): ReviewQueue => ({ count, files: [] });
+    const settleIdle = () => new Promise((resolve) => setTimeout(resolve, queueIdleDelayMs + 30));
+
+    const cases = [
+      { name: 're-prunes once the queue stays empty', queueCounts: [0], pushed: true, disposed: false, expectedPrunes: 1 },
+      {
+        name: 'collapses a burst of empty-queue results into one re-prune',
+        queueCounts: [0, 0, 0],
+        pushed: true,
+        disposed: false,
+        expectedPrunes: 1,
+      },
+      { name: 'waits while work is still queued', queueCounts: [0, 2], pushed: true, disposed: false, expectedPrunes: 0 },
+      { name: 're-prunes after the queue drains again', queueCounts: [2, 0], pushed: true, disposed: false, expectedPrunes: 1 },
+      {
+        name: 'does not re-prune before any inventory is known',
+        queueCounts: [0],
+        pushed: false,
+        disposed: false,
+        expectedPrunes: 0,
+      },
+      {
+        name: 'cancels a pending re-prune when the watch is disposed',
+        queueCounts: [0],
+        pushed: true,
+        disposed: true,
+        expectedPrunes: 0,
+      },
+    ];
+
+    cases.forEach(({ name, queueCounts, pushed, disposed, expectedPrunes }) => {
+      test(name, async () => {
+        await watch.syncAll();
+        if (pushed) inventoryEmitter.fire({ repoRoot, files: [] });
+        const prunesBefore = pruned.length;
+        inventoryRequests.length = 0;
+
+        queueCounts.forEach((count) => queueEmitter.fire(queue(count)));
+        if (disposed) watch.dispose();
+        await settleIdle();
+
+        assert.strictEqual(pruned.length - prunesBefore, expectedPrunes);
+        assert.deepStrictEqual(inventoryRequests, [], 'The re-prune uses the inventory the CLI already pushed');
+      });
+    });
+
+    test('keeps listed files and dirty buffers when re-pruning', async () => {
+      await watch.syncAll();
+      inventoryEmitter.fire({ repoRoot, files: ['listed.ts'] });
+      const prunesBefore = pruned.length;
+
+      queueEmitter.fire(queue(0));
+      await settleIdle();
+
+      assert.strictEqual(pruned.length, prunesBefore + 1);
+      assert.deepStrictEqual(new Set(lastPruned()), new Set([path.join(repoRoot, 'listed.ts'), dirtyDoc.uri.fsPath]));
+      assertLogContains('debug', 'queue idle, monitor re-pruned');
     });
   });
 

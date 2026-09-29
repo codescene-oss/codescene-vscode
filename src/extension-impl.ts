@@ -287,11 +287,13 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
       getWatchInventory: DevtoolsAPI.getWatchInventory,
       onDidWatchInventory: DevtoolsAPI.onDidWatchInventory,
       onDidServerStart: DevtoolsAPI.onDidServerStart,
-      onDidDelta: DevtoolsAPI.onDidServerDelta,
+      onDidQueue: DevtoolsAPI.onDidQueue,
     },
     DevtoolsAPI.reviewPipeline,
     createWorkspaceWatchDependencies(() => gitApi.repositories)
   );
+  const watch = workspaceWatchInstance;
+  DevtoolsAPI.reviewPipeline.setWatchDeltaFilter((repoRoot, relPath) => watch.admitsDelta(repoRoot, relPath));
   const openListener = gitApi.onDidOpenRepository((repo) => {
     const repoRoot = getRepoRootPath(repo);
     logOutputChannel.info(`[watch] repository opened root=${repoRoot}`);

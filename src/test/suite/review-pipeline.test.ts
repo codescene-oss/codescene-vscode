@@ -259,6 +259,83 @@ suite('ReviewPipeline Test Suite', () => {
     assertLogContains('warn', 'reason=stale-sha');
   });
 
+  suite('watch delta filter', () => {
+    const content = 'const value = 1;';
+    const sha = gitBlobSha(content);
+    let filtered: Array<{ repoRoot: string; relPath: string }>;
+
+    setup(() => {
+      filtered = [];
+      const document = new TestTextDocument('/repo/src/file.ts', content, 'typescript');
+      pipeline.dispose();
+      pipeline = new ReviewPipeline(client as any, createPresentation(events), () => 'review-1', fileAccess(document, false));
+    });
+
+    const cases = [
+      {
+        name: 'keeps a watch delta out of the monitor when the filter rejects it',
+        admitted: false,
+        result: { 'file-level-findings': [], 'function-level-findings': [], 'new-git-blob-sha': sha },
+        expectedDeltas: 0,
+        expectedFilterCalls: 1,
+      },
+      {
+        name: 'presents a watch delta the filter admits',
+        admitted: true,
+        result: { 'file-level-findings': [], 'function-level-findings': [], 'new-git-blob-sha': sha },
+        expectedDeltas: 1,
+        expectedFilterCalls: 1,
+      },
+      {
+        name: 'passes an empty watch delta through without consulting the filter',
+        admitted: false,
+        result: null,
+        expectedDeltas: 1,
+        expectedFilterCalls: 0,
+      },
+    ];
+
+    cases.forEach(({ name, admitted, result, expectedDeltas, expectedFilterCalls }) => {
+      test(name, async () => {
+        pipeline.setWatchDeltaFilter(async (root, relPath) => {
+          filtered.push({ repoRoot: root, relPath });
+          return admitted;
+        });
+
+        client.deltaEmitter.fire({ repoRoot, path: 'src/file.ts', result: result as any });
+
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.strictEqual(events.deltas.length, expectedDeltas);
+        assert.deepStrictEqual(filtered, Array(expectedFilterCalls).fill({ repoRoot, relPath: 'src/file.ts' }));
+      });
+    });
+
+    test('logs why a rejected watch delta was dropped', async () => {
+      pipeline.setWatchDeltaFilter(async () => false);
+
+      client.deltaEmitter.fire({ repoRoot, path: 'src/file.ts', result: cases[0].result as any });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assertLogContains('debug', 'ignoring watch delta');
+      assertLogContains('debug', 'reason=outside-watch-inventory');
+    });
+
+    test('never filters deltas for reviews the extension requested', async () => {
+      pipeline.setWatchDeltaFilter(async (root, relPath) => {
+        filtered.push({ repoRoot: root, relPath });
+        return false;
+      });
+      const document = new TestTextDocument('/repo/src/file.ts', content, 'typescript');
+      const review = pipeline.submit(repoRoot, submission(document));
+
+      completeReview(client, 'review-1', repoRoot);
+      await review;
+
+      assert.strictEqual(events.deltas.length, 1);
+      assert.deepStrictEqual(filtered, []);
+    });
+  });
+
   suite('watch result reuse', () => {
     const content = 'const value = 1;';
     let document: vscode.TextDocument;

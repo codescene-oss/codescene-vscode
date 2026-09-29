@@ -1,7 +1,7 @@
 import * as path from 'path';
 import vscode from 'vscode';
 import type { Repository } from '../../types/git';
-import type { CsIdeServerClient, DeltaResult, ServerStartEvent, WatchInventory } from '../devtools-api/ide-server-client';
+import type { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from '../devtools-api/ide-server-client';
 import { supportedExtensions } from '../language-support';
 import { formatLogFields, logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
@@ -17,7 +17,7 @@ export type WatchClient = Pick<
   | 'getWatchInventory'
   | 'onDidWatchInventory'
   | 'onDidServerStart'
-  | 'onDidDelta'
+  | 'onDidQueue'
 >;
 
 /**
@@ -25,7 +25,10 @@ export type WatchClient = Pick<
  */
 export const INVENTORY_REFRESH_DELAY_MS = 250;
 
+export const QUEUE_IDLE_PRUNE_DELAY_MS = 1000;
+
 export interface WorkspaceWatchDependencies {
+  queueIdleDelayMs: number;
   repositories(): readonly Repository[];
   workspaceFolders(): readonly vscode.WorkspaceFolder[];
   gitRootFor(directory: string): Promise<string | undefined>;
@@ -54,10 +57,17 @@ interface RepoInventory {
   relPaths: Set<string>;
 }
 
+interface PendingRefresh {
+  timer?: ReturnType<typeof setTimeout>;
+  settled: Promise<void>;
+  settle: () => void;
+}
+
 export class WorkspaceWatch implements vscode.Disposable {
   private readonly watched = new Map<string, WatchedRepo>();
   private readonly inventories = new Map<string, RepoInventory>();
-  private readonly refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly pendingRefreshes = new Map<string, PendingRefresh>();
+  private queueIdleTimer?: ReturnType<typeof setTimeout>;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly rootCache = new Map<string, string | undefined>();
   private readonly knownRoots = new Map<string, string>();
@@ -71,7 +81,7 @@ export class WorkspaceWatch implements vscode.Disposable {
     this.disposables.push(
       client.onDidWatchInventory((inventory) => this.applyInventory(inventory)),
       client.onDidServerStart((event) => this.handleServerStart(event)),
-      client.onDidDelta((event) => this.handleDelta(event))
+      client.onDidQueue((queue) => this.handleQueue(queue))
     );
   }
 
@@ -115,8 +125,8 @@ export class WorkspaceWatch implements vscode.Disposable {
     }
     this.watched.clear();
     this.inventories.clear();
-    this.refreshTimers.forEach((timer) => clearTimeout(timer));
-    this.refreshTimers.clear();
+    this.cancelPendingRefreshes();
+    this.cancelQueueIdlePrune();
     this.disposables.forEach((disposable) => disposable.dispose());
   }
 
@@ -135,7 +145,12 @@ export class WorkspaceWatch implements vscode.Disposable {
       this.stopWatching(target.repoRoot, 'no-scope');
       return;
     }
-    this.ensureWatch(target, scope);
+    if (this.ensureWatch(target, scope)) {
+      logOutputChannel.debug(
+        `[watch] inventory refresh deferred ${formatLogFields({ repo: target.repoRoot, reason: 'awaiting-watch-push' })}`
+      );
+      return;
+    }
     await this.refreshInventory(target.repoRoot);
   }
 
@@ -206,7 +221,7 @@ export class WorkspaceWatch implements vscode.Disposable {
    * CLI cannot see. A changed scope is the exception: watchFiles replaces the watched roots rather
    * than adding to them, so the full list has to be resent.
    */
-  private ensureWatch(target: WatchTarget, scope: WatchScope): void {
+  private ensureWatch(target: WatchTarget, scope: WatchScope): boolean {
     const normalizedRoot = normalizeFsPath(target.repoRoot);
     const scopeKey = watchScopeKey(scope);
     const previous = this.watched.get(normalizedRoot);
@@ -221,7 +236,7 @@ export class WorkspaceWatch implements vscode.Disposable {
           head: headLabel(target.repo),
         })}`
       );
-      return;
+      return false;
     }
     if (established) {
       logOutputChannel.info(
@@ -246,6 +261,7 @@ export class WorkspaceWatch implements vscode.Disposable {
       this.startWatch(target, scope);
     }
     this.seed(target.repoRoot);
+    return !established;
   }
 
   private startWatch(target: WatchTarget, scope: WatchScope): void {
@@ -285,8 +301,7 @@ export class WorkspaceWatch implements vscode.Disposable {
       repoRoot,
       relPaths: new Set(inventory.files.map(toPosixRelPath)),
     });
-    const reported = Array.from(this.inventories.values());
-    const keepPaths = this.pathsToKeep(reported);
+    const keepPaths = this.pruneToInventories();
     logOutputChannel.debug(
       `[watch] inventory applied ${formatLogFields({
         repo: repoRoot,
@@ -294,10 +309,42 @@ export class WorkspaceWatch implements vscode.Disposable {
         keepPaths: keepPaths.size,
       })}`
     );
+  }
+
+  private pruneToInventories(): Set<string> {
+    const reported = Array.from(this.inventories.values());
+    const keepPaths = this.pathsToKeep(reported);
     this.dependencies.pruneMonitor(
       reported.map((entry) => entry.repoRoot),
       keepPaths
     );
+    return keepPaths;
+  }
+
+  private handleQueue(queue: ReviewQueue): void {
+    this.cancelQueueIdlePrune();
+    if (!this.shouldPruneWhenIdle(queue)) return;
+    this.queueIdleTimer = setTimeout(() => {
+      this.queueIdleTimer = undefined;
+      const keepPaths = this.pruneToInventories();
+      logOutputChannel.debug(
+        `[watch] queue idle, monitor re-pruned ${formatLogFields({
+          repos: this.inventories.size,
+          keepPaths: keepPaths.size,
+        })}`
+      );
+    }, this.dependencies.queueIdleDelayMs);
+  }
+
+  private shouldPruneWhenIdle(queue: ReviewQueue): boolean {
+    if (this.disposed) return false;
+    if (queue.count > 0) return false;
+    return this.inventories.size > 0;
+  }
+
+  private cancelQueueIdlePrune(): void {
+    clearTimeout(this.queueIdleTimer);
+    this.queueIdleTimer = undefined;
   }
 
   private async refreshInventory(repoRoot: string): Promise<void> {
@@ -313,40 +360,53 @@ export class WorkspaceWatch implements vscode.Disposable {
   /**
    * A delta for a file the change set does not list is either a result queued before the change
    * set shrank, or one that arrived ahead of the inventory that grew to include it. Asking the CLI
-   * settles it without having to guess: the reply is ordered after everything already sent, and it
-   * can only ever prune, so an early delta keeps its place in the monitor.
+   * settles it without having to guess: the reply is ordered after everything already sent, so an
+   * early delta is admitted once the refreshed inventory lists it.
    */
-  private handleDelta(event: DeltaResult): void {
-    if (this.disposed || !event.result) return;
-    const repoRoot = this.resolveRepoRoot(event.repoRoot);
-    const inventory = this.inventories.get(normalizeFsPath(repoRoot));
-    if (!inventory) {
-      logOutputChannel.debug(`[watch] delta ignored ${formatLogFields({ repo: repoRoot, path: event.path, reason: 'no-inventory' })}`);
-      return;
+  async admitsDelta(reportedRoot: string, relPath: string): Promise<boolean> {
+    if (this.disposed) return true;
+    const repoRoot = this.resolveRepoRoot(reportedRoot);
+    const posixPath = toPosixRelPath(relPath);
+    if (!this.inventories.has(normalizeFsPath(repoRoot))) {
+      logOutputChannel.debug(`[watch] delta admitted ${formatLogFields({ repo: repoRoot, path: posixPath, reason: 'no-inventory' })}`);
+      return true;
     }
-    const relPath = toPosixRelPath(event.path);
-    if (inventory.relPaths.has(relPath)) return;
-    if (this.dirtyDocuments(repoRoot).has(relPath)) {
-      logOutputChannel.debug(`[watch] delta ignored ${formatLogFields({ repo: repoRoot, path: relPath, reason: 'dirty-buffer' })}`);
-      return;
-    }
+    if (this.isMonitoredPath(repoRoot, posixPath)) return true;
     logOutputChannel.debug(
-      `[watch] delta reconcile scheduled ${formatLogFields({ repo: repoRoot, path: relPath, reason: 'not-in-inventory' })}`
+      `[watch] delta reconcile scheduled ${formatLogFields({ repo: repoRoot, path: posixPath, reason: 'not-in-inventory' })}`
     );
-    this.scheduleInventoryRefresh(repoRoot);
+    await this.scheduleInventoryRefresh(repoRoot);
+    const admitted = this.isMonitoredPath(repoRoot, posixPath);
+    if (!admitted) {
+      logOutputChannel.debug(`[watch] delta rejected ${formatLogFields({ repo: repoRoot, path: posixPath, reason: 'not-in-inventory' })}`);
+    }
+    return admitted;
   }
 
-  private scheduleInventoryRefresh(repoRoot: string): void {
+  private isMonitoredPath(repoRoot: string, relPath: string): boolean {
+    const inventory = this.inventories.get(normalizeFsPath(repoRoot));
+    if (inventory?.relPaths.has(relPath)) return true;
+    return this.dirtyDocuments(repoRoot).has(relPath);
+  }
+
+  private scheduleInventoryRefresh(repoRoot: string): Promise<void> {
     const key = normalizeFsPath(repoRoot);
-    const pending = this.refreshTimers.get(key);
-    if (pending) clearTimeout(pending);
-    this.refreshTimers.set(
-      key,
-      setTimeout(() => {
-        this.refreshTimers.delete(key);
-        void this.refreshInventory(repoRoot);
-      }, INVENTORY_REFRESH_DELAY_MS)
-    );
+    const pending = this.pendingRefreshes.get(key) ?? createPendingRefresh();
+    clearTimeout(pending.timer);
+    pending.timer = setTimeout(() => {
+      this.pendingRefreshes.delete(key);
+      void this.refreshInventory(repoRoot).then(pending.settle);
+    }, INVENTORY_REFRESH_DELAY_MS);
+    this.pendingRefreshes.set(key, pending);
+    return pending.settled;
+  }
+
+  private cancelPendingRefreshes(): void {
+    for (const pending of this.pendingRefreshes.values()) {
+      clearTimeout(pending.timer);
+      pending.settle();
+    }
+    this.pendingRefreshes.clear();
   }
 
   /**
@@ -434,6 +494,7 @@ export function createWorkspaceWatchDependencies(
   repositories: () => readonly Repository[]
 ): WorkspaceWatchDependencies {
   return {
+    queueIdleDelayMs: QUEUE_IDLE_PRUNE_DELAY_MS,
     repositories,
     workspaceFolders: () => vscode.workspace.workspaceFolders ?? [],
     gitRootFor: (directory) => resolveGitRoot(directory),
@@ -464,6 +525,12 @@ function matchesExclude(pattern: string, relPath: string): boolean {
     })
     .join('');
   return new RegExp(`^(?:${escaped}|.*/${escaped})(?:/.*)?$`).test(normalized);
+}
+
+function createPendingRefresh(): PendingRefresh {
+  let settle!: () => void;
+  const settled = new Promise<void>((resolve) => (settle = resolve));
+  return { settled, settle };
 }
 
 function headLabel(repo: Repository | undefined): string {
