@@ -80,16 +80,7 @@ updatedocs:
 	npm run updatedocs
 
 updatecwf:
-	@if [ -d "../cs-webview" ] && [ -z "$${CI}" ]; then \
-		echo "Building CWF locally from ../cs-webview..."; \
-		(cd ../cs-webview && npm run build); \
-		rm -rf ./cs-cwf; \
-		cp -r ../cs-webview/build ./cs-cwf; \
-		echo "CWF built and copied to ./cs-cwf"; \
-	else \
-		echo "Downloading CWF from GitHub releases..."; \
-		npm run updatecwf; \
-	fi
+	node ./scripts/update-cwf.js
 
 clean:
 	npm run clean

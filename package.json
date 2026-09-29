@@ -266,8 +266,8 @@
     "test": "mocha",
     "test:coverage": "c8 npm run test",
     "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
-    "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
-    "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
+    "updatedocs": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics codescene-ide-protocol",
+    "updatecwf": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics cs-webview ./cs-cwf",
     "release:minor": "standard-version --release-as minor",
     "release:patch": "standard-version --release-as patch",
     "release:major": "standard-version --release-as major"
