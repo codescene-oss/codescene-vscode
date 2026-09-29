@@ -1,13 +1,13 @@
-.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs benchmark
+.PHONY: build package tsc clean lint watch test pretest pretest-e2e test-e2e test-release updatedocs updatecwf benchmark
 
 .DEFAULT_GOAL := build
 
-build:
+build: updatecwf
 	npm run build
 
 package: lint pretest
 	npm i
-	npm run updatecwf
+	$(MAKE) updatecwf
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
@@ -61,6 +61,9 @@ test-release:
 
 updatedocs:
 	npm run updatedocs
+
+updatecwf:
+	node ./scripts/update-cwf.js
 
 clean:
 	npm run clean
