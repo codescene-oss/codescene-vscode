@@ -88,6 +88,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
+    if (!Reviewer.instance) return;
     const cacheItem = Reviewer.instance.reviewCache.get(document, "any");
     if (!cacheItem) return;
 
@@ -159,7 +160,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
         const currentCached = this.commandCache.get(cacheKey);
         if (currentCached) {
           // Get review result to extract function range info when fnToRefactor is not available
-          const cacheItem = Reviewer.instance.reviewCache.get(currentCached.document, "any");
+          const cacheItem = Reviewer.instance?.reviewCache.get(currentCached.document, "any");
           let reviewResult: Review | undefined = undefined;
           if (cacheItem) {
             const reviewResultRaw = await cacheItem.review.reviewResult;

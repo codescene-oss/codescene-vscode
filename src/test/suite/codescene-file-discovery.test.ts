@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { execSync } from 'child_process';
 import { discoverCodeHealthRulesFileUris } from '../../git/codescene-file-discovery';
+import { gitExecutor } from '../../git-utils';
 import { setMockFindFilesResults, clearMockFindFilesResults } from '../setup';
 
 function assertNotInGitRepo(dir: string): void {
@@ -160,6 +161,48 @@ suite('CodeScene File Discovery Test Suite', function () {
 
     assert.strictEqual(uris.length, 1);
     assert.strictEqual(path.normalize(uris[0].fsPath), path.normalize(insideRules));
+  });
+
+  test('returns empty array when tracked files exist but no rules file', async function () {
+    this.timeout(10000);
+
+    const readme = path.join(testDir, 'README.md');
+    fs.writeFileSync(readme, 'hello');
+    gitAdd(readme);
+    gitCommit('Add readme');
+
+    const executedArgs: string[][] = [];
+    const originalExecute = gitExecutor.execute.bind(gitExecutor);
+    gitExecutor.execute = async (command, options, input) => {
+      executedArgs.push(command.args);
+      return originalExecute(command, options, input);
+    };
+
+    try {
+      const uris = await discoverCodeHealthRulesFileUris(testDir, testDir);
+      assert.strictEqual(uris.length, 0);
+      const listedAllTrackedFiles = executedArgs.some((args) => args.length === 1 && args[0] === 'ls-files');
+      assert.strictEqual(listedAllTrackedFiles, false);
+    } finally {
+      gitExecutor.execute = originalExecute;
+    }
+  });
+
+  test('resolves git root when gitRootPath is omitted', async function () {
+    this.timeout(10000);
+
+    const rulesPath = createCodeHealthRulesFile('.codescene/code-health-rules.json');
+    gitAdd(rulesPath);
+    gitCommit('Add rules');
+
+    setMockFindFilesResults([]);
+    try {
+      const uris = await discoverCodeHealthRulesFileUris(testDir, undefined);
+      assert.strictEqual(uris.length, 1);
+      assert.strictEqual(path.normalize(uris[0].fsPath), path.normalize(rulesPath));
+    } finally {
+      clearMockFindFilesResults();
+    }
   });
 
   suite('non-git workspace (uses findFiles fallback)', function () {

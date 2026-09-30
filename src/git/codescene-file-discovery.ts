@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import vscode from 'vscode';
-import { gitExecutor, GIT_TASK_ID } from '../git-utils';
+import { gitExecutor, GIT_TASK_ID, resolveGitRoot } from '../git-utils';
 import { CODE_SCENE_DIR } from './codescene-repo-config';
 
 const CODE_HEALTH_RULES_FILE = 'code-health-rules.json';
@@ -16,7 +16,8 @@ export async function discoverCodeHealthRulesFileUris(
   workspacePath: string,
   gitRootPath?: string
 ): Promise<vscode.Uri[]> {
-  if (!gitRootPath) {
+  const resolvedGitRoot = gitRootPath ?? (await resolveGitRoot(workspacePath));
+  if (!resolvedGitRoot) {
     return vscode.workspace.findFiles('**/.codescene/code-health-rules.json');
   }
 
@@ -27,9 +28,9 @@ export async function discoverCodeHealthRulesFileUris(
     absolutePaths.add(path.normalize(workspaceRules));
   }
 
-  const trackedPaths = await listTrackedCodeHealthRulesPaths(gitRootPath);
+  const trackedPaths = await listTrackedCodeHealthRulesPaths(resolvedGitRoot);
   for (const relativePath of trackedPaths) {
-    const absolutePath = path.normalize(path.resolve(gitRootPath, relativePath));
+    const absolutePath = path.normalize(path.resolve(resolvedGitRoot, relativePath));
     if (isWithinDirectory(absolutePath, workspacePath)) {
       absolutePaths.add(absolutePath);
     }
@@ -50,7 +51,7 @@ async function listTrackedCodeHealthRulesPaths(gitRootPath: string): Promise<str
       { cwd: gitRootPath }
     );
 
-    if (result.exitCode !== 0 || !result.stdout.trim()) {
+    if (result.exitCode !== 0) {
       return listTrackedCodeHealthRulesPathsFallback(gitRootPath);
     }
 

@@ -47,6 +47,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ) {
+    if (!Reviewer.instance) return;
     const reviewCacheItem = Reviewer.instance.reviewCache.get(document, "any");
     if (!reviewCacheItem) return;
 
