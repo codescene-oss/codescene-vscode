@@ -6,10 +6,11 @@ import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
+import type { CsIdeServerClient } from './devtools-api/ide-server-client';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
 import { register as registerCsDocProvider } from './documentation/csdoc-provider';
-import { ensureCompatibleIdeServer } from './download';
+import { createBundledIdeServer, verifyIdeServerVersion } from './download';
 import { reviewDocumentSelector } from './language-support';
 import { deactivate as deactivateLog, logOutputChannel, registerShowLogCommand } from './log';
 import { initAce } from './refactoring';
@@ -89,7 +90,7 @@ async function initializeCodeHealthFileVersions() {
 
   const rulesFiles = await discoverCodeHealthRulesFileUris(workspacePath, gitRootPath);
   logOutputChannel.debug(
-    `[config] rulesFiles found count=${rulesFiles.length} gitRoot=${gitRootPath ?? '(none)'} method=${gitRootPath ? 'git' : 'findFiles'}`
+    `[config] rulesFiles found count=${rulesFiles.length} gitRoot=${gitRootPath ?? '(none)'}`
   );
 
   for (const uri of rulesFiles) {
@@ -114,31 +115,21 @@ export async function activate(context: vscode.ExtensionContext) {
   initExtensionId(context);
   CsExtensionState.init(context);
 
-  ensureCompatibleIdeServer(context.extensionPath).then(
-    async (ideServer) => {
-      DevtoolsAPI.init(ideServer.binaryPath, context, ideServer);
-      await Telemetry.init(context);
-
-      try {
-        Reviewer.init(context, getCodeHealthFileVersions);
-        CsExtensionState.setAnalysisState({ state: 'enabled' });
-        await startExtension(context);
-        finalizeActivation(context);
-        logOutputChannel.info('Extension activated');
-      } catch (e) {
-        CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
-        reportError({ context: 'Unable to start extension', e });
-        void vscode.commands.executeCommand('codescene.controlCenterView.focus');
-      }
-    },
-    (e) => {
-      const error = assertError(e);
-      CsExtensionState.setAnalysisState({ state: 'error', error });
-      reportError({ context: 'Unable to start extension', e });
-      void vscode.commands.executeCommand('codescene.controlCenterView.focus');
-      Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
-    }
-  );
+  try {
+    const ideServer = createBundledIdeServer(context.extensionPath);
+    DevtoolsAPI.init(ideServer.binaryPath, context, ideServer);
+    void ideServer.start();
+    await Telemetry.init(context);
+    registerExtensionUi(context);
+    finalizeActivation(context);
+    return completeActivation(context, ideServer);
+  } catch (e) {
+    const error = assertError(e);
+    CsExtensionState.setAnalysisState({ state: 'error', error });
+    reportError({ context: 'Unable to start extension', e });
+    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
+    Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
+  }
 }
 
 function setupCodeLensProviders(context: vscode.ExtensionContext) {
@@ -166,7 +157,7 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
   context.subscriptions.push(aceConfigDisposable);
 }
 
-async function startExtension(context: vscode.ExtensionContext) {
+function registerExtensionUi(context: vscode.ExtensionContext) {
   const csWorkspace = new CsWorkspace(context);
   const csContext: CsContext = {
     csWorkspace,
@@ -192,19 +183,28 @@ async function startExtension(context: vscode.ExtensionContext) {
   createAuthProvider(context, csContext);
   registerCommands(context, csContext);
   registerCsDocProvider(context);
-  await initializeCodeHealthFileVersions();
-
-  addReviewListeners(context);
-  logOutputChannel.info('Review listeners ready');
-
   activateCHMonitor(context);
-
-  setupCodeLensProviders(context);
-
-  registerCodeActionProvider(context);
 
   if (ACE_ENABLED) {
     setupAceConfiguration(context);
+  }
+}
+
+async function completeActivation(context: vscode.ExtensionContext, ideServer: CsIdeServerClient) {
+  try {
+    await verifyIdeServerVersion(ideServer);
+    Reviewer.init(context, getCodeHealthFileVersions);
+    CsExtensionState.setAnalysisState({ state: 'enabled' });
+    setupCodeLensProviders(context);
+    registerCodeActionProvider(context);
+    await initializeCodeHealthFileVersions();
+    addReviewListeners(context);
+    logOutputChannel.info('Review listeners ready');
+    logOutputChannel.info('Extension activated');
+  } catch (e) {
+    CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
+    reportError({ context: 'Unable to start extension', e });
+    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
   }
 }
 

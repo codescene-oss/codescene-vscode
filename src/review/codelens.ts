@@ -88,6 +88,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
   }
 
   async provideCodeLenses(document: vscode.TextDocument, token: vscode.CancellationToken) {
+    if (!Reviewer.instance) return;
     const cacheItem = Reviewer.instance.reviewCache.get(document, "any");
     if (!cacheItem) return;
 
