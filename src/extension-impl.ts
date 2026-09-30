@@ -122,7 +122,7 @@ export async function activate(context: vscode.ExtensionContext) {
     await Telemetry.init(context);
     registerExtensionUi(context);
     finalizeActivation(context);
-    void completeActivation(context, ideServer);
+    return completeActivation(context, ideServer);
   } catch (e) {
     const error = assertError(e);
     CsExtensionState.setAnalysisState({ state: 'error', error });

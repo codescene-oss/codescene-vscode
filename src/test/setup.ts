@@ -12,6 +12,7 @@ import { CodeLensStub } from './stubs/code-lens-stub';
 import { ThemeColorStub } from './stubs/theme-color-stub';
 import { ThemeIconStub } from './stubs/theme-icon-stub';
 import { TreeItemStub } from './stubs/tree-item-stub';
+import { DisposableStub } from './stubs/disposable-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
@@ -259,6 +260,8 @@ function createMockGitApi() {
       const fsPath = uri.fsPath || uri.path || '';
       return mockGitRepositories.find((repo) => fsPath.startsWith(repo.rootUri.fsPath)) || null;
     },
+    onDidOpenRepository: () => ({ dispose: () => {} }),
+    onDidCloseRepository: () => ({ dispose: () => {} }),
   };
 }
 
@@ -295,6 +298,7 @@ const vscodeStub = {
     },
     onDidChangeActiveTextEditor: didChangeActiveTextEditor.event,
     onDidChangeVisibleTextEditors: didChangeVisibleTextEditors.event,
+    registerUriHandler: () => ({ dispose: () => {} }),
     createOutputChannel: (name: string) => ({
       append: (text: string) => captureLog(name, 'info', text, []),
       appendLine: (text: string) => captureLog(name, 'info', text, []),
@@ -439,6 +443,7 @@ const vscodeStub = {
       return { dispose: () => {} };
     },
     textDocuments: [],
+    registerTextDocumentContentProvider: () => ({ dispose: () => {} }),
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
@@ -537,8 +542,18 @@ const vscodeStub = {
     SourceOrganizeImports: 'source.organizeImports',
     Empty: '',
   },
+  Disposable: DisposableStub,
+  authentication: {
+    registerAuthenticationProvider: () => ({ dispose: () => {} }),
+    getSession: async () => undefined,
+  },
   env: {
     appName: 'Visual Studio Code',
+    createTelemetryLogger: () => ({
+      logUsage: () => {},
+      logError: () => {},
+      dispose: () => {},
+    }),
   },
   Uri: {
     parse: (value: string) => ({
