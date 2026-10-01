@@ -1,0 +1,42 @@
+name: Bootstrap Marketplace publishing identity (one-off)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - CS-11609-marketplace-entra-publishing
+    paths:
+      - .github/workflows/bootstrap-marketplace-identity.yml
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  profile:
+    name: 'Resolve Marketplace profile ID'
+    runs-on: 'ubuntu-latest'
+    environment: marketplace
+
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_PUBLISHING_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_PUBLISHING_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Fetch Azure DevOps profile
+        run: |
+          set -euo pipefail
+          profile=$(az rest \
+            --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798)
+          echo "$profile" | jq .
+          profile_id=$(echo "$profile" | jq -r '.id')
+          echo "Marketplace member ID: ${profile_id}"
+          {
+            echo "### Marketplace member ID"
+            echo
+            echo "Add \`${profile_id}\` as a Contributor on the CodeScene publisher."
+          } >> "$GITHUB_STEP_SUMMARY"
