@@ -24,7 +24,7 @@ jobs:
       stable_tag: ${{ steps.release.outputs.stable_tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -171,7 +171,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - uses: './.github/actions/setup'
 
@@ -238,7 +238,7 @@ jobs:
           echo "No ACE settings in no-ACE VSIX package.json"
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           path: '${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix'
           name: '${{ matrix.vsix_prefix }}-${{ matrix.platform }}-${{ matrix.arch }}'
@@ -250,10 +250,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all VSIX artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./artifacts
 

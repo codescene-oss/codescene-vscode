@@ -77,7 +77,7 @@ function webviewConfig(watch = false) {
 
   return {
     ...baseConfig,
-    target: 'es2020',
+    target: 'es2022',
     format: 'esm',
     entryPoints,
     outdir: './out',
