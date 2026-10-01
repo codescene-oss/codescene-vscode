@@ -105,7 +105,7 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   const target = `${platform}-${arch}`;
   const vsixName = `${pkg.name}-${pkg.version}-${target}.vsix`;
 
-  execSync(`npx @vscode/vsce@3.7.1 package --target ${target} --no-yarn --out ${vsixName}`, {
+  execSync(`npx @vscode/vsce@4.0.0 package --target ${target} --no-yarn --out ${vsixName}`, {
     stdio: 'inherit',
     env: tokenEnv,
   });

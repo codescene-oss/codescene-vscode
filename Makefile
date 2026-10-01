@@ -11,7 +11,7 @@ package: lint pretest
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
-	npx @vscode/vsce@3.7.1 package; \
+	npx @vscode/vsce@4.0.0 package; \
 	git checkout .vscodeignore; \
 
 tsc:

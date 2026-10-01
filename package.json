@@ -12,7 +12,7 @@
   "version": "0.28.2",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.75.1"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Programming Languages",
@@ -193,7 +193,7 @@
     "build": "node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",
     "tsc": "tsc -p ./",
-    "lint": "eslint src --ext ts --max-warnings=0",
+    "lint": "eslint src --max-warnings=0",
     "check-cwf": "node -e \"if (!require('fs').existsSync('cs-cwf/index.html')) { console.error('CWF files missing. Run: npm run updatecwf'); process.exit(1); }\"",
     "maybe-check-cwf": "node -e \"if (!process.env.CI && !require('fs').existsSync('cs-cwf/index.html')) { console.error('CWF files missing. Run: npm run updatecwf'); process.exit(1); }\"",
     "pretest": "npm run maybe-check-cwf && npm run tsc && npm run lint && npm run build && npm run bundle-cli-test",
@@ -202,52 +202,49 @@
     "benchmark": "mocha --config .mocharc.bench.json",
     "test:coverage": "c8 npm run test",
     "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
-    "updatedocs": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics codescene-ide-protocol",
-    "updatecwf": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics cs-webview ./cs-cwf",
+    "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
+    "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
     "release:test": "node ./scripts/create-test-release.js",
-    "release:minor": "standard-version --release-as minor",
-    "release:patch": "standard-version --release-as patch",
-    "release:major": "standard-version --release-as major"
+    "release:minor": "commit-and-tag-version --release-as minor",
+    "release:patch": "commit-and-tag-version --release-as patch",
+    "release:major": "commit-and-tag-version --release-as major"
   },
   "extensionDependencies": [
     "vscode.git"
   ],
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "@terascope/fetch-github-release": "^1.0.0",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@terascope/fetch-github-release": "^2.3.2",
     "@types/follow-redirects": "^1.14.1",
-    "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
+    "@types/node": "22.19.21",
     "@types/pidusage": "^2.0.5",
-    "@types/uuid": "^9.0.1",
-    "@types/vscode": "1.75.1",
-    "@typescript-eslint/eslint-plugin": "^5.51.0",
-    "@typescript-eslint/parser": "^5.45.0",
-    "c8": "^10.1.3",
-    "esbuild": "^0.25.1",
+    "@types/vscode": "1.105.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "c8": "^12.0.0",
+    "commit-and-tag-version": "^13.2.1",
+    "esbuild": "^0.28.2",
     "esbuild-plugin-copy": "^2.1.1",
-    "eslint": "^8.33.0",
+    "eslint": "^10.11.0",
     "extract-zip": "^2.0.1",
-    "follow-redirects": "^1.15.6",
-    "glob": "^8.0.3",
+    "follow-redirects": "^1.16.0",
     "husky": "^9.1.7",
-    "mocha": "^10.8.2",
+    "mocha": "^12.0.2",
     "pidusage": "^4.0.1",
-    "standard-version": "^9.5.0",
-    "typescript": "^4.9.5"
+    "typescript": "~6.0.3"
   },
   "dependencies": {
     "@types/lodash.debounce": "^4.0.7",
     "@types/lodash.throttle": "^4.1.9",
     "@types/vscode-webview": "^1.57.5",
-    "@vscode-elements/elements": "^1.8.0",
+    "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.44",
-    "axios": "^1.12.0",
+    "axios": "^1.20.0",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
-    "uuid": "^9.0.0",
-    "vscode-jsonrpc": "^8.2.1"
+    "uuid": "^14.0.2",
+    "vscode-jsonrpc": "^9.0.3"
   }
 }

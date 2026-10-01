@@ -54,7 +54,12 @@ export class SimpleExecutor implements Executor {
 
         this.stats.addRun(command, end - start);
 
-        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
+        resolve({
+          stdout: String(stdout).trim(),
+          stderr: String(stderr).trim(),
+          exitCode: error?.code || 0,
+          duration: end - start,
+        });
       });
 
       if (isDefined(input) && childProcess.stdin) {

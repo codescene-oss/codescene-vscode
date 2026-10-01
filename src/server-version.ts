@@ -47,7 +47,7 @@ export class CsServerVersion {
       const response: AxiosResponse = await axios.get(`${url}/version`);
       const contentType = response.headers['content-type'];
 
-      if (contentType.includes('application/json')) {
+      if (typeof contentType === 'string' && contentType.includes('application/json')) {
         return { version: response.data, url: url };
       } else {
         // cloud returns text/html
