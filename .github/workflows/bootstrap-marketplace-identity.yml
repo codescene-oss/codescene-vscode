@@ -16,7 +16,6 @@ jobs:
   profile:
     name: 'Resolve Marketplace profile ID'
     runs-on: 'ubuntu-latest'
-    environment: marketplace
 
     steps:
       - name: Azure login (OIDC)
