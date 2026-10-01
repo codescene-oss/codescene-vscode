@@ -11,6 +11,14 @@ on:
         type: boolean
         default: true
         description: Publish to Open VSX
+      dry_run:
+        type: boolean
+        default: false
+        description: Verify release assets and Marketplace publish rights without publishing
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   build:
@@ -55,21 +63,34 @@ jobs:
         with:
           node-version: 22
 
-      - name: Publish full variant to VS Code Marketplace
+      - name: Azure login (OIDC)
+        if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' }}
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_PUBLISHING_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_PUBLISHING_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Verify VS Code Marketplace publish rights
         if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' }}
         run: |
-          npm install -g vsce
+          npm install -g @vscode/vsce@4.0.0
+          vsce verify-pat --azure-credential CodeScene
+
+      - name: Publish full variant to VS Code Marketplace
+        if: ${{ github.event.inputs.publish_vscode_marketplace == 'true' && github.event.inputs.dry_run != 'true' }}
+        run: |
           declare -A vsix_map
           while IFS='=' read -r target file; do
             vsix_map["$target"]="$file"
           done < vsix-map.txt
           for target in "${!vsix_map[@]}"; do
             echo "🚀 Publishing ${vsix_map[$target]} to Marketplace (target=${target})"
-            vsce publish --pat ${{ secrets.VSCODE_MARKETPLACE_PUBLISHING_TOKEN }} --packagePath "${vsix_map[$target]}"
+            vsce publish --azure-credential --packagePath "${vsix_map[$target]}"
           done
 
       - name: Publish to open-vsx
-        if: ${{ github.event.inputs.publish_open_vsx == 'true' }}
+        if: ${{ github.event.inputs.publish_open_vsx == 'true' && github.event.inputs.dry_run != 'true' }}
         run: |
           npm install -g ovsx
           while IFS='=' read -r target file; do

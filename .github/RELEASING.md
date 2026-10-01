@@ -22,6 +22,8 @@ The release workflow requires the tag version to match `package.json`. GitHub ge
 
 Publishing to the VS Code Marketplace and Open VSX remains a separate manual action through the `Publish latest release (manual)` workflow.
 
+The workflow authenticates to the VS Code Marketplace with Microsoft Entra ID through GitHub OIDC, so it needs no Marketplace token. Enable `dry_run` to download and check the release assets and verify Marketplace publish rights without publishing anything.
+
 ## Test releases
 
 Create a test release tag without changing package metadata:
