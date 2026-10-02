@@ -127,7 +127,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const error = assertError(e);
     CsExtensionState.setAnalysisState({ state: 'error', error });
     reportError({ context: 'Unable to start extension', e });
-    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
     Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
   }
 }
@@ -204,7 +203,6 @@ async function completeActivation(context: vscode.ExtensionContext, ideServer: C
   } catch (e) {
     CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
     reportError({ context: 'Unable to start extension', e });
-    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
   }
 }
 

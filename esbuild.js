@@ -64,7 +64,6 @@ const extensionConfig = {
 
 function webviewConfig(watch = false) {
   const entryPoints = [
-    './src/control-center/webview-script.ts',
     './src/codescene-tab/webview/script.ts',
     './src/codescene-tab/webview/documentation-script.ts',
   ];
