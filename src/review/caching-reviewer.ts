@@ -1,5 +1,4 @@
 import vscode, { Disposable } from 'vscode';
-import { AbortError } from '../devtools-api/abort-error';
 import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { reportError } from '../utils';
@@ -18,14 +17,8 @@ export class CachingReviewer implements Disposable {
     this.reviewCache = new ReviewCache(getCodeHealthFileVersions);
   }
 
-  private handleReviewError(e: Error, document: vscode.TextDocument) {
-    if (e instanceof AbortError) {
-      // Delete the cache entry for this document if the review was aborted (document closed)
-      // Otherwise it won't be reviewed immediately when the document is opened again
-      this.reviewCache.delete(document.uri.fsPath);
-    } else {
-      reportError({context: "Review error", e, consoleOnly: true});
-    }
+  private handleReviewError(e: Error) {
+    reportError({context: "Review error", e, consoleOnly: true});
   }
 
   review(document: vscode.TextDocument, reviewOpts: ReviewOpts): CsReview {
@@ -44,7 +37,7 @@ export class CachingReviewer implements Disposable {
         }
         return reviewResult;
       })
-      .catch((e) => this.handleReviewError(e, document));
+      .catch((e) => this.handleReviewError(e));
 
     const csReview = new CsReview(document, reviewPromise);
 

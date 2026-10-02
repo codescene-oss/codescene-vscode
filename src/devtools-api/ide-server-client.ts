@@ -4,6 +4,7 @@ import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
 import { formatLogFields, logOutputChannel } from '../log';
 import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
+import { AbortError } from './abort-error';
 import { Delta } from './delta-model';
 import { CheckRulesResponse, CodeHealthRulesTemplateResponse } from './model';
 import { FnToRefactor, PreFlightResponse, RefactorResponse } from './refactor-models';
@@ -255,6 +256,9 @@ export class CsIdeServerClient implements vscode.Disposable {
     if (signal?.aborted) cancel();
     try {
       return refactorResponse(await this.sendRequest('cs-ide/refactor', params, cancellation.token));
+    } catch (error) {
+      if (signal?.aborted) throw new AbortError();
+      throw error;
     } finally {
       signal?.removeEventListener('abort', cancel);
       cancellation.dispose();

@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as path from 'path';
+import { AbortError } from '../../devtools-api/abort-error';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { gitBlobSha } from '../../review/review-pipeline';
 
@@ -80,6 +81,13 @@ suite('CsIdeServerClient Test Suite', () => {
       failed: false,
       'parsing-errors': [],
     });
+  });
+
+  test('maps a cancelled refactor to AbortError', async () => {
+    const controller = new AbortController();
+    const pending = client.refactor({ token: 'hang' }, controller.signal);
+    controller.abort();
+    await assert.rejects(pending, (error: unknown) => error instanceof AbortError);
   });
 
   test('sends check-rules path relative to the repo root', async () => {
