@@ -154,16 +154,13 @@ export class CsExtensionState {
   }
 
   /**
-   * Sets session state and updates the codescene.isSignedIn context variable.
-   * It's used in package.json to conditionally enable/disable views.
+   * Sets the signed-in session and notifies listeners.
    */
   static setSession(session?: vscode.AuthenticationSession) {
     const signedIn = isDefined(session);
-    void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
     CsExtensionState._instance.stateProperties.session = session;
     this._instance.sessionChangedEmitter.fire();
     if (!signedIn) {
-      // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
       return;
     }
 
