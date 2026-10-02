@@ -1,4 +1,4 @@
-import { createMessageConnection, ErrorCodes, ResponseError } from 'vscode-jsonrpc/node';
+import { createMessageConnection, ResponseError } from 'vscode-jsonrpc/node';
 import { createHash } from 'crypto';
 
 const connection = createMessageConnection(process.stdin, process.stdout);
@@ -43,8 +43,8 @@ connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; 
 });
 connection.onRequest('cs-ide/refactor', (params, token) => {
   if (params?.token === 'hang') {
-    return new Promise((_resolve, reject) => {
-      const cancel = () => reject(new ResponseError(ErrorCodes.RequestCancelled, 'Request cancelled'));
+    return new Promise((resolve, reject) => {
+      const cancel = () => reject(new ResponseError(-32800, 'Request cancelled'));
       if (token.isCancellationRequested) {
         cancel();
         return;
