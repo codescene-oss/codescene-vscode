@@ -47,6 +47,21 @@ suite('DevtoolsAPI JSON-RPC Test Suite', () => {
     assert.ok(events.some((event) => event.state === 'idle' && event.queueCount === 0 && event.queueDone === 3));
   });
 
+  test('clearQueue publishes an idle progress snapshot', () => {
+    const events: AnalysisEvent[] = [];
+    const subscription = DevtoolsAPI.onDidAnalysisStateChange((event) => events.push(event));
+    DevtoolsAPI.clearQueue();
+    subscription.dispose();
+
+    assert.deepStrictEqual(events[events.length - 1], {
+      state: 'idle',
+      jobs: DevtoolsAPI.jobs,
+      queued: [],
+      queueCount: 0,
+      queueDone: 0,
+    });
+  });
+
   aceTest('uses the shared server for preflight', async () => {
     assert.strictEqual((await DevtoolsAPI.preflight())?.version, 2);
   });
