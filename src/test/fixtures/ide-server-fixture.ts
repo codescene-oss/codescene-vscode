@@ -122,12 +122,16 @@ connection.onNotification('cs-ide/stopWatchFiles', (params) => {
 connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot }) => {
   for (const file of files) {
     if (file.content === 'fail') {
+      void connection.sendNotification('cs-ide/reviewProgress', {
+        count: 0,
+        done: 3,
+        files: [],
+      });
       void connection.sendNotification('cs-ide/reviewFailed', {
         ...(file.id ? { id: file.id } : {}),
         path: file['rel-path'],
         repoRoot,
         message: 'fixture review failed',
-        queue: { count: 0, files: [] },
       });
       continue;
     }
@@ -144,6 +148,11 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         endColumn: 2,
       },
     }] : [];
+    void connection.sendNotification('cs-ide/reviewProgress', {
+      count: 2,
+      done: 1,
+      files: ['b.ts', 'c.ts'],
+    });
     void connection.sendNotification('cs-ide/fileReview', {
       ...(file.id ? { id: file.id } : {}),
       path: file['rel-path'],
@@ -155,7 +164,11 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         score: 9.68,
         gitBlobSha,
       },
-      queue: { count: 2, files: ['b.ts', 'c.ts'] },
+    });
+    void connection.sendNotification('cs-ide/reviewProgress', {
+      count: 1,
+      done: 2,
+      files: ['c.ts'],
     });
     void connection.sendNotification('cs-ide/deltaReview', {
       ...(file.id ? { id: file.id } : {}),
@@ -170,7 +183,6 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
         oldGitBlobSha: 'old-sha',
         newGitBlobSha: gitBlobSha,
       },
-      queue: { count: 1, files: ['c.ts'] },
     });
   }
 });

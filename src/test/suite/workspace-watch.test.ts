@@ -441,7 +441,7 @@ suite('WorkspaceWatch Test Suite', () => {
   });
 
   suite('re-prune once the CLI queue goes idle', () => {
-    const queue = (count: number): ReviewQueue => ({ count, files: [] });
+    const queue = (count: number): ReviewQueue => ({ count, done: 0, files: [] });
     const settleIdle = () => new Promise((resolve) => setTimeout(resolve, queueIdleDelayMs + 30));
 
     const cases = [

@@ -184,11 +184,12 @@ export function watchInventoryResponse(value: WireObject): { repoRoot?: string; 
   };
 }
 
-export function queueResponse(value: WireObject): { count: number; files: string[] } | undefined {
-  const queue = value.queue;
-  if (!queue || typeof queue !== 'object') return;
+export function reviewProgressResponse(value: unknown): { count: number; done: number; files: string[] } | undefined {
+  if (!value || typeof value !== 'object') return;
+  const progress = value as WireObject;
   return {
-    count: typeof queue.count === 'number' ? queue.count : 0,
-    files: Array.isArray(queue.files) ? queue.files : [],
+    count: typeof progress.count === 'number' ? progress.count : 0,
+    done: typeof progress.done === 'number' ? progress.done : 0,
+    files: Array.isArray(progress.files) ? progress.files : [],
   };
 }

@@ -120,8 +120,8 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(await failure, { id: 'file-2', message: 'fixture review failed' });
   });
 
-  test('forwards queue progress from review, delta, and failure notifications', async () => {
-    const queues: Array<{ count: number; files: string[] }> = [];
+  test('forwards reviewProgress notifications', async () => {
+    const queues: Array<{ count: number; done: number; files: string[] }> = [];
     client.onDidQueue((queue) => queues.push(queue));
     const review = new Promise<void>((resolve) => {
       client.onDidReview(() => resolve());
@@ -143,9 +143,9 @@ suite('CsIdeServerClient Test Suite', () => {
     await failure;
 
     assert.deepStrictEqual(queues, [
-      { count: 2, files: [path.join('/repo', 'b.ts'), path.join('/repo', 'c.ts')] },
-      { count: 1, files: [path.join('/repo', 'c.ts')] },
-      { count: 0, files: [] },
+      { count: 2, done: 1, files: ['b.ts', 'c.ts'] },
+      { count: 1, done: 2, files: ['c.ts'] },
+      { count: 0, done: 3, files: [] },
     ]);
   });
 
@@ -340,7 +340,7 @@ suite('CsIdeServerClient Test Suite', () => {
     await delta;
     assertLogContains('info', 'received fileReview id=file-1 path=file.ts');
     assertLogContains('info', 'received deltaReview id=file-1 path=file.ts');
-    assertLogContains('info', 'received queue');
+    assertLogContains('info', 'received reviewProgress');
 
     const inventory = new Promise<void>((resolve) => client.onDidWatchInventory(() => resolve()));
     client.watchFiles('/repo', ['packages/app']);

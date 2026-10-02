@@ -26,28 +26,25 @@ import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresenta
 import { CsReview } from '../review/cs-review';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { relativePosix } from '../utils/fs-paths';
-import { ReviewQueueProgress } from './review-queue-progress';
 
 export class DevtoolsAPI {
   private static reviewCache: ReviewCache;
   private static ideServer: CsIdeServerClient;
   private static pipeline: ReviewPipeline;
-  private static queueProgress?: ReviewQueueProgress;
   private static queueSubscription?: vscode.Disposable;
   private static lastNetworkError = false;
 
   static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
     DevtoolsAPI.pipeline?.dispose();
-    DevtoolsAPI.queueProgress?.dispose();
     DevtoolsAPI.queueSubscription?.dispose();
     DevtoolsAPI.ideServer?.dispose();
     DevtoolsAPI.reviewCache = new ReviewCache(context);
     DevtoolsAPI.ideServer = ideServer ?? new CsIdeServerClient(binaryPath);
     DevtoolsAPI.pipeline = new ReviewPipeline(DevtoolsAPI.ideServer, DevtoolsAPI.pipelinePresentation(), uuid);
     DevtoolsAPI.queueCount = 0;
+    DevtoolsAPI.queueDone = 0;
     DevtoolsAPI.queued = [];
-    DevtoolsAPI.queueProgress = new ReviewQueueProgress((snapshot) => DevtoolsAPI.applyQueue(snapshot));
-    DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.queueProgress?.update(queue));
+    DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.applyQueue(queue));
   }
 
   static get reviewPipeline(): ReviewPipeline {
@@ -104,6 +101,7 @@ export class DevtoolsAPI {
   private static analysesRunning = 0;
   public static jobs = new Set<string>();
   private static queueCount = 0;
+  private static queueDone = 0;
   private static queued: string[] = [];
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
@@ -121,14 +119,15 @@ export class DevtoolsAPI {
   }
 
   private static applyQueue(snapshot: ReviewQueue): void {
-    const queue = automaticAnalysisEnabled() ? snapshot : { count: 0, files: [] };
+    const queue = automaticAnalysisEnabled() ? snapshot : { count: 0, done: 0, files: [] };
     DevtoolsAPI.queueCount = queue.count;
+    DevtoolsAPI.queueDone = queue.done;
     DevtoolsAPI.queued = queue.files;
     DevtoolsAPI.fireAnalysisState();
   }
 
   static clearQueue(): void {
-    DevtoolsAPI.queueProgress?.update({ count: 0, files: [] });
+    DevtoolsAPI.applyQueue({ count: 0, done: 0, files: [] });
   }
 
   private static fireAnalysisState(): void {
@@ -138,6 +137,7 @@ export class DevtoolsAPI {
       jobs: DevtoolsAPI.jobs,
       queued: DevtoolsAPI.queued,
       queueCount: DevtoolsAPI.queueCount,
+      queueDone: DevtoolsAPI.queueDone,
     });
   }
 
@@ -377,7 +377,6 @@ export class DevtoolsAPI {
 
   static dispose() {
     DevtoolsAPI.pipeline?.dispose();
-    DevtoolsAPI.queueProgress?.dispose();
     DevtoolsAPI.queueSubscription?.dispose();
     DevtoolsAPI.ideServer?.dispose();
     try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
@@ -429,7 +428,13 @@ export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
   return `[traceId ${traceId ?? 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
 
-export type AnalysisEvent = { state: 'running' | 'idle'; jobs?: Set<string>; queued?: string[]; queueCount?: number };
+export type AnalysisEvent = {
+  state: 'running' | 'idle';
+  jobs?: Set<string>;
+  queued?: string[];
+  queueCount?: number;
+  queueDone?: number;
+};
 export type ReviewEvent = { document: vscode.TextDocument; result?: Review };
 export type DeltaAnalysisEvent = {
   document: vscode.TextDocument;

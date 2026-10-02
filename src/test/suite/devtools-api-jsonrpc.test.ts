@@ -43,8 +43,8 @@ suite('DevtoolsAPI JSON-RPC Test Suite', () => {
     await failure;
     subscription.dispose();
 
-    assert.ok(events.some((event) => event.state === 'running' && event.queueCount === 2));
-    assert.ok(events.some((event) => event.state === 'idle' && event.queueCount === 0));
+    assert.ok(events.some((event) => event.state === 'running' && event.queueCount === 2 && event.queueDone === 1));
+    assert.ok(events.some((event) => event.state === 'idle' && event.queueCount === 0 && event.queueDone === 3));
   });
 
   aceTest('uses the shared server for preflight', async () => {
