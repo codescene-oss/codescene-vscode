@@ -6,6 +6,7 @@ import { BackgroundServiceView } from '../../code-health-monitor/background-view
 import { CsExtensionState } from '../../cs-extension-state';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
+import { handleCWFMessage } from '../../code-health-monitor/home/cwf-message-handlers';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -246,5 +247,20 @@ suite('HomeView', () => {
         assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], expectedFiles);
       });
     });
+  });
+});
+
+suite('Home view login messages', () => {
+  test('open-login opens the login flow', async () => {
+    const states: Array<{ loginOpen: boolean; loginState: string }> = [];
+    const homeView = {
+      setLoginFlowState: (state: { loginOpen: boolean; loginState: string }) => {
+        states.push(state);
+      },
+    };
+
+    await handleCWFMessage(homeView as HomeView, { messageType: 'open-login' });
+
+    assert.deepStrictEqual(states, [{ loginOpen: true, loginState: 'init' }]);
   });
 });
