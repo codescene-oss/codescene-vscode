@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { sortFnInfo, sortIssues } from '../../code-health-monitor/sort-fn-info';
 
-suite('Code Health Monitor tree-model Test Suite', () => {
+suite('Code Health Monitor sort-fn-info Test Suite', () => {
   test('Test sorting of DeltaFunctionItems', async () => {
     const list: any[] = [
       { fnName: 'b', isRefactoringSupported: true, range: { start: { line: 2 } }, children: [] },
