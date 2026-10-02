@@ -250,17 +250,12 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   async refactor(params: RefactorParams, signal?: AbortSignal): Promise<RefactorResponse> {
-    const cancellation = new CancellationTokenSource();
-    const cancel = () => cancellation.cancel();
-    signal?.addEventListener('abort', cancel);
-    if (signal?.aborted) cancel();
+    const cancellation = this.bindRefactorCancellation(signal);
     try {
       return refactorResponse(await this.sendRequest('cs-ide/refactor', params, cancellation.token));
     } catch (error) {
-      if (signal?.aborted) throw new AbortError();
-      throw error;
+      throw this.refactorRejection(error, signal);
     } finally {
-      signal?.removeEventListener('abort', cancel);
       cancellation.dispose();
     }
   }
@@ -337,6 +332,24 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.watchInventoryEmitter.dispose();
     this.serverStartEmitter.dispose();
     this.queueEmitter.dispose();
+  }
+
+  private bindRefactorCancellation(signal?: AbortSignal): { token: CancellationToken; dispose: () => void } {
+    const cancellation = new CancellationTokenSource();
+    const cancel = () => cancellation.cancel();
+    signal?.addEventListener('abort', cancel);
+    if (signal?.aborted) cancel();
+    return {
+      token: cancellation.token,
+      dispose: () => {
+        signal?.removeEventListener('abort', cancel);
+        cancellation.dispose();
+      },
+    };
+  }
+
+  private refactorRejection(error: unknown, signal?: AbortSignal): unknown {
+    return signal?.aborted ? new AbortError() : error;
   }
 
   private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {
