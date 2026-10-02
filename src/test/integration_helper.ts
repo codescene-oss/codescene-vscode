@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { ArtifactInfo } from '../artifact-info';
-import { ensureCompatibleBinary } from '../download';
+import { createBundledIdeServer, verifyIdeServerVersion } from '../download';
 
 export function createTestDir(testName: string): string {
   return path.join(os.homedir(), '.codescene-test-data', testName);
@@ -18,7 +18,12 @@ export async function ensureBinary(): Promise<string> {
   if (!distributionReady) {
     console.log(`CLI distribution not found at ${binaryPath}, attempting to download...`);
     try {
-      await ensureCompatibleBinary(extensionPath);
+      const client = createBundledIdeServer(extensionPath);
+      try {
+        await verifyIdeServerVersion(client);
+      } finally {
+        client.dispose();
+      }
       console.log(`CLI distribution downloaded successfully to ${binaryPath}`);
     } catch (error) {
       throw new Error(

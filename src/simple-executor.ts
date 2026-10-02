@@ -2,7 +2,6 @@ import { ChildProcess, execFile, ExecOptions } from 'child_process';
 import { logOutputChannel } from './log';
 import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
-import { Stats } from './executor-stats';
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
 
@@ -17,12 +16,6 @@ export class SimpleExecutor implements Executor {
     } else {
       throw Error(`error: cannot write to stdin of the ${childProcess.spawnfile} process. Unable to execute?`);
     }
-  }
-
-  private stats: Stats = new Stats();
-
-  logStats(): void {
-    this.stats.logStats();
   }
 
   execute(command: Command, options: ExecOptions & { cwd: string }, input?: string) {
@@ -52,8 +45,6 @@ export class SimpleExecutor implements Executor {
           `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
         );
 
-        this.stats.addRun(command, end - start);
-
         resolve({
           stdout: String(stdout).trim(),
           stderr: String(stderr).trim(),
@@ -69,14 +60,4 @@ export class SimpleExecutor implements Executor {
       logOutputChannel.debug(`[pid ${childProcess.pid}] "${logName}" started`);
     });
   }
-
-  async executeTask<T>(task: () => Promise<T>): Promise<T> {
-    return task();
-  }
-
-  abortAllTasks(): void {}
-}
-
-export interface Task extends Command {
-  taskId: string;
 }

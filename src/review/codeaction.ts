@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { ACE_ENABLED } from '../build-flags';
-import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';

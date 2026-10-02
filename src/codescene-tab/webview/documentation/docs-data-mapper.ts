@@ -4,7 +4,7 @@ import { findFnToRefactor } from '../../../refactoring/utils';
 import { getAutoRefactorConfig } from '../ace/acknowledgement/ace-acknowledgement-mapper';
 import { getCWFDocType } from './utils';
 import { CodeSceneTabPanelState } from './cwf-webview-docs-panel';
-import { FunctionRange, IssueInfo } from '../../../documentation/commands';
+import { FunctionRange } from '../../../documentation/commands';
 import { FnToRefactor } from '../../../devtools-api/refactor-models';
 
 export async function getDocsData(state: CodeSceneTabPanelState): Promise<DocsContextViewProps> {
@@ -39,14 +39,14 @@ function getFileData(state: CodeSceneTabPanelState): FileMetaType | undefined {
           fileName: document?.fileName || '',
           fn: {
             name: issueInfo.fnName ?? fnToRefactor?.name ?? functionRange?.function ?? '',
-            range: getRange(issueInfo, fnToRefactor, functionRange),
+            range: getRange(fnToRefactor, functionRange),
           },
         }
       : undefined;
   return fileData;
 }
 
-function getRange(issueInfo: IssueInfo, fnToRefactor: FnToRefactor | undefined, functionRange?: FunctionRange) {
+function getRange(fnToRefactor: FnToRefactor | undefined, functionRange?: FunctionRange) {
   if (fnToRefactor && fnToRefactor.range) {
     return {
       startLine: fnToRefactor.range['start-line'] ?? 0, // Adjusted only for display purposes (1-based)

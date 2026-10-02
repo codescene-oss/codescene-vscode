@@ -57,26 +57,4 @@ export class QueuedSingleTaskExecutor implements Executor {
       void this.processNextTask(taskId).catch(() => {});
     }
   }
-
-  logStats(): void {
-    this.executor.logStats();
-  }
-
-  async executeTask<T>(task: () => Promise<T>): Promise<T> {
-    return this.executor.executeTask(task);
-  }
-
-  abortAllTasks(): void {
-    this.executor.abortAllTasks();
-
-    // Reject all pending tasks to prevent callers from hanging
-    for (const queue of this.taskQueues.values()) {
-      for (const queuedTask of queue) {
-        queuedTask.reject(new Error('Task aborted'));
-      }
-    }
-
-    this.taskQueues.clear();
-    this.runningTasks.clear();
-  }
 }

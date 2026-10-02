@@ -4,6 +4,7 @@ import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
 import { formatLogFields, logOutputChannel } from '../log';
 import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
+import { AbortError } from './abort-error';
 import { Delta } from './delta-model';
 import { CheckRulesResponse, CodeHealthRulesTemplateResponse } from './model';
 import { FnToRefactor, PreFlightResponse, RefactorResponse } from './refactor-models';
@@ -249,14 +250,12 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   async refactor(params: RefactorParams, signal?: AbortSignal): Promise<RefactorResponse> {
-    const cancellation = new CancellationTokenSource();
-    const cancel = () => cancellation.cancel();
-    signal?.addEventListener('abort', cancel);
-    if (signal?.aborted) cancel();
+    const cancellation = this.bindRefactorCancellation(signal);
     try {
       return refactorResponse(await this.sendRequest('cs-ide/refactor', params, cancellation.token));
+    } catch (error) {
+      throw this.refactorRejection(error, signal);
     } finally {
-      signal?.removeEventListener('abort', cancel);
       cancellation.dispose();
     }
   }
@@ -333,6 +332,24 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.watchInventoryEmitter.dispose();
     this.serverStartEmitter.dispose();
     this.queueEmitter.dispose();
+  }
+
+  private bindRefactorCancellation(signal?: AbortSignal): { token: CancellationToken; dispose: () => void } {
+    const cancellation = new CancellationTokenSource();
+    const cancel = () => cancellation.cancel();
+    signal?.addEventListener('abort', cancel);
+    if (signal?.aborted) cancel();
+    return {
+      token: cancellation.token,
+      dispose: () => {
+        signal?.removeEventListener('abort', cancel);
+        cancellation.dispose();
+      },
+    };
+  }
+
+  private refactorRejection(error: unknown, signal?: AbortSignal): unknown {
+    return signal?.aborted ? new AbortError() : error;
   }
 
   private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {

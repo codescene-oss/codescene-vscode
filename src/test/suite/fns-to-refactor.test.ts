@@ -6,7 +6,6 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { ChangeType } from '../../devtools-api/delta-model';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
 import { aceSuite } from '../ace-test-suite';

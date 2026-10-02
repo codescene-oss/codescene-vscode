@@ -6,7 +6,6 @@ import { ReviewCodeActionProvider } from '../../review/codeaction';
 import { CodeSmell } from '../../devtools-api/review-model';
 import Reviewer from '../../review/reviewer';
 import { CsReview } from '../../review/cs-review';
-import type * as VSCode from 'vscode';
 import { DevtoolsAPI } from '../../devtools-api';
 
 let provider: ReviewCodeActionProvider;

@@ -97,8 +97,7 @@ function handleOpenSettings() {
  * Change homeview state to display loginflow
  * @param homeView
  */
-async function handleOpenLogin(homeView: HomeView) {
-  await vscode.commands.executeCommand('codescene.signInCancel');
+function handleOpenLogin(homeView: HomeView) {
   homeView.setLoginFlowState({
     loginOpen: true,
     loginState: 'init',
@@ -152,7 +151,7 @@ function handleLifecyleMessage(homeView: HomeView, message: MessageToIDEType) {
 async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'open-login':
-      await handleOpenLogin(homeView);
+      handleOpenLogin(homeView);
       return;
     case 'open-home':
       handleCloseLogin(homeView);

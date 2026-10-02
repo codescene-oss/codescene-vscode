@@ -6,8 +6,6 @@ import { requiredDevtoolsVersion } from '../../artifact-info';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import {
   createBundledIdeServer,
-  ensureCompatibleBinary,
-  ensureCompatibleIdeServer,
   verifyIdeServerVersion,
 } from '../../download';
 
@@ -84,19 +82,14 @@ suite('Download Test Suite', function () {
     });
   }
 
-  test('ensureCompatibleIdeServer starts the bundled distribution', async function () {
+  test('verifyIdeServerVersion accepts the bundled distribution', async function () {
     this.timeout(60000);
-    const client = await ensureCompatibleIdeServer(extensionRoot());
+    const client = createBundledIdeServer(extensionRoot());
     try {
-      assert.ok(client.binaryPath);
+      await verifyIdeServerVersion(client);
+      assert.ok(fs.existsSync(client.binaryPath));
     } finally {
       client.dispose();
     }
-  });
-
-  test('ensureCompatibleBinary returns the bundled binary path', async function () {
-    this.timeout(60000);
-    const binaryPath = await ensureCompatibleBinary(extensionRoot());
-    assert.ok(fs.existsSync(binaryPath));
   });
 });

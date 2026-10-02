@@ -2,8 +2,8 @@ import { commands } from 'vscode';
 import { getEffectiveToken } from '../../devtools-api';
 import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
-import { collapsibleContent, markdownAsCollapsible } from './components';
-import { escapeHtml, readRawMarkdownDocs } from './utils';
+import { collapsibleContent } from './components';
+import { escapeHtml } from './utils';
 
 export function refactoringSummary(confidence: Confidence) {
   const {
@@ -42,48 +42,10 @@ export function customRefactoringSummary(level: number, action: string, actionDe
   `;
 }
 
-function retryButton() {
-  return `<vscode-button id="retry-button" icon="sparkle" primary aria-label="Retry Auto-Refactor" title="Retry Auto-Refactor">
-            Retry Auto-Refactor
-          </vscode-button>`;
-}
-
 export function refactoringContent(response: RefactorResponse, languageId: string, isStale: boolean) {
   const decoratedCode = decorateCode(response, languageId);
   const code = { content: decoratedCode, languageId };
   return autoRefactorContent(response, code, isStale);
-}
-
-type Code = {
-  content: string;
-  languageId: string;
-};
-
-async function codeImprovementContent(response: RefactorResponse, code: Code) {
-  const {
-    'refactoring-properties': { 'removed-code-smells': removedCodeSmells },
-  } = response;
-
-  let solutionContent;
-  if (removedCodeSmells.length > 0) {
-    solutionContent = await codeSmellsGuide(removedCodeSmells[0]);
-  } else {
-    solutionContent = await codeSmellsGuide('modularity-improvement');
-  }
-
-  return /*html*/ `
-      ${solutionContent}
-      ${collapsibleContent('Example code', await codeContainerContent(code, false, 'copy-code-to-clipboard-button'))}
-    `;
-}
-async function codeSmellsGuide(codeSmell: string) {
-  const docsGuide = readRawMarkdownDocs(codeSmell, 'improvement-guides');
-  const [problem, solution] = docsGuide.split('## Solution');
-
-  return `
-      ${await markdownAsCollapsible('Problem', problem)}
-      ${await markdownAsCollapsible('Solution', solution)}
-    `;
 }
 
 async function autoRefactorContent(response: RefactorResponse, code: CodeWithLangId, isStale: boolean) {
@@ -168,16 +130,6 @@ async function codeContainerContent(code: CodeWithLangId, showDiff = true, copyB
         </div>
       </div>
     `;
-}
-
-async function unverifiedRefactoring(response: RefactorResponse, code: CodeWithLangId) {
-  return /*html*/ `
-    ${reasonsContent(response)}
-    ${collapsibleContent(
-      'Refactored code (unverified)',
-      await codeContainerContent(code, false, 'copy-code-to-clipboard-button'),
-    )}
-  `;
 }
 
 export function refactoringError(isAuthError = false) {

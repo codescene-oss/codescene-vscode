@@ -20,7 +20,6 @@ import Reviewer from './review/reviewer';
 import { CsServerVersion } from './server-version';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
-import { CsWorkspace } from './workspace';
 import debounce = require('lodash.debounce');
 import { registerCopyDeviceIdCommand } from './device-id';
 import { OpenFilesObserver } from './review/open-files-observer';
@@ -35,10 +34,6 @@ import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extens
 export { reloadWindowForUpdate } from './extension-reload';
 
 const ENABLE_AUTH_COMMANDS = false;
-
-interface CsContext {
-  csWorkspace: CsWorkspace;
-}
 
 let DISPOSABLES: vscode.Disposable[] = [];
 
@@ -127,7 +122,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const error = assertError(e);
     CsExtensionState.setAnalysisState({ state: 'error', error });
     reportError({ context: 'Unable to start extension', e });
-    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
     Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
   }
 }
@@ -158,12 +152,6 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
 }
 
 function registerExtensionUi(context: vscode.ExtensionContext) {
-  const csWorkspace = new CsWorkspace(context);
-  const csContext: CsContext = {
-    csWorkspace,
-  };
-  DISPOSABLES.push(csWorkspace);
-  context.subscriptions.push(csWorkspace);
   CsServerVersion.init();
 
   CsExtensionState.addListeners(context);
@@ -180,8 +168,8 @@ function registerExtensionUi(context: vscode.ExtensionContext) {
   context.subscriptions.push(gitUnavailableDisposable);
 
   CsDiagnostics.init(context);
-  createAuthProvider(context, csContext);
-  registerCommands(context, csContext);
+  createAuthProvider(context);
+  registerCommands(context);
   registerCsDocProvider(context);
   activateCHMonitor(context);
 
@@ -204,7 +192,6 @@ async function completeActivation(context: vscode.ExtensionContext, ideServer: C
   } catch (e) {
     CsExtensionState.setAnalysisState({ state: 'error', error: assertError(e) });
     reportError({ context: 'Unable to start extension', e });
-    void vscode.commands.executeCommand('codescene.controlCenterView.focus');
   }
 }
 
@@ -220,7 +207,7 @@ function finalizeActivation(context: vscode.ExtensionContext) {
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
 
-function registerCommands(context: vscode.ExtensionContext, csContext: CsContext) {
+function registerCommands(context: vscode.ExtensionContext) {
   registerShowLogCommand(context);
   registerDocumentationCommands(context);
   if (ACE_ENABLED) {
@@ -343,7 +330,7 @@ async function handleSignOut(authProvider: CsAuthenticationProvider) {
   }
 }
 
-function registerSignInCommand(context: vscode.ExtensionContext, csContext: CsContext) {
+function registerSignInCommand(context: vscode.ExtensionContext) {
   const signInCmd = vscode.commands.registerCommand('codescene.signIn', async () => {
     const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
     vscode.authentication
@@ -360,12 +347,12 @@ function registerSignOutCommand(context: vscode.ExtensionContext, authProvider: 
   context.subscriptions.push(signOutCmd);
 }
 
-function createAuthProvider(context: vscode.ExtensionContext, csContext: CsContext) {
+function createAuthProvider(context: vscode.ExtensionContext) {
   const authProvider = new CsAuthenticationProvider(context);
 
   // Register manual sign in command
   if (ENABLE_AUTH_COMMANDS) {
-    registerSignInCommand(context, csContext);
+    registerSignInCommand(context);
   }
 
   // Register manual sign out command

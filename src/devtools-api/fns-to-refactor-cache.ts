@@ -2,8 +2,6 @@ import vscode from 'vscode';
 import { FnToRefactor } from './refactor-models';
 import { CodeSmell } from './review-model';
 import { DevtoolsAPI } from '.';
-import { logOutputChannel } from '../log';
-import { basename } from 'path';
 
 /**
  * Shared cache for fnsToRefactor results to avoid redundant binary calls.

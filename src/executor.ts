@@ -15,10 +15,7 @@ export interface Command {
 }
 
 export interface Executor {
-  logStats(): void;
   execute(command: Command, options: ExecOptions, input?: string): Promise<ExecResult>;
-  executeTask<T>(task: () => Promise<T>): Promise<T>;
-  abortAllTasks(): void;
 }
 
 /**

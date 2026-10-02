@@ -1,4 +1,4 @@
-import { createMessageConnection } from 'vscode-jsonrpc/node';
+import { createMessageConnection, ResponseError } from 'vscode-jsonrpc/node';
 import { createHash } from 'crypto';
 
 const connection = createMessageConnection(process.stdin, process.stdout);
@@ -41,20 +41,32 @@ connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; 
     refactoringTargets: [{ category: 'Complex Method', line: 1 }],
   }];
 });
-connection.onRequest('cs-ide/refactor', () => ({
-  code: 'function f() {}',
-  confidence: {
-    level: 1,
-    title: 'High confidence',
-    recommendedAction: { description: 'Apply', details: 'Safe change' },
-    reviewHeader: 'Review',
-  },
-  metadata: { 'cached?': false },
-  reasons: [],
-  refactoringProperties: { addedCodeSmells: [], removedCodeSmells: ['Complex Method'] },
-  traceId: 'trace-1',
-  creditsInfo: { limit: 10, used: 1 },
-}));
+connection.onRequest('cs-ide/refactor', (params, token) => {
+  if (params?.token === 'hang') {
+    return new Promise((resolve, reject) => {
+      const cancel = () => reject(new ResponseError(-32800, 'Request cancelled'));
+      if (token.isCancellationRequested) {
+        cancel();
+        return;
+      }
+      token.onCancellationRequested(cancel);
+    });
+  }
+  return {
+    code: 'function f() {}',
+    confidence: {
+      level: 1,
+      title: 'High confidence',
+      recommendedAction: { description: 'Apply', details: 'Safe change' },
+      reviewHeader: 'Review',
+    },
+    metadata: { 'cached?': false },
+    reasons: [],
+    refactoringProperties: { addedCodeSmells: [], removedCodeSmells: ['Complex Method'] },
+    traceId: 'trace-1',
+    creditsInfo: { limit: 10, used: 1 },
+  };
+});
 connection.onRequest('cs-ide/telemetry', (params) => ({ status: 202, params }));
 connection.onRequest('cs-ide/device-id', () => ({ deviceId: 'device-42' }));
 connection.onRequest('cs-ide/code-health-rules-template', () => ({ template: '{"rule_sets":[]}' }));
