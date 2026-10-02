@@ -7,7 +7,6 @@ import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspac
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { RefactoringRequest } from '../../refactoring/request';
-import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { ChangeType } from '../../devtools-api/delta-model';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';

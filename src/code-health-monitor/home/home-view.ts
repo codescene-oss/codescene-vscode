@@ -79,7 +79,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
-      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect change to commit baseline
+      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect sign-in session changes
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())

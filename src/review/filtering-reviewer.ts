@@ -9,9 +9,7 @@ import { logOutputChannel } from '../log';
 /**
  * A reviewer that respects .gitignore settings.
  *
- * If git is not installed, or if the current document is not part of workspace
- * (i.e. it's opened as a standalone file), then this reviewer will basically be
- * downgraded to the injected reviewer (which for normal use is the CachingReviewer)
+ * Ignored files are skipped. CachingReviewer wraps this reviewer.
  */
 export class FilteringReviewer {
   private gitIgnoreChecker: GitIgnoreChecker;

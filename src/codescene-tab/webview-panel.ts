@@ -1,6 +1,5 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-api';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import { CodeSmell } from '../devtools-api/review-model';
@@ -371,7 +370,7 @@ export class CodeSceneTabPanel implements Disposable {
 
   private async highlightCode(refactoring: RefactoringRequest, isStale?: boolean) {
     const { fnToRefactor, document } = refactoring;
-    const result = await refactoring.promise;
+    await refactoring.promise;
     const highlightCode = !isStale;
     const editor = targetEditor(document);
     if (highlightCode && editor) {

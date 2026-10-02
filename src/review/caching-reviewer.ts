@@ -1,5 +1,4 @@
 import vscode, { Disposable } from 'vscode';
-import { logOutputChannel } from '../log';
 import { CsReview } from './cs-review';
 import { reportError } from '../utils';
 import { FilteringReviewer } from './filtering-reviewer';

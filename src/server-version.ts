@@ -1,5 +1,4 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import vscode from 'vscode';
 import { getServerUrl } from './configuration';
 import { logOutputChannel } from './log';
 import { networkErrors } from './utils';
