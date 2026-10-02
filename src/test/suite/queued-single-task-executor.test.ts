@@ -5,29 +5,14 @@ import { Command, ExecResult, Executor, Task } from '../../executor';
 
 class MockExecutor implements Executor {
   executeCalls: Array<{ command: Command | Task; options: ExecOptions; input?: string }> = [];
-  executeTaskCalls: Array<() => Promise<any>> = [];
   private pending: Array<{ resolve: (result: any) => void; reject: (error: Error) => void }> = [];
 
   async execute(command: Command | Task, options: ExecOptions = {}, input?: string): Promise<ExecResult> {
     this.executeCalls.push({ command, options, input });
     return new Promise<ExecResult>((resolve, reject) => {
       this.pending.push({ resolve, reject });
-      if (options.signal) {
-        options.signal.addEventListener('abort', () => {
-          reject(new Error('Aborted'));
-        });
-      }
     });
   }
-
-  async executeTask<T>(task: () => Promise<T>): Promise<T> {
-    this.executeTaskCalls.push(task as any);
-    return new Promise<T>((resolve, reject) => {
-      this.pending.push({ resolve, reject });
-    });
-  }
-
-  logStats(): void {}
 
   complete(index: number, result: any = { stdout: '', stderr: '', exitCode: 0, duration: 100 }): void {
     this.pending[index]?.resolve(result);
@@ -35,15 +20,6 @@ class MockExecutor implements Executor {
 
   fail(index: number, error: Error): void {
     this.pending[index]?.reject(error);
-  }
-
-  get totalCalls(): number {
-    return this.executeCalls.length + this.executeTaskCalls.length;
-  }
-
-  abortAllTasks(): void {
-    this.pending.forEach((p) => p.reject(new Error('Aborted')));
-    this.pending = [];
   }
 }
 
@@ -162,25 +138,6 @@ suite('QueuedSingleTaskExecutor Test Suite', () => {
     assert.deepStrictEqual(result, expected);
   });
 
-  test('abortAllTasks clears queues and aborts running tasks', async () => {
-    const mock = new MockExecutor();
-    const exec = new QueuedSingleTaskExecutor(mock);
-
-    const p1 = exec.execute({ command: 'test1', args: [], taskId: 'task1' });
-    const p2 = exec.execute({ command: 'test2', args: [], taskId: 'task1' });
-    const p3 = exec.execute({ command: 'test3', args: [], taskId: 'task2' });
-
-    await tick();
-    // p1 and p3 should be running, p2 should be queued
-    assert.strictEqual(mock.executeCalls.length, 2);
-
-    exec.abortAllTasks();
-
-    // The running tasks should be aborted via the underlying executor
-    // The queued task (p2) should never execute
-    assert.strictEqual(mock.executeCalls.length, 2);
-  });
-
   test('Mixed taskIds with queuing', async () => {
     const mock = new MockExecutor();
     const exec = new QueuedSingleTaskExecutor(mock);
@@ -209,31 +166,6 @@ suite('QueuedSingleTaskExecutor Test Suite', () => {
     mock.complete(2);
     mock.complete(3);
     await Promise.all([p2, p4]);
-  });
-
-  test('executeTask delegates to underlying executor', async () => {
-    const mock = new MockExecutor();
-    const exec = new QueuedSingleTaskExecutor(mock);
-
-    const p = exec.executeTask(async () => 'result');
-    await tick();
-
-    assert.strictEqual(mock.executeTaskCalls.length, 1);
-    mock.complete(0, 'result');
-    const result = await p;
-
-    assert.strictEqual(result, 'result');
-  });
-
-  test('logStats delegates to underlying executor', () => {
-    let logStatsCalled = false;
-    const mock = new MockExecutor();
-    mock.logStats = () => { logStatsCalled = true; };
-    const exec = new QueuedSingleTaskExecutor(mock);
-
-    exec.logStats();
-
-    assert.strictEqual(logStatsCalled, true);
   });
 
   test('Runs 5 sequential tasks each taking 500ms', async function() {
