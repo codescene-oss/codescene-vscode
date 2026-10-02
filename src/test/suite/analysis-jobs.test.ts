@@ -1,47 +1,89 @@
 import * as assert from 'assert';
+import * as path from 'path';
+import vscode from 'vscode';
 import { analysisJobsToCwf, getHomeData } from '../../code-health-monitor/home/home-props-utils';
 import { analysisProgressTooltip } from '../../cs-statusbar';
 
 suite('analysisJobsToCwf', () => {
+  const root = path.join('/repo');
   const cases: Array<{
     name: string;
     running?: string[];
     queued?: string[];
+    repoRoots?: string[];
     expected: Array<{ fileName: string; state: 'running' | 'queued' }>;
   }> = [
     { name: 'empty when neither running nor queued', expected: [] },
     {
       name: 'maps running jobs as running',
-      running: ['/repo/a.ts'],
-      expected: [{ fileName: '/repo/a.ts', state: 'running' }],
+      running: [path.join(root, 'a.ts')],
+      repoRoots: [root],
+      expected: [{ fileName: path.join(root, 'a.ts'), state: 'running' }],
     },
     {
       name: 'maps queued jobs as queued',
-      queued: ['/repo/b.ts', '/repo/c.ts'],
+      queued: ['b.ts', 'c.ts'],
+      repoRoots: [root],
       expected: [
-        { fileName: '/repo/b.ts', state: 'queued' },
-        { fileName: '/repo/c.ts', state: 'queued' },
+        { fileName: path.join(root, 'b.ts'), state: 'queued' },
+        { fileName: path.join(root, 'c.ts'), state: 'queued' },
       ],
     },
     {
-      name: 'omits queued paths that are already running',
-      running: ['/repo/a.ts'],
-      queued: ['/repo/a.ts', '/repo/b.ts'],
+      name: 'marks a listed path running when it matches an editor review',
+      running: [path.join(root, 'a.ts')],
+      queued: ['a.ts', 'b.ts'],
+      repoRoots: [root],
       expected: [
-        { fileName: '/repo/a.ts', state: 'running' },
-        { fileName: '/repo/b.ts', state: 'queued' },
+        { fileName: path.join(root, 'a.ts'), state: 'running' },
+        { fileName: path.join(root, 'b.ts'), state: 'queued' },
       ],
+    },
+    {
+      name: 'appends editor reviews that are not in the progress list',
+      running: [path.join(root, 'dirty.ts')],
+      queued: ['a.ts'],
+      repoRoots: [root],
+      expected: [
+        { fileName: path.join(root, 'a.ts'), state: 'queued' },
+        { fileName: path.join(root, 'dirty.ts'), state: 'running' },
+      ],
+    },
+    {
+      name: 'keeps a relative path when it matches more than one repo',
+      queued: ['src/a.ts'],
+      repoRoots: [path.join('/repo-a'), path.join('/repo-b')],
+      expected: [{ fileName: 'src/a.ts', state: 'queued' }],
     },
   ];
 
-  for (const { name, running, queued, expected } of cases) {
+  for (const { name, running, queued, repoRoots, expected } of cases) {
     test(name, () => {
       assert.deepStrictEqual(
-        analysisJobsToCwf(running, queued).map((job) => ({ fileName: job.file.fileName, state: job.state })),
+        analysisJobsToCwf(running, queued, repoRoots).map((job) => ({ fileName: job.file.fileName, state: job.state })),
         expected
       );
     });
   }
+
+  test('resolves a progress file to the one open document when several repos are known', () => {
+    const repoA = path.join('/repo-a');
+    const fileName = path.join(repoA, 'src', 'a.ts');
+    const documents = vscode.workspace.textDocuments as vscode.TextDocument[];
+    const previous = [...documents];
+    documents.splice(0, documents.length, { fileName } as vscode.TextDocument);
+    try {
+      assert.deepStrictEqual(
+        analysisJobsToCwf(undefined, ['src/a.ts'], [repoA, path.join('/repo-b')]).map((job) => ({
+          fileName: job.file.fileName,
+          state: job.state,
+        })),
+        [{ fileName, state: 'queued' }]
+      );
+    } finally {
+      documents.splice(0, documents.length, ...previous);
+    }
+  });
 });
 
 suite('analysisProgressTooltip', () => {

@@ -14,8 +14,8 @@ import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateTy
 import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, getServerUrl } from '../../configuration';
-import { AnalysisBatchTracker, remainingJobCount } from './analysis-batch';
-import { onFileDeletedFromGit } from '../../git-utils';
+import { monitorJobCounts } from './analysis-batch';
+import { acquireGitApi, getRepoRootPath, onFileDeletedFromGit } from '../../git-utils';
 import { logOutputChannel } from '../../log';
 import { StaleFileRemover } from '../stale-file-remover';
 
@@ -58,8 +58,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
   private loginFlowState: LoginFlowStateType;
-
-  private batch = new AnalysisBatchTracker();
 
   private ideContextData: IdeContextData = {
     showOnboarding: false,
@@ -177,16 +175,27 @@ export class HomeView implements WebviewViewProvider, Disposable {
       this.setStoppedAnalysis();
       return;
     }
-    const remaining = remainingJobCount(event.jobs, event.queued, event.queueCount);
-    const { totalCount, remainingCount } = this.batch.update(remaining);
-    this.ideContextData.jobs = analysisJobsToCwf(event.jobs, event.queued);
+    const repoRoots = this.repoRoots();
+    const { totalCount, remainingCount } = monitorJobCounts(
+      event.jobs,
+      event.queued,
+      event.queueCount,
+      event.queueDone,
+      repoRoots
+    );
+    this.ideContextData.jobs = analysisJobsToCwf(event.jobs, event.queued, repoRoots);
     this.ideContextData.analysisState = remainingCount > 0 ? 'running' : 'idle';
     this.ideContextData.totalCount = totalCount > 0 ? totalCount : undefined;
     this.ideContextData.remainingCount = remainingCount;
   }
 
+  private repoRoots(): string[] {
+    const git = acquireGitApi();
+    if (!git) return [];
+    return git.repositories.map((repo) => getRepoRootPath(repo));
+  }
+
   private setStoppedAnalysis() {
-    this.batch.reset();
     this.fileIssueMap.clear();
     this.rebuildFileDeltaData();
     this.ideContextData.jobs = [];

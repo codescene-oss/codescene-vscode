@@ -18,7 +18,7 @@ import {
   notificationRepoRoot,
   preflightResponse,
   refactorResponse,
-  queueResponse,
+  reviewProgressResponse,
   reviewResponse,
   watchInventoryResponse,
 } from './rpc-response-normalizers';
@@ -81,6 +81,7 @@ export interface ReviewFailed {
 
 export interface ReviewQueue {
   count: number;
+  done: number;
   files: string[];
 }
 
@@ -117,7 +118,6 @@ interface ResultNotification<T> {
   repoRoot?: string;
   'repo-root'?: string;
   result: T;
-  queue?: unknown;
 }
 
 interface NotificationIdentity {
@@ -215,6 +215,8 @@ export class CsIdeServerClient implements vscode.Disposable {
         this.handleDelta(notification));
       connection.onNotification('cs-ide/reviewFailed', (notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string }) =>
         this.handleReviewFailure(notification));
+      connection.onNotification('cs-ide/reviewProgress', (notification: Record<string, unknown>) =>
+        this.handleReviewProgress(notification));
       connection.onNotification('cs-ide/watchInventoryChanged', (notification: Record<string, any>) =>
         this.handleWatchInventory(notification));
       connection.onError(([error]) => this.handleError(error));
@@ -449,7 +451,6 @@ export class CsIdeServerClient implements vscode.Disposable {
         ...reviewSummary(result),
       })}`
     );
-    this.emitQueue(notification, identity.repoRoot);
     this.reviewEmitter.fire({
       ...identity,
       result,
@@ -468,7 +469,6 @@ export class CsIdeServerClient implements vscode.Disposable {
         ...deltaSummary(result),
       })}`
     );
-    this.emitQueue(notification, identity.repoRoot);
     this.deltaEmitter.fire({
       ...identity,
       result,
@@ -476,7 +476,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   private handleReviewFailure(
-    notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string; queue?: unknown }
+    notification: Omit<ReviewFailed, 'repoRoot'> & { repoRoot?: string; 'repo-root'?: string }
   ): void {
     const identity = this.notificationIdentity(notification, 'reviewFailed');
     if (!identity) return;
@@ -488,23 +488,23 @@ export class CsIdeServerClient implements vscode.Disposable {
         message: notification.message,
       })}`
     );
-    this.emitQueue(notification, identity.repoRoot);
     this.reviewFailedEmitter.fire({
       ...identity,
       message: notification.message,
     });
   }
 
-  private emitQueue(notification: { queue?: unknown }, repoRoot: string): void {
-    const queue = queueResponse(notification);
-    if (!queue) return;
+  private handleReviewProgress(notification: Record<string, unknown>): void {
+    const progress = reviewProgressResponse(notification);
+    if (!progress) return;
     logOutputChannel.info(
-      `[cs-ide] received queue ${formatLogFields({ repo: repoRoot, count: queue.count, files: queue.files })}`
+      `[cs-ide] received reviewProgress ${formatLogFields({
+        count: progress.count,
+        done: progress.done,
+        files: progress.files,
+      })}`
     );
-    this.queueEmitter.fire({
-      count: queue.count,
-      files: queue.files.map((relPath) => path.join(repoRoot, ...toPosixRelPath(relPath).split('/'))),
-    });
+    this.queueEmitter.fire(progress);
   }
 
   private notificationIdentity(

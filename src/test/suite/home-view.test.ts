@@ -7,6 +7,7 @@ import { CsExtensionState } from '../../cs-extension-state';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
 import { handleCWFMessage } from '../../code-health-monitor/home/cwf-message-handlers';
+import { clearMockGitRepositories, setMockGitRepositories } from '../setup';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -247,6 +248,81 @@ suite('HomeView', () => {
         assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], expectedFiles);
       });
     });
+  });
+
+  suite('review progress', () => {
+    let homeView: HomeView;
+    const root = path.join('/repo');
+
+    setup(() => {
+      const mockContext = createMockExtensionContext(root);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext);
+      }
+      setMockGitRepositories([{ rootUri: { fsPath: root } }]);
+      homeView = new HomeView(mockContext, { updateBadge: () => {}, dispose: () => {} } as any);
+    });
+
+    teardown(() => {
+      clearMockGitRepositories();
+    });
+
+    const cases: Array<{
+      name: string;
+      event: {
+        state: 'running' | 'idle';
+        jobs: string[];
+        queued: string[];
+        queueCount: number;
+        queueDone: number;
+      };
+      analysisState: 'running' | 'idle';
+      remainingCount: number;
+      totalCount?: number;
+      jobs: Array<{ fileName: string; state: 'running' | 'queued' }>;
+    }> = [
+      {
+        name: 'shows remaining, total, and the job list from review progress',
+        event: {
+          state: 'running',
+          jobs: [path.join(root, 'dirty.ts')],
+          queued: ['a.ts'],
+          queueCount: 2,
+          queueDone: 1,
+        },
+        analysisState: 'running',
+        remainingCount: 3,
+        totalCount: 4,
+        jobs: [
+          { fileName: path.join(root, 'a.ts'), state: 'queued' },
+          { fileName: path.join(root, 'dirty.ts'), state: 'running' },
+        ],
+      },
+      {
+        name: 'clears the counts when the batch has drained',
+        event: { state: 'idle', jobs: [], queued: [], queueCount: 0, queueDone: 3 },
+        analysisState: 'idle',
+        remainingCount: 0,
+        jobs: [],
+      },
+    ];
+
+    for (const { name, event, analysisState, remainingCount, totalCount, jobs } of cases) {
+      test(name, () => {
+        (homeView as any).applyAnalysisEvent({ ...event, jobs: new Set(event.jobs) });
+        const data = (homeView as any).ideContextData;
+        assert.strictEqual(data.analysisState, analysisState);
+        assert.strictEqual(data.remainingCount, remainingCount);
+        assert.strictEqual(data.totalCount, totalCount);
+        assert.deepStrictEqual(
+          data.jobs.map((job: { file: { fileName: string }; state: string }) => ({
+            fileName: job.file.fileName,
+            state: job.state,
+          })),
+          jobs
+        );
+      });
+    }
   });
 });
 
