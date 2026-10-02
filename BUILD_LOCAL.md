@@ -149,8 +149,8 @@ In the Extension Development Host window:
    - `Cmd+Shift+U` (Mac) or `Ctrl+Shift+U` (Windows/Linux)
    - Select "CodeScene Log" from dropdown
    - Should see: "⚙️ Activating extension..."
-   - Should see: "Checking for bundled CodeScene devtools binary..."
-   - Should see: "CodeScene devtools binary is ready."
+   - Should see: "Checking for bundled cs-ide..."
+   - Should see: "cs-ide is ready."
 
 2. **Check Extension is loaded:**
    - Go to Extensions view
@@ -236,8 +236,8 @@ Or manually:
 1. **Check Extension Activation:**
    - Open VS Code Output panel (`Cmd+Shift+U` / `Ctrl+Shift+U`)
    - Select "CodeScene Log" from dropdown
-   - Should see: "Checking for bundled CodeScene devtools binary..."
-   - Should see: "CodeScene devtools binary is ready."
+   - Should see: "Checking for bundled cs-ide..."
+   - Should see: "cs-ide is ready."
    - ❌ Should NOT see: "Downloading..." messages
 
 2. **Verify Distribution Path:**
@@ -306,7 +306,7 @@ npm run build
 
 #### Version Mismatch Error
 
-**Error:** `The devtools binary version does not match the required version ...`
+**Error:** `The cs-ide distribution version does not match the required version ...`
 
 **Solution:** Either rebuild against a published CLI zip whose SHA matches `scripts/cli-config.js`, or point at your local build and override:
 

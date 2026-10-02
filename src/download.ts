@@ -33,7 +33,7 @@ function createIdeServer(binaryPath: string): CsIdeServerClient {
 }
 
 export function createBundledIdeServer(extensionPath: string): CsIdeServerClient {
-  logOutputChannel.info('Checking for bundled CodeScene devtools binary...');
+  logOutputChannel.info('Checking for bundled cs-ide...');
   const binaryPath = getBundledBinaryPath(extensionPath);
   if (!bundledDistributionExists(extensionPath, binaryPath)) {
     throw new Error(`The cs-ide distribution "${binaryPath}" is incomplete. This should be bundled with the extension during the build process.`);
@@ -58,17 +58,5 @@ export async function verifyIdeServerVersion(client: CsIdeServerClient): Promise
         `(e.g. in .vscode/launch.json env when using F5).`
     );
   }
-  logOutputChannel.info('CodeScene devtools binary is ready.');
-}
-
-export async function ensureCompatibleBinary(extensionPath: string): Promise<string> {
-  const client = await ensureCompatibleIdeServer(extensionPath);
-  client.dispose();
-  return client.binaryPath;
-}
-
-export async function ensureCompatibleIdeServer(extensionPath: string): Promise<CsIdeServerClient> {
-  const client = createBundledIdeServer(extensionPath);
-  await verifyIdeServerVersion(client);
-  return client;
+  logOutputChannel.info('cs-ide is ready.');
 }
