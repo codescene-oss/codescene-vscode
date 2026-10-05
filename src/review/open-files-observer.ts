@@ -216,10 +216,6 @@ export class OpenFilesObserver {
       logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=not-visible`);
       return;
     }
-    if (!e.document.isDirty) {
-      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=clean`);
-      return;
-    }
     if (this.shouldSkipDocumentChange(e)) {
       const reason = e.contentChanges.length === 0 ? 'empty-change' : 'duplicate-version';
       logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=${reason}`);
@@ -229,9 +225,18 @@ export class OpenFilesObserver {
     this.reviewTimers.set(
       filePath,
       setTimeout(() => {
-        this.reviewDocument(e.document, 'text changed', !automaticAnalysisEnabled());
+        this.reviewChangedDocument(e.document);
       }, 1000)
     );
+  }
+
+  private reviewChangedDocument(document: vscode.TextDocument): void {
+    if (document.isDirty) {
+      this.reviewDocument(document, 'text changed', !automaticAnalysisEnabled());
+      return;
+    }
+    this.reviewDocument(document, 'text reverted');
+    DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
   }
 
   dispose(): void {
