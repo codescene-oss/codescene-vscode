@@ -7,7 +7,14 @@ import { formatLogFields, logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
 import { getRepoRootPath, resolveGitRoot } from '../git-utils';
 import { pruneMonitorToPaths } from '../code-health-monitor/monitor-prune';
-import { isPathUnderRoot, normalizeFsPath, relativePosix, toPosixRelPath } from '../utils/fs-paths';
+import {
+  isPathUnderRoot,
+  normalizeFsPath,
+  relativePosix,
+  rememberLocalRepoRoot,
+  toLocalRepoRoot,
+  toPosixRelPath,
+} from '../utils/fs-paths';
 import { WatchScope, watchScopeKey, watchScopePaths, watchScopes } from './watch-scope';
 
 export type WatchClient = Pick<
@@ -191,6 +198,7 @@ export class WorkspaceWatch implements vscode.Disposable {
     this.knownRoots.clear();
     for (const [key, target] of targets) {
       this.knownRoots.set(key, target.repoRoot);
+      rememberLocalRepoRoot(target.repoRoot);
     }
     return Array.from(targets.values());
   }
@@ -452,7 +460,7 @@ export class WorkspaceWatch implements vscode.Disposable {
    * The CLI canonicalises repo roots, which can differ from the form VS Code reports.
    */
   private resolveRepoRoot(reported: string): string {
-    return this.knownRoots.get(normalizeFsPath(reported)) ?? path.normalize(reported);
+    return this.knownRoots.get(normalizeFsPath(reported)) ?? path.normalize(toLocalRepoRoot(reported));
   }
 
   /**
