@@ -168,6 +168,43 @@ suite('OpenFilesObserver Test Suite', () => {
         restoreDefaultConfiguration();
       }
     });
+
+    test('reviews the first edit even when the document is still clean at the change event', async function () {
+      this.timeout(5000);
+      const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript');
+      setMockVisibleTextEditors([new MockEditor(document)]);
+      (observer as any).visibleDocuments.set(filePath, document);
+
+      (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
+      document.setDirty(true);
+
+      await waitForReview(() => capturedOpts.length === 1);
+      assert.strictEqual(capturedOpts[0].skipMonitorUpdate, false);
+      assertLogContains('debug', 'reason=text changed skipMonitor=false');
+    });
+
+    test('restores disk state when the buffer is clean by the time the review runs', async function () {
+      this.timeout(5000);
+      const restoreCalls: any[] = [];
+      const originalRestore = DevtoolsAPI.restoreFromDiskIfBufferOwned;
+      DevtoolsAPI.restoreFromDiskIfBufferOwned = (document) => {
+        restoreCalls.push(document);
+      };
+      try {
+        const document = new TestTextDocument(filePath, 'const value = 1;', 'typescript');
+        setMockVisibleTextEditors([new MockEditor(document)]);
+        (observer as any).visibleDocuments.set(filePath, document);
+
+        (observer as any).scheduleTextChangeReview(new MockTextDocumentChangeEvent(document, [{}] as any));
+
+        await waitForReview(() => capturedOpts.length === 1);
+        assert.strictEqual(capturedOpts[0].skipMonitorUpdate, true);
+        assert.deepStrictEqual(restoreCalls, [document]);
+        assertLogContains('debug', 'reason=text reverted');
+      } finally {
+        DevtoolsAPI.restoreFromDiskIfBufferOwned = originalRestore;
+      }
+    });
   });
 
   suite('skip logging', () => {
