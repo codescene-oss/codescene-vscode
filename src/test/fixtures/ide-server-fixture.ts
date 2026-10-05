@@ -42,6 +42,9 @@ connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; 
   }];
 });
 connection.onRequest('cs-ide/refactor', (params, token) => {
+  if (params?.token === 'unauthorized') {
+    throw new ResponseError(-32603, 'Request failed [401]');
+  }
   if (params?.token === 'hang') {
     return new Promise((resolve, reject) => {
       const cancel = () => reject(new ResponseError(-32800, 'Request cancelled'));

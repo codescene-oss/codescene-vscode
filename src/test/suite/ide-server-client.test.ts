@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import { AbortError } from '../../devtools-api/abort-error';
+import { DevtoolsError } from '../../devtools-api/devtools-error';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { gitBlobSha } from '../../review/review-pipeline';
 
@@ -88,6 +89,13 @@ suite('CsIdeServerClient Test Suite', () => {
     const pending = client.refactor({ token: 'hang' }, controller.signal);
     controller.abort();
     await assert.rejects(pending, (error: unknown) => error instanceof AbortError);
+  });
+
+  test('maps an HTTP failure from the server to a DevtoolsError with its status', async () => {
+    await assert.rejects(
+      client.refactor({ token: 'unauthorized' }),
+      (error: unknown) => error instanceof DevtoolsError && error.status === 401
+    );
   });
 
   test('sends check-rules path relative to the repo root', async () => {
