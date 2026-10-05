@@ -72,30 +72,30 @@ export class CsStatusBar implements Disposable {
       return;
     }
 
-    switch (analysis.analysisState) {
-      case 'running':
-        this.setStatus(item, {
-          text: '$(loading~spin) Analyzing...',
-          tooltip: analysisProgressTooltip(analysis.queueCount),
-          command: 'codescene.showLogOutput',
-        });
-        return;
-      case 'idle':
-        this.setStatus(item, {
-          text: '$(cs-logo) Analysis',
-          tooltip: 'Code Health Analysis ready',
-          command: 'codescene.homeView.focus',
-        });
-        return;
+    if (analysis.analysisState === 'running') {
+      this.setStatus(item, {
+        text: '$(loading~spin) Analyzing...',
+        tooltip: analysisProgressTooltip(analysis.queueCount),
+        command: 'codescene.showLogOutput',
+      });
+      return;
     }
 
-    if (analysis.state === 'loading') {
+    if (analysis.state === 'loading' && analysis.analysisState === undefined) {
       this.setStatus(item, {
         text: '$(loading~spin) Initializing...',
         tooltip: 'Analysis feature is initializing...',
         command: 'codescene.showLogOutput',
       });
+      return;
     }
+
+    // A workspace with nothing to review never reports a runner state, so 'enabled' alone means ready.
+    this.setStatus(item, {
+      text: '$(cs-logo) Analysis',
+      tooltip: 'Code Health Analysis ready',
+      command: 'codescene.homeView.focus',
+    });
   }
 
   private handleErrorStates(analysis: AnalysisFeature) {

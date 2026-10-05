@@ -13,7 +13,15 @@ import {
 import { Review } from '../devtools-api/review-model';
 import { formatLogFields, logOutputChannel } from '../log';
 import { automaticAnalysisEnabled } from '../configuration';
-import { normalizeFsPath, pathsEqual, relativePosix, toPosixRelPath } from '../utils/fs-paths';
+import {
+  canonicalRepoRoot,
+  normalizeFsPath,
+  pathsEqual,
+  relativePosix,
+  rememberLocalRepoRoot,
+  toLocalRepoRoot,
+  toPosixRelPath,
+} from '../utils/fs-paths';
 
 export interface ReviewSubmission {
   document?: vscode.TextDocument;
@@ -257,6 +265,7 @@ export class ReviewPipeline implements vscode.Disposable {
       document,
       relPath: toPosixRelPath(submission.relPath),
     };
+    rememberLocalRepoRoot(repoRoot);
     const pathKey = this.pathKey(repoRoot, normalizedSubmission.relPath);
     const contentHash = gitBlobSha(normalizedSubmission.content);
     const dedupKey = `${pathKey}\0${contentHash}\0${this.dedupEpoch}`;
@@ -527,7 +536,7 @@ export class ReviewPipeline implements vscode.Disposable {
     receivedSha: string | undefined
   ): Promise<ReviewSubmission & { document: vscode.TextDocument } | undefined> {
     const posixPath = toPosixRelPath(relPath);
-    const filePath = path.join(repoRoot, ...posixPath.split('/'));
+    const filePath = path.join(toLocalRepoRoot(repoRoot), ...posixPath.split('/'));
     const document =
       this.fileAccess.findOpenDocument(filePath)
       ?? await Promise.resolve(this.fileAccess.openDocument(filePath)).catch(() => undefined);
@@ -626,7 +635,7 @@ export class ReviewPipeline implements vscode.Disposable {
   }
 
   private pathKey(repoRoot: string, relPath: string): string {
-    return `${normalizeFsPath(repoRoot)}\0${toPosixRelPath(relPath)}`;
+    return `${canonicalRepoRoot(repoRoot)}\0${toPosixRelPath(relPath)}`;
   }
 
   private nextGeneration(pathKey: string): number {
