@@ -63,15 +63,45 @@ suite('CsStatusBar automatic analysis', () => {
     assert.strictEqual(analysis.command, 'codescene.startAutomaticAnalysis');
   });
 
-  test('shows ready once enabled even if no review has run yet', () => {
-    const analysis = renderAnalysisItem();
-    assert.strictEqual(analysis.text, '$(cs-logo) Analysis');
-    assert.strictEqual(analysis.command, 'codescene.homeView.focus');
-  });
+  const analysisStateCases: Array<{ name: string; feature: AnalysisFeature; expected: Partial<FakeItem> }> = [
+    {
+      name: 'ready once enabled even if no review has run yet',
+      feature: { state: 'enabled' },
+      expected: { text: '$(cs-logo) Analysis', command: 'codescene.homeView.focus' },
+    },
+    {
+      name: 'ready when the runner reports idle',
+      feature: { state: 'enabled', analysisState: 'idle' },
+      expected: { text: '$(cs-logo) Analysis', command: 'codescene.homeView.focus' },
+    },
+    {
+      name: 'ready when the runner reports idle while still loading',
+      feature: { state: 'loading', analysisState: 'idle' },
+      expected: { text: '$(cs-logo) Analysis', command: 'codescene.homeView.focus' },
+    },
+    {
+      name: 'initializing while the analysis feature is loading',
+      feature: { state: 'loading' },
+      expected: { text: '$(loading~spin) Initializing...', command: 'codescene.showLogOutput' },
+    },
+    {
+      name: 'analyzing with the queue count while the runner is busy',
+      feature: { state: 'enabled', analysisState: 'running', queueCount: 2 },
+      expected: {
+        text: '$(loading~spin) Analyzing...',
+        tooltip: 'CodeScene analysis in progress (2 remaining)...',
+        command: 'codescene.showLogOutput',
+      },
+    },
+  ];
 
-  test('shows initializing while the analysis feature is loading', () => {
-    analysisFeature = { state: 'loading' };
-    const analysis = renderAnalysisItem();
-    assert.strictEqual(analysis.text, '$(loading~spin) Initializing...');
+  analysisStateCases.forEach(({ name, feature, expected }) => {
+    test(`shows ${name}`, () => {
+      analysisFeature = feature;
+      const analysis = renderAnalysisItem();
+      for (const [key, value] of Object.entries(expected)) {
+        assert.strictEqual(analysis[key as keyof FakeItem], value, key);
+      }
+    });
   });
 });
