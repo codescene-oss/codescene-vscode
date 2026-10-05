@@ -6,6 +6,7 @@ import { formatLogFields, logOutputChannel } from '../log';
 import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
 import { AbortError } from './abort-error';
 import { Delta } from './delta-model';
+import { DevtoolsError } from './devtools-error';
 import { CheckRulesResponse, CodeHealthRulesTemplateResponse } from './model';
 import { FnToRefactor, PreFlightResponse, RefactorResponse } from './refactor-models';
 import { Review } from './review-model';
@@ -24,6 +25,18 @@ import {
 } from './rpc-response-normalizers';
 
 const STARTUP_TIMEOUT_MS = 30000;
+const HTTP_FAILURE = /^Request failed \[(\d{3})\]/;
+
+/**
+ * cs-ide reports failed backend calls as a JSON-RPC error with the HTTP status only in the message.
+ * Callers tell auth failures apart through `DevtoolsError.status`, as they did before the cs-ide server.
+ */
+function httpFailure(error: unknown): DevtoolsError | undefined {
+  if (!(error instanceof Error)) return;
+  const match = HTTP_FAILURE.exec(error.message);
+  if (!match) return;
+  return new DevtoolsError({ message: error.message, status: Number(match[1]) });
+}
 
 export function distributionServerCommand(
   distributionPath: string,
@@ -351,7 +364,8 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   private refactorRejection(error: unknown, signal?: AbortSignal): unknown {
-    return signal?.aborted ? new AbortError() : error;
+    if (signal?.aborted) return new AbortError();
+    return httpFailure(error) ?? error;
   }
 
   private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {
