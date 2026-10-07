@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.28.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.2...v0.28.3) (2026-10-07)
+
+
+### Bug fixes
+
+* bundle cs-ide built with bouncycastle 1.86 ([#372](https://github.com/codescene-oss/codescene-vscode/issues/372)) ([08efb15](https://github.com/codescene-oss/codescene-vscode/commit/08efb1515da1b58412473ccd8af236c392f5f3a2))
+
 ### [0.28.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.1...v0.28.2) (2026-09-23)
 
 ### [0.28.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.0...v0.28.1) (2026-09-07)
