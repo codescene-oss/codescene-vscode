@@ -6,11 +6,13 @@ on:
       - main
     paths:
       - 'src/**'
+      - 'scripts/cli-config.js'
   pull_request:
     branches:
       - main
     paths:
       - 'src/**'
+      - 'scripts/cli-config.js'
 
 permissions:
   contents: read # required for actions/checkout
