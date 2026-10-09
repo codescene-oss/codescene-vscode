@@ -9,7 +9,7 @@
   "author": "CodeScene AB",
   "publisher": "CodeScene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.28.3",
+  "version": "0.29.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.105.0"

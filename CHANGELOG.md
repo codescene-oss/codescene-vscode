@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.3...v0.29.0) (2026-10-09)
+
+### Features
+
+* CLI single process json-rpc (#340) ([bf78f3d](https://github.com/codescene-oss/codescene-vscode/commit/bf78f3d9046912c10328b31250fa49a6c603d63d))
+* show remaining CLI review jobs in the Code Health monitor (#348) ([1b5116d](https://github.com/codescene-oss/codescene-vscode/commit/1b5116d1ded4045b7cf7ad38ce0fcc74c6048cc0))
+* add decision-level diagnostic logs for CLI and workspace (#349) ([f8885e1](https://github.com/codescene-oss/codescene-vscode/commit/f8885e1ee44f3cfd0c513ba995e9ee02379dfbe8))
+* add analysis progress and stop/start of automatic analysis (#360) ([1d3f4fa](https://github.com/codescene-oss/codescene-vscode/commit/1d3f4fae2fea6c320cbf7b8fa469debd9cd82270))
+* add tagged test releases (#347) ([284af87](https://github.com/codescene-oss/codescene-vscode/commit/284af87580d4546a8dfac593a9fd50ac54ca1c2e))
+
+### Performance Improvements
+
+* show activity bar icon before large-repo startup work (#362) ([e4ecb57](https://github.com/codescene-oss/codescene-vscode/commit/e4ecb57b7d24abb384e102925d6cf70a106a6f77))
+
+### [0.28.3](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.2...v0.28.3) (2026-10-08)
+
+### Bug fixes
+
+* bundle cs-ide built with bouncycastle 1.86 ([7da84b3](https://github.com/codescene-oss/codescene-vscode/commit/7da84b36fbe325e7062050160b75be9ea04d517a))
+
 ### [0.28.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.1...v0.28.2) (2026-09-23)
 
 ### [0.28.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.0...v0.28.1) (2026-09-07)
