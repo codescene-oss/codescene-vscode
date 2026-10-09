@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.0](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.3...v0.29.0) (2026-10-09)
+
+### Bug fixes
+
+* exclude merge-commit files from Code Health Monitor (#345) ([8775311](https://github.com/codescene-oss/codescene-vscode/commit/8775311364e67658264272dbed614720635934fc))
+* restore the Code Health Monitor when unsaved edits are discarded (#350) ([8c6cb23](https://github.com/codescene-oss/codescene-vscode/commit/8c6cb23235c05cfbb1c79a8924a068c6b1d4d702))
+* keep the signed JNA library with the macOS CLI distribution (#352) ([90389d4](https://github.com/codescene-oss/codescene-vscode/commit/90389d4a435d6e635de427a5546b3fdf7f52914e))
+* show current Code Health when file-level CodeLens has no old score (#351) ([6584bbb](https://github.com/codescene-oss/codescene-vscode/commit/6584bbba1f48d9abefe75395ec647aad5998c6ac))
+* fix broken codescene docs with dash in name (#353) ([9efeb93](https://github.com/codescene-oss/codescene-vscode/commit/9efeb93c9e839806a950e9b3b99af03e9b8d4493))
+* keep files outside the watch inventory out of the monitor (#361) ([1b0d10d](https://github.com/codescene-oss/codescene-vscode/commit/1b0d10d875e8fd4f891f08f133609122c88d77a7))
+* show analysis ready without reviews and match canonical repo roots (#368) ([c3cfb6b](https://github.com/codescene-oss/codescene-vscode/commit/c3cfb6bbeccb20366b63e8e1f347821b527f2d5e))
+* review the first unsaved edit of an open file (#369) ([a3296c8](https://github.com/codescene-oss/codescene-vscode/commit/a3296c88ce868b50b17348610b6b68501e6d6173))
+* show ACE auth failures from cs-ide as authentication errors (#370) ([0f4b0a1](https://github.com/codescene-oss/codescene-vscode/commit/0f4b0a18915edea72cbde8d90c5d48e1d334aa86))
+* bundle cs-ide built with bouncycastle 1.86 ([7da84b3](https://github.com/codescene-oss/codescene-vscode/commit/7da84b36fbe325e7062050160b75be9ea04d517a))
+
+### Features
+
+* add tagged test releases (#347) ([284af87](https://github.com/codescene-oss/codescene-vscode/commit/284af87580d4546a8dfac593a9fd50ac54ca1c2e))
+* CLI single process json-rpc (#340) ([bf78f3d](https://github.com/codescene-oss/codescene-vscode/commit/bf78f3d9046912c10328b31250fa49a6c603d63d))
+* show remaining CLI review jobs in the Code Health monitor (#348) ([1b5116d](https://github.com/codescene-oss/codescene-vscode/commit/1b5116d1ded4045b7cf7ad38ce0fcc74c6048cc0))
+* add decision-level diagnostic logs for CLI and workspace (#349) ([f8885e1](https://github.com/codescene-oss/codescene-vscode/commit/f8885e1ee44f3cfd0c513ba995e9ee02379dfbe8))
+* enable webview devmode only while debugging with watch (#355) ([e808816](https://github.com/codescene-oss/codescene-vscode/commit/e80881671da233520849f56ff2b66e65052592c3))
+* add analysis progress and stop/start of automatic analysis (#360) ([1d3f4fa](https://github.com/codescene-oss/codescene-vscode/commit/1d3f4fae2fea6c320cbf7b8fa469debd9cd82270))
+* drive the monitor from CLI review progress (#367) ([73d8359](https://github.com/codescene-oss/codescene-vscode/commit/73d8359cf99ee5d0428c693317b6a0ebcd39c837))
+
+### Performance Improvements
+
+* show activity bar icon before large-repo startup work (#362) ([e4ecb57](https://github.com/codescene-oss/codescene-vscode/commit/e4ecb57b7d24abb384e102925d6cf70a106a6f77))
+
 ### [0.28.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.1...v0.28.2) (2026-09-23)
 
 ### [0.28.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.28.0...v0.28.1) (2026-09-07)
