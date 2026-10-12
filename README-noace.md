@@ -48,6 +48,8 @@ You can find more documentation on its content [here](https://codescene.io/docs/
 
 Location: `.codescene/config.json`
 
+The bundled CLI (since 0.29.0) picks the Git merge base used for delta analysis. See [Baseline resolution](docs/baseline-resolution.md) for the full algorithm, examples, and troubleshooting.
+
 Example configuration:
 ```json
 {
@@ -56,7 +58,7 @@ Example configuration:
 ```
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| **baseline_branch** | String | origin/HEAD (default branch) | The name of the branch that the Code Health Monitor should compare against when running its delta analysis. If no origin/HEAD or config present, it will look for the nearest merge-base among common shared branches (main, master, develop etc)
+| **baseline_branch** | String | Automatic (see [Baseline resolution](docs/baseline-resolution.md)) | Branch name used to resolve the merge base with `HEAD` (remote `origin/<branch>` preferred over local). Replaces the default ref list entirely when set.
 
 ### Settings ###
 

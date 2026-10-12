@@ -1,6 +1,7 @@
 out
 dist
-docs
+docs/*
+!docs/baseline-resolution.md
 node_modules
 .vscode-test/
 .vscode-exp/
