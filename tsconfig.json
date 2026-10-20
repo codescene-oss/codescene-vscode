@@ -1,5 +1,4 @@
 {
-  "exclude": ["e2e"],
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "bundler",
