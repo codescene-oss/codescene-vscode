@@ -190,9 +190,34 @@ connection.onNotification('cs-ide/reviewFiles', ({ files, 'repo-root': repoRoot 
   }
 });
 
+const signedOutStatus = {
+  state: 'signed-out',
+  'credential-source': null,
+  'env-token-present': false,
+  server: { url: 'https://codescene.io', onprem: false, source: 'default', 'pat-url': 'https://codescene.io/users/me/pat' },
+  'oauth-supported': null,
+  user: null,
+  account: null,
+  license: null,
+  'ace-credential': false,
+  'expires-at': null,
+  login: null,
+  error: null,
+};
+connection.onRequest('cs-ide/auth-status', () => signedOutStatus);
+connection.onRequest('cs-ide/auth-configure', () => signedOutStatus);
+connection.onRequest('cs-ide/auth-login', () => {
+  throw new ResponseError(-32803, 'This CodeScene server does not support browser sign-in.', { code: 'auth/oauth-unsupported' });
+});
+connection.onRequest('test/emitAuthStatus', (status) => {
+  void connection.sendNotification('cs-ide/authStatusChanged', status);
+  return null;
+});
+
 connection.listen();
 void connection.sendNotification('cs-ide/start', {
   sha: 'fixture-sha',
   version: 'fixture-version',
   args: process.argv.slice(2),
+  ...(process.argv.includes('--auth-v1') ? { capabilities: ['auth-v1'] } : {}),
 });

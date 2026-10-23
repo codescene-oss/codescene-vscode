@@ -12,7 +12,9 @@ import {
 } from '../../../refactoring/utils';
 import { logOutputChannel } from '../../../log';
 import { RefactoringRequest } from '../../../refactoring/request';
-import { initBaseContent } from '../../../centralized-webview-framework/cwf-html-utils';
+import { initBaseContent, updateRendererMessage } from '../../../centralized-webview-framework/cwf-html-utils';
+import { onDidChangeCwfAuth } from '../../../auth/cwf-auth';
+import { routeAuthMessage } from '../../../auth/auth-message-handler';
 import { AceContextViewProps } from '../../../centralized-webview-framework/types';
 import { getAceData } from './ace-data-mapper';
 import debounce = require('lodash.debounce');
@@ -77,6 +79,13 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       this,
       this.disposables
     );
+
+    onDidChangeCwfAuth(() => this.rerender(), this, this.disposables);
+  }
+
+  private rerender() {
+    const state = this.state;
+    if (state?.cwfProps) void this.renderAce(state.request, state.cwfProps);
   }
 
   private handleIsStale(e: vscode.TextDocumentChangeEvent) {
@@ -94,6 +103,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
   private async handleMessages(message: MessageToIDEType) {
     try {
+      if (await routeAuthMessage(message)) return;
       if (!this.state) return;
       await this.handleAceMessage(this.state.request, message);
     } catch (e) {
@@ -271,10 +281,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     if (this.isDisposing) return;
     this.state = { request, cwfProps: aceData };
 
-    const message = {
-      messageType: 'update-renderer',
-      payload: aceData,
-    };
+    const message = updateRendererMessage(aceData);
 
     if (this.isActive()) {
       await this.webViewPanel.webview.postMessage(message);

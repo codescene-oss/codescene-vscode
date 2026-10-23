@@ -1,0 +1,14 @@
+{
+  "state": "signed-out",
+  "credential-source": null,
+  "env-token-present": false,
+  "server": { "url": "https://codescene.io", "onprem": false, "source": "default", "pat-url": "https://codescene.io/users/me/pat" },
+  "oauth-supported": true,
+  "user": null,
+  "account": null,
+  "license": null,
+  "ace-credential": false,
+  "expires-at": null,
+  "login": null,
+  "error": { "code": "auth/session-revoked", "message": "Your CodeScene session has ended. Sign in again." }
+}

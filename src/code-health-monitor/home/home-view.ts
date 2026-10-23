@@ -2,7 +2,7 @@ import vscode, { Disposable, ExtensionContext, WebviewViewProvider } from 'vscod
 import throttle from 'lodash.throttle';
 import Telemetry from '../../telemetry';
 import { commonResourceRoots } from '../../webview-utils';
-import { getHomeData, getLoginData, analysisJobsToCwf } from './home-props-utils';
+import { getHomeData, analysisJobsToCwf } from './home-props-utils';
 import { AnalysisEvent, DeltaAnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsExtensionState } from '../../cs-extension-state';
 import { FileWithIssues } from '../file-with-issues';
@@ -10,21 +10,17 @@ import { convertFileIssueToCWFDeltaItem } from '../../centralized-webview-framew
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { MessageToIDEType } from '../../centralized-webview-framework/types/messages';
-import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job, LoginFlowStateType } from '../../centralized-webview-framework/types';
-import { ignoreSessionStateFeatureFlag, initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
+import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job } from '../../centralized-webview-framework/types';
+import { initBaseContent, updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
+import { onDidChangeCwfAuth } from '../../auth/cwf-auth';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
-import { automaticAnalysisEnabled, onDidChangeConfiguration, getServerUrl } from '../../configuration';
+import { automaticAnalysisEnabled, onDidChangeConfiguration } from '../../configuration';
 import { monitorJobCounts } from './analysis-batch';
 import { acquireGitApi, getRepoRootPath, onFileDeletedFromGit } from '../../git-utils';
 import { logOutputChannel } from '../../log';
 import { StaleFileRemover } from '../stale-file-remover';
 
 type CancelableVoid = (() => void) & { cancel(): void; flush(): void };
-
-function getUserName(accountLabel: string | undefined) {
-  if (!accountLabel || accountLabel === 'null') return 'Signed in';
-  return accountLabel;
-}
 
 let homeViewInstance: HomeView | undefined;
 
@@ -55,10 +51,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private initialized: boolean = false; // keep track of webview init state
   private fileIssueMap: Map<string, FileWithIssues> = new Map(); // Raw VSCode specific delta result, source of truth
   private backgroundServiceView: BackgroundServiceView; //handles badge updates
-
-  private session: vscode.AuthenticationSession | undefined = CsExtensionState.session;
-  private loginFlowState: LoginFlowStateType;
-
   private ideContextData: IdeContextData = {
     showOnboarding: false,
     fileDeltaData: [], // refined fileIssueMap in the CWF format
@@ -69,7 +61,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
   };
 
   constructor(context: vscode.ExtensionContext, backgroundServiceView: BackgroundServiceView) {
-    this.loginFlowState = { loginOpen: false, loginState: 'init' };
     this.backgroundServiceView = backgroundServiceView;
 
     this.disposables.push(
@@ -77,8 +68,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
-      CsExtensionState.onSessionChanged(() => this.handleSessionChanged()), // Detect sign-in session changes
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
+      CsExtensionState.onAuthChanged(() => this.refreshAceState()),
+      onDidChangeCwfAuth(() => this.update()),
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );
@@ -109,11 +101,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
   }
 
   public update!: CancelableVoid;
-
-  //Setter of login state used by message handler
-  setLoginFlowState(updatedLoginFlowState: LoginFlowStateType) {
-    this.loginFlowState = updatedLoginFlowState;
-  }
 
   //Setter of init state used by message handler
   setInitiated(updatedInitiated: boolean) {
@@ -224,8 +211,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
       analysisState: this.ideContextData.analysisState,
       totalCount: this.ideContextData.totalCount,
       remainingCount: this.ideContextData.remainingCount,
-      signedIn: this.isSignedIn(),
-      user: { name: getUserName(this.session?.account.label) },
     });
   }
 
@@ -256,18 +241,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.update();
   }
 
-  private handleSessionChanged() {
-    this.session = CsExtensionState.session;
-    if (this.session) {
-      this.loginFlowState.loginOpen = false;
-      this.updateActivityBadge();
-    } else if (this.loginFlowState.loginState === 'pending' && this.loginFlowState.loginOpen) {
-      // If the user has a pending login that fails we update the login flow state.
-      this.loginFlowState.loginState = 'error';
-    }
-    this.update();
-  }
-
   private handleVisibilityEvents(view: vscode.WebviewView) {
     // On first resolve ("resolveWebviewView is called when a view first becomes visible")
     Telemetry.logUsage('code-health-details/visibility', { visible: view.visible });
@@ -289,13 +262,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.update();
   }
 
-  private isSignedIn() {
-    // if the ignoreSessionStateFeatureFlag is true we always consider the user signed in.
-    return ignoreSessionStateFeatureFlag ? true : Boolean(this.session);
-  }
-
   private updateActivityBadge() {
-    this.backgroundServiceView.updateBadge(this.isSignedIn() ? this.fileIssueMap.size : 0);
+    this.backgroundServiceView.updateBadge(this.fileIssueMap.size);
   }
 
   dispose() {
@@ -321,24 +289,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private async updateHomeRenderer() {
     const webView = this.view?.webview;
     if (!webView) return;
-    await webView.postMessage({
-      messageType: 'update-renderer',
-      payload: this.homePayload(),
-    });
-  }
-
-  private async updateLoginRenderer() {
-    const webView = this.view?.webview;
-    if (!webView) return;
-    await webView.postMessage({
-      messageType: 'update-renderer',
-      payload: getLoginData({
-        baseUrl: getServerUrl(),
-        availableProjects: [],
-        state: this.loginFlowState.loginState,
-        user: { name: getUserName(this.session?.account.label) },
-      }),
-    });
+    await webView.postMessage(updateRendererMessage(this.homePayload()));
   }
 
   // Update function for rendering webview. used by lodash throttle to limit number of rerenders
@@ -347,11 +298,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     if (!webView) return;
 
     if (this.initialized) {
-      if (this.loginFlowState.loginOpen) {
-        await this.updateLoginRenderer();
-      } else {
-        await this.updateHomeRenderer();
-      }
+      await this.updateHomeRenderer();
     } else {
       webView.html = this.baseContent;
     }

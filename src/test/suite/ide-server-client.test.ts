@@ -4,6 +4,7 @@ import { AbortError } from '../../devtools-api/abort-error';
 import { DevtoolsError } from '../../devtools-api/devtools-error';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { gitBlobSha } from '../../review/review-pipeline';
+import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 
 suite('CsIdeServerClient Test Suite', () => {
   const fixture = path.join(__dirname, '../fixtures/ide-server-fixture.js');
@@ -27,6 +28,51 @@ suite('CsIdeServerClient Test Suite', () => {
       version: 'fixture-version',
       args: ['server', '--threads', '3'],
     });
+  });
+
+  test('reports the auth-v1 capability from startup metadata', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(process.execPath, [fixture, '--auth-v1']);
+    assert.deepStrictEqual(await client.start(), {
+      sha: 'fixture-sha',
+      version: 'fixture-version',
+      args: ['--auth-v1'],
+      capabilities: ['auth-v1'],
+    });
+  });
+
+  test('forwards authStatusChanged notifications', async () => {
+    const received = new Promise<unknown>((resolve) => client.onDidAuthStatusChange(resolve));
+    await client.request('test/emitAuthStatus', authStatusFixture('signing-in'));
+    assert.deepStrictEqual(await received, authStatusFixture('signing-in'));
+  });
+
+  test('rejects auth requests with the auth error code in the error data', async () => {
+    await assert.rejects(
+      client.request('cs-ide/auth-login', {}),
+      (error: { code?: number; data?: unknown }) => {
+        assert.deepStrictEqual(
+          { code: error.code, data: error.data },
+          { code: -32803, data: { code: 'auth/oauth-unsupported' } }
+        );
+        return true;
+      }
+    );
+  });
+
+  test('logs auth requests and status changes without tokens or authorize URLs', async () => {
+    const { assertLogContains, assertLogOmits } = await import('../setup');
+    const received = new Promise<unknown>((resolve) => client.onDidAuthStatusChange(resolve));
+    await client.request('cs-ide/auth-configure', { 'server-url': 'https://cs.example', 'access-token': 'secret-pat-123' });
+    await client.request('test/emitAuthStatus', authStatusFixture('signing-in'));
+    await received;
+
+    assertLogContains('info', 'method=cs-ide/auth-configure serverUrl=https://cs.example hasAccessToken=true');
+    assertLogContains('info', 'state=signed-out source=null errorCode=null');
+    assertLogContains('info', 'received authStatusChanged state=signing-in source=null errorCode=null');
+    assertLogOmits('secret-pat-123');
+    assertLogOmits('oauth2/auth');
+    assertLogOmits('3f1c9a2e');
   });
 
   test('sends typed requests over one connection', async () => {
