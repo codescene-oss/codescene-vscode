@@ -83,6 +83,18 @@
       {
         "command": "codescene.copyDeviceId",
         "title": "CodeScene: copy Device ID"
+      },
+      {
+        "command": "codescene.signIn",
+        "title": "CodeScene: Sign in"
+      },
+      {
+        "command": "codescene.signOut",
+        "title": "CodeScene: Sign out"
+      },
+      {
+        "command": "codescene.openAccount",
+        "title": "CodeScene: Open CodeScene account"
       }
     ],
     "viewsContainers": {
@@ -127,6 +139,18 @@
         {
           "command": "codescene.startAutomaticAnalysis",
           "when": "!config.codescene.enableAutomaticAnalysis"
+        },
+        {
+          "command": "codescene.signIn",
+          "when": "codescene.signInActive"
+        },
+        {
+          "command": "codescene.signOut",
+          "when": "codescene.signInActive"
+        },
+        {
+          "command": "codescene.openAccount",
+          "when": "codescene.signInActive"
         }
       ]
     },

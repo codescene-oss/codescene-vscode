@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { activateAuth } from './auth/auth-feature';
 import { readLegacySession } from './auth/legacy-session';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { register as registerCHRulesCommands } from './code-health-rules';
@@ -113,6 +114,7 @@ export async function activate(context: vscode.ExtensionContext) {
     void ideServer.start();
     await Telemetry.init(context);
     registerExtensionUi(context);
+    registerAuth(context, ideServer);
     finalizeActivation(context);
     return completeActivation(context, ideServer);
   } catch (e) {
@@ -146,6 +148,12 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
   });
   DISPOSABLES.push(aceConfigDisposable);
   context.subscriptions.push(aceConfigDisposable);
+}
+
+function registerAuth(context: vscode.ExtensionContext, ideServer: CsIdeServerClient) {
+  const disposables = activateAuth(context, ideServer);
+  DISPOSABLES.push(...disposables);
+  context.subscriptions.push(...disposables);
 }
 
 function registerExtensionUi(context: vscode.ExtensionContext) {
