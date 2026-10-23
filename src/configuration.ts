@@ -55,10 +55,6 @@ export function onDidChangeConfiguration(
   });
 }
 
-export function getServerUrl() {
-  return "https://codescene.io";
-}
-
 export function reviewCodeLensesEnabled() {
   return getConfiguration<boolean>('enableReviewCodeLenses');
 }

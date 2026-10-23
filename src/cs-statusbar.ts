@@ -1,7 +1,7 @@
 import vscode, { Disposable } from 'vscode';
 import { ACE_ENABLED } from './build-flags';
 import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { getEffectiveToken } from './devtools-api';
+import { aceAvailable } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
@@ -165,7 +165,7 @@ export class CsStatusBar implements Disposable {
       });
     },
     enabled: (ace, item) => {
-      const hasToken = !!getEffectiveToken();
+      const hasToken = aceAvailable();
       this.setStatus(item, {
         text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
         command: 'codescene.openSettingsAndFocusToken',

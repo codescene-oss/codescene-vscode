@@ -1,5 +1,5 @@
 import { commands } from 'vscode';
-import { getEffectiveToken } from '../../devtools-api';
+import { aceAvailable } from '../../devtools-api';
 import { Confidence, FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { CodeWithLangId, decorateCode } from '../../refactoring/utils';
 import { collapsibleContent } from './components';
@@ -149,7 +149,7 @@ export function refactoringError(isAuthError = false) {
 }
 
 export function refactoringButton(refactoring?: FnToRefactor) {
-  const hasValidToken = !!getEffectiveToken();
+  const hasValidToken = aceAvailable();
 
   if (!refactoring || !hasValidToken) {
     return /* html */ `

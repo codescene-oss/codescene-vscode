@@ -19,6 +19,7 @@ suite('CsStatusBar automatic analysis', () => {
     Object.defineProperty(CsExtensionState, 'stateProperties', {
       configurable: true,
       get: () => ({
+        auth: { active: false, status: null },
         features: {
           analysis: analysisFeature,
           ace: { state: 'enabled' },

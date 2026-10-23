@@ -1,5 +1,5 @@
 import vscode from 'vscode';
-import { AUTH_TYPE, CsAuthenticationProvider } from './auth/auth-provider';
+import { readLegacySession } from './auth/legacy-session';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
@@ -17,7 +17,6 @@ import { initAce } from './refactoring';
 import { register as registerCodeActionProvider } from './review/codeaction';
 import { CsReviewCodeLensProvider } from './review/codelens';
 import Reviewer from './review/reviewer';
-import { CsServerVersion } from './server-version';
 import Telemetry from './telemetry';
 import { assertError, reportError } from './utils';
 import debounce = require('lodash.debounce');
@@ -32,8 +31,6 @@ import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 
 export { reloadWindowForUpdate } from './extension-reload';
-
-const ENABLE_AUTH_COMMANDS = false;
 
 let DISPOSABLES: vscode.Disposable[] = [];
 
@@ -106,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext) {
   guardWindowLifecycleDuringTests();
   await reloadWindowForUpdate(context);
 
-  logOutputChannel.info('⚙️ Activating extension...');
+  logOutputChannel.info('âš™ï¸ Activating extension...');
   initExtensionId(context);
   CsExtensionState.init(context);
 
@@ -152,8 +149,6 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
 }
 
 function registerExtensionUi(context: vscode.ExtensionContext) {
-  CsServerVersion.init();
-
   CsExtensionState.addListeners(context);
   if (ACE_ENABLED) {
     initAce(context);
@@ -168,7 +163,8 @@ function registerExtensionUi(context: vscode.ExtensionContext) {
   context.subscriptions.push(gitUnavailableDisposable);
 
   CsDiagnostics.init(context);
-  createAuthProvider(context);
+  loadLegacySession(context);
+  refreshTabOnAuthTokenChange(context);
   registerCommands(context);
   registerCsDocProvider(context);
   activateCHMonitor(context);
@@ -321,74 +317,14 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
   workspaceWatchInstance.start();
 }
 
-async function handleSignOut(authProvider: CsAuthenticationProvider) {
-  if (CsExtensionState.session?.id) {
-    await authProvider.removeSession(CsExtensionState.session.id);
-    void vscode.window.showInformationMessage('Signed out from CodeScene.');
-  } else {
-    void vscode.window.showInformationMessage('Not signed in to CodeScene.');
-  }
+function loadLegacySession(context: vscode.ExtensionContext) {
+  void readLegacySession(context.secrets).then((session) => CsExtensionState.setLegacySession(session));
 }
 
-function registerSignInCommand(context: vscode.ExtensionContext) {
-  const signInCmd = vscode.commands.registerCommand('codescene.signIn', async () => {
-    const existingSession = await vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
-    vscode.authentication
-      .getSession(AUTH_TYPE, [], { createIfNone: true })
-      .then(onGetSessionSuccess(!!existingSession), onGetSessionError());
-  });
-  DISPOSABLES.push(signInCmd);
-  context.subscriptions.push(signInCmd);
-}
-
-function registerSignOutCommand(context: vscode.ExtensionContext, authProvider: CsAuthenticationProvider) {
-  const signOutCmd = vscode.commands.registerCommand('codescene.signOut', () => handleSignOut(authProvider));
-  DISPOSABLES.push(signOutCmd);
-  context.subscriptions.push(signOutCmd);
-}
-
-function createAuthProvider(context: vscode.ExtensionContext) {
-  const authProvider = new CsAuthenticationProvider(context);
-
-  // Register manual sign in command
-  if (ENABLE_AUTH_COMMANDS) {
-    registerSignInCommand(context);
-  }
-
-  // Register manual sign out command
-  if (ENABLE_AUTH_COMMANDS) {
-    registerSignOutCommand(context, authProvider);
-  }
-
-  // If there's already a session we enable the remote features, otherwise silently add an option to
-  // sign in in the accounts menu - see AuthenticationGetSessionOptions
-  vscode.authentication
-    .getSession(AUTH_TYPE, [], { silent: true })
-    .then(onGetSessionSuccess(), onGetSessionError());
-
-  // Handle login/logout session changes
-  authProvider.onDidChangeSessions((e) => {
-    if (e.removed && e.removed.length > 0) {
-      // Without the following getSession call, the login option in the accounts picker will not reappear!
-      // This is probably refreshing the account picker under the hood
-      void vscode.authentication.getSession(AUTH_TYPE, [], { silent: true });
-      onGetSessionSuccess()(undefined); // removed a session
-    }
-    if (e.added && e.added.length > 0) {
-      // We only have one session in this extension currently, so grabbing the first one is ok.
-      onGetSessionSuccess()(e.added[0]);
-    }
-    CodeSceneTabPanel.refreshIfExists();
-  });
-
-  const authTokenChangedDisposable = onDidChangeConfiguration('authToken', () => {
-    CodeSceneTabPanel.refreshIfExists();
-    // TODO: refresh CWF view(s)
-  });
-
-  DISPOSABLES.push(authProvider);
-  DISPOSABLES.push(authTokenChangedDisposable);
-  context.subscriptions.push(authProvider, authTokenChangedDisposable);
+function refreshTabOnAuthTokenChange(context: vscode.ExtensionContext) {
+  const disposable = onDidChangeConfiguration('authToken', () => CodeSceneTabPanel.refreshIfExists());
+  DISPOSABLES.push(disposable);
+  context.subscriptions.push(disposable);
 }
 
 // This method is called when your extension is deactivated
@@ -404,20 +340,4 @@ export function deactivate() {
   }
   DISPOSABLES = [];
   DevtoolsAPI.dispose();
-}
-
-function onGetSessionSuccess(showAlreadySignedIn = false) {
-  return (session: vscode.AuthenticationSession | undefined) => {
-    CsExtensionState.setSession(session);
-    if (session && showAlreadySignedIn) {
-      void vscode.window.showInformationMessage('Already signed in to CodeScene.');
-    }
-  };
-}
-
-function onGetSessionError() {
-  return (error: any) => {
-    CsExtensionState.setSession();
-    void vscode.window.showErrorMessage(`Error signing in with CodeScene: ${error}`);
-  };
 }

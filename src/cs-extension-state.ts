@@ -1,4 +1,6 @@
 import vscode, { Uri } from 'vscode';
+import type { LegacySession } from './auth/legacy-session';
+import type { AuthStatus } from './centralized-webview-framework/types/auth';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -25,8 +27,14 @@ interface CsFeatures {
   ace: CsFeature;
 }
 
+export interface ExtensionAuthState {
+  active: boolean;
+  status: AuthStatus | null;
+}
+
 export interface CsStateProperties {
-  session?: vscode.AuthenticationSession;
+  auth: ExtensionAuthState;
+  legacySession?: LegacySession;
   features: CsFeatures;
 }
 
@@ -43,14 +51,15 @@ export class CsExtensionState {
   readonly statusBar: CsStatusBar;
   readonly extensionUri: Uri;
 
-  private sessionChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onSessionChanged = this.sessionChangedEmitter.event;
+  private authChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAuthChanged = this.authChangedEmitter.event;
 
   private aceStateChangedEmitter = new vscode.EventEmitter<void>();
   readonly onAceStateChanged = this.aceStateChangedEmitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
+      auth: { active: false, status: null },
       features: {
         analysis: { state: 'loading' },
         ace: { state: 'loading' },
@@ -153,26 +162,23 @@ export class CsExtensionState {
     CsExtensionState._instance.statusBar.update();
   }
 
-  /**
-   * Sets the signed-in session and notifies listeners.
-   */
-  static setSession(session?: vscode.AuthenticationSession) {
-    const signedIn = isDefined(session);
-    CsExtensionState._instance.stateProperties.session = session;
-    this._instance.sessionChangedEmitter.fire();
-    if (!signedIn) {
-      return;
-    }
-
-    CsExtensionState._instance.updateStatusViews();
+  static setAuth(auth: ExtensionAuthState) {
+    CsExtensionState._instance.stateProperties.auth = auth;
+    CsExtensionState._instance.authChanged();
   }
 
-  static get session(): vscode.AuthenticationSession | undefined {
-    return CsExtensionState.stateProperties.session;
+  static setLegacySession(session: LegacySession | undefined) {
+    CsExtensionState._instance.stateProperties.legacySession = session;
+    CsExtensionState._instance.authChanged();
   }
 
-  static get onSessionChanged() {
-    return this._instance.onSessionChanged;
+  static get onAuthChanged() {
+    return this._instance.onAuthChanged;
+  }
+
+  private authChanged() {
+    this.updateStatusViews();
+    this.authChangedEmitter.fire();
   }
 
   static get onAceStateChanged() {

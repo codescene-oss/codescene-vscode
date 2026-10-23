@@ -123,7 +123,7 @@ export interface FnsToRefactorParams {
 }
 
 export interface RefactorParams {
-  token: string;
+  token?: string;
   'fn-to-refactor'?: FnToRefactor;
   'fn-to-refactor-nippy-b64'?: string;
   'skip-cache'?: boolean;

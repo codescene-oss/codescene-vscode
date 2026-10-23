@@ -1,12 +1,16 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
 import { getConfiguration } from './configuration';
-import { CsExtensionState } from './cs-extension-state';
+import { CsExtensionState, type CsStateProperties } from './cs-extension-state';
 import { getExtensionSettingsFilter } from './extension-id';
 import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
 import { serializeError } from './utils';
+
+function telemetryUserId({ auth, legacySession }: CsStateProperties): string | undefined {
+  return auth.status?.user?.id ?? legacySession?.userId;
+}
 
 export default class Telemetry {
   private static _instance?: Telemetry;
@@ -152,9 +156,8 @@ export default class Telemetry {
       'process-platform': process.platform,
       'process-arch': process.arch,
     };
-    if (CsExtensionState.stateProperties.session) {
-      telemetryEvent['user-id'] = CsExtensionState.stateProperties.session.account.id;
-    }
+    const userId = telemetryUserId(CsExtensionState.stateProperties);
+    if (userId) telemetryEvent['user-id'] = userId;
     if (process.env.X_CODESCENE_INTERNAL) {
       telemetryEvent['internal'] = true;
     }

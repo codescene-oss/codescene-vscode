@@ -6,7 +6,7 @@ import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
-import { getAuthToken } from '../configuration';
+import { aceAvailable } from '../devtools-api';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { buildInsertText, getLineIndentation } from '../utils/codeaction-utils';
 
@@ -79,7 +79,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       return;
     }
 
-    const authToken = getAuthToken();
+    const aceUsable = aceAvailable();
     const fnsToRefactor = await Promise.all(
       codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
     );
@@ -95,7 +95,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       title: 'Refactor using CodeScene ACE',
       arguments: [document, 'codeaction', fnToRefactor],
     };
-    refactorAction.disabled = !authToken
+    refactorAction.disabled = !aceUsable
       ? {
           reason: 'Refactoring is not available. Please verify your authentication token in Workspace settings.',
         }
