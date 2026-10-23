@@ -49,6 +49,7 @@ export class AuthService implements vscode.Disposable {
   }
 
   async retry(): Promise<void> {
+    if (!this.enabled) return;
     this.applyStatus(await this.rpc.status());
   }
 

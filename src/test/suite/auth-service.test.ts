@@ -214,4 +214,25 @@ suite('AuthService', () => {
     harness.transport.notify(authStatusFixture('signed-out'));
     assert.deepStrictEqual(states, ['signed-out']);
   });
+
+  test('does not call cs-ide on retry while the toggle is off', async () => {
+    harness = createHarness({ signInEnabled: false });
+    await harness.service.start();
+    await harness.service.retry();
+    assert.deepStrictEqual(
+      { requests: harness.transport.requests, methods: harness.transport.methods() },
+      { requests: [], methods: [] }
+    );
+  });
+
+  test('refreshes status on retry while active', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-status', () => authStatusFixture('signed-in-oauth'));
+    await harness.service.start();
+    await harness.service.retry();
+    assert.deepStrictEqual(
+      { methods: harness.transport.methods(), status: harness.service.current.status },
+      { methods: ['cs-ide/auth-configure', 'cs-ide/auth-status'], status: authStatusFixture('signed-in-oauth') }
+    );
+  });
 });
