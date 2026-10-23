@@ -27,6 +27,7 @@ export class AuthService implements vscode.Disposable {
   private capable = false;
   private enabled = false;
   private optedIn = false;
+  private startHandled = false;
   private configureSeq = 0;
   private loadedKey: string | undefined;
   readonly onDidChange = this.emitter.event;
@@ -42,12 +43,13 @@ export class AuthService implements vscode.Disposable {
   async start(): Promise<void> {
     this.disposables.push(
       this.deps.transport.onDidServerStart((event) => {
-        if (event.restart) void this.handleServerStart(event.metadata);
+        if (event.restart || !this.startHandled) void this.handleServerStart(event.metadata);
       }),
       this.deps.transport.onDidAuthStatusChange((status) => this.applyStatus(status)),
       this.deps.settings.onDidChange(() => void this.refresh())
     );
-    await this.handleServerStart(await this.deps.transport.start());
+    const metadata = await this.deps.transport.start();
+    if (!this.startHandled) await this.handleServerStart(metadata);
   }
 
   async signIn(): Promise<void> {
@@ -124,6 +126,7 @@ export class AuthService implements vscode.Disposable {
   }
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {
+    this.startHandled = true;
     this.capable = metadata.capabilities?.includes(AUTH_CAPABILITY) === true;
     this.optedIn = false;
     await this.refresh();

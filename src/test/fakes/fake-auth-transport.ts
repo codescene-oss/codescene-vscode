@@ -13,6 +13,7 @@ export interface RecordedRequest {
 export class FakeAuthTransport implements AuthTransport {
   readonly requests: RecordedRequest[] = [];
   restarts = 0;
+  private startError: Error | undefined;
   private readonly handlers = new Map<string, Handler>();
   private readonly startEmitter = new EventEmitter<ServerStartEvent>();
   private readonly statusEmitter = new EventEmitter<AuthStatus>();
@@ -22,7 +23,18 @@ export class FakeAuthTransport implements AuthTransport {
   constructor(private metadata: ServerMetadata = { sha: 'sha', version: 'version', capabilities: ['auth-v1'] }) {}
 
   start(): Promise<ServerMetadata> {
+    if (this.startError) return Promise.reject(this.startError);
     return Promise.resolve(this.metadata);
+  }
+
+  failStart(error: Error): this {
+    this.startError = error;
+    return this;
+  }
+
+  emitStart(metadata: ServerMetadata = this.metadata): void {
+    this.metadata = metadata;
+    this.startEmitter.fire({ metadata, restart: false });
   }
 
   respond(method: string, handler: Handler): this {

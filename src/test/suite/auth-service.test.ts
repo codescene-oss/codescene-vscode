@@ -94,6 +94,26 @@ suite('AuthService', () => {
     });
   });
 
+  test('configures cs-ide when the first start fails and a later start event is not a restart', async () => {
+    harness = createHarness();
+    harness.transport.failStart(new Error('start failed'));
+    await assert.rejects(harness.service.start(), /start failed/);
+    harness.transport.emitStart();
+    await flushPromises();
+    assert.deepStrictEqual(harness.transport.requests, [{ method: 'cs-ide/auth-configure', params: NULL_CONFIGURATION }]);
+  });
+
+  test('configures cs-ide once when a start event precedes the resolved start', async () => {
+    harness = createHarness();
+    harness.transport.start = async () => {
+      harness.transport.emitStart();
+      return { sha: 'sha', version: 'version', capabilities: ['auth-v1'] };
+    };
+    await harness.service.start();
+    await flushPromises();
+    assert.deepStrictEqual(harness.transport.methods(), ['cs-ide/auth-configure']);
+  });
+
   test('configures cs-ide again after a restart', async () => {
     harness = createHarness();
     await harness.service.start();
