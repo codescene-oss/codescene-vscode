@@ -1,6 +1,7 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { initBaseContent, updateRendererMessage } from '../../../../centralized-webview-framework/cwf-html-utils';
 import { onDidChangeCwfAuth } from '../../../../auth/cwf-auth';
+import { routeAuthMessage } from '../../../../auth/auth-message-handler';
 import { AceAcknowledgeContextViewProps } from '../../../../centralized-webview-framework/types';
 import { MessageToIDEType } from '../../../../centralized-webview-framework/types/messages';
 import { logOutputChannel } from '../../../../log';
@@ -66,6 +67,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
 
   private async handleMessages(message: MessageToIDEType) {
     try {
+      if (await routeAuthMessage(message)) return;
       if (!this.state) return;
       await this.handleMessage(this.state.request, message);
     } catch (e) {

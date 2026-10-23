@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { routeAuthMessage } from '../../auth/auth-message-handler';
 import { getFileAndFunctionFromState, getFunctionPosition } from '../../centralized-webview-framework/cwf-parsers';
 import { HomeView } from './home-view';
 import { showDocAtPosition } from '../../utils';
@@ -159,6 +160,7 @@ function handleAnalysisMessage(message: MessageToIDEType) {
  * @returns
  */
 export async function handleCWFMessage(homeView: HomeView, message: MessageToIDEType) {
+  if (await routeAuthMessage(message)) return;
   switch (getMessageCategory(message.messageType)) {
     case 'lifecycle':
       handleLifecyleMessage(homeView, message);

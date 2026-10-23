@@ -5,6 +5,7 @@ import { commonResourceRoots } from '../../../webview-utils';
 import { MessageToIDEType } from '../../../centralized-webview-framework/types/messages';
 import { initBaseContent, updateRendererMessage } from '../../../centralized-webview-framework/cwf-html-utils';
 import { onDidChangeCwfAuth } from '../../../auth/cwf-auth';
+import { routeAuthMessage } from '../../../auth/auth-message-handler';
 import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
@@ -69,6 +70,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
   // MESSAGES
   private async handleMessages(message: MessageToIDEType) {
     try {
+      if (await routeAuthMessage(message)) return;
       if (!this.state) return;
       await this.handleDocumentationMessage(this.state, message);
     } catch (e) {
