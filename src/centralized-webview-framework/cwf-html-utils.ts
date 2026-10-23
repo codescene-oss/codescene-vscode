@@ -4,16 +4,9 @@ import { getUri, nonce } from '../webview-utils';
 import { FeatureFlags } from './types/cwf-feature';
 export const ideType = 'VSCode';
 
-// This flag is used to enable or disable the login flow
-// true: will ignore any session data and always show Code Health Monitor
-// false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
-export const ignoreSessionStateFeatureFlag = true;
-
 // Enable Webview devmode with alot of logging
 export const devmode = process.env.DEVMODE === 'true';
 export const featureFlags: FeatureFlags[] = ['jobs', 'open-settings']; // CS-5597: removed 'commit-baseline'
-if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
-
 const opacityHexLookup = {
   '1': {
     hex: '03',

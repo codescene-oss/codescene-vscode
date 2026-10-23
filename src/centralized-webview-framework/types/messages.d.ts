@@ -35,24 +35,7 @@ export type MessageToIDEType =
       payload: { userCompletedOnboarding: boolean };
     }
   | {
-      messageType: 'init-login';
-      payload: { type: 'cloud' | 'enterprise'; baseUrl: string };
-    }
-  | {
-      messageType: 'select-codescene-project';
-      payload: { id: number };
-    }
-  | {
-      messageType: 'skip-select-codescene-project';
-    }
-  | {
       messageType: 'open-home';
-    }
-  | {
-      messageType: 'open-login';
-    }
-  | {
-      messageType: 'open-select-codescene-project';
     }
   | {
       messageType: 'show-onboarding';

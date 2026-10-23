@@ -1,6 +1,6 @@
 import * as path from 'path';
 import vscode from 'vscode';
-import { HomeContextViewProps, IdeContextType, Job, LoginViewProps } from '../../centralized-webview-framework/types';
+import { HomeContextViewProps, IdeContextType, Job } from '../../centralized-webview-framework/types';
 import { devmode, featureFlags, ideType } from '../../centralized-webview-framework/cwf-html-utils';
 import { isPathUnderRoot, normalizeFsPath, relativePosix, toPosixRelPath } from '../../utils/fs-paths';
 
@@ -109,14 +109,12 @@ export const getHomeData = ({
   analysisState,
   totalCount,
   remainingCount,
-  signedIn,
-  user,
-}: HomeContextViewProps['data'] & { signedIn: boolean }): IdeContextType => {
+}: HomeContextViewProps['data']): IdeContextType => {
   return {
     ideType: ideType,
     view: 'home',
     devmode: devmode,
-    pro: signedIn,
+    pro: true,
     featureFlags: featureFlags,
     data: {
       fileDeltaData,
@@ -126,28 +124,6 @@ export const getHomeData = ({
       analysisState,
       totalCount,
       remainingCount,
-      user,
-    },
-  };
-};
-
-/**
- * Generate all needed props for LoginView
- * @param param0
- * @returns
- */
-export const getLoginData = ({ baseUrl, state, availableProjects, user }: LoginViewProps['data']) => {
-  return {
-    ideType: ideType,
-    view: 'login',
-    devmode: devmode,
-    pro: false,
-    featureFlags: featureFlags,
-    data: {
-      baseUrl,
-      state,
-      availableProjects,
-      user,
     },
   };
 };

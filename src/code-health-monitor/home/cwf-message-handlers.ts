@@ -94,41 +94,6 @@ function handleOpenSettings() {
 }
 
 /**
- * Change homeview state to display loginflow
- * @param homeView
- */
-function handleOpenLogin(homeView: HomeView) {
-  homeView.setLoginFlowState({
-    loginOpen: true,
-    loginState: 'init',
-  });
-}
-
-/**
- * Change homeview state to hide loginflow
- * @param homeView
- */
-function handleCloseLogin(homeView: HomeView) {
-  homeView.setLoginFlowState({
-    loginOpen: false,
-    loginState: 'init',
-  });
-}
-
-/**
- * Initiate the login.
- * @param homeView
- * @param payload
- */
-async function handleInitLogin(homeView: HomeView, payload: { baseUrl: string; type: 'cloud' | 'enterprise' }) {
-  void vscode.commands.executeCommand('codescene.signIn');
-  homeView.setLoginFlowState({
-    loginOpen: true,
-    loginState: 'pending',
-  });
-}
-
-/**
  * Handles messages related to webview meta state
  * @param homeView
  * @param message
@@ -138,26 +103,6 @@ function handleLifecyleMessage(homeView: HomeView, message: MessageToIDEType) {
   switch (message.messageType) {
     case 'init':
       homeView.setInitiated(true);
-      return;
-  }
-}
-
-/**
- * Handles messages related to loginflow or from the login view
- * @param homeView
- * @param message
- * @returns
- */
-async function handleLoginMessage(homeView: HomeView, message: MessageToIDEType) {
-  switch (message.messageType) {
-    case 'open-login':
-      handleOpenLogin(homeView);
-      return;
-    case 'open-home':
-      handleCloseLogin(homeView);
-      return;
-    case 'init-login':
-      await handleInitLogin(homeView, message.payload);
       return;
   }
 }
@@ -217,9 +162,6 @@ export async function handleCWFMessage(homeView: HomeView, message: MessageToIDE
   switch (getMessageCategory(message.messageType)) {
     case 'lifecycle':
       handleLifecyleMessage(homeView, message);
-      return;
-    case 'login':
-      await handleLoginMessage(homeView, message);
       return;
     case 'panel':
       handlePanelMessage(homeView, message);

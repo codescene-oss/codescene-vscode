@@ -56,36 +56,6 @@ export interface HomeContextViewProps extends AuthField {
   };
 }
 
-export type LoginFlowStateType = {
-  loginOpen: boolean;
-  loginState: LoginViewProps['data']['state'];
-};
-
-export interface LoginViewProps extends AuthField {
-  ideType: IdeTypes;
-  /**Enable premium UI elements */
-  pro?: boolean;
-  view: 'login';
-  /**devmode will display devtools and log state and messages in the browser console */
-  devmode?: boolean;
-  /** array of feature flags string */
-  featureFlags?: FeatureFlags[];
-  data: {
-    state: 'init' | 'pending' | 'project-selection' | 'summary' | 'error';
-    baseUrl: string;
-    repo?: {
-      name: string;
-    };
-    user?: { name: string } | undefined | null;
-    availableProjects: {
-      name: string;
-      id: number;
-    }[];
-    selectedProjectId?: number;
-    errorMessage?: string;
-  };
-}
-
 export interface DocsContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
@@ -154,7 +124,6 @@ export interface AuthContextViewProps extends AuthField {
 
 export type WebViewPropsType =
   | HomeContextViewProps
-  | LoginViewProps
   | DocsContextViewProps
   | AceContextViewProps
   | AceAcknowledgeContextViewProps
