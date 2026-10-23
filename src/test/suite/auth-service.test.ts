@@ -2,8 +2,9 @@ import * as assert from 'assert';
 import { INACTIVE_SNAPSHOT, toAuthPayload } from '../../auth/auth-payload';
 import { AuthService } from '../../auth/auth-service';
 import { FakeAuthSettings } from '../fakes/fake-auth-settings';
-import { FakeAuthTransport, flushPromises } from '../fakes/fake-auth-transport';
-import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
+import { authRpcError, FakeAuthTransport, flushPromises } from '../fakes/fake-auth-transport';
+import { authPayloadFixture, authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { assertLogOmits } from '../setup';
 
 interface Harness {
@@ -232,7 +233,220 @@ suite('AuthService', () => {
     await harness.service.retry();
     assert.deepStrictEqual(
       { methods: harness.transport.methods(), status: harness.service.current.status },
-      { methods: ['cs-ide/auth-configure', 'cs-ide/auth-status'], status: authStatusFixture('signed-in-oauth') }
+      {
+        methods: ['cs-ide/auth-configure', 'cs-ide/auth-status', 'cs-ide/auth-list-accounts', 'cs-ide/projects-list'],
+        status: authStatusFixture('signed-in-oauth'),
+      }
+    );
+  });
+});
+
+suite('AuthService account data', () => {
+  const repo = { path: 'C:\\git\\acme-backend', name: 'acme-backend' };
+  let harness: Harness;
+
+  teardown(() => harness.service.dispose());
+
+  test('loads accounts, projects and the repo link once signed in', async () => {
+    const expected = authPayloadFixture('auth-payload-account-pick');
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-list-accounts', () => expected.accounts)
+      .respond('cs-ide/projects-list', () => expected.projects);
+    await harness.service.start();
+    await harness.service.setRepo(repo);
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    assert.deepStrictEqual(toAuthPayload(harness.service.current), expected);
+  });
+
+  test('loads the link when a repo is selected after sign-in', async () => {
+    const expected = authPayloadFixture('auth-payload-linked-project');
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-list-accounts', () => expected.accounts)
+      .respond('cs-ide/projects-list', () => expected.projects)
+      .respond('cs-ide/project-link-get', (params) => ({
+        project: params['repo-path'] === repo.path ? { id: '101', name: 'acme-backend' } : null,
+      }));
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.setRepo(repo);
+    assert.deepStrictEqual(toAuthPayload(harness.service.current), expected);
+  });
+
+  test('clears account data after sign-out', async () => {
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-list-accounts', () => authPayloadFixture('auth-payload-account-pick').accounts)
+      .respond('cs-ide/auth-logout', () => authStatusFixture('signed-out'));
+    await harness.service.start();
+    await harness.service.setRepo(repo);
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.signOut();
+    await flushPromises();
+    assert.deepStrictEqual(
+      { payload: toAuthPayload(harness.service.current), events: harness.events },
+      {
+        payload: { status: authStatusFixture('signed-out'), accounts: null, projects: null, repo, 'linked-project': null },
+        events: [{ name: 'auth/sign-out' }],
+      }
+    );
+  });
+
+  test('keeps working when account requests fail', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-list-accounts', () => {
+      throw authRpcError('auth/network');
+    });
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    assert.deepStrictEqual(
+      { accounts: harness.service.current.accounts, projects: harness.service.current.projects },
+      { accounts: null, projects: [] }
+    );
+  });
+});
+
+suite('AuthService actions', () => {
+  const authorizeUrl = 'https://codescene.io/oauth2/auth?state=xyz';
+  const cancelled: AuthStatus = {
+    ...authStatusFixture('signed-out'),
+    'oauth-supported': true,
+    error: { code: 'auth/cancelled', message: 'Sign-in was cancelled.' },
+  };
+  let harness: Harness;
+
+  teardown(() => harness.service.dispose());
+
+  test('sign-in opens the authorize URL returned by auth-login', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-login', () => ({ 'login-id': '3f1c9a2e', 'authorize-url': authorizeUrl }));
+    await harness.service.start();
+    await harness.service.signIn();
+    assert.deepStrictEqual(
+      { opened: harness.opened, events: harness.events },
+      { opened: [authorizeUrl], events: [{ name: 'auth/sign-in-started' }] }
+    );
+  });
+
+  test('a failed auth-login reports the error code and requests nothing else', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-login', () => {
+      throw authRpcError('auth/port-unavailable');
+    });
+    await harness.service.start();
+    await harness.service.signIn();
+    assert.deepStrictEqual(
+      { methods: harness.transport.methods(), opened: harness.opened, events: harness.events },
+      {
+        methods: ['cs-ide/auth-configure', 'cs-ide/auth-login'],
+        opened: [],
+        events: [
+          { name: 'auth/sign-in-started' },
+          { name: 'auth/sign-in-failed', data: { 'error-code': 'auth/port-unavailable' } },
+        ],
+      }
+    );
+  });
+
+  test('open-browser-again re-opens the pending authorize URL', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signing-in'));
+    await harness.service.openBrowserAgain();
+    assert.deepStrictEqual(harness.opened, [authStatusFixture('signing-in').login?.['authorize-url']]);
+  });
+
+  test('cancel sends the pending login id and reports the cancellation', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-cancel-login', () => cancelled);
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signing-in'));
+    await harness.service.cancelSignIn();
+    assert.deepStrictEqual(
+      { last: harness.transport.requests.at(-1), status: harness.service.current.status, events: harness.events },
+      {
+        last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': '3f1c9a2e' } },
+        status: cancelled,
+        events: [{ name: 'auth/sign-in-cancelled' }],
+      }
+    );
+  });
+
+  test('retry applies the auth-status result', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-status', () => authStatusFixture('signed-in-network-error'));
+    await harness.service.start();
+    await harness.service.retry();
+    assert.deepStrictEqual(harness.service.current.status, authStatusFixture('signed-in-network-error'));
+  });
+
+  test('selecting an account without a local session opens its authorize URL', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-select-account', () => authStatusFixture('signing-in'));
+    await harness.service.start();
+    await harness.service.selectAccount('7');
+    assert.deepStrictEqual(
+      { last: harness.transport.requests.at(-1), opened: harness.opened, events: harness.events },
+      {
+        last: { method: 'cs-ide/auth-select-account', params: { 'account-id': '7' } },
+        opened: [authStatusFixture('signing-in').login?.['authorize-url']],
+        events: [{ name: 'auth/sign-in-started' }],
+      }
+    );
+  });
+
+  test('selecting an account with a local session opens no browser', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-select-account', () => authStatusFixture('signed-in-oauth'));
+    await harness.service.start();
+    await harness.service.selectAccount('42');
+    assert.deepStrictEqual(
+      { opened: harness.opened, status: harness.service.current.status },
+      { opened: [], status: authStatusFixture('signed-in-oauth') }
+    );
+  });
+
+  test('link-project stores the link for the current repo', async () => {
+    const repo = { path: 'C:\\git\\acme-backend', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-set', () => ({ project: { id: '102', name: 'acme-frontend' } }));
+    await harness.service.start();
+    await harness.service.setRepo(repo);
+    await harness.service.linkProject('102');
+    assert.deepStrictEqual(
+      { last: harness.transport.requests.at(-1), linked: harness.service.current.linkedProject },
+      {
+        last: { method: 'cs-ide/project-link-set', params: { 'repo-path': repo.path, 'project-id': '102' } },
+        linked: { id: '102', name: 'acme-frontend' },
+      }
+    );
+  });
+
+  test('setting and removing the access token writes the setting and configures cs-ide again', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    await harness.service.setAccessToken('pat-1');
+    await flushPromises();
+    await harness.service.removeAccessToken();
+    await flushPromises();
+    assert.deepStrictEqual(
+      {
+        writes: harness.settings.tokenWrites,
+        configurations: harness.transport.requests
+          .filter((request) => request.method === 'cs-ide/auth-configure')
+          .map((request) => request.params),
+        events: harness.events,
+      },
+      {
+        writes: ['pat-1', undefined],
+        configurations: [NULL_CONFIGURATION, { 'server-url': null, 'access-token': 'pat-1' }, NULL_CONFIGURATION],
+        events: [{ name: 'auth/pat-set' }, { name: 'auth/pat-removed' }],
+      }
     );
   });
 });

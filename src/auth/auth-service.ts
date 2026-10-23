@@ -3,10 +3,11 @@ import { isDeepStrictEqual } from 'util';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
-import { INACTIVE_SNAPSHOT, type AuthSnapshot } from './auth-payload';
-import { AuthRpc } from './auth-rpc';
+import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchLinkedProject } from './account-data';
+import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
+import { authErrorCode, AuthRpc } from './auth-rpc';
 import { authConfiguration, type AuthSettings } from './auth-settings';
-import { signInOutcome, type AuthTelemetryEvent } from './auth-telemetry';
+import { signInFailed, signInOutcome, type AuthTelemetryEvent } from './auth-telemetry';
 import type { AuthTransport } from './auth-transport';
 
 export const AUTH_CAPABILITY = 'auth-v1';
@@ -27,6 +28,7 @@ export class AuthService implements vscode.Disposable {
   private enabled = false;
   private optedIn = false;
   private configureSeq = 0;
+  private loadedKey: string | undefined;
   readonly onDidChange = this.emitter.event;
 
   constructor(private readonly deps: AuthServiceDeps) {
@@ -48,9 +50,72 @@ export class AuthService implements vscode.Disposable {
     await this.handleServerStart(await this.deps.transport.start());
   }
 
+  async signIn(): Promise<void> {
+    if (!this.enabled) return;
+    this.deps.logUsage('auth/sign-in-started');
+    try {
+      const login = await this.rpc.login();
+      await this.deps.openExternal(login['authorize-url']);
+    } catch (error) {
+      this.logEvent(signInFailed(authErrorCode(error)));
+    }
+  }
+
+  async openBrowserAgain(): Promise<void> {
+    const url = this.snapshot.status?.login?.['authorize-url'];
+    if (url) await this.deps.openExternal(url);
+  }
+
+  async cancelSignIn(): Promise<void> {
+    if (!this.enabled) return;
+    const loginId = this.snapshot.status?.login?.['login-id'];
+    if (loginId) this.applyStatus(await this.rpc.cancelLogin(loginId));
+  }
+
+  async signOut(): Promise<void> {
+    if (!this.enabled) return;
+    this.deps.logUsage('auth/sign-out');
+    this.applyStatus(await this.rpc.logout());
+  }
+
   async retry(): Promise<void> {
     if (!this.enabled) return;
-    this.applyStatus(await this.rpc.status());
+    this.applyStatus(await this.rpc.status(), true);
+  }
+
+  async selectAccount(accountId: string): Promise<void> {
+    if (!this.enabled) return;
+    const status = await this.rpc.selectAccount(accountId);
+    this.applyStatus(status);
+    const url = status.login?.['authorize-url'];
+    if (!url) return;
+    this.deps.logUsage('auth/sign-in-started');
+    await this.deps.openExternal(url);
+  }
+
+  async linkProject(projectId: string | null): Promise<void> {
+    const repo = this.snapshot.repo;
+    if (!this.enabled || !repo) return;
+    const link = await this.rpc.setProjectLink(repo.path, projectId);
+    this.publish({ ...this.snapshot, linkedProject: link.project });
+  }
+
+  async setAccessToken(token: string): Promise<void> {
+    await this.deps.settings.setAccessToken(token);
+    this.deps.logUsage('auth/pat-set');
+  }
+
+  async removeAccessToken(): Promise<void> {
+    await this.deps.settings.setAccessToken(undefined);
+    this.deps.logUsage('auth/pat-removed');
+  }
+
+  async setRepo(repo: AuthRepo | null): Promise<void> {
+    if (isDeepStrictEqual(repo, this.snapshot.repo)) return;
+    this.publish({ ...this.snapshot, repo, linkedProject: null });
+    if (!this.loadedKey) return;
+    const linkedProject = await fetchLinkedProject(this.rpc, repo);
+    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, linkedProject });
   }
 
   dispose(): void {
@@ -70,6 +135,7 @@ export class AuthService implements vscode.Disposable {
       await this.configure();
       return;
     }
+    this.loadedKey = undefined;
     this.publish({ ...INACTIVE_SNAPSHOT, repo: this.snapshot.repo });
     await this.optOut();
   }
@@ -96,10 +162,19 @@ export class AuthService implements vscode.Disposable {
     }
   }
 
-  private applyStatus(status: AuthStatus): void {
+  private applyStatus(status: AuthStatus, reloadAccountData = false): void {
     if (!this.enabled) return;
     this.logEvent(signInOutcome(this.snapshot.status, status));
     this.publish({ ...this.snapshot, active: true, status });
+    void this.loadAccountData(status, reloadAccountData);
+  }
+
+  private async loadAccountData(status: AuthStatus, reload: boolean): Promise<void> {
+    const key = accountDataKey(status);
+    if (!reload && key === this.loadedKey) return;
+    this.loadedKey = key;
+    const data = key ? await fetchAccountData(this.rpc, this.snapshot.repo) : EMPTY_ACCOUNT_DATA;
+    if (key === this.loadedKey) this.publish({ ...this.snapshot, ...data });
   }
 
   private logEvent(event: AuthTelemetryEvent | undefined): void {
