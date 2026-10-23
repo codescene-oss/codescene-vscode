@@ -1,5 +1,6 @@
 import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
-import { initBaseContent } from '../../../../centralized-webview-framework/cwf-html-utils';
+import { initBaseContent, updateRendererMessage } from '../../../../centralized-webview-framework/cwf-html-utils';
+import { onDidChangeCwfAuth } from '../../../../auth/cwf-auth';
 import { AceAcknowledgeContextViewProps } from '../../../../centralized-webview-framework/types';
 import { MessageToIDEType } from '../../../../centralized-webview-framework/types/messages';
 import { logOutputChannel } from '../../../../log';
@@ -54,6 +55,13 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
       this,
       this.disposables
     );
+
+    onDidChangeCwfAuth(() => this.rerender(), this, this.disposables);
+  }
+
+  private rerender() {
+    const state = this.state;
+    if (state?.cwfProps) void this.renderAce(state.request, state.cwfProps);
   }
 
   private async handleMessages(message: MessageToIDEType) {
@@ -124,10 +132,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
   private async renderAce(request: RefactoringRequest, data: AceAcknowledgeContextViewProps) {
     this.state = { request, cwfProps: data };
 
-    const message = {
-      messageType: 'update-renderer',
-      payload: data,
-    };
+    const message = updateRendererMessage(data);
 
     if (this.isActive()) {
       await this.webViewPanel.webview.postMessage(message);

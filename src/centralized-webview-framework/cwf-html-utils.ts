@@ -2,6 +2,8 @@ import { Webview } from 'vscode';
 import { IdeContextType } from './types';
 import { getUri, nonce } from '../webview-utils';
 import { FeatureFlags } from './types/cwf-feature';
+import { withCwfAuth } from '../auth/cwf-auth';
+import type { MessageType } from './types/messages';
 export const ideType = 'VSCode';
 
 // Enable Webview devmode with alot of logging
@@ -107,6 +109,10 @@ function safeJsonStringify(obj: unknown): string {
   return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
+export function updateRendererMessage(payload: IdeContextType): MessageType {
+  return { messageType: 'update-renderer', payload: withCwfAuth(payload) };
+}
+
 export const initialDataContextScriptTag = (ideContext: IdeContextType, scriptNonce: string) => /*html*/ `
   <script nonce="${scriptNonce}">
     function setContext() {
@@ -151,7 +157,7 @@ export function initBaseContent(webView: Webview, initialIdeContext: IdeContextT
       <link rel="stylesheet" type="text/css" href="${stylesUri}">
       <title>VSCode React Webview</title>
       ${ideStylesVars}
-      ${initialDataContextScriptTag(initialIdeContext, scriptNonce)}
+      ${initialDataContextScriptTag(withCwfAuth(initialIdeContext), scriptNonce)}
     </head>
     <body>
       <div id="root"></div>

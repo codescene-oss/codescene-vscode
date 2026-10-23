@@ -4,14 +4,23 @@ import {
   getCsp,
   initBaseContent,
   initialDataContextScriptTag,
+  updateRendererMessage,
 } from '../../centralized-webview-framework/cwf-html-utils';
+import { setCwfAuth } from '../../auth/cwf-auth';
 import { CsExtensionState } from '../../cs-extension-state';
+import { authPayloadFixture } from '../fixtures/auth/auth-fixtures';
 
 suite('cwf-html-utils Test Suite', () => {
   const fakeWebview = {
     cspSource: 'vscode-resource:',
     asWebviewUri: (uri: any) => uri.toString(),
   } as any;
+
+  const originalInstance = (CsExtensionState as any)._instance;
+
+  suiteTeardown(() => {
+    (CsExtensionState as any)._instance = originalInstance;
+  });
 
   test('getCsp uses provided nonce and restrictive directives', () => {
     const csp = getCsp(fakeWebview, 'abc123');
@@ -51,5 +60,29 @@ suite('cwf-html-utils Test Suite', () => {
     const nonces = html.match(/nonce="([A-Za-z0-9+/=]+)"/g)!;
     assert.ok(nonces.length >= 2);
     assert.strictEqual(nonces[0], nonces[1]);
+  });
+
+  test('updateRendererMessage carries the auth payload while sign-in is active', () => {
+    const payload = authPayloadFixture('auth-payload-account-pick');
+    setCwfAuth(payload);
+    try {
+      assert.deepStrictEqual(updateRendererMessage({ ideType: 'VSCode', view: 'auth' }), {
+        messageType: 'update-renderer',
+        payload: { ideType: 'VSCode', view: 'auth', featureFlags: ['ide-auth'], auth: payload },
+      });
+    } finally {
+      setCwfAuth(undefined);
+    }
+  });
+
+  test('initBaseContent embeds the ide-auth flag while sign-in is active', () => {
+    (CsExtensionState as any)._instance = { extensionUri: { toString: () => '/ext' } };
+    setCwfAuth(authPayloadFixture('auth-payload-account-pick'));
+    try {
+      const html = initBaseContent(fakeWebview, { ideType: 'VSCode', view: 'auth' });
+      assert.ok(html.includes('"featureFlags":["ide-auth"]'), html);
+    } finally {
+      setCwfAuth(undefined);
+    }
   });
 });

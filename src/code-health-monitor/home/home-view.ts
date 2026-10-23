@@ -11,7 +11,8 @@ import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { MessageToIDEType } from '../../centralized-webview-framework/types/messages';
 import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job } from '../../centralized-webview-framework/types';
-import { initBaseContent } from '../../centralized-webview-framework/cwf-html-utils';
+import { initBaseContent, updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
+import { onDidChangeCwfAuth } from '../../auth/cwf-auth';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from '../../configuration';
 import { monitorJobCounts } from './analysis-batch';
@@ -68,6 +69,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
+      CsExtensionState.onAuthChanged(() => this.refreshAceState()),
+      onDidChangeCwfAuth(() => this.update()),
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );
@@ -286,10 +289,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private async updateHomeRenderer() {
     const webView = this.view?.webview;
     if (!webView) return;
-    await webView.postMessage({
-      messageType: 'update-renderer',
-      payload: this.homePayload(),
-    });
+    await webView.postMessage(updateRendererMessage(this.homePayload()));
   }
 
   // Update function for rendering webview. used by lodash throttle to limit number of rerenders
