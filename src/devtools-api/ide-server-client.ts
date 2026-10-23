@@ -2,7 +2,10 @@ import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
+import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import { formatLogFields, logOutputChannel } from '../log';
+import { redactSecrets } from '../log-redaction';
+import { authRequestSummaries, authResponseSummaries, authStatusSummary } from './auth-log-summaries';
 import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
 import { AbortError } from './abort-error';
 import { Delta } from './delta-model';
@@ -49,6 +52,7 @@ export function distributionServerCommand(
 export interface ServerMetadata {
   sha: string;
   version: string;
+  capabilities?: string[];
 }
 
 export interface ServerStartEvent {
@@ -159,6 +163,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private readonly watchInventoryEmitter = new vscode.EventEmitter<WatchInventory>();
   private readonly serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
   private readonly queueEmitter = new vscode.EventEmitter<ReviewQueue>();
+  private readonly authStatusEmitter = new vscode.EventEmitter<AuthStatus>();
 
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
@@ -167,6 +172,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   readonly onDidWatchInventory = this.watchInventoryEmitter.event;
   readonly onDidServerStart = this.serverStartEmitter.event;
   readonly onDidQueue = this.queueEmitter.event;
+  readonly onDidAuthStatusChange = this.authStatusEmitter.event;
 
   constructor(
     readonly binaryPath: string,
@@ -207,10 +213,10 @@ export class CsIdeServerClient implements vscode.Disposable {
         const text = data.toString();
         if (stderr.length < 4000) stderr += text.slice(0, 4000 - stderr.length);
         const trimmed = text.trim();
-        if (trimmed) logOutputChannel.debug(`[cs-ide] ${trimmed}`);
+        if (trimmed) logOutputChannel.debug(`[cs-ide] ${redactSecrets(trimmed)}`);
       });
       process.on('exit', (code, signal) => {
-        const detail = stderr.trim();
+        const detail = redactSecrets(stderr.trim());
         this.handleProcessFailure(
           new Error(
             `cs-ide server exited${code === null ? '' : ` with code ${code}`}${signal ? ` (${signal})` : ''}${detail ? `: ${detail}` : ''}`
@@ -232,6 +238,7 @@ export class CsIdeServerClient implements vscode.Disposable {
         this.handleReviewProgress(notification));
       connection.onNotification('cs-ide/watchInventoryChanged', (notification: Record<string, any>) =>
         this.handleWatchInventory(notification));
+      connection.onNotification('cs-ide/authStatusChanged', (status: AuthStatus) => this.handleAuthStatus(status));
       connection.onError(([error]) => this.handleError(error));
       connection.listen();
     } catch (error) {
@@ -281,6 +288,10 @@ export class CsIdeServerClient implements vscode.Disposable {
 
   async deviceId(): Promise<{ 'device-id': string }> {
     return deviceIdResponse(await this.sendRequest('cs-ide/device-id', {}));
+  }
+
+  request<T>(method: string, params: unknown): Promise<T> {
+    return this.sendRequest<T>(method, params);
   }
 
   async codeHealthRulesTemplate(): Promise<CodeHealthRulesTemplateResponse> {
@@ -347,6 +358,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.watchInventoryEmitter.dispose();
     this.serverStartEmitter.dispose();
     this.queueEmitter.dispose();
+    this.authStatusEmitter.dispose();
   }
 
   private bindRefactorCancellation(signal?: AbortSignal): { token: CancellationToken; dispose: () => void } {
@@ -387,7 +399,7 @@ export class CsIdeServerClient implements vscode.Disposable {
       );
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSecrets(error instanceof Error ? error.message : String(error));
       logOutputChannel.error(
         `[cs-ide] request failed id=${id} method=${method} durationMs=${Date.now() - started}: ${message}`
       );
@@ -433,12 +445,17 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.startCount++;
     const restart = this.startCount > 1;
     logOutputChannel.info(
-      `[cs-ide] received start ${formatLogFields({ version: metadata.version, sha: metadata.sha, restart })}`
+      `[cs-ide] received start ${formatLogFields({ version: metadata.version, sha: metadata.sha, restart, capabilities: metadata.capabilities })}`
     );
     this.resolveStart?.(metadata);
     this.resolveStart = undefined;
     this.rejectStart = undefined;
     this.serverStartEmitter.fire({ metadata, restart });
+  }
+
+  private handleAuthStatus(status: AuthStatus): void {
+    logOutputChannel.info(`[cs-ide] received authStatusChanged ${authStatusSummary(status)}`);
+    this.authStatusEmitter.fire(status);
   }
 
   private handleWatchInventory(notification: Record<string, any>): void {
@@ -642,6 +659,7 @@ const requestSummaries: Record<string, (value: Record<string, unknown>) => strin
   'cs-ide/telemetry': (value) => formatLogFields({ eventName: telemetryEventName(value) }),
   'cs-ide/check-rules': (value) => formatLogFields({ repoRoot: value['repo-root'], path: value.path }),
   'cs-ide/getWatchInventory': (value) => formatLogFields({ repoRoot: value['repo-root'] }),
+  ...authRequestSummaries,
 };
 
 function summarizeRequest(method: string, params: unknown): string {
@@ -693,6 +711,7 @@ const responseSummaries: Record<string, (value: Record<string, unknown>) => stri
     const files = (value.files as string[] | undefined) ?? [];
     return formatLogFields({ count: files.length, files });
   },
+  ...authResponseSummaries,
 };
 
 function summarizeResponse(method: string, result: unknown): string {
