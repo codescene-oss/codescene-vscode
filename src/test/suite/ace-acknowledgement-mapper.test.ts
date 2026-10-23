@@ -120,4 +120,5 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
       },
       { cloud: false, onpremPat: true }
     );
-  });});
+  });
+});

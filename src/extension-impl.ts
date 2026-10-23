@@ -103,7 +103,7 @@ export async function activate(context: vscode.ExtensionContext) {
   guardWindowLifecycleDuringTests();
   await reloadWindowForUpdate(context);
 
-  logOutputChannel.info('âš™ï¸ Activating extension...');
+  logOutputChannel.info('⚙️ Activating extension...');
   initExtensionId(context);
   CsExtensionState.init(context);
 
