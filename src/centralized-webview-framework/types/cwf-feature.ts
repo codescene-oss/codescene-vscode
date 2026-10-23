@@ -8,4 +8,5 @@ export type FeatureFlags =
   | 'onboarding-guide'
   | 'sign-in'
   | 'sign-in-enterprise'
-  | 'commit-baseline';
+  | 'commit-baseline'
+  | 'ide-auth';

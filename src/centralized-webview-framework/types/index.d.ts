@@ -1,6 +1,11 @@
 import { RefactorResponse } from './ace';
+import { AuthPayload } from './auth';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
+
+export interface AuthField {
+  auth?: AuthPayload;
+}
 
 export type IdeTypes = 'VSCode';
 
@@ -27,7 +32,7 @@ export type Job = {
 
 export type AnalysisState = 'idle' | 'running' | 'stopped';
 
-export interface HomeContextViewProps {
+export interface HomeContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -56,7 +61,7 @@ export type LoginFlowStateType = {
   loginState: LoginViewProps['data']['state'];
 };
 
-export interface LoginViewProps {
+export interface LoginViewProps extends AuthField {
   ideType: IdeTypes;
   /**Enable premium UI elements */
   pro?: boolean;
@@ -81,7 +86,7 @@ export interface LoginViewProps {
   };
 }
 
-export interface DocsContextViewProps {
+export interface DocsContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -101,7 +106,7 @@ export interface DocsContextViewProps {
   };
 }
 
-export interface AceContextViewProps {
+export interface AceContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -121,7 +126,7 @@ export interface AceContextViewProps {
   };
 }
 
-export interface AceAcknowledgeContextViewProps {
+export interface AceAcknowledgeContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -138,12 +143,22 @@ export interface AceAcknowledgeContextViewProps {
   };
 }
 
+export interface AuthContextViewProps extends AuthField {
+  ideType: IdeTypes;
+  pro?: boolean;
+  view: 'auth';
+  devmode?: boolean;
+  featureFlags?: FeatureFlags[];
+  data?: undefined;
+}
+
 export type WebViewPropsType =
   | HomeContextViewProps
   | LoginViewProps
   | DocsContextViewProps
   | AceContextViewProps
-  | AceAcknowledgeContextViewProps;
+  | AceAcknowledgeContextViewProps
+  | AuthContextViewProps;
 
 export type IdeContextType = WebViewPropsType;
 
