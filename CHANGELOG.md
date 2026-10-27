@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.29.2](https://github.com/codescene-oss/codescene-vscode/compare/v0.29.1...v0.29.2) (2026-10-24)
+
+### Chores
+
+* Bump IDE CLI to 1.0.80 ([#382](https://github.com/codescene-oss/codescene-vscode/pull/382))
+* Remove E2E tests and report coverage on pull requests ([#380](https://github.com/codescene-oss/codescene-vscode/pull/380))
+
 ### [0.29.1](https://github.com/codescene-oss/codescene-vscode/compare/v0.29.0...v0.29.1) (2026-10-19)
 
 ### Bug fixes
