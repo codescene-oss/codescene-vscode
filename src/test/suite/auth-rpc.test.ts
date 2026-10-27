@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { authErrorCode, AuthRpc } from '../../auth/auth-rpc';
+import { authErrorCode, AuthRpc, isMethodNotFound } from '../../auth/auth-rpc';
 import { authRpcError, FakeAuthTransport } from '../fakes/fake-auth-transport';
 
 suite('AuthRpc', () => {
@@ -26,6 +26,12 @@ suite('AuthRpc', () => {
       call: (rpc) => rpc.selectAccount('7'),
       method: 'cs-ide/auth-select-account',
       params: { 'account-id': '7' },
+    },
+    {
+      name: 'syncAccount',
+      call: (rpc) => rpc.syncAccount(repoPath),
+      method: 'cs-ide/auth-sync-account',
+      params: { 'repo-path': repoPath },
     },
     { name: 'listProjects', call: (rpc) => rpc.listProjects(), method: 'cs-ide/projects-list', params: {} },
     {
@@ -63,5 +69,19 @@ suite('AuthRpc', () => {
         assert.strictEqual(authErrorCode(error), expected);
       });
     }
+  });
+
+  suite('isMethodNotFound', () => {
+    test('recognises a JSON-RPC method-not-found error', () => {
+      assert.deepStrictEqual(
+        [
+          isMethodNotFound(Object.assign(new Error('Method not found'), { code: -32601 })),
+          isMethodNotFound(Object.assign(new Error('bad'), { code: -32602 })),
+          isMethodNotFound(new Error('boom')),
+          isMethodNotFound(undefined),
+        ],
+        [true, false, false, false]
+      );
+    });
   });
 });

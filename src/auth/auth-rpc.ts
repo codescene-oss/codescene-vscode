@@ -2,6 +2,7 @@ import type { Account, AuthErrorCode, AuthStatus, Project } from '../centralized
 import type { AuthTransport } from './auth-transport';
 
 const AUTH_ERROR = -32803;
+const METHOD_NOT_FOUND = -32601;
 
 export interface AuthConfiguration {
   'server-url': string | null;
@@ -48,6 +49,10 @@ export class AuthRpc {
     return this.transport.request('cs-ide/auth-select-account', { 'account-id': accountId });
   }
 
+  syncAccount(repoPath: string): Promise<AuthStatus> {
+    return this.transport.request('cs-ide/auth-sync-account', { 'repo-path': repoPath });
+  }
+
   listProjects(): Promise<Project[]> {
     return this.transport.request('cs-ide/projects-list', {});
   }
@@ -69,6 +74,10 @@ function isAuthRpcError(error: unknown): error is { code: number; data: Record<s
   if (!isRecord(error)) return false;
   if (error.code !== AUTH_ERROR) return false;
   return isRecord(error.data);
+}
+
+export function isMethodNotFound(error: unknown): boolean {
+  return isRecord(error) && error.code === METHOD_NOT_FOUND;
 }
 
 export function authErrorCode(error: unknown): AuthErrorCode | undefined {

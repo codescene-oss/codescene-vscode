@@ -28,7 +28,10 @@ function createHarness(options: HarnessOptions = {}): Harness {
     .respond('cs-ide/auth-configure', () => authStatusFixture('signed-out'))
     .respond('cs-ide/auth-list-accounts', () => [])
     .respond('cs-ide/projects-list', () => [])
-    .respond('cs-ide/project-link-get', () => ({ project: null }));
+    .respond('cs-ide/project-link-get', () => ({ project: null }))
+    .respond('cs-ide/auth-sync-account', () => {
+      throw Object.assign(new Error('Method not found'), { code: -32601 });
+    });
   const settings = new FakeAuthSettings({
     signInEnabled: options.signInEnabled ?? true,
     serverUrl: '',
@@ -327,6 +330,135 @@ suite('AuthService account data', () => {
     assert.deepStrictEqual(
       { accounts: harness.service.current.accounts, projects: harness.service.current.projects },
       { accounts: null, projects: [] }
+    );
+  });
+});
+
+suite('AuthService account sync', () => {
+  const repo = { path: 'C:\\git\\acme-backend', name: 'acme-backend' };
+  const otherRepo = { path: 'C:\\git\\other-web', name: 'other-web' };
+  const signedIn = authStatusFixture('signed-in-oauth');
+  const switched: AuthStatus = { ...signedIn, account: { id: '7', name: 'Other Corp' } };
+  let harness: Harness;
+
+  teardown(() => harness.service.dispose());
+
+  const syncedPaths = () =>
+    harness.transport.requests
+      .filter((request) => request.method === 'cs-ide/auth-sync-account')
+      .map((request) => (request.params as Record<string, unknown>)['repo-path']);
+
+  const signInTo = async (status: AuthStatus = signedIn) => {
+    harness.transport.notify(status);
+    await flushPromises();
+  };
+
+  test('moves to the repository account when signing in and reloads its account data', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-sync-account', () => switched);
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    assert.deepStrictEqual(
+      {
+        synced: syncedPaths(),
+        account: harness.service.current.status?.account,
+        accountLists: harness.transport.methods().filter((method) => method === 'cs-ide/auth-list-accounts').length,
+      },
+      { synced: [repo.path], account: switched.account, accountLists: 2 }
+    );
+  });
+
+  test('asks nothing without a repository, then asks when one is selected', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-sync-account', () => signedIn);
+    await harness.service.start();
+    await signInTo();
+    const before = syncedPaths();
+    await harness.service.setRepo(repo);
+    assert.deepStrictEqual({ before, after: syncedPaths() }, { before: [], after: [repo.path] });
+  });
+
+  test('asks again when another repository is selected and loads its link under the resulting account', async () => {
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-sync-account', (params) => (params['repo-path'] === otherRepo.path ? switched : signedIn))
+      .respond('cs-ide/project-link-get', (params) => ({
+        project: params['repo-path'] === otherRepo.path ? { id: '201', name: 'other-web' } : null,
+      }));
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    await harness.service.setRepo(otherRepo);
+    await flushPromises();
+    assert.deepStrictEqual(
+      {
+        synced: syncedPaths(),
+        account: harness.service.current.status?.account,
+        linked: harness.service.current.linkedProject,
+      },
+      { synced: [repo.path, otherRepo.path], account: switched.account, linked: { id: '201', name: 'other-web' } }
+    );
+  });
+
+  test('leaves the account the user picked alone', async () => {
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-sync-account', () => signedIn)
+      .respond('cs-ide/auth-select-account', () => switched);
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    await harness.service.selectAccount('7');
+    await flushPromises();
+    assert.deepStrictEqual(
+      { synced: syncedPaths(), account: harness.service.current.status?.account },
+      { synced: [repo.path], account: switched.account }
+    );
+  });
+
+  test('asks again after signing out and in', async () => {
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-sync-account', () => signedIn)
+      .respond('cs-ide/auth-logout', () => authStatusFixture('signed-out'))
+      .respond('cs-ide/auth-login', () => ({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' }));
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    await harness.service.signOut();
+    await harness.service.signIn();
+    await signInTo();
+    assert.deepStrictEqual(syncedPaths(), [repo.path, repo.path]);
+  });
+
+  test('stops asking a cs-ide that does not know the method, and still loads the link', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-get', (params) => ({
+      project: params['repo-path'] === otherRepo.path ? { id: '201', name: 'other-web' } : null,
+    }));
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    await harness.service.setRepo(otherRepo);
+    assert.deepStrictEqual(
+      { synced: syncedPaths(), linked: harness.service.current.linkedProject },
+      { synced: [repo.path], linked: { id: '201', name: 'other-web' } }
+    );
+  });
+
+  test('keeps the account and keeps asking when a request fails', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-sync-account', () => {
+      throw authRpcError('auth/network');
+    });
+    await harness.service.setRepo(repo);
+    await harness.service.start();
+    await signInTo();
+    await harness.service.setRepo(otherRepo);
+    assert.deepStrictEqual(
+      { synced: syncedPaths(), status: harness.service.current.status },
+      { synced: [repo.path, otherRepo.path], status: signedIn }
     );
   });
 });

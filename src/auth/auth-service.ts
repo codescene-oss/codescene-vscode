@@ -5,7 +5,7 @@ import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
 import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchLinkedProject } from './account-data';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
-import { authErrorCode, AuthRpc } from './auth-rpc';
+import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
 import { authConfiguration, type AuthSettings } from './auth-settings';
 import { signInFailed, signInOutcome, type AuthTelemetryEvent } from './auth-telemetry';
 import type { AuthTransport } from './auth-transport';
@@ -28,6 +28,8 @@ export class AuthService implements vscode.Disposable {
   private enabled = false;
   private optedIn = false;
   private startHandled = false;
+  private syncOnSignIn = false;
+  private syncSupported = true;
   private configureSeq = 0;
   private loadedKey: string | undefined;
   readonly onDidChange = this.emitter.event;
@@ -54,6 +56,7 @@ export class AuthService implements vscode.Disposable {
 
   async signIn(): Promise<void> {
     if (!this.enabled) return;
+    this.syncOnSignIn = true;
     this.deps.logUsage('auth/sign-in-started');
     try {
       const login = await this.rpc.login();
@@ -116,6 +119,7 @@ export class AuthService implements vscode.Disposable {
     if (isDeepStrictEqual(repo, this.snapshot.repo)) return;
     this.publish({ ...this.snapshot, repo, linkedProject: null });
     if (!this.loadedKey) return;
+    if (await this.syncAccount()) return;
     const linkedProject = await fetchLinkedProject(this.rpc, repo);
     if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, linkedProject });
   }
@@ -127,6 +131,7 @@ export class AuthService implements vscode.Disposable {
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {
     this.startHandled = true;
+    this.syncSupported = true;
     this.capable = metadata.capabilities?.includes(AUTH_CAPABILITY) === true;
     this.optedIn = false;
     await this.refresh();
@@ -157,6 +162,7 @@ export class AuthService implements vscode.Disposable {
   private async configure(): Promise<void> {
     const seq = ++this.configureSeq;
     this.optedIn = true;
+    this.syncOnSignIn = true;
     try {
       const status = await this.rpc.configure(authConfiguration(this.deps.settings.read()));
       if (seq === this.configureSeq) this.applyStatus(status);
@@ -170,6 +176,30 @@ export class AuthService implements vscode.Disposable {
     this.logEvent(signInOutcome(this.snapshot.status, status));
     this.publish({ ...this.snapshot, active: true, status });
     void this.loadAccountData(status, reloadAccountData);
+    if (this.syncOnSignIn && accountDataKey(status)) {
+      this.syncOnSignIn = false;
+      void this.syncAccount();
+    }
+  }
+
+  private syncableRepo(): AuthRepo | null {
+    return this.enabled && this.syncSupported ? this.snapshot.repo : null;
+  }
+
+  /** Moves cs-ide to the account that owns the current repository. True when the account changed. */
+  private async syncAccount(): Promise<boolean> {
+    const repo = this.syncableRepo();
+    if (!repo) return false;
+    try {
+      const status = await this.rpc.syncAccount(repo.path);
+      const switched = accountDataKey(status) !== accountDataKey(this.snapshot.status);
+      this.applyStatus(status);
+      return switched;
+    } catch (error) {
+      if (isMethodNotFound(error)) this.syncSupported = false;
+      else logOutputChannel.warn(`[auth] account sync failed code=${authErrorCode(error) ?? 'unknown'}`);
+      return false;
+    }
   }
 
   private async loadAccountData(status: AuthStatus, reload: boolean): Promise<void> {
