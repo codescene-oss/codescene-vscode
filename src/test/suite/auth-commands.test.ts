@@ -3,7 +3,9 @@ import * as vscode from 'vscode';
 import {
   NOT_SIGNED_IN_MESSAGE,
   registerAuthCommands,
+  SIGN_IN_COMMAND,
   SIGN_IN_INACTIVE_MESSAGE,
+  SIGN_OUT_COMMAND,
   TOKEN_SIGN_OUT_MESSAGE,
 } from '../../auth/auth-commands';
 import { INACTIVE_SNAPSHOT, type AuthSnapshot } from '../../auth/auth-payload';
@@ -57,8 +59,8 @@ suite('auth commands', () => {
 
   test('every command explains the toggle while sign-in is inactive', async () => {
     const calls = register(INACTIVE_SNAPSHOT);
-    await run('codescene.signIn');
-    await run('codescene.signOut');
+    await run(SIGN_IN_COMMAND);
+    await run(SIGN_OUT_COMMAND);
     await run('codescene.openAccount');
     assert.deepStrictEqual(
       { calls, infos },
@@ -68,31 +70,31 @@ suite('auth commands', () => {
 
   test('sign-in shows the account view and starts a browser sign-in', async () => {
     const calls = register(active(authStatusFixture('signed-out')));
-    await run('codescene.signIn');
+    await run(SIGN_IN_COMMAND);
     assert.deepStrictEqual(calls, ['showAuthView', 'signIn']);
   });
 
   test('sign-in only shows the account view when already signed in', async () => {
     const calls = register(active(authStatusFixture('signed-in-oauth')));
-    await run('codescene.signIn');
+    await run(SIGN_IN_COMMAND);
     assert.deepStrictEqual(calls, ['showAuthView']);
   });
 
   test('sign-out signs out an OAuth session', async () => {
     const calls = register(active(authStatusFixture('signed-in-oauth')));
-    await run('codescene.signOut');
+    await run(SIGN_OUT_COMMAND);
     assert.deepStrictEqual(calls, ['signOut']);
   });
 
   test('sign-out explains how to remove a settings token', async () => {
     const calls = register(active(authStatusFixture('signed-in-setting-token-onprem')));
-    await run('codescene.signOut');
+    await run(SIGN_OUT_COMMAND);
     assert.deepStrictEqual({ calls, infos }, { calls: [], infos: [TOKEN_SIGN_OUT_MESSAGE] });
   });
 
   test('sign-out says when nobody is signed in', async () => {
     register(active(authStatusFixture('signed-out')));
-    await run('codescene.signOut');
+    await run(SIGN_OUT_COMMAND);
     assert.deepStrictEqual(infos, [NOT_SIGNED_IN_MESSAGE]);
   });
 

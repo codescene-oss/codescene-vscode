@@ -2,6 +2,8 @@ import vscode from 'vscode';
 import type { CredentialSource } from '../centralized-webview-framework/types/auth';
 import type { AuthService } from './auth-service';
 
+export const SIGN_IN_COMMAND = 'codescene.browserSignIn';
+export const SIGN_OUT_COMMAND = 'codescene.browserSignOut';
 export const SIGN_IN_CONTEXT_KEY = 'codescene.signInActive';
 export const SIGN_IN_INACTIVE_MESSAGE =
   'Browser sign-in is experimental. Turn on the codescene.experimental.signIn setting to use it.';
@@ -33,8 +35,8 @@ export function registerAuthCommands(service: CommandService, showAuthView: () =
   const whenActive = (action: () => unknown) => () =>
     service.current.active ? action() : vscode.window.showInformationMessage(SIGN_IN_INACTIVE_MESSAGE);
   return [
-    vscode.commands.registerCommand('codescene.signIn', whenActive(() => signIn(service, showAuthView))),
-    vscode.commands.registerCommand('codescene.signOut', whenActive(() => signOut(service))),
+    vscode.commands.registerCommand(SIGN_IN_COMMAND, whenActive(() => signIn(service, showAuthView))),
+    vscode.commands.registerCommand(SIGN_OUT_COMMAND, whenActive(() => signOut(service))),
     vscode.commands.registerCommand('codescene.openAccount', whenActive(showAuthView)),
   ];
 }

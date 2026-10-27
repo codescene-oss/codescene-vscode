@@ -3,7 +3,7 @@ import { CsExtensionState } from '../cs-extension-state';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
-import { registerAuthCommands, SIGN_IN_CONTEXT_KEY } from './auth-commands';
+import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
 import { registerAuthMessages, routeAuthMessage } from './auth-message-handler';
 import { AuthNotices } from './auth-notices';
 import { AuthPanel } from './auth-panel';
@@ -56,7 +56,7 @@ export function activateAuth(context: vscode.ExtensionContext, transport: AuthTr
   });
   const notices = new AuthNotices(context.globalState, {
     show: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
-    signIn: () => vscode.commands.executeCommand('codescene.signIn'),
+    signIn: () => vscode.commands.executeCommand(SIGN_IN_COMMAND),
   });
   const disposables: vscode.Disposable[] = [
     settings,
