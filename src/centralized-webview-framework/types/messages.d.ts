@@ -35,24 +35,7 @@ export type MessageToIDEType =
       payload: { userCompletedOnboarding: boolean };
     }
   | {
-      messageType: 'init-login';
-      payload: { type: 'cloud' | 'enterprise'; baseUrl: string };
-    }
-  | {
-      messageType: 'select-codescene-project';
-      payload: { id: number };
-    }
-  | {
-      messageType: 'skip-select-codescene-project';
-    }
-  | {
       messageType: 'open-home';
-    }
-  | {
-      messageType: 'open-login';
-    }
-  | {
-      messageType: 'open-select-codescene-project';
     }
   | {
       messageType: 'show-onboarding';
@@ -93,4 +76,16 @@ export type MessageToIDEType =
     }
   | {
       messageType: 'start-analysis';
-    };
+    }
+  | { messageType: 'open-auth' }
+  | { messageType: 'auth-sign-in' }
+  | { messageType: 'auth-open-browser-again' }
+  | { messageType: 'auth-cancel-sign-in' }
+  | { messageType: 'auth-sign-out' }
+  | { messageType: 'auth-retry' }
+  | { messageType: 'auth-select-account'; payload: { accountId: string } }
+  | { messageType: 'auth-link-project'; payload: { projectId: string | null } }
+  | { messageType: 'auth-set-access-token'; payload: { token: string } }
+  | { messageType: 'auth-remove-access-token' }
+  | { messageType: 'auth-open-server-setting' }
+  | { messageType: 'auth-open-pat-page' };

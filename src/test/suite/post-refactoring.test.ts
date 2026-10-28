@@ -63,7 +63,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
-        session: undefined,
+        auth: { active: false, status: null },
         features: {
           analysis: { state: 'enabled' },
           ace: { state: 'enabled' }

@@ -6,6 +6,5 @@ export type FeatureFlags =
   | 'onboarding'
   | 'open-settings'
   | 'onboarding-guide'
-  | 'sign-in'
-  | 'sign-in-enterprise'
-  | 'commit-baseline';
+  | 'commit-baseline'
+  | 'ide-auth';

@@ -7,10 +7,12 @@ import { CodeSmell } from '../../devtools-api/review-model';
 import Reviewer from '../../review/reviewer';
 import { CsReview } from '../../review/cs-review';
 import { DevtoolsAPI } from '../../devtools-api';
+import { CsExtensionState } from '../../cs-extension-state';
 
 let provider: ReviewCodeActionProvider;
 let mockReviewCache: any;
 let originalDevtoolsAPIInstance: any;
+const originalCsExtensionStateInstance = (CsExtensionState as any)._instance;
 
 function setupTestEnvironment() {
   provider = new ReviewCodeActionProvider();
@@ -34,9 +36,16 @@ function setupTestEnvironment() {
   (DevtoolsAPI as any).instance = {
     preflightJson: undefined
   };
+
+  (CsExtensionState as any)._instance = {
+    stateProperties: {
+      auth: { active: false, status: null }
+    }
+  };
 }
 
 function teardownTestEnvironment() {
+  (CsExtensionState as any)._instance = originalCsExtensionStateInstance;
   (DevtoolsAPI as any).instance = originalDevtoolsAPIInstance;
   vscode.window.setActiveEditor(undefined);
   mockReviewCache.reviewMap.clear();

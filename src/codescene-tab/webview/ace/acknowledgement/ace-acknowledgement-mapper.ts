@@ -4,7 +4,7 @@ import { CsExtensionState } from '../../../../cs-extension-state';
 import { RefactoringRequest } from '../../../../refactoring/request';
 import { getFileData } from '../ace-data-mapper';
 import { devmode } from '../../../../centralized-webview-framework/cwf-html-utils';
-import { getAuthToken } from '../../../../configuration';
+import { aceAvailable } from '../../../../devtools-api';
 
 export function getAceAcknowledgeData(request: RefactoringRequest): AceAcknowledgeContextViewProps {
   return {
@@ -23,7 +23,7 @@ export function getAutoRefactorConfig(): AutoRefactorConfig {
     return { disabled: true, activated: false, visible: false };
   }
 
-  const hasToken = !!getAuthToken()?.trim();
+  const hasToken = aceAvailable();
   const acknowledged = CsExtensionState.acknowledgedAceUsage === true;
   const activated = !(!acknowledged && hasToken);
 

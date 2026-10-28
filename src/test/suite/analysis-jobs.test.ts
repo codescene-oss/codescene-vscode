@@ -105,21 +105,31 @@ suite('analysisProgressTooltip', () => {
 });
 
 suite('getHomeData', () => {
-  test('forwards analysisState, totalCount and remainingCount', () => {
+  test('renders the home view as pro without a user or login flags', () => {
     const payload = getHomeData({
       fileDeltaData: [],
       jobs: [],
+      autoRefactor: undefined,
       showOnboarding: false,
       analysisState: 'running',
       totalCount: 11,
       remainingCount: 4,
-      signedIn: true,
-      user: { name: 'Ada' },
     });
-    assert.strictEqual(payload.view, 'home');
-    if (payload.view !== 'home') return;
-    assert.strictEqual(payload.data.analysisState, 'running');
-    assert.strictEqual(payload.data.totalCount, 11);
-    assert.strictEqual(payload.data.remainingCount, 4);
+    assert.deepStrictEqual(payload, {
+      ideType: 'VSCode',
+      view: 'home',
+      devmode: false,
+      pro: true,
+      featureFlags: ['jobs', 'open-settings'],
+      data: {
+        fileDeltaData: [],
+        jobs: [],
+        autoRefactor: undefined,
+        showOnboarding: false,
+        analysisState: 'running',
+        totalCount: 11,
+        remainingCount: 4,
+      },
+    });
   });
 });

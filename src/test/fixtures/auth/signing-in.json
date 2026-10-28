@@ -1,0 +1,17 @@
+{
+  "state": "signing-in",
+  "credential-source": null,
+  "env-token-present": false,
+  "server": { "url": "https://codescene.io", "onprem": false, "source": "default", "pat-url": "https://codescene.io/users/me/pat" },
+  "oauth-supported": true,
+  "user": null,
+  "account": null,
+  "license": null,
+  "ace-credential": false,
+  "expires-at": null,
+  "login": {
+    "login-id": "3f1c9a2e",
+    "authorize-url": "https://codescene.io/oauth2/auth?client_id=cs-ide&response_type=code&redirect_uri=http%3A%2F%2F127.0.0.1%3A19876%2Fcallback&code_challenge_method=S256&code_challenge=abc&state=xyz"
+  },
+  "error": null
+}

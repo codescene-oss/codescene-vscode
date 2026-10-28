@@ -1,0 +1,25 @@
+{
+  "status": {
+    "state": "signed-in",
+    "credential-source": "oauth",
+    "env-token-present": false,
+    "server": { "url": "https://codescene.io", "onprem": false, "source": "default", "pat-url": "https://codescene.io/users/me/pat" },
+    "oauth-supported": true,
+    "user": { "id": "1234", "name": "Ada Lovelace" },
+    "account": { "id": "42", "name": "Acme Corp" },
+    "license": { "pro": true },
+    "ace-credential": true,
+    "expires-at": 1792000000,
+    "login": null,
+    "error": null
+  },
+  "accounts": [
+    { "id": "42", "name": "Acme Corp", "signed-in-locally": true }
+  ],
+  "projects": [
+    { "id": "101", "name": "acme-backend" },
+    { "id": "102", "name": "acme-frontend" }
+  ],
+  "repo": { "path": "C:\\git\\acme-backend", "name": "acme-backend" },
+  "linked-project": { "id": "101", "name": "acme-backend" }
+}

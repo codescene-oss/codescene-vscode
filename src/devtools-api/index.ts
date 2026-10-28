@@ -5,7 +5,7 @@ import { FnToRefactor, RefactorResponse } from './refactor-models';
 import { basename, dirname } from 'path';
 import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
-import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
+import { isAceAvailable, refactorToken, resolveAceToken } from '../auth/ace-credential';
 import { ACE_ENABLED } from '../build-flags';
 import { getAuthToken, automaticAnalysisEnabled } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
@@ -16,7 +16,6 @@ import { Delta } from './delta-model';
 import { addRefactorableFunctionsToDeltaResult } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
-import { MissingAuthTokenError } from '../missing-auth-token-error';
 import { AbortError } from './abort-error';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
@@ -283,8 +282,8 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
-  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string): RefactorParams {
-    const payload: RefactorParams = { token };
+  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string | undefined): RefactorParams {
+    const payload: RefactorParams = token ? { token } : {};
     if (fnToRefactor['nippy-b64']) payload['fn-to-refactor-nippy-b64'] = fnToRefactor['nippy-b64'];
     else payload['fn-to-refactor'] = fnToRefactor;
     if (skipCache) payload['skip-cache'] = true;
@@ -316,10 +315,8 @@ export class DevtoolsAPI {
     if (!ACE_ENABLED) throw new Error('ACE is not available in this build');
   }
 
-  private static getRefactoringAuthToken(): string {
-    const token = getEffectiveToken();
-    if (!token) throw new MissingAuthTokenError();
-    return token;
+  private static getRefactoringAuthToken(): string | undefined {
+    return refactorToken(aceToken(), CsExtensionState.stateProperties.auth);
   }
 
   private static logRefactorRequested(fnToRefactor: FnToRefactor, skipCache: boolean): void {
@@ -412,16 +409,12 @@ function validateFileParts(operation: string, fp: FileParts, document: vscode.Te
   return true;
 }
 
-export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
-  return (x as CodeSceneAuthenticationSession).url !== undefined;
+export function aceToken(): string | undefined {
+  return resolveAceToken(getAuthToken(), CsExtensionState.stateProperties.legacySession?.accessToken);
 }
 
-export function getEffectiveToken(): string | undefined {
-  const configToken = getAuthToken();
-  const session = CsExtensionState.stateProperties.session;
-  const sessionToken = session && isCodeSceneSession(session) ? session.accessToken : undefined;
-  const token = configToken || sessionToken;
-  return token?.trim() ? token : undefined;
+export function aceAvailable(): boolean {
+  return isAceAvailable(aceToken(), CsExtensionState.stateProperties.auth);
 }
 
 export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
