@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793178878962,
+  "lastUpdate": 1793203974827,
   "repoUrl": "https://github.com/codescene-oss/codescene-vscode",
   "entries": {
     "Review pipeline": [
@@ -13030,6 +13030,324 @@ window.BENCHMARK_DATA = {
           {
             "name": "git-checkout-branch / peak memory",
             "value": 524.94,
+            "unit": "MB",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "martin.safsten@codescene.com",
+            "name": "Martin Säfsten",
+            "username": "martinsafsten-codescene"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d77ade96c5fe5ee97c5b24e41c31fdbf9a3ea5f8",
+          "message": "ci: adopt the MCP server's tag-driven release flow (#385)\n\n* chore: retire the changelog and version tooling\n\nRelease notes now live on GitHub Releases, and the tag-driven flow records\nthe released version itself, so the bump-and-changelog tooling has no job\nleft. Remove CHANGELOG.md, .versionrc.json, the commit-and-tag-version dev\ndependency (the lockfile loses only it and entries used solely by it) and\nthe release:patch|minor|major scripts. release:test and the Makefile\ntest-release target are unchanged. Both READMEs gain a Release notes\nsection before Configuration that links to the GitHub Releases page.\n\nThe A2 check packaged a VSIX without CHANGELOG.md (win32/x64, local run):\n  CI=true CS_IDE_USE_LOCAL_DISTRIBUTION=true GITHUB_TOKEN=$(gh auth token) \\\n    node ./scripts/package-platform.js win32 x64\n  with npm_config_script_shell pointing at Git bash, because the\n  vscode:prepublish script uses POSIX NODE_ENV=... syntax.\nPackaging succeeded: unzip -l lists no CHANGELOG.md,\nextension/out/.cs-prod-build is present (CI=true makes esbuild write the\nmarker), and extension/package.json reports version 0.29.2. The produced\nVSIX was removed afterwards.\n\n* ci: release from a pushed tag with publish, version commit and promotion\n\nThe tag is now the only human action. Pushing vX.Y.Z creates a not-latest\nGitHub Release with label-categorised generated notes, builds and attaches\nall ten VSIXs, requires a green test run on the tagged commit, publishes\nthe full variant to the VS Code Marketplace over Azure OIDC and both\nvariants to Open VSX, records the released version on main as a bot\ncommit, and only then promotes the release to latest. Test tags still\nproduce prereleases that never publish or touch main. A workflow_dispatch\nwith a tag completes whatever a failed run left, skipping what already\nexists.\n\nThe Azure login from a tag ref was proven by a dry-run dispatch before the\npublish job moved into this workflow, so publish-release.yml is removed.\nThe release helper in scripts/release-flow.js holds the tag classification,\nversion comparison and idempotency logic so it is unit tested.\n\nscripts/migrate-changelog-to-releases.js copies the CHANGELOG.md history\ninto the existing stable release bodies under a marked block. It is a dry\nrun unless --apply is passed, reports sections without a release and never\ncreates releases. RELEASING.md describes the new procedure.",
+          "timestamp": "2026-10-28T17:01:27+01:00",
+          "tree_id": "5ee88f662850549bc00cd189fa967f43feace87b",
+          "url": "https://github.com/codescene-oss/codescene-vscode/commit/d77ade96c5fe5ee97c5b24e41c31fdbf9a3ea5f8"
+        },
+        "date": 1793203972972,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "review-10-files / wall time",
+            "value": 110,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / p95 file latency",
+            "value": 110,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli busy time",
+            "value": 2117,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli cpu time",
+            "value": 120,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / extension cpu time",
+            "value": 50,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / peak memory",
+            "value": 528.41,
+            "unit": "MB",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / wall time",
+            "value": 436,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / p95 file latency",
+            "value": 410,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli busy time",
+            "value": 2455,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli cpu time",
+            "value": 1130,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / extension cpu time",
+            "value": 110,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / peak memory",
+            "value": 561.36,
+            "unit": "MB",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / wall time",
+            "value": 906,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / p95 file latency",
+            "value": 808,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli busy time",
+            "value": 2915,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli cpu time",
+            "value": 2590,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / extension cpu time",
+            "value": 210,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / peak memory",
+            "value": 650.13,
+            "unit": "MB",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / wall time",
+            "value": 2609,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / p95 file latency",
+            "value": 2609,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli busy time",
+            "value": 4618,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli cpu time",
+            "value": 2580,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / extension cpu time",
+            "value": 90,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / peak memory",
+            "value": 681.16,
+            "unit": "MB",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / wall time",
+            "value": 1575,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / p95 file latency",
+            "value": 1572,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli busy time",
+            "value": 6616,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli cpu time",
+            "value": 1090,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / extension cpu time",
+            "value": 120,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / peak memory",
+            "value": 538.68,
+            "unit": "MB",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / wall time",
+            "value": 30557,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / p95 file latency",
+            "value": 30553,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli busy time",
+            "value": 60434,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli cpu time",
+            "value": 370,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / extension cpu time",
+            "value": 1070,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / peak memory",
+            "value": 530.98,
+            "unit": "MB",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / wall time",
+            "value": 30409,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / p95 file latency",
+            "value": 30404,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli busy time",
+            "value": 60212,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli cpu time",
+            "value": 390,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / extension cpu time",
+            "value": 1000,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / peak memory",
+            "value": 520.61,
             "unit": "MB",
             "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
           },
