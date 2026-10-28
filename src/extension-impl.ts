@@ -3,7 +3,6 @@ import { activateAuth } from './auth/auth-feature';
 import { readLegacySession } from './auth/legacy-session';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { register as registerCHRulesCommands } from './code-health-rules';
-import { CodeSceneTabPanel } from './codescene-tab/webview-panel';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
 import { DevtoolsAPI } from './devtools-api';
@@ -172,7 +171,6 @@ function registerExtensionUi(context: vscode.ExtensionContext) {
 
   CsDiagnostics.init(context);
   loadLegacySession(context);
-  refreshTabOnAuthTokenChange(context);
   registerCommands(context);
   registerCsDocProvider(context);
   activateCHMonitor(context);
@@ -327,12 +325,6 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
 
 function loadLegacySession(context: vscode.ExtensionContext) {
   void readLegacySession(context.secrets).then((session) => CsExtensionState.setLegacySession(session));
-}
-
-function refreshTabOnAuthTokenChange(context: vscode.ExtensionContext) {
-  const disposable = onDidChangeConfiguration('authToken', () => CodeSceneTabPanel.refreshIfExists());
-  DISPOSABLES.push(disposable);
-  context.subscriptions.push(disposable);
 }
 
 // This method is called when your extension is deactivated

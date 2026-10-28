@@ -1,9 +1,12 @@
 import { BenchmarkAdapter, delay, GIT_OBSERVE_QUIESCENCE, WATCH_DRAIN_MS, WATCH_QUIESCENCE } from './adapter';
+import { encodingHelperDir, jellyfinFixtureFile, readPinnedEncodingHelper } from './encoding-helper';
 import { FixtureFile, FixtureRepo } from './fixture-repo';
+import { CompatibilityCheck, compatibilityFailures, ReviewFingerprint } from './review-fingerprint';
 
 const WATCH_FILE_COUNT = 20;
 const BIG_FILE_METHOD_COUNT = 40;
 const ITERATIONS = 3;
+const JELLYFIN_ITERATIONS = 5;
 
 /**
  * Both architectures cache reviews by content, and scenarios draw from the same head of the file
@@ -24,12 +27,14 @@ export interface ScenarioContext {
 export interface ScenarioResult {
   fileCount: number;
   latencies: number[];
+  review?: ReviewFingerprint;
 }
 
 export interface Scenario {
   id: string;
   description: string;
   iterations: number;
+  warmup?(context: ScenarioContext): Promise<CompatibilityCheck | void>;
   setup(context: ScenarioContext, iteration: number): Promise<void>;
   run(context: ScenarioContext): Promise<ScenarioResult>;
   teardown(context: ScenarioContext): Promise<void>;
@@ -162,14 +167,82 @@ export function gitCheckoutBranchScenario(): Scenario {
   };
 }
 
-export function benchmarkScenarios(): Scenario[] {
+function csharpJellyfinEncodingHelperScenario(): Scenario {
+  let pinned: string | undefined;
+  const load = async () => {
+    pinned ??= await readPinnedEncodingHelper(encodingHelperDir());
+    return pinned;
+  };
+  let files: FixtureFile[] = [];
+  return {
+    id: 'csharp-jellyfin-encoding-helper',
+    description: 'Review the pinned Jellyfin EncodingHelper.cs dirty buffer',
+    iterations: JELLYFIN_ITERATIONS,
+    warmup: async (context) => {
+      const review = await submitJellyfin(context, jellyfinFixtureFile(await load(), 'exact'));
+      return {
+        score: review?.score,
+        issueCategories: review?.issueCategories ?? [],
+        failures: compatibilityFailures(review),
+      };
+    },
+    setup: async (context, iteration) => {
+      if (!context.repo) throw new Error('Jellyfin scenario requires a fixture repo');
+      files = [jellyfinFixtureFile(await load(), iteration)];
+    },
+    run: async (context) => {
+      const review = await submitJellyfin(context, files[0]);
+      return { fileCount: files.length, latencies: context.adapter.latencies(), review };
+    },
+    teardown: noTeardown,
+  };
+}
+
+async function submitJellyfin(context: ScenarioContext, file: FixtureFile): Promise<ReviewFingerprint | undefined> {
+  context.adapter.beginMeasurement();
+  await context.adapter.enqueue(context.repo.root, [file]);
+  await context.adapter.waitForQuiescence();
+  return context.adapter.reviewFingerprint();
+}
+
+function coreReviewScenarios(): Scenario[] {
+  return [reviewFilesScenario(10), reviewFilesScenario(100), reviewFilesScenario(200), bigSmellyFileScenario()];
+}
+
+function analysisBenchmarkScenarios(): Scenario[] {
+  return [...coreReviewScenarios(), csharpJellyfinEncodingHelperScenario()];
+}
+
+function everyScenario(): Scenario[] {
   return [
-    reviewFilesScenario(10),
-    reviewFilesScenario(100),
-    reviewFilesScenario(200),
-    bigSmellyFileScenario(),
+    ...analysisBenchmarkScenarios(),
     largeRepoWatchScenario(),
     gitStashPopScenario(),
     gitCheckoutBranchScenario(),
   ];
+}
+
+export function benchmarkScenarios(): Scenario[] {
+  return [
+    ...coreReviewScenarios(),
+    largeRepoWatchScenario(),
+    gitStashPopScenario(),
+    gitCheckoutBranchScenario(),
+  ];
+}
+
+export function selectedBenchmarkScenarios(env: NodeJS.ProcessEnv = process.env): Scenario[] {
+  const requested = env.CS_BENCH_SCENARIOS?.split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  if (requested && requested.length > 0) {
+    const available = new Map(everyScenario().map((scenario) => [scenario.id, scenario]));
+    return requested.map((id) => {
+      const scenario = available.get(id);
+      if (!scenario) throw new Error(`Unknown benchmark scenario ${id}`);
+      return scenario;
+    });
+  }
+  if (env.CS_BENCH_ANALYSIS_ONLY === '1') return analysisBenchmarkScenarios();
+  return benchmarkScenarios();
 }

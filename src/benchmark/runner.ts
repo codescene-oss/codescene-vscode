@@ -1,7 +1,8 @@
 import * as os from 'os';
 import * as path from 'path';
-import { ProcessMetrics } from './process-metrics';
+import { ResourceSample } from './process-metrics';
 import { BenchmarkEnvironment, Measurement, measurementOf, medianMeasurement, ScenarioReport } from './report';
+import { ReviewFingerprint } from './review-fingerprint';
 import { Scenario, ScenarioContext } from './scenarios';
 
 export function outputDir(): string {
@@ -25,9 +26,11 @@ export function environmentInfo(): BenchmarkEnvironment {
 export async function runScenario(
   scenario: Scenario,
   context: ScenarioContext,
-  metrics: ProcessMetrics
+  metrics: { start(): Promise<void>; stop(): Promise<ResourceSample> }
 ): Promise<ScenarioReport> {
+  const compatibility = await scenario.warmup?.(context);
   const iterations: Measurement[] = [];
+  const reviews: ReviewFingerprint[] = [];
   let fileCount = 0;
   const iterationCount = iterationsFor(scenario);
   for (let iteration = 0; iteration < iterationCount; iteration++) {
@@ -38,6 +41,7 @@ export async function runScenario(
     await scenario.teardown(context);
     fileCount = result.fileCount;
     iterations.push(measurementOf(sample, result));
+    if (result.review) reviews.push(result.review);
   }
   return {
     id: scenario.id,
@@ -45,5 +49,7 @@ export async function runScenario(
     fileCount,
     iterations,
     median: medianMeasurement(iterations),
+    ...(compatibility ? { compatibility } : {}),
+    ...(reviews.length > 0 ? { reviews } : {}),
   };
 }

@@ -1,4 +1,5 @@
 import { FixtureFile } from './fixture-repo';
+import { ReviewFingerprint } from './review-fingerprint';
 
 export interface QuiescenceOptions {
   settleMs: number;
@@ -50,4 +51,5 @@ export interface BenchmarkAdapter {
   unwatch(repoRoot: string): Promise<void>;
   waitForQuiescence(options?: QuiescenceOptions): Promise<void>;
   latencies(): number[];
+  reviewFingerprint(): ReviewFingerprint | undefined;
 }
