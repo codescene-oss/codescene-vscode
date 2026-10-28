@@ -185,7 +185,7 @@
   "scripts": {
     "prepare": "husky",
     "vscode:prepublish": "npm run package",
-    "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
+    "prepackage": "npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
     "bundle-cli": "node ./scripts/bundle-cli.js",
     "package-platform": "node ./scripts/package-platform.js",
@@ -202,8 +202,7 @@
     "benchmark": "mocha --config .mocharc.bench.json",
     "test:coverage": "c8 npm run test",
     "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
-    "updatedocs": "fetch-github-release empear-analytics codescene-ide-protocol",
-    "updatecwf": "fetch-github-release empear-analytics cs-webview ./cs-cwf",
+    "updatecwf": "node scripts/update-cwf.js",
     "release:test": "node ./scripts/create-test-release.js",
     "release:minor": "commit-and-tag-version --release-as minor",
     "release:patch": "commit-and-tag-version --release-as patch",
@@ -215,7 +214,6 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
-    "@terascope/fetch-github-release": "^2.3.2",
     "@types/follow-redirects": "^1.14.1",
     "@types/mocha": "^10.0.1",
     "@types/node": "22.19.21",

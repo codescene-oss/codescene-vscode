@@ -165,7 +165,3 @@ export function toDocsParams(
 ): InteractiveDocsParams {
   return { issueInfo: { category, position, fnName: fnToRefactor?.name }, document, fnToRefactor };
 }
-
-export function categoryToDocsCode(issueCategory: string) {
-  return issueCategory.replace(/ /g, '-').replace(/,/g, '').toLowerCase();
-}

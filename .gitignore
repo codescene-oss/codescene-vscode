@@ -14,6 +14,7 @@ cs-win32-*
 cs-ide-*
 cs-cwf/
 *.zip
+!src/test/fixtures/*.zip
 .idea/
 test-git-repo/
 test-git-repo-diff-utils/

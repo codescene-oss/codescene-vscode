@@ -35,24 +35,28 @@ function cleanupOtherBinaries(targetPlatform, targetArch) {
   }
 }
 
+function applyVscodeIgnoreExceptions(content, targetBinary) {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.replace(/!cs-.*\r?\n/g, '').split(/\r?\n/);
+  const exceptions = ['!cs-cwf/', '!cs-cwf/**', `!${targetBinary}/`, `!${targetBinary}/**`];
+  const zipLineIndex = lines.findIndex(line => line.trim() === '*.zip');
+
+  if (zipLineIndex >= 0) {
+    lines.splice(zipLineIndex + 1, 0, ...exceptions);
+  } else {
+    lines.push(...exceptions);
+  }
+
+  return lines.join(eol);
+}
+
 function updateVscodeIgnore(targetPlatform, targetArch, originalContent) {
   const vscodeIgnorePath = path.join(__dirname, '..', '.vscodeignore');
   const targetBinary = `cs-${targetPlatform}-${targetArch}`;
 
-  let content = originalContent || fs.readFileSync(vscodeIgnorePath, 'utf8');
+  const content = originalContent || fs.readFileSync(vscodeIgnorePath, 'utf8');
 
-  content = content.replace(/!cs-.*\n/g, '');
-
-  const lines = content.split('\n');
-  const zipLineIndex = lines.findIndex(line => line.trim() === '*.zip');
-
-  if (zipLineIndex >= 0) {
-    lines.splice(zipLineIndex + 1, 0, `!${targetBinary}/`, `!${targetBinary}/**`);
-  } else {
-    lines.push(`!${targetBinary}/`, `!${targetBinary}/**`);
-  }
-
-  fs.writeFileSync(vscodeIgnorePath, lines.join('\n'));
+  fs.writeFileSync(vscodeIgnorePath, applyVscodeIgnoreExceptions(content, targetBinary));
   console.log(`Updated .vscodeignore to include only: ${targetBinary}`);
 
   return content;
@@ -69,7 +73,6 @@ function refreshAssets(tokenEnv) {
     console.log('Skipping remote asset refresh for local distribution packaging.');
     return;
   }
-  execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
   execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
 }
 
@@ -90,7 +93,7 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   console.log('\nStep 3: Updating .vscodeignore...');
   updateVscodeIgnore(platform, arch, originalVscodeIgnore);
 
-  console.log('\nStep 4: Updating docs and webview...');
+  console.log('\nStep 4: Updating webview...');
   const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
   refreshAssets(tokenEnv);
 
@@ -160,4 +163,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { cleanupOtherBinaries, updateVscodeIgnore };
+module.exports = { cleanupOtherBinaries, updateVscodeIgnore, applyVscodeIgnoreExceptions };
