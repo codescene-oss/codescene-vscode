@@ -1,10 +1,13 @@
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
 import vscode from 'vscode';
-import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
+import { CsIdeServerClient, ServerMetadata } from '../../devtools-api/ide-server-client';
 import { ReviewPipeline } from '../../review/review-pipeline';
 import { ensureBinary } from '../../test/integration_helper';
 import { BenchmarkAdapter, DEFAULT_QUIESCENCE, delay, QuiescenceOptions } from '../adapter';
+import { resolveBenchBinary } from '../bench-binary';
 import { FixtureFile } from '../fixture-repo';
+import { fingerprintOf, ReviewFingerprint } from '../review-fingerprint';
 import { diskFileAccess, documentFor, silentPresentation } from './pipeline-plumbing';
 
 const POLL_INTERVAL_MS = 100;
@@ -18,16 +21,24 @@ export class IdeServerAdapter implements BenchmarkAdapter {
   private lastEventAt = 0;
   private eventCount = 0;
   private reviewLatencies: number[] = [];
+  private fingerprints: ReviewFingerprint[] = [];
+  private metadata?: ServerMetadata;
 
   async start(): Promise<void> {
-    const binaryPath = await ensureBinary();
-    const client = CsIdeServerClient.fromDistribution(binaryPath);
+    const launch = resolveBenchBinary(process.env, fs.existsSync);
+    const client = launch
+      ? new CsIdeServerClient(launch.binaryPath, launch.args)
+      : CsIdeServerClient.fromDistribution(await ensureBinary());
     this.disposables.push(
-      client.onDidReview(() => this.markEvent(true)),
+      client.onDidReview((event) => {
+        this.markEvent(true);
+        this.fingerprints.push(fingerprintOf(event.result));
+      }),
       client.onDidDelta(() => this.markEvent(false)),
       client.onDidReviewFailed(() => this.markEvent(false))
     );
-    await client.start();
+    const started = await client.start();
+    this.metadata = { sha: started.sha, version: started.version };
     this.client = client;
     this.pipeline = new ReviewPipeline(client, silentPresentation(), () => randomUUID(), diskFileAccess());
   }
@@ -50,6 +61,15 @@ export class IdeServerAdapter implements BenchmarkAdapter {
     this.measurementStart = Date.now();
     this.lastEventAt = this.measurementStart;
     this.reviewLatencies = [];
+    this.fingerprints = [];
+  }
+
+  reviewFingerprint(): ReviewFingerprint | undefined {
+    return this.fingerprints.at(-1);
+  }
+
+  serverMetadata(): ServerMetadata | undefined {
+    return this.metadata;
   }
 
   async enqueue(repoRoot: string, files: FixtureFile[]): Promise<void> {

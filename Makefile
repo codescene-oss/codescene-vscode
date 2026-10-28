@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest test-release updatedocs updatecwf benchmark
+.PHONY: build package tsc clean lint watch test pretest test-release updatedocs updatecwf benchmark benchmark-isolated
 
 .DEFAULT_GOAL := build
 
@@ -35,6 +35,11 @@ test: pretest
 # Performance benchmarks. Add "ITERATIONS=n" to override the per scenario iteration count.
 benchmark: pretest
 	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )npm run benchmark
+
+# Fresh Node process and cs-ide server per side, repeated CS_BENCH_ROUNDS times (default 3).
+# Requires CS_BENCH_BEFORE_BIN and CS_BENCH_AFTER_BIN.
+benchmark-isolated: pretest
+	node scripts/isolated-benchmark.js
 
 # Runs just one test.
 # Example: make test1 TEST='workspace-watch'
