@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793203974827,
+  "lastUpdate": 1793204170642,
   "repoUrl": "https://github.com/codescene-oss/codescene-vscode",
   "entries": {
     "Review pipeline": [
@@ -13348,6 +13348,324 @@ window.BENCHMARK_DATA = {
           {
             "name": "git-checkout-branch / peak memory",
             "value": 520.61,
+            "unit": "MB",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "martin.safsten@codescene.com",
+            "name": "Martin Säfsten",
+            "username": "martinsafsten-codescene"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "00442878c1a27a7eb3f0094e6ea8d62051dc6843",
+          "message": "feat(auth): add browser sign-in behind an experimental toggle (#381)\n\n* feat(auth): add CWF auth types and cs-ide auth contract fixtures\n\nThe sign-in UI from cs-webview sends 12 new messages and reads a\ntop-level auth payload. The extension needs the same types, and its\nAuthService tests share the contract fixtures used by cs-ide and CWF.\n\nRefs: CS-11463\n\n* feat(auth): expose cs-ide auth capability, status notifications and requests\n\nAuthService needs the auth-v1 capability from cs-ide/start, the\nauthStatusChanged notification and a generic request entry point. Auth\nrequests log only server URL, token presence, state and error code, and\nstderr and request errors are redacted so tokens never reach the log.\n\nRefs: CS-11463\n\n* feat(auth): add typed wrappers for the cs-ide auth and project requests\n\nAuthRpc keeps method names and kebab-case params in one place, and\nAuthTransport is the seam that lets AuthService be tested without a\ncs-ide process.\n\nRefs: CS-11463\n\n* feat(auth): add sign-in toggle, server URL setting and PAT description\n\nBrowser sign-in ships behind codescene.experimental.signIn. The server\nURL is sent to cs-ide, and codescene.authToken becomes the general PAT\nfallback; its storage stays the same.\n\nRefs: CS-11463\n\n* feat(auth): add AuthService activation, configuration and status tracking\n\nThe service is active only when cs-ide reports auth-v1 and the toggle\nis on. It sends auth-configure on start, on setting changes and after\nevery cs-ide restart, and publishes the status it returns, including\nthe invalid-token warning when cs-ide skips a rejected setting token.\nWith the toggle off it never calls auth-configure, so cs-ide stays in\ntoday's behaviour. Switching the toggle off at runtime restarts cs-ide,\nbecause only a fresh process is not opted in.\n\nRefs: CS-11463\n\n* fix(auth): skip auth-status when sign-in is inactive\n\nretry() must respect the same enabled gate as applyStatus so an\ninactive service never issues cs-ide auth RPCs.\n\nRefs: CS-11463\n\n* feat(auth): add sign-in actions, account and project loading to AuthService\n\nThe service opens authorize URLs from auth-login and from select-account\nresults that carry a login. It loads accounts, projects and the repo's\nproject link when signed in, and it writes the PAT setting so the\nsettings listener configures cs-ide again.\n\nRefs: CS-11463\n\n* refactor(home): remove the old CWF login flow and sign-in flags\n\nCWF replaced the login view and the sign-in flags with the ide-auth\nflag and a separate auth view. ignoreSessionStateFeatureFlag kept the\nhome view permanently pro, so dropping the login state keeps the\ncurrent behaviour.\n\nRefs: CS-11463\n\n* refactor(auth): replace the PAT-redirect provider with one ACE availability rule\n\nThe old provider was hidden behind ENABLE_AUTH_COMMANDS. Its stored session\nis now read once and kept as an ACE and telemetry fallback. ACE is available\nwhen a token exists (the token setting, else the legacy session token) or\nwhen browser sign-in is active and cs-ide reports ace-credential. Any\nexisting token is still sent explicitly, so on-prem users keep their Cloud\nACE token.\n\nRefs: CS-11463\n\n* fix(auth): restore the activation log text\n\nThe activation log line must keep the original gear emoji so the Output\nchannel shows the intended message instead of mojibake from a bad\nUTF-8 round-trip.\n\nSplit the closing braces in ace-acknowledgement-mapper.test.ts to\nmatch the rest of the suite.\n\nRefs: CS-11463\n\n* feat(auth): push the auth payload and ide-auth flag to every CWF view\n\nEvery initial ideContext and update-renderer message now goes through one seam\nthat adds the cs-ide auth payload while browser sign-in is active. Each open\nview re-renders when the payload changes.\n\nRefs: CS-11463\n\n* feat(auth): handle CWF auth messages and add the CodeScene account panel\n\nAll 12 contract messages map to AuthService actions in one table, and every\nCWF view routes them. The auth view has no back button, so it opens in its\nown editor panel that closes when browser sign-in turns inactive.\n\nRefs: CS-11463\n\n* test(review): initialize extension state for code action tests\n\nCode actions call aceAvailable(), which reads CsExtensionState.stateProperties via\n_instance. Initialize a minimal mock in setup and restore the previous instance in\nteardown so the disable-action suite can run without activating the extension.\n\nRefs: CS-11463\n\n* feat(auth): add sign-in commands, notices and activation wiring\n\nSign in, Sign out and Open CodeScene account appear in the palette only\nwhile browser sign-in is active. One dismissable nudge invites signed-out\nusers to sign in; it is the only auth notification, and other problems\nsuch as a rejected settings token show in the CWF auth view.\n\nRefs: CS-11463\n\n* fix(auth): configure cs-ide after a failed first start\n\nAuthService only configured cs-ide from the awaited start() or from\nrestart events. The client counts a start only after a successful\ncs-ide/start, so when the first start rejects, a later successful start\nis reported with restart false and was ignored. Auth-configure then\nnever ran, and browser sign-in stayed disabled for the whole session.\n\nTrack whether a server start has been handled and accept a start event\nwhen it is a restart or no start was handled yet. The flag is set\nsynchronously so the awaited path and the event path configure once.\n\nRefs: CS-11463\n\n* fix(auth): avoid command ids owned by the CodeScene MCP extension\n\ncodescene.signIn and codescene.signOut are registered by the\nCodeScene MCP extension. Registering them again aborts activation.\n\nRefs: CS-11463\n\n* feat(auth): switch to the account that owns the repository\n\nAfter sign-in and when another repository is selected, ask cs-ide to move\nthe session to the account that owns the repository's projects, so the\nproject opens in the right account. An account the user picks by hand is\nleft alone until the next sign-in or repository change.\n\ncs-ide builds without cs-ide/auth-sync-account answer method-not-found;\nthe extension then stops asking until cs-ide restarts.\n\nRefs: CS-11463\n\n* chore: bump IDE CLI to 1.0.81\n\n* chore: bump IDE CLI to 1.0.82\n\nRequests the repository projects with a real path separator, so the\nautomatic account switch can find the account that owns a repository.\n\nRefs: CS-11463",
+          "timestamp": "2026-10-28T17:04:48+01:00",
+          "tree_id": "e108e34bb06597a8e1f19bb7d8c58f05e8844934",
+          "url": "https://github.com/codescene-oss/codescene-vscode/commit/00442878c1a27a7eb3f0094e6ea8d62051dc6843"
+        },
+        "date": 1793204169675,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "review-10-files / wall time",
+            "value": 111,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / p95 file latency",
+            "value": 111,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli busy time",
+            "value": 2121,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli cpu time",
+            "value": 120,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / extension cpu time",
+            "value": 50,
+            "unit": "ms",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / peak memory",
+            "value": 528.31,
+            "unit": "MB",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-10-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 10 modified files submitted as dirty buffers (10 files, 10 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / wall time",
+            "value": 423,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / p95 file latency",
+            "value": 400,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli busy time",
+            "value": 2440,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli cpu time",
+            "value": 1090,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / extension cpu time",
+            "value": 110,
+            "unit": "ms",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / peak memory",
+            "value": 559.85,
+            "unit": "MB",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-100-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 100 modified files submitted as dirty buffers (100 files, 100 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / wall time",
+            "value": 900,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / p95 file latency",
+            "value": 815,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli busy time",
+            "value": 2909,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli cpu time",
+            "value": 2490,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / extension cpu time",
+            "value": 220,
+            "unit": "ms",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / peak memory",
+            "value": 578.37,
+            "unit": "MB",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "review-200-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review 200 modified files submitted as dirty buffers (200 files, 200 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / wall time",
+            "value": 2493,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / p95 file latency",
+            "value": 2493,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli busy time",
+            "value": 4508,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli cpu time",
+            "value": 2470,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / extension cpu time",
+            "value": 80,
+            "unit": "ms",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / peak memory",
+            "value": 682.9,
+            "unit": "MB",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "big-smelly-file / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Review the largest source file with 40 injected code smells (1 files, 1 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / wall time",
+            "value": 1563,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / p95 file latency",
+            "value": 1561,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli busy time",
+            "value": 6612,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli cpu time",
+            "value": 1100,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / extension cpu time",
+            "value": 120,
+            "unit": "ms",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / peak memory",
+            "value": 538.56,
+            "unit": "MB",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "large-repo-watch-20-files / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Cold watch start on a large repository with a 20 file change set (20 files, 20 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / wall time",
+            "value": 30584,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / p95 file latency",
+            "value": 30578,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli busy time",
+            "value": 60494,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli cpu time",
+            "value": 350,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / extension cpu time",
+            "value": 950,
+            "unit": "ms",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / peak memory",
+            "value": 533.33,
+            "unit": "MB",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-stash-pop / cli processes",
+            "value": 1,
+            "unit": "count",
+            "extra": "Stash and pop a 20 file working tree change set while watching (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / wall time",
+            "value": 30353,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / p95 file latency",
+            "value": 30346,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli busy time",
+            "value": 60154,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / cli cpu time",
+            "value": 370,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / extension cpu time",
+            "value": 750,
+            "unit": "ms",
+            "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
+          },
+          {
+            "name": "git-checkout-branch / peak memory",
+            "value": 525.97,
             "unit": "MB",
             "extra": "Check out the baseline branch and back while watching a 20 file change set (20 files, 40 results delivered, median of 3)"
           },
