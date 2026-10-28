@@ -1,4 +1,4 @@
-.PHONY: build package tsc clean lint watch test pretest test-release updatedocs updatecwf benchmark
+.PHONY: build package tsc clean lint watch test pretest test-release updatecwf benchmark
 
 .DEFAULT_GOAL := build
 
@@ -48,9 +48,6 @@ endif
 
 test-release:
 	npm run release:test -- $(if $(BUMP),$(BUMP),patch)
-
-updatedocs:
-	npm run updatedocs
 
 updatecwf:
 	node ./scripts/update-cwf.js

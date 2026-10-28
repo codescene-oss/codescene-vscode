@@ -73,7 +73,7 @@ $env:CS_IDE_USE_LOCAL_DISTRIBUTION = 'true'
 npm run bundle-cli-test
 ```
 
-With that flag set, `scripts/bundle-cli.js` validates the local directory and does **not** download. `scripts/package-platform.js` also skips remote docs/webview refresh when packaging.
+With that flag set, `scripts/bundle-cli.js` validates the local directory and does **not** download. `scripts/package-platform.js` also skips remote webview refresh when packaging.
 
 3. If your local build's SHA differs from `scripts/cli-config.js` (`requiredDevtoolsVersion`), override the runtime check.
 
@@ -341,7 +341,7 @@ nvm use 20
 **Check:**
 1. Node.js version is 20+
 2. Dependencies are installed: `npm ci`
-3. GITHUB_TOKEN is set (if needed for docs/webview updates):
+3. GITHUB_TOKEN is set (if needed for webview updates):
    ```bash
    export GITHUB_TOKEN=your_token_here
    ```
