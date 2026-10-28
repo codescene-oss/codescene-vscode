@@ -24,7 +24,6 @@ cs-*
 Makefile
 commitlint.config.js
 .github/**
-.versionrc.json
 .codescene/
 .c8rc.json
 .nvmrc
