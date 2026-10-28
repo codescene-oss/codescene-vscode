@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ResourceSample } from './process-metrics';
+import { CompatibilityCheck, ReviewFingerprint } from './review-fingerprint';
 import { ScenarioResult } from './scenarios';
 
 export interface Measurement {
@@ -20,6 +21,8 @@ export interface ScenarioReport {
   fileCount: number;
   iterations: Measurement[];
   median: Measurement;
+  reviews?: ReviewFingerprint[];
+  compatibility?: CompatibilityCheck;
 }
 
 export interface BenchmarkEnvironment {
@@ -31,9 +34,20 @@ export interface BenchmarkEnvironment {
 
 export interface BenchmarkReport {
   adapter: string;
+  label?: string;
+  server?: { sha: string; version: string };
   createdAt: string;
   environment: BenchmarkEnvironment;
   scenarios: ScenarioReport[];
+}
+
+const labelPattern = /^[A-Za-z0-9._-]+$/;
+
+export function benchmarkLabel(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const label = env.CS_BENCH_LABEL;
+  if (!label) return undefined;
+  if (!labelPattern.test(label)) throw new Error(`CS_BENCH_LABEL must be a single file name, got ${label}`);
+  return label;
 }
 
 export interface BenchmarkEntry {
@@ -108,5 +122,6 @@ export function benchmarkEntries(report: BenchmarkReport): BenchmarkEntry[] {
 export function writeReport(report: BenchmarkReport, outputDir: string): void {
   fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(path.join(outputDir, 'benchmark-results.json'), `${JSON.stringify(benchmarkEntries(report), null, 2)}\n`);
-  fs.writeFileSync(path.join(outputDir, `${report.adapter}.json`), `${JSON.stringify(report, null, 2)}\n`);
+  const reportName = report.label ? `${report.label}.json` : `${report.adapter}.json`;
+  fs.writeFileSync(path.join(outputDir, reportName), `${JSON.stringify(report, null, 2)}\n`);
 }
