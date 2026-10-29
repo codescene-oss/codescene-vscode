@@ -18,6 +18,10 @@ function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
+function toLf(str: string): string {
+  return str.replace(/\r\n/g, '\n');
+}
+
 const INPUT_FILE = 'render-code-fix-input.json';
 const OUTPUT_FILE = 'render-code-fix-output.json';
 
@@ -214,10 +218,21 @@ export class AgentRefactoringService {
 
   private static applyChange(code: string, change: AgentChange): string {
     if (change.change_type === 'whole_file' && change.whole_file_content) {
-      return change.whole_file_content;
+      return toLf(change.whole_file_content);
     }
     if (!change.replacements) return code;
-    return change.replacements.reduce((c, r) => c.replace(r.search, r.replace), code);
+    return change.replacements.reduce((c, r) => {
+      const exact = { search: toLf(r.search), replace: toLf(r.replace) };
+      const trimmed = { search: exact.search.replace(/\n+$/, ''), replace: exact.replace.replace(/\n+$/, '') };
+      const match = [exact, trimmed].find((candidate) => candidate.search && c.includes(candidate.search));
+      if (!match) {
+        logOutputChannel.warn(
+          `Agent replacement did not match the function body.\nsearch: ${JSON.stringify(r.search)}\nbody: ${JSON.stringify(code)}`
+        );
+        return c;
+      }
+      return c.replace(match.search, () => match.replace);
+    }, code);
   }
 
   private static applyChanges(
@@ -228,10 +243,12 @@ export class AgentRefactoringService {
     const relevantChanges = changes.filter(
       (change) => path.basename(change.file) === path.basename(document.fileName)
     );
-    return relevantChanges.reduce(
+    const usesCrlf = fnToRefactor.body.includes('\r\n');
+    const patched = relevantChanges.reduce(
       (code, change) => AgentRefactoringService.applyChange(code, change),
-      fnToRefactor.body
+      toLf(fnToRefactor.body)
     );
+    return usesCrlf ? patched.replace(/\n/g, '\r\n') : patched;
   }
 
   private static mapConfidence(output: AgentOutput): Confidence {

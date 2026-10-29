@@ -186,6 +186,94 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     assert.strictEqual(response.code, fnBody);
   });
 
+  test('mapOutputToResponse applies LF-based replacements to a CRLF function body', () => {
+    const fnBody = 'void F(int a)\r\n{\r\n    if (a > 0)\r\n    {\r\n        Run(a);\r\n    }\r\n}';
+    const output: AgentOutput = {
+      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      schema_version: '1.0',
+      task_id: 'test-crlf',
+      fix_result: 'fix_proposed',
+      confidence: 'high',
+      summary: 'Applied change',
+      reasoning: 'Test',
+      changes: [
+        {
+          file: 'test.cs',
+          change_type: 'partial',
+          description: 'Guard clause',
+          replacements: [
+            {
+              search: '    if (a > 0)\n    {\n        Run(a);\n    }\n',
+              replace: '    if (a <= 0) return;\n    Run(a);\n',
+            },
+          ],
+        },
+      ],
+      generated_at: '2026-08-31T12:00:00Z',
+    };
+
+    const fnToRefactor = createMockFnToRefactor(fnBody);
+    const document = createMockDocument('/test/test.cs', fnBody);
+
+    const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
+
+    assert.strictEqual(response.code, 'void F(int a)\r\n{\r\n    if (a <= 0) return;\r\n    Run(a);\r\n}');
+    assert.strictEqual(response.confidence.title, 'Applied change');
+  });
+
+  const trailingNewlineCases = [
+    { name: 'LF', eol: '\n' },
+    { name: 'CRLF', eol: '\r\n' },
+  ];
+
+  for (const { name, eol } of trailingNewlineCases) {
+    test(`mapOutputToResponse applies a whole-method replacement whose search ends with a trailing newline (${name})`, () => {
+      const fnBody = ['    void F(int a)', '    {', '        Run(a);', '    }'].join(eol);
+      const output: AgentOutput = {
+        '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+        schema_version: '1.0',
+        task_id: 'test-trailing-newline',
+        fix_result: 'fix_proposed',
+        confidence: 'high',
+        summary: 'Applied change',
+        reasoning: 'Test',
+        changes: [
+          {
+            file: 'test.cs',
+            change_type: 'partial',
+            description: 'Extract helper',
+            replacements: [
+              {
+                search: '    void F(int a)\n    {\n        Run(a);\n    }\n',
+                replace: '    void F(int a)\n    {\n        Helper(a);\n    }\n\n    void Helper(int a)\n    {\n        Run(a);\n    }\n',
+              },
+            ],
+          },
+        ],
+        generated_at: '2026-08-31T12:00:00Z',
+      };
+
+      const fnToRefactor = createMockFnToRefactor(fnBody);
+      const document = createMockDocument('/test/test.cs', fnBody);
+
+      const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
+
+      const expected = [
+        '    void F(int a)',
+        '    {',
+        '        Helper(a);',
+        '    }',
+        '',
+        '    void Helper(int a)',
+        '    {',
+        '        Run(a);',
+        '    }',
+      ].join(eol);
+      assert.strictEqual(response.code, expected);
+      assert.strictEqual(response.confidence.title, 'Applied change');
+    });
+  }
+
   test('mapOutputToResponse sets metadata cached to false', () => {
     const output: AgentOutput = {
       '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
