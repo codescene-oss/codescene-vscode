@@ -76,12 +76,6 @@ suite('CsIdeServerClient Test Suite', () => {
   });
 
   test('sends typed requests over one connection', async () => {
-    const codeSmells = {
-      'file-name': 'file.ts',
-      'file-content': 'function f() {}',
-      preflight: { version: 2, 'file-types': ['ts'], 'language-common': { 'max-input-loc': 100, 'code-smells': [] } },
-      'code-smells': [{ category: 'Complex Method' }],
-    };
     const telemetry = {
       'editor-type': 'VSCode',
       'event-name': 'test',
@@ -104,17 +98,6 @@ suite('CsIdeServerClient Test Suite', () => {
       'old-git-blob-sha': 'old-sha',
       'new-git-blob-sha': 'new-sha',
     });
-    assert.deepStrictEqual(await client.preflight({ force: true }), {
-      version: 2,
-      'file-types': ['ts'],
-      'language-common': { 'max-input-loc': 100, 'code-smells': ['Complex Method'] },
-    });
-    const [fn] = await client.fnsToRefactor(codeSmells);
-    assert.strictEqual(fn['file-type'], 'TypeScript');
-    assert.strictEqual(fn['function-type'], 'Function');
-    assert.strictEqual(fn['nippy-b64'], 'encoded');
-    assert.deepStrictEqual(fn.range, { 'start-line': 1, 'start-column': 1, 'end-line': 1, 'end-column': 16 });
-    assert.deepStrictEqual(fn['refactoring-targets'], [{ category: 'Complex Method', line: 1 }]);
     const refactor = await client.refactor({ token: 'token' });
     assert.strictEqual(refactor['trace-id'], 'trace-1');
     assert.deepStrictEqual(refactor['credits-info'], { limit: 10, used: 1 });
@@ -321,13 +304,6 @@ suite('CsIdeServerClient Test Suite', () => {
 
     await client.review({ path: 'file.ts' });
     await client.delta({ 'old-score': 'old' });
-    await client.preflight({ force: true });
-    await client.fnsToRefactor({
-      'file-name': 'file.ts',
-      'file-content': 'function f() {}',
-      preflight: { version: 2, 'file-types': ['ts'], 'language-common': { 'max-input-loc': 100, 'code-smells': [] } },
-      'code-smells': [{ category: 'Complex Method' } as any],
-    });
     await client.refactor({ token: 'secret-token', 'fn-to-refactor-nippy-b64': 'encoded', 'skip-cache': true });
     await client.telemetry({ 'editor-type': 'VSCode', 'event-name': 'test-event', 'extension-version': '1.0.0', 'user-id': 'user-99' });
     await client.deviceId();
@@ -341,10 +317,6 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogContains('info', 'score=9.68 fileSmells=0 functionSmells=0 hasRulesError=false sha=review-sha');
     assertLogContains('info', 'method=cs-ide/delta hasOldScore=true hasNewScore=false');
     assertLogContains('info', 'oldScore=10 newScore=9.68 scoreChange=-0.32 fileFindings=0 functionFindings=0');
-    assertLogContains('info', 'method=cs-ide/preflight force=true');
-    assertLogContains('info', 'version=2 fileTypes=ts codeSmellCount=1 maxInputLoc=100');
-    assertLogContains('info', 'method=cs-ide/fns-to-refactor fileName=file.ts input=code-smells smellCount=1');
-    assertLogContains('info', 'functions=f@1:1-1:16[Complex Method]');
     assertLogContains('info', 'method=cs-ide/refactor format=nippy-b64 skipCache=true');
     assertLogContains('info', 'traceId=trace-1 confidence=1 cached=false reasonCount=0');
     assertLogContains('info', 'method=cs-ide/telemetry eventName=test-event');

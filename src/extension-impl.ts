@@ -5,7 +5,7 @@ import { activate as activateCHMonitor, deactivate as deactivateAddon } from './
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
-import { DevtoolsAPI } from './devtools-api';
+import { aceUsable, DevtoolsAPI } from './devtools-api';
 import type { CsIdeServerClient } from './devtools-api/ide-server-client';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
@@ -238,6 +238,12 @@ function registerCommands(context: vscode.ExtensionContext) {
 
 function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
   const cmd = vscode.commands.registerCommand('codescene.testConnectivity', async () => {
+    if (!aceUsable()) {
+      void vscode.window.showInformationMessage(
+        'Enable "Enable Auto Refactor" and sign in to CodeScene to test provider connectivity.'
+      );
+      return;
+    }
     const abortController = new AbortController();
 
     await vscode.window.withProgress(

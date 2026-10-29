@@ -6,8 +6,8 @@ import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
-import { aceAvailable } from '../devtools-api';
-import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
+import { aceUsable } from '../devtools-api';
+import { findFnToRefactor } from '../refactoring/utils';
 import { buildInsertText, getLineIndentation } from '../utils/codeaction-utils';
 
 export function register(context: vscode.ExtensionContext) {
@@ -75,15 +75,11 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     codeSmells: any[],
     actions: vscode.CodeAction[]
   ) {
-    if (!ACE_ENABLED) {
+    if (!ACE_ENABLED || !aceUsable()) {
       return;
     }
 
-    const aceUsable = aceAvailable();
-    const fnsToRefactor = await Promise.all(
-      codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
-    );
-    const fnToRefactor = fnsToRefactor.find(isDefined);
+    const fnToRefactor = await findFnToRefactor(document, codeSmells[0]);
 
     if (!fnToRefactor) return;
 
@@ -95,11 +91,6 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       title: 'Refactor using CodeScene Agent',
       arguments: [document, 'codeaction', fnToRefactor],
     };
-    refactorAction.disabled = !aceUsable
-      ? {
-          reason: 'Activate the refactoring agent by providing your authentication token in Workspace settings.',
-        }
-      : undefined;
     actions.push(refactorAction);
   }
 
@@ -113,10 +104,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     const reviewResultRaw = await reviewCacheItem.review.reviewResult;
     const reviewResult: Review | undefined = reviewResultRaw && typeof reviewResultRaw === 'object' ? reviewResultRaw : undefined;
 
-    const fnsToRefactor = await Promise.all(
-      codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
-    );
-    const fnToRefactor = fnsToRefactor.find(isDefined);
+    const fnToRefactor = await findFnToRefactor(document, codeSmells[0]);
 
     codeSmells.forEach((codeSmell) => {
       const { category } = codeSmell;

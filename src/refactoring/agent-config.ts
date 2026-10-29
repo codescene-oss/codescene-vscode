@@ -1,4 +1,4 @@
-import { getAuthToken, getProviderOptions } from '../configuration';
+import { getProviderOptions } from '../configuration';
 import { AgentConfig, BedrockOpencodeProvider, ProviderCredentials } from './agent-types';
 
 function hasAnyApiKey(anthropicApiKey: string | undefined, openaiApiKey: string | undefined, googleApiKey: string | undefined): boolean {
@@ -51,33 +51,17 @@ export function buildOpencodeConfig(opts: Record<string, string>): AgentConfig['
   return { provider };
 }
 
-export function buildAgentConfigWithToken(token: string, ioDir?: string): AgentConfig {
-  if (!token) {
-    throw new Error('No authentication token available for agent');
-  }
-
+export function buildAgentConfigWithToken(token: string | undefined, ioDir?: string): AgentConfig {
   const providerOpts = getProviderOptions();
   const providerCredentials = buildProviderCredentials(providerOpts);
   const opencodeConfig = buildOpencodeConfig(providerOpts);
 
   return {
-    codescene_access_token: token,
+    codescene_access_token: token ?? '',
     plugins: ['render-code-fix-reporter'],
     tracking: { environment: 'codescene-vscode' },
     ...(ioDir && { io_json_dir: ioDir }),
     ...(providerCredentials && { provider: providerCredentials }),
     ...(opencodeConfig && { opencode_config: opencodeConfig }),
   };
-}
-
-export function buildAgentConfig(): AgentConfig {
-  const token = getAuthToken();
-  if (!token) {
-    throw new Error('No authentication token available for agent');
-  }
-  return buildAgentConfigWithToken(token);
-}
-
-export function buildAgentConfigJson(): string {
-  return JSON.stringify(buildAgentConfig());
 }

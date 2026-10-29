@@ -145,6 +145,10 @@
           "when": "!config.codescene.enableAutomaticAnalysis"
         },
         {
+          "command": "codescene.testConnectivity",
+          "when": "codescene.aceUsable"
+        },
+        {
           "command": "codescene.browserSignIn",
           "when": "codescene.signInActive"
         },

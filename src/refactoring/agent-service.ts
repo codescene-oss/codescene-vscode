@@ -9,7 +9,7 @@ import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
-import { aceToken } from '../devtools-api';
+import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 
@@ -54,10 +54,13 @@ export class AgentRefactoringService {
 
       logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      await AgentRefactoringService.invokeAgent(workDir, ioDir, signal, onProgress);
+      const token = await AgentRefactoringService.requireToken();
+      const stderr = await AgentRefactoringService.invokeAgent(workDir, ioDir, token, signal, onProgress);
 
       if (!fs.existsSync(outputPath)) {
-        throw new Error('Agent did not produce output file');
+        const detail = stripAnsi(stderr).trim().split('\n').slice(-5).join('\n');
+        logOutputChannel.error(`Agent exited successfully without producing output. stderr: ${detail}`);
+        throw new Error(detail ? `Agent did not produce output file: ${detail}` : 'Agent did not produce output file');
       }
 
       const outputContent = fs.readFileSync(outputPath, 'utf-8');
@@ -88,12 +91,22 @@ export class AgentRefactoringService {
     };
   }
 
-  private static spawnAgentProcess(workDir: string, ioDir: string): { proc: ChildProcess; binaryPath: string } {
-    const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-    const token = aceToken();
+  private static async requireToken(): Promise<string> {
+    const token = await resolveAgentToken();
     if (!token) {
-      throw new Error('No authentication token available for agent');
+      throw new Error(
+        'Refactoring requires a CodeScene sign-in or access token for the CodeScene MCP server. Sign in to CodeScene or set the "Auth token" setting.'
+      );
     }
+    return token;
+  }
+
+  private static spawnAgentProcess(
+    workDir: string,
+    ioDir: string,
+    token: string
+  ): { proc: ChildProcess; binaryPath: string } {
+    const binaryPath = AgentRefactoringService.getAgentBinaryPath();
     const config = buildAgentConfigWithToken(token, ioDir);
     const configJson = JSON.stringify(config);
 
@@ -132,9 +145,15 @@ export class AgentRefactoringService {
     });
   }
 
-  private static invokeAgent(workDir: string, ioDir: string, signal?: AbortSignal, onProgress?: ProgressCallback): Promise<void> {
+  private static invokeAgent(
+    workDir: string,
+    ioDir: string,
+    token: string,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir, ioDir);
+      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir, ioDir, token);
       const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
       AgentRefactoringService.setupStdoutHandler(proc, onProgress);
 
@@ -147,10 +166,10 @@ export class AgentRefactoringService {
 
       proc.on('close', (code: number | null) => {
         signal?.removeEventListener('abort', abortHandler);
+        const stderr = getStderr();
         if (code === 0) {
-          resolve();
+          resolve(stderr);
         } else {
-          const stderr = getStderr();
           logOutputChannel.error(`Agent exited with code ${code}: ${stderr}`);
           reject(new Error(`Agent exited with code ${code}: ${stderr}`));
         }

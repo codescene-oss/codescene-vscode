@@ -23,13 +23,13 @@ export function getAutoRefactorConfig(): AutoRefactorConfig {
     return { disabled: true, activated: false, visible: false };
   }
 
-  const hasToken = aceAvailable();
+  const authenticated = aceAvailable();
   const acknowledged = CsExtensionState.acknowledgedAceUsage === true;
-  const activated = !(!acknowledged && hasToken);
+  const activated = !(!acknowledged && authenticated);
 
   return {
-    disabled: !hasToken,
+    disabled: !authenticated,
     activated,
-    visible: CsExtensionState.stateProperties.features.ace.state === 'enabled',
+    visible: authenticated && CsExtensionState.stateProperties.features.ace.state === 'enabled',
   };
 }

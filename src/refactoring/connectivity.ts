@@ -29,13 +29,8 @@ function getAgentBinaryPath(): string {
 const DEFAULT_TIMEOUT_MS = 60000;
 
 export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
-  const token = aceToken();
-  if (!token) {
-    return { success: false, error: 'No authentication token available' };
-  }
-
   const binaryPath = getAgentBinaryPath();
-  const config = buildAgentConfigWithToken(token);
+  const config = buildAgentConfigWithToken(aceToken());
   const configJson = JSON.stringify(config);
   const model = getAgentModel();
 

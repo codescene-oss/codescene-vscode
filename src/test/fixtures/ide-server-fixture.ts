@@ -19,28 +19,6 @@ connection.onRequest('cs-ide/delta', () => ({
   oldGitBlobSha: 'old-sha',
   newGitBlobSha: 'new-sha',
 }));
-connection.onRequest('cs-ide/preflight', () => ({
-  version: 2,
-  fileTypes: ['ts'],
-  languageCommon: { maxInputLoc: 100, codeSmells: ['Complex Method'] },
-}));
-connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; fileName?: string }) => {
-  const fileName = params && typeof params === 'object' && !Array.isArray(params)
-    ? params['file-name'] ?? params.fileName
-    : undefined;
-  if (!fileName) {
-    throw new Error('Missing file-name');
-  }
-  return [{
-    body: 'function f() {}',
-    name: 'f',
-    fileType: 'TypeScript',
-    functionType: 'Function',
-    nippyB64: 'encoded',
-    range: { startLine: 1, startColumn: 1, endLine: 1, endColumn: 16 },
-    refactoringTargets: [{ category: 'Complex Method', line: 1 }],
-  }];
-});
 connection.onRequest('cs-ide/refactor', (params, token) => {
   if (params?.token === 'unauthorized') {
     throw new ResponseError(-32603, 'Request failed [401]');

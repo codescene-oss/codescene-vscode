@@ -62,18 +62,6 @@ export interface RefactoringTarget {
   line: number;
 }
 
-export type PreFlightResponse = {
-  version: number;
-  'file-types': string[];
-  'language-common': RefactorSupport;
-  'language-specific'?: Record<string, Partial<RefactorSupport>>;
-};
-
-export type RefactorSupport = {
-  'max-input-loc': number;
-  'code-smells': string[];
-};
-
 export interface RefactorResponse {
   /**
    * Refactored code

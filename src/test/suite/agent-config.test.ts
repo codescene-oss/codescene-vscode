@@ -175,9 +175,9 @@ aceSuite('AgentConfig Test Suite', () => {
     });
   }
 
-  test('buildAgentConfigWithToken throws when token is empty', () => {
+  test('buildAgentConfigWithToken falls back to an empty token when none is available', () => {
     mockConfiguration('codescene', {});
-    assert.throws(() => buildAgentConfigWithToken(''), /No authentication token/);
+    assert.strictEqual(buildAgentConfigWithToken(undefined).codescene_access_token, '');
   });
 
   test('buildOpencodeConfig produces exact bedrock structure', () => {
