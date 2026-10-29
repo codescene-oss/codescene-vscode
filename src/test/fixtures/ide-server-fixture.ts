@@ -19,35 +19,6 @@ connection.onRequest('cs-ide/delta', () => ({
   oldGitBlobSha: 'old-sha',
   newGitBlobSha: 'new-sha',
 }));
-connection.onRequest('cs-ide/refactor', (params, token) => {
-  if (params?.token === 'unauthorized') {
-    throw new ResponseError(-32603, 'Request failed [401]');
-  }
-  if (params?.token === 'hang') {
-    return new Promise((resolve, reject) => {
-      const cancel = () => reject(new ResponseError(-32800, 'Request cancelled'));
-      if (token.isCancellationRequested) {
-        cancel();
-        return;
-      }
-      token.onCancellationRequested(cancel);
-    });
-  }
-  return {
-    code: 'function f() {}',
-    confidence: {
-      level: 1,
-      title: 'High confidence',
-      recommendedAction: { description: 'Apply', details: 'Safe change' },
-      reviewHeader: 'Review',
-    },
-    metadata: { 'cached?': false },
-    reasons: [],
-    refactoringProperties: { addedCodeSmells: [], removedCodeSmells: ['Complex Method'] },
-    traceId: 'trace-1',
-    creditsInfo: { limit: 10, used: 1 },
-  };
-});
 connection.onRequest('cs-ide/telemetry', (params) => ({ status: 202, params }));
 connection.onRequest('cs-ide/device-id', () => ({ deviceId: 'device-42' }));
 connection.onRequest('cs-ide/code-health-rules-template', () => ({ template: '{"rule_sets":[]}' }));

@@ -64,11 +64,7 @@ export class AgentRefactoringService {
       const token = await AgentRefactoringService.requireToken();
       const stderr = await AgentRefactoringService.invokeAgent(workDir, ioDir, token, signal, onProgress);
 
-      if (!fs.existsSync(outputPath)) {
-        const detail = stripAnsi(stderr).trim().split('\n').slice(-5).join('\n');
-        logOutputChannel.error(`Agent exited successfully without producing output. stderr: ${detail}`);
-        throw new Error(detail ? `Agent did not produce output file: ${detail}` : 'Agent did not produce output file');
-      }
+      if (!fs.existsSync(outputPath)) throw AgentRefactoringService.missingOutputError(stderr);
 
       const outputContent = fs.readFileSync(outputPath, 'utf-8');
       const output: AgentOutput = JSON.parse(outputContent);
@@ -81,6 +77,12 @@ export class AgentRefactoringService {
         AgentRefactoringService.cleanup(ioDir);
       }
     }
+  }
+
+  private static missingOutputError(stderr: string): Error {
+    const detail = stripAnsi(stderr).trim().split('\n').slice(-5).join('\n');
+    logOutputChannel.error(`Agent exited successfully without producing output. stderr: ${detail}`);
+    return new Error(detail ? `Agent did not produce output file: ${detail}` : 'Agent did not produce output file');
   }
 
   private static buildInput(document: TextDocument, fnToRefactor: FnToRefactor, taskId: string): AgentInput {
@@ -102,7 +104,7 @@ export class AgentRefactoringService {
     const token = await resolveAgentToken();
     if (!token) {
       throw new Error(
-        'Refactoring requires a CodeScene sign-in or access token for the CodeScene MCP server. Sign in to CodeScene or set the "Auth token" setting.'
+        'Refactoring requires you to be signed in to CodeScene. Sign in, or set a personal access token in the "Auth token" setting.'
       );
     }
     return token;

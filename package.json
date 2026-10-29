@@ -267,7 +267,7 @@
         "codescene.authToken": {
           "type": "string",
           "default": "",
-          "description": "Personal access token — fallback for WSL, remote and headless environments. Browser sign-in is recommended.",
+          "description": "Personal access token — an alternative to signing in, for WSL, remote and headless environments. Also used for refactoring. Browser sign-in is recommended.",
           "order": 19.5
         },
         "codescene.experimental.signIn": {

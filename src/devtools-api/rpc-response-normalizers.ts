@@ -1,10 +1,5 @@
 import { ChangeDetail, ChangeType, Delta, FunctionFinding } from './delta-model';
 import { CheckRulesResponse } from './model';
-import {
-  Confidence,
-  RefactorResponse,
-  RefactoringProperties,
-} from './refactor-models';
 import { CodeSmell, Function as ReviewFunction, Range, Review } from './review-model';
 
 type WireObject = Record<string, any>;
@@ -86,39 +81,6 @@ export function deltaResponse(value: WireObject): Delta {
     ...(field(value, 'newGitBlobSha', 'new-git-blob-sha') === undefined
       ? {}
       : { 'new-git-blob-sha': field<string>(value, 'newGitBlobSha', 'new-git-blob-sha') }),
-  };
-}
-
-function confidence(value: WireObject): Confidence {
-  return {
-    level: value.level,
-    title: value.title,
-    'recommended-action': field(value, 'recommendedAction', 'recommended-action')!,
-    ...(field(value, 'reviewHeader', 'review-header') === undefined
-      ? {}
-      : { 'review-header': field<string>(value, 'reviewHeader', 'review-header') }),
-  };
-}
-
-function refactoringProperties(value: WireObject): RefactoringProperties {
-  return {
-    'added-code-smells': field(value, 'addedCodeSmells', 'added-code-smells') ?? [],
-    'removed-code-smells': field(value, 'removedCodeSmells', 'removed-code-smells') ?? [],
-  };
-}
-
-export function refactorResponse(value: WireObject): RefactorResponse {
-  return {
-    code: value.code,
-    confidence: confidence(value.confidence),
-    ...(value.declarations === undefined ? {} : { declarations: value.declarations }),
-    metadata: value.metadata,
-    reasons: value.reasons ?? [],
-    'refactoring-properties': refactoringProperties(field(value, 'refactoringProperties', 'refactoring-properties')!),
-    'trace-id': field<string>(value, 'traceId', 'trace-id')!,
-    ...(field(value, 'creditsInfo', 'credits-info') === undefined
-      ? {}
-      : { 'credits-info': field(value, 'creditsInfo', 'credits-info') }),
   };
 }
 

@@ -1,7 +1,5 @@
 import * as assert from 'assert';
 import * as path from 'path';
-import { AbortError } from '../../devtools-api/abort-error';
-import { DevtoolsError } from '../../devtools-api/devtools-error';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { gitBlobSha } from '../../review/review-pipeline';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
@@ -98,11 +96,6 @@ suite('CsIdeServerClient Test Suite', () => {
       'old-git-blob-sha': 'old-sha',
       'new-git-blob-sha': 'new-sha',
     });
-    const refactor = await client.refactor({ token: 'token' });
-    assert.strictEqual(refactor['trace-id'], 'trace-1');
-    assert.deepStrictEqual(refactor['credits-info'], { limit: 10, used: 1 });
-    assert.deepStrictEqual(refactor['refactoring-properties'], { 'added-code-smells': [], 'removed-code-smells': ['Complex Method'] });
-    assert.deepStrictEqual(refactor.confidence['recommended-action'], { description: 'Apply', details: 'Safe change' });
     assert.deepStrictEqual(await client.telemetry(telemetry), { status: 202, params: { event: telemetry } });
     assert.deepStrictEqual(await client.deviceId(), { 'device-id': 'device-42' });
     assert.deepStrictEqual(await client.authToken(), { 'credential-source': 'oauth', 'access-token': 'fixture-access-token' });
@@ -112,20 +105,6 @@ suite('CsIdeServerClient Test Suite', () => {
       failed: false,
       'parsing-errors': [],
     });
-  });
-
-  test('maps a cancelled refactor to AbortError', async () => {
-    const controller = new AbortController();
-    const pending = client.refactor({ token: 'hang' }, controller.signal);
-    controller.abort();
-    await assert.rejects(pending, (error: unknown) => error instanceof AbortError);
-  });
-
-  test('maps an HTTP failure from the server to a DevtoolsError with its status', async () => {
-    await assert.rejects(
-      client.refactor({ token: 'unauthorized' }),
-      (error: unknown) => error instanceof DevtoolsError && error.status === 401
-    );
   });
 
   test('sends check-rules path relative to the repo root', async () => {
@@ -305,7 +284,6 @@ suite('CsIdeServerClient Test Suite', () => {
 
     await client.review({ path: 'file.ts' });
     await client.delta({ 'old-score': 'old' });
-    await client.refactor({ token: 'secret-token', 'fn-to-refactor-nippy-b64': 'encoded', 'skip-cache': true });
     await client.telemetry({ 'editor-type': 'VSCode', 'event-name': 'test-event', 'extension-version': '1.0.0', 'user-id': 'user-99' });
     await client.deviceId();
     await client.authToken();
@@ -319,8 +297,6 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogContains('info', 'score=9.68 fileSmells=0 functionSmells=0 hasRulesError=false sha=review-sha');
     assertLogContains('info', 'method=cs-ide/delta hasOldScore=true hasNewScore=false');
     assertLogContains('info', 'oldScore=10 newScore=9.68 scoreChange=-0.32 fileFindings=0 functionFindings=0');
-    assertLogContains('info', 'method=cs-ide/refactor format=nippy-b64 skipCache=true');
-    assertLogContains('info', 'traceId=trace-1 confidence=1 cached=false reasonCount=0');
     assertLogContains('info', 'method=cs-ide/telemetry eventName=test-event');
     assertLogContains('info', 'method=cs-ide/telemetry durationMs=');
     assertLogContains('info', 'status=202');
@@ -333,9 +309,7 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogContains('info', 'method=cs-ide/getWatchInventory repoRoot=/repo');
     assertLogContains('info', 'count=1 files=requested.ts');
 
-    assertLogOmits('secret-token');
     assertLogOmits('function f() {}');
-    assertLogOmits('encoded');
     assertLogOmits('device-42');
     assertLogOmits('fixture-access-token');
     assertLogOmits('user-99');
