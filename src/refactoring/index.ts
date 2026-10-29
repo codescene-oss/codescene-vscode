@@ -3,7 +3,6 @@ import { getConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
 import { DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
-import Reviewer from '../review/reviewer';
 import { CsRefactoringCommands } from './commands';
 import { createTmpDiffUriScheme } from './utils';
 
@@ -24,10 +23,6 @@ export function initAce(context: vscode.ExtensionContext) {
     createTmpDiffUriScheme(),
     DevtoolsAPI.onDidChangePreflightState((event) => {
       CsExtensionState.setACEState(event);
-      // Refresh deltas to add/remove refactorable functions from the code health monitor when ace state changes
-      if (event.state === 'enabled' || event.state === 'disabled') {
-        Reviewer.instance.refreshDeltas();
-      }
     })
   );
 

@@ -1,0 +1,14 @@
+{
+  "state": "signed-in",
+  "credential-source": "oauth",
+  "env-token-present": false,
+  "server": { "url": "https://codescene.io", "onprem": false, "source": "default", "pat-url": "https://codescene.io/users/me/pat" },
+  "oauth-supported": true,
+  "user": { "id": "1234", "name": "Ada Lovelace" },
+  "account": { "id": "42", "name": "Acme Corp" },
+  "license": { "pro": true },
+  "ace-credential": true,
+  "expires-at": 1792000000,
+  "login": null,
+  "error": { "code": "auth/network", "message": "Could not reach CodeScene. Retrying in the background." }
+}

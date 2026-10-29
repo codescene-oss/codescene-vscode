@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
 import { getExtensionPath } from '../cs-extension-state';
-import { getEffectiveToken } from '../devtools-api';
+import { aceToken } from '../devtools-api';
 import { buildAgentConfigWithToken } from './agent-config';
 import { getAgentModel } from '../configuration';
 import { logOutputChannel } from '../log';
@@ -29,7 +29,7 @@ function getAgentBinaryPath(): string {
 const DEFAULT_TIMEOUT_MS = 60000;
 
 export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
-  const token = getEffectiveToken();
+  const token = aceToken();
   if (!token) {
     return { success: false, error: 'No authentication token available' };
   }

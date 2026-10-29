@@ -1,0 +1,414 @@
+import * as assert from 'assert';
+import * as path from 'path';
+import { AbortError } from '../../devtools-api/abort-error';
+import { DevtoolsError } from '../../devtools-api/devtools-error';
+import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
+import { gitBlobSha } from '../../review/review-pipeline';
+import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+
+suite('CsIdeServerClient Test Suite', () => {
+  const fixture = path.join(__dirname, '../fixtures/ide-server-fixture.js');
+  let client: CsIdeServerClient;
+
+  setup(() => {
+    client = new CsIdeServerClient(process.execPath, [fixture]);
+  });
+
+  teardown(() => client.dispose());
+
+  test('reports startup metadata', async () => {
+    assert.deepStrictEqual(await client.start(), { sha: 'fixture-sha', version: 'fixture-version', args: [] });
+  });
+
+  test('passes configured worker arguments to the server process', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(process.execPath, [fixture, 'server', '--threads', '3']);
+    assert.deepStrictEqual(await client.start(), {
+      sha: 'fixture-sha',
+      version: 'fixture-version',
+      args: ['server', '--threads', '3'],
+    });
+  });
+
+  test('reports the auth-v1 capability from startup metadata', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(process.execPath, [fixture, '--auth-v1']);
+    assert.deepStrictEqual(await client.start(), {
+      sha: 'fixture-sha',
+      version: 'fixture-version',
+      args: ['--auth-v1'],
+      capabilities: ['auth-v1'],
+    });
+  });
+
+  test('forwards authStatusChanged notifications', async () => {
+    const received = new Promise<unknown>((resolve) => client.onDidAuthStatusChange(resolve));
+    await client.request('test/emitAuthStatus', authStatusFixture('signing-in'));
+    assert.deepStrictEqual(await received, authStatusFixture('signing-in'));
+  });
+
+  test('rejects auth requests with the auth error code in the error data', async () => {
+    await assert.rejects(
+      client.request('cs-ide/auth-login', {}),
+      (error: { code?: number; data?: unknown }) => {
+        assert.deepStrictEqual(
+          { code: error.code, data: error.data },
+          { code: -32803, data: { code: 'auth/oauth-unsupported' } }
+        );
+        return true;
+      }
+    );
+  });
+
+  test('logs auth requests and status changes without tokens or authorize URLs', async () => {
+    const { assertLogContains, assertLogOmits } = await import('../setup');
+    const received = new Promise<unknown>((resolve) => client.onDidAuthStatusChange(resolve));
+    await client.request('cs-ide/auth-configure', { 'server-url': 'https://cs.example', 'access-token': 'secret-pat-123' });
+    await client.request('test/emitAuthStatus', authStatusFixture('signing-in'));
+    await received;
+
+    assertLogContains('info', 'method=cs-ide/auth-configure serverUrl=https://cs.example hasAccessToken=true');
+    assertLogContains('info', 'state=signed-out source=null errorCode=null');
+    assertLogContains('info', 'received authStatusChanged state=signing-in source=null errorCode=null');
+    assertLogOmits('secret-pat-123');
+    assertLogOmits('oauth2/auth');
+    assertLogOmits('3f1c9a2e');
+  });
+
+  test('sends typed requests over one connection', async () => {
+    const codeSmells = {
+      'file-name': 'file.ts',
+      'file-content': 'function f() {}',
+      preflight: { version: 2, 'file-types': ['ts'], 'language-common': { 'max-input-loc': 100, 'code-smells': [] } },
+      'code-smells': [{ category: 'Complex Method' }],
+    };
+    const telemetry = {
+      'editor-type': 'VSCode',
+      'event-name': 'test',
+      'extension-version': '1.0.0',
+    };
+
+    assert.deepStrictEqual(await client.review({ path: 'file.ts' }), {
+      'file-level-code-smells': [],
+      'function-level-code-smells': [],
+      'raw-score': 'raw',
+      score: 9.68,
+      'git-blob-sha': 'review-sha',
+    });
+    assert.deepStrictEqual(await client.delta({ 'old-score': 'old' }), {
+      'file-level-findings': [],
+      'function-level-findings': [],
+      'old-score': 10,
+      'new-score': 9.68,
+      'score-change': -0.32,
+      'old-git-blob-sha': 'old-sha',
+      'new-git-blob-sha': 'new-sha',
+    });
+    assert.deepStrictEqual(await client.preflight({ force: true }), {
+      version: 2,
+      'file-types': ['ts'],
+      'language-common': { 'max-input-loc': 100, 'code-smells': ['Complex Method'] },
+    });
+    const [fn] = await client.fnsToRefactor(codeSmells);
+    assert.strictEqual(fn['file-type'], 'TypeScript');
+    assert.strictEqual(fn['function-type'], 'Function');
+    assert.strictEqual(fn['nippy-b64'], 'encoded');
+    assert.deepStrictEqual(fn.range, { 'start-line': 1, 'start-column': 1, 'end-line': 1, 'end-column': 16 });
+    assert.deepStrictEqual(fn['refactoring-targets'], [{ category: 'Complex Method', line: 1 }]);
+    const refactor = await client.refactor({ token: 'token' });
+    assert.strictEqual(refactor['trace-id'], 'trace-1');
+    assert.deepStrictEqual(refactor['credits-info'], { limit: 10, used: 1 });
+    assert.deepStrictEqual(refactor['refactoring-properties'], { 'added-code-smells': [], 'removed-code-smells': ['Complex Method'] });
+    assert.deepStrictEqual(refactor.confidence['recommended-action'], { description: 'Apply', details: 'Safe change' });
+    assert.deepStrictEqual(await client.telemetry(telemetry), { status: 202, params: { event: telemetry } });
+    assert.deepStrictEqual(await client.deviceId(), { 'device-id': 'device-42' });
+    assert.deepStrictEqual(await client.codeHealthRulesTemplate(), { template: '{"rule_sets":[]}' });
+    assert.deepStrictEqual(await client.checkRules('/repo', 'src/file.ts'), {
+      result: 'matched',
+      failed: false,
+      'parsing-errors': [],
+    });
+  });
+
+  test('maps a cancelled refactor to AbortError', async () => {
+    const controller = new AbortController();
+    const pending = client.refactor({ token: 'hang' }, controller.signal);
+    controller.abort();
+    await assert.rejects(pending, (error: unknown) => error instanceof AbortError);
+  });
+
+  test('maps an HTTP failure from the server to a DevtoolsError with its status', async () => {
+    await assert.rejects(
+      client.refactor({ token: 'unauthorized' }),
+      (error: unknown) => error instanceof DevtoolsError && error.status === 401
+    );
+  });
+
+  test('sends check-rules path relative to the repo root', async () => {
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await client.checkRules('/repo', '/repo/src/file.ts');
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastCheckRules', {}), {
+      'repo-root': '/repo',
+      path: 'src/file.ts',
+    });
+  });
+
+  test('receives correlated review, delta, and failure notifications', async () => {
+    const review = new Promise<{ id?: string; sha: string | undefined }>((resolve) => {
+      client.onDidReview((event) => resolve({ id: event.id, sha: event.result['git-blob-sha'] }));
+    });
+    const delta = new Promise<{ id?: string; score: number | undefined }>((resolve) => {
+      client.onDidDelta((event) => resolve({ id: event.id, score: event.result?.['new-score'] }));
+    });
+    const failure = new Promise<{ id?: string; message: string }>((resolve) => {
+      client.onDidReviewFailed((event) => resolve({ id: event.id, message: event.message }));
+    });
+
+    client.reviewFiles('/repo', [
+      { id: 'file-1', relPath: 'file.ts', content: 'const x = 1;' },
+      { id: 'file-2', relPath: 'broken.ts', content: 'fail' },
+    ]);
+
+    assert.deepStrictEqual(await review, { id: 'file-1', sha: gitBlobSha('const x = 1;') });
+    assert.deepStrictEqual(await delta, { id: 'file-1', score: 9.68 });
+    assert.deepStrictEqual(await failure, { id: 'file-2', message: 'fixture review failed' });
+  });
+
+  test('forwards reviewProgress notifications', async () => {
+    const queues: Array<{ count: number; done: number; files: string[] }> = [];
+    client.onDidQueue((queue) => queues.push(queue));
+    const review = new Promise<void>((resolve) => {
+      client.onDidReview(() => resolve());
+    });
+    const delta = new Promise<void>((resolve) => {
+      client.onDidDelta(() => resolve());
+    });
+    const failure = new Promise<void>((resolve) => {
+      client.onDidReviewFailed(() => resolve());
+    });
+
+    client.reviewFiles('/repo', [
+      { id: 'file-1', relPath: 'file.ts', content: 'const x = 1;' },
+      { id: 'file-2', relPath: 'broken.ts', content: 'fail' },
+    ]);
+
+    await review;
+    await delta;
+    await failure;
+
+    assert.deepStrictEqual(queues, [
+      { count: 2, done: 1, files: ['b.ts', 'c.ts'] },
+      { count: 1, done: 2, files: ['c.ts'] },
+      { count: 0, done: 3, files: [] },
+    ]);
+  });
+
+  test('does not emit queue when the notification omits it', async () => {
+    const queues: Array<{ count: number; files: string[] }> = [];
+    client.onDidQueue((queue) => queues.push(queue));
+    const review = new Promise<void>((resolve) => {
+      client.onDidReview(() => resolve());
+    });
+
+    client.watchFiles('/repo');
+    await review;
+
+    assert.deepStrictEqual(queues, []);
+  });
+
+  test('sends kebab-case watch payloads and forwards id-less notifications', async () => {
+    const review = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReview((event) => resolve({ id: event.id, path: event.path }));
+    });
+    const stopped = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReviewFailed((event) => resolve({ id: event.id, path: event.path }));
+    });
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+
+    client.watchFiles('/repo');
+    assert.deepStrictEqual(await review, { id: undefined, path: 'watched.ts' });
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastWatch', {}), {
+      'repo-root': '/repo',
+    });
+
+    client.stopWatchFiles('/repo');
+    assert.deepStrictEqual(await stopped, { id: undefined, path: 'stopped.ts' });
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), { 'repo-root': '/repo' });
+  });
+
+  test('sends relative-paths only when the watch is narrowed to sub-directories', async () => {
+    const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await client.start();
+
+    client.watchFiles('/repo', ['packages/app', 'packages/lib']);
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastWatch', {}), {
+      'repo-root': '/repo',
+      'relative-paths': ['packages/app', 'packages/lib'],
+    });
+
+    client.stopWatchFiles('/repo', ['packages/lib']);
+    assert.deepStrictEqual(await rpc.sendRequest('test/lastStop', {}), {
+      'repo-root': '/repo',
+      'relative-paths': ['packages/lib'],
+    });
+  });
+
+  test('forwards watch inventory notifications and on-demand inventory requests', async () => {
+    const inventory = new Promise<{ repoRoot: string; files: string[] }>((resolve) => {
+      client.onDidWatchInventory((event) => resolve(event));
+    });
+
+    client.watchFiles('/repo');
+
+    assert.deepStrictEqual(await inventory, { repoRoot: '/repo', files: ['watched.ts'] });
+    assert.deepStrictEqual(await client.getWatchInventory('/repo'), {
+      repoRoot: '/repo',
+      files: ['requested.ts'],
+    });
+  });
+
+  test('reports whether a server start is a restart', async () => {
+    const starts: boolean[] = [];
+    client.onDidServerStart((event) => starts.push(event.restart));
+
+    await client.start();
+    await client.restart();
+
+    assert.deepStrictEqual(starts, [false, true]);
+  });
+
+  test('omits optional reviewFiles id and content on the wire', async () => {
+    const review = new Promise<{ id?: string; path: string }>((resolve) => {
+      client.onDidReview((event) => resolve({ id: event.id, path: event.path }));
+    });
+
+    client.reviewFiles('/repo', [{ relPath: 'disk.ts' }]);
+
+    assert.deepStrictEqual(await review, { id: undefined, path: 'disk.ts' });
+  });
+
+  test('rejects an in-flight request when the server exits', async () => {
+    const connection = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await assert.rejects(connection.sendRequest('test/exit', {}), /exited|connection/i);
+  });
+
+  test('rejects startup when the process cannot be spawned', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(path.join(__dirname, 'missing-server'));
+    await assert.rejects(client.start(), /ENOENT|spawn/i);
+  });
+
+  test('includes stderr when the server exits during startup', async () => {
+    client.dispose();
+    client = new CsIdeServerClient(process.execPath, ['-e', 'process.stderr.write("could not open jvm.cfg\\n"); process.exit(1)']);
+    await assert.rejects(client.start(), /exited with code 1: could not open jvm.cfg/);
+  });
+
+  test('can restart after the server exits', async () => {
+    await client.start();
+    const connection = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await assert.rejects(connection.sendRequest('test/exit', {}), /exited|connection/i);
+    assert.deepStrictEqual(await client.restart(), { sha: 'fixture-sha', version: 'fixture-version', args: [] });
+    assert.deepStrictEqual(await client.deviceId(), { 'device-id': 'device-42' });
+  });
+
+  test('logs process lifecycle and correlated request summaries without secrets', async () => {
+    const { assertLogContains, assertLogOmits, capturedLogText } = await import('../setup');
+    await client.start();
+    assertLogContains('info', '[cs-ide] starting');
+    assertLogContains('info', '[cs-ide] started');
+    assertLogContains('info', '[cs-ide] received start version=fixture-version sha=fixture-sha restart=false');
+
+    await client.review({ path: 'file.ts' });
+    await client.delta({ 'old-score': 'old' });
+    await client.preflight({ force: true });
+    await client.fnsToRefactor({
+      'file-name': 'file.ts',
+      'file-content': 'function f() {}',
+      preflight: { version: 2, 'file-types': ['ts'], 'language-common': { 'max-input-loc': 100, 'code-smells': [] } },
+      'code-smells': [{ category: 'Complex Method' } as any],
+    });
+    await client.refactor({ token: 'secret-token', 'fn-to-refactor-nippy-b64': 'encoded', 'skip-cache': true });
+    await client.telemetry({ 'editor-type': 'VSCode', 'event-name': 'test-event', 'extension-version': '1.0.0', 'user-id': 'user-99' });
+    await client.deviceId();
+    await client.codeHealthRulesTemplate();
+    await client.checkRules('/repo', 'src/file.ts');
+    await client.getWatchInventory('/repo');
+
+    assertLogContains('info', 'sending id=1 method=cs-ide/review path=file.ts hasContent=false hasCachePath=false');
+    assertLogContains('info', 'received id=1 method=cs-ide/review durationMs=');
+    assertLogContains('info', 'method=cs-ide/review');
+    assertLogContains('info', 'score=9.68 fileSmells=0 functionSmells=0 hasRulesError=false sha=review-sha');
+    assertLogContains('info', 'method=cs-ide/delta hasOldScore=true hasNewScore=false');
+    assertLogContains('info', 'oldScore=10 newScore=9.68 scoreChange=-0.32 fileFindings=0 functionFindings=0');
+    assertLogContains('info', 'method=cs-ide/preflight force=true');
+    assertLogContains('info', 'version=2 fileTypes=ts codeSmellCount=1 maxInputLoc=100');
+    assertLogContains('info', 'method=cs-ide/fns-to-refactor fileName=file.ts input=code-smells smellCount=1');
+    assertLogContains('info', 'functions=f@1:1-1:16[Complex Method]');
+    assertLogContains('info', 'method=cs-ide/refactor format=nippy-b64 skipCache=true');
+    assertLogContains('info', 'traceId=trace-1 confidence=1 cached=false reasonCount=0');
+    assertLogContains('info', 'method=cs-ide/telemetry eventName=test-event');
+    assertLogContains('info', 'method=cs-ide/telemetry durationMs=');
+    assertLogContains('info', 'status=202');
+    assertLogContains('info', 'method=cs-ide/device-id');
+    assertLogContains('info', 'method=cs-ide/device-id durationMs=');
+    assertLogContains('info', 'ok=true');
+    assertLogContains('info', 'method=cs-ide/check-rules repoRoot=/repo path=src/file.ts');
+    assertLogContains('info', 'method=cs-ide/getWatchInventory repoRoot=/repo');
+    assertLogContains('info', 'count=1 files=requested.ts');
+
+    assertLogOmits('secret-token');
+    assertLogOmits('function f() {}');
+    assertLogOmits('encoded');
+    assertLogOmits('device-42');
+    assertLogOmits('user-99');
+    assertLogOmits('{"rule_sets":[]}');
+    assert.ok(!capturedLogText().includes('file-content'), capturedLogText());
+  });
+
+  test('caps reviewFiles path lists and omits file content', async () => {
+    const { assertLogContains, assertLogOmits, getCapturedLogs } = await import('../setup');
+    const files = Array.from({ length: 21 }, (_, index) => ({
+      relPath: `file-${index}.ts`,
+      content: 'secret-source',
+    }));
+    client.reviewFiles('/repo', files);
+    await waitForLog('[cs-ide] sending reviewFiles');
+    const sending = getCapturedLogs().find((entry) => entry.message.includes('sending reviewFiles'));
+    assert.ok(sending, 'expected a reviewFiles send log');
+    assert.ok(sending.message.includes('count=21'), sending.message);
+    assert.ok(sending.message.includes('file-0.ts'), sending.message);
+    assert.ok(sending.message.includes('file-19.ts'), sending.message);
+    assert.ok(sending.message.includes('omitted=1'), sending.message);
+    assert.ok(!sending.message.includes('file-20.ts'), sending.message);
+    assertLogContains('info', '[cs-ide] sending reviewFiles repo=/repo count=21');
+    assertLogOmits('secret-source');
+  });
+
+  test('logs inbound review, delta, failure, queue, and watch notifications', async () => {
+    const { assertLogContains } = await import('../setup');
+    const review = new Promise<void>((resolve) => client.onDidReview(() => resolve()));
+    const delta = new Promise<void>((resolve) => client.onDidDelta(() => resolve()));
+    client.reviewFiles('/repo', [{ id: 'file-1', relPath: 'file.ts', content: 'const x = 1;' }]);
+    await review;
+    await delta;
+    assertLogContains('info', 'received fileReview id=file-1 path=file.ts');
+    assertLogContains('info', 'received deltaReview id=file-1 path=file.ts');
+    assertLogContains('info', 'received reviewProgress');
+
+    const inventory = new Promise<void>((resolve) => client.onDidWatchInventory(() => resolve()));
+    client.watchFiles('/repo', ['packages/app']);
+    await inventory;
+    assertLogContains('info', 'sending watchFiles repo=/repo relativePaths=packages/app');
+    assertLogContains('info', 'received watchInventoryChanged repo=/repo count=1 files=watched.ts');
+  });
+});
+
+async function waitForLog(snippet: string): Promise<void> {
+  const { getCapturedLogs } = await import('../setup');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (getCapturedLogs().some((entry) => entry.message.includes(snippet))) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`timed out waiting for log containing ${snippet}`);
+}

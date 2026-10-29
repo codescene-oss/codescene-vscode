@@ -1,5 +1,4 @@
 import * as assert from 'assert';
-import * as path from 'path';
 import * as fs from 'fs';
 import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
@@ -30,7 +29,7 @@ suite('Code Health Rules Template Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
   });
 
   teardown(() => {

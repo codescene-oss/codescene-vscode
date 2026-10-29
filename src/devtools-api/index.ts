@@ -1,321 +1,239 @@
-import { CodeSmell, Review } from '../devtools-api/review-model';
-import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError, safeJsonParse } from '../utils';
-import { AceRequestEvent, CheckRulesResponse, CodeHealthRulesResult, CodeHealthRulesTemplateResponse } from './model';
-import {
-  FnToRefactor,
-  PreFlightResponse,
-  RefactorResponse,
-  REFACTOR_TASK_ID,
-  TELEMETRY_POST_TASK_ID,
-  TELEMETRY_DEVICE_ID_TASK_ID,
-  DELTA_TASK_ID_PREFIX,
-} from './refactor-models';
-
+import { CodeSmell, Review } from './review-model';
+import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError } from '../utils';
+import { AceRequestEvent, CodeHealthRulesResult } from './model';
+import { FnToRefactor, RefactorResponse } from './refactor-models';
 import { basename, dirname } from 'path';
 import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
-import { CodeSceneAuthenticationSession } from '../auth/auth-provider';
+import { isAceAvailable, refactorToken, resolveAceToken } from '../auth/ace-credential';
 import { ACE_ENABLED } from '../build-flags';
-import { getAuthToken } from '../configuration';
+import { getAuthToken, automaticAnalysisEnabled } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
 import { AgentRefactoringService, ProgressCallback } from '../refactoring/agent-service';
 import { vscodeRange } from '../review/utils';
-import { StatsCollector } from '../stats';
 import { Delta } from './delta-model';
-import { addRefactorableFunctionsToDeltaResult, jsonForScores } from './delta-utils';
+import { addRefactorableFunctionsToDeltaResult } from './delta-utils';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { ReviewCache } from './review-cache';
-import { MissingAuthTokenError } from '../missing-auth-token-error';
-import { DevtoolsAPIImpl, BinaryOpts } from './devtools-api-impl';
-import { DevtoolsError } from './devtools-error';
 import { AbortError } from './abort-error';
-import { IsCpuTooBusyFn } from '../cpu-usage-based-executor';
+import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
+import Reviewer, { ReviewOpts } from '../review/reviewer';
+import { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
+import { v4 as uuid } from 'uuid';
+import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
+import { CsReview } from '../review/cs-review';
+import CsDiagnostics from '../diagnostics/cs-diagnostics';
+import { relativePosix } from '../utils/fs-paths';
 
 export class DevtoolsAPI {
-  private static instance: DevtoolsAPIImpl;
   private static reviewCache: ReviewCache;
+  private static ideServer: CsIdeServerClient;
+  private static pipeline: ReviewPipeline;
+  private static queueSubscription?: vscode.Disposable;
+  private static lastNetworkError = false;
 
-  static init(binaryPath: string, context: ExtensionContext, isCpuTooBusyFn?: IsCpuTooBusyFn) {
-    DevtoolsAPI.instance = new DevtoolsAPIImpl(binaryPath, context, isCpuTooBusyFn);
+  static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
+    DevtoolsAPI.pipeline?.dispose();
+    DevtoolsAPI.queueSubscription?.dispose();
+    DevtoolsAPI.ideServer?.dispose();
     DevtoolsAPI.reviewCache = new ReviewCache(context);
+    DevtoolsAPI.ideServer = ideServer ?? new CsIdeServerClient(binaryPath);
+    DevtoolsAPI.pipeline = new ReviewPipeline(DevtoolsAPI.ideServer, DevtoolsAPI.pipelinePresentation(), uuid);
+    DevtoolsAPI.queueCount = 0;
+    DevtoolsAPI.queueDone = 0;
+    DevtoolsAPI.queued = [];
+    DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.applyQueue(queue));
   }
 
-  static get concurrencyLimitingExecutor() {
-    return DevtoolsAPI.instance.concurrencyLimitingExecutor;
+  static get reviewPipeline(): ReviewPipeline {
+    return DevtoolsAPI.pipeline;
+  }
+
+  static watchFiles(repoRoot: string, relativePaths?: string[]): void {
+    DevtoolsAPI.ideServer.watchFiles(repoRoot, relativePaths);
+  }
+
+  static stopWatchFiles(repoRoot: string, relativePaths?: string[]): void {
+    DevtoolsAPI.ideServer.stopWatchFiles(repoRoot, relativePaths);
+  }
+
+  static getWatchInventory(repoRoot: string): Promise<WatchInventory> {
+    return DevtoolsAPI.ideServer.getWatchInventory(repoRoot);
+  }
+
+  static readonly onDidWatchInventory: vscode.Event<WatchInventory> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidWatchInventory(listener, thisArgs, disposables);
+
+  static readonly onDidServerStart: vscode.Event<ServerStartEvent> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidServerStart(listener, thisArgs, disposables);
+
+  static readonly onDidQueue: vscode.Event<ReviewQueue> = (listener, thisArgs?, disposables?) =>
+    DevtoolsAPI.ideServer.onDidQueue(listener, thisArgs, disposables);
+
+  static invalidateReviewEpoch(): void {
+    DevtoolsAPI.pipeline?.invalidate();
   }
 
   static get networkError() {
-    return DevtoolsAPI.instance?.networkError ?? false;
+    return DevtoolsAPI.lastNetworkError;
   }
 
-  /**
-   * Executes the command for creating a code health rules template.
-   */
   static async codeHealthRulesTemplate() {
-    const result = await DevtoolsAPI.instance.runBinary({
-      args: ['run-command', 'code-health-rules-template'],
-      input: JSON.stringify({}),
-      execOptions: { cwd: getWorkspaceCwd() }
-    });
-    const response = safeJsonParse(result.stdout, { command: 'code-health-rules-template' }) as CodeHealthRulesTemplateResponse;
-    return response.template;
+    return (await DevtoolsAPI.ideServer.codeHealthRulesTemplate()).template;
   }
 
-  /**
-   * Executes the command for checking code health rule match against file
-   */
   static async checkRules(rootPath: string, filePath: string) {
-    const payload = {
-      'path': filePath,
-    };
-
-    const { stdout, stderr } = await DevtoolsAPI.instance.runBinary({
-      args: ['run-command', 'check-rules'],
-      input: JSON.stringify(payload),
-      execOptions: { cwd: rootPath },
-    });
-
-    try {
-      const { result, 'parsing-errors': parsingErrors, failed } = safeJsonParse(stdout, { command: 'check-rules', args: payload }) as CheckRulesResponse;
-
-      if (failed) {
-        if (parsingErrors && parsingErrors.length > 0) {
-          const errorMessages = parsingErrors.map((err: any) => {
-            return err.message;
-          }).join('\n');
-          const report = `Problem in ruleset:\n${errorMessages}\nFailed to parse the code health rule set`;
-          return {
-            rulesMsg: result,
-            errorMsg: report,
-          } as CodeHealthRulesResult;
-        }
-
-        return {
-          rulesMsg: result,
-        } as CodeHealthRulesResult;
-      }
-
-      return { rulesMsg: result } as CodeHealthRulesResult;
-    } catch (error) {
-      return { errorMsg: stderr } as CodeHealthRulesResult;
+    const { result, 'parsing-errors': parsingErrors, failed } = await DevtoolsAPI.ideServer.checkRules(rootPath, filePath);
+    if (failed && parsingErrors?.length) {
+      const errorMessages = parsingErrors.map((error) => error.message).join('\n');
+      return {
+        rulesMsg: result,
+        errorMsg: `Problem in ruleset:\n${errorMessages}\nFailed to parse the code health rule set`,
+      } as CodeHealthRulesResult;
     }
-
+    return { rulesMsg: result } as CodeHealthRulesResult;
   }
 
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
-  /** Emits events when review or delta analysis state changes (running/idle?) */
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
-  public static get isAnalysisRunning(): boolean {
-    return DevtoolsAPI.analysesRunning > 0;
-  }
-  public static setAnalysesRunningForTesting(count: number): void {
-    DevtoolsAPI.analysesRunning = count;
-  }
-  public static jobs = new Set<string>(); // Keep track of the filename of current jobs
+  public static jobs = new Set<string>();
+  private static queueCount = 0;
+  private static queueDone = 0;
+  private static queued: string[] = [];
   private static readonly analysisErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidAnalysisFail = DevtoolsAPI.analysisErrorEmitter.event;
 
-  // Adding to the jobs set if it's a delta analysis
   private static startAnalysisEvent(fileName: string, delta?: boolean) {
-    delta && DevtoolsAPI.jobs.add(fileName);
+    if (delta) DevtoolsAPI.jobs.add(fileName);
     DevtoolsAPI.analysesRunning++;
-    DevtoolsAPI.analysisStateEmitter.fire({ state: 'running', jobs: DevtoolsAPI.jobs });
+    DevtoolsAPI.fireAnalysisState();
   }
 
   private static endAnalysisEvent(fileName: string, delta?: boolean) {
-    delta && DevtoolsAPI.jobs.delete(fileName); // Remove filename from jobs list on completed delta analysis
+    if (delta) DevtoolsAPI.jobs.delete(fileName);
     DevtoolsAPI.analysesRunning--;
-    if (DevtoolsAPI.analysesRunning === 0) {
-      DevtoolsAPI.analysisStateEmitter.fire({ state: 'idle' });
-    }
+    DevtoolsAPI.fireAnalysisState();
+  }
+
+  private static applyQueue(snapshot: ReviewQueue): void {
+    const queue = automaticAnalysisEnabled() ? snapshot : { count: 0, done: 0, files: [] };
+    DevtoolsAPI.queueCount = queue.count;
+    DevtoolsAPI.queueDone = queue.done;
+    DevtoolsAPI.queued = queue.files;
+    DevtoolsAPI.fireAnalysisState();
+  }
+
+  static clearQueue(): void {
+    DevtoolsAPI.applyQueue({ count: 0, done: 0, files: [] });
+  }
+
+  private static fireAnalysisState(): void {
+    const running = DevtoolsAPI.analysesRunning > 0 || DevtoolsAPI.queueCount > 0;
+    DevtoolsAPI.analysisStateEmitter.fire({
+      state: running ? 'running' : 'idle',
+      jobs: DevtoolsAPI.jobs,
+      queued: DevtoolsAPI.queued,
+      queueCount: DevtoolsAPI.queueCount,
+      queueDone: DevtoolsAPI.queueDone,
+    });
   }
 
   private static readonly reviewEmitter = new vscode.EventEmitter<ReviewEvent>();
   public static readonly onDidReviewComplete = DevtoolsAPI.reviewEmitter.event;
 
-  static async reviewContent(document: vscode.TextDocument) {
-    const fp = fileParts(document);
-    if (!validateFileParts('reviewContent', fp, document)) {
-      return;
+  static reviewWithServer(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<Review | void> {
+    const repoRoot = DevtoolsAPI.repoRootFor(document);
+    return DevtoolsAPI.pipeline.submit(repoRoot, {
+      document,
+      relPath: relativePosix(repoRoot, document.fileName),
+      content: document.getText(),
+      updateDiagnosticsPane: reviewOpts?.updateDiagnosticsPane ?? false,
+      updateMonitor: !(reviewOpts?.skipMonitorUpdate ?? false),
+    });
+  }
+
+  static releaseBufferMonitorOwnership(document: vscode.TextDocument): void {
+    DevtoolsAPI.pipeline.releaseBufferMonitorOwnership(DevtoolsAPI.repoRootFor(document), document);
+  }
+
+  static restoreFromDiskIfBufferOwned(document: vscode.TextDocument): void {
+    DevtoolsAPI.pipeline.restoreFromDiskIfBufferOwned(DevtoolsAPI.repoRootFor(document), document);
+  }
+
+  private static repoRootFor(document: vscode.TextDocument): string {
+    const repo = acquireGitApi()?.getRepository(document.uri);
+    if (repo) return getRepoRootPath(repo);
+    const cwd = getWorkspaceCwd();
+    logOutputChannel.debug(`[cs-ide] repoRoot fallback path=${document.fileName} cwd=${cwd}`);
+    return cwd;
+  }
+
+  private static pipelinePresentation(): ReviewPipelinePresentation {
+    return {
+      reviewStarted: (document) => DevtoolsAPI.startAnalysisEvent(document.fileName),
+      reviewFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName),
+      deltaStarted: (document) => DevtoolsAPI.startAnalysisEvent(document.fileName, true),
+      deltaFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName, true),
+      presentReview: (review) => DevtoolsAPI.presentServerReview(review),
+      presentDelta: (delta) => DevtoolsAPI.presentServerDelta(delta),
+      remove: (document) => DevtoolsAPI.removeServerReview(document),
+      failed: (error) => DevtoolsAPI.analysisErrorEmitter.fire(error),
+    };
+  }
+
+  private static presentServerReview({ document, result, updateDiagnosticsPane, updateMonitor }: PresentedReview): void {
+    const review = new CsReview(document, Promise.resolve(result));
+    Reviewer.instance.updateOrAdd(document, review, !updateMonitor);
+    if (updateDiagnosticsPane) {
+      void review.diagnostics.then((diagnostics) => CsDiagnostics.set(
+        document.uri,
+        diagnostics.filter((diagnostic) => diagnostic.codeSmell !== null)
+      ));
     }
-    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
+    DevtoolsAPI.reviewEmitter.fire({ document, result });
+  }
 
-    const payload = {
-      'path': fp.fileName,
-      'file-content': document.getText(),
-      ...(cachePath ? { 'cache-path': cachePath } : {}),
-    };
+  private static presentServerDelta({ document, result, updateMonitor }: PresentedDelta): void {
+    const normalized = result ?? undefined;
+    if (normalized) {
+      normalized['file-level-findings'] ??= [];
+      normalized['function-level-findings'] ??= [];
+    }
+    Reviewer.instance.reviewCache.get(document, 'any')?.setDelta(normalized);
+    DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: normalized, updateMonitor });
+    if (normalized) void DevtoolsAPI.enrichServerDelta(document, normalized, updateMonitor);
+  }
 
-    const binaryOpts = {
-      args: ['run-command', 'review'],
-      taskId: taskId('review', document),
-      execOptions: { cwd: fp.documentDirectory },
-      input: JSON.stringify(payload),
-    };
-
-    DevtoolsAPI.startAnalysisEvent(document.fileName);
+  private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
     try {
-      const reviewResult = await DevtoolsAPI.review(document, binaryOpts);
-      if (reviewResult['code-health-rules-error']) {
-        // TODO - maybe show a popup notification? Might become spammy when having multiple files open...
-        const { description, remedy } = reviewResult['code-health-rules-error'];
-        logOutputChannel.warn(`${description}`);
-        logOutputChannel.warn(`${remedy}`);
-      }
-      DevtoolsAPI.reviewEmitter.fire({ document, result: reviewResult });
-      return reviewResult;
-    } catch (e) {
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-      }
-    } finally {
-      DevtoolsAPI.endAnalysisEvent(document.fileName);
+      await addRefactorableFunctionsToDeltaResult(document, result);
+      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor, enrichment: true });
+    } catch (error) {
+      logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);
     }
   }
 
-  static async reviewBaseline(baselineCommit: string, document: vscode.TextDocument) {
-    const fp = fileParts(document);
-    if (!validateFileParts('reviewBaseline', fp, document)) {
-      return;
-    }
-    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
-
-    const path = `${baselineCommit}:./${fp.fileName}`;
-
-    const payload = {
-      'path': path,
-      ...(cachePath ? { 'cache-path': cachePath } : {}),
-    };
-
-    const binaryOpts = {
-      args: ['run-command', 'review'],
-      taskId: taskId('review-base', document),
-      execOptions: { cwd: fp.documentDirectory },
-      input: JSON.stringify(payload),
-    };
-
-    DevtoolsAPI.startAnalysisEvent(document.fileName);
-    try {
-      return await DevtoolsAPI.review(document, binaryOpts);
-    } catch (e) {
-      if (e instanceof DevtoolsError) {
-        // Just return on regular devtoolerrors - this just means that we don't have any baseline to compare to
-        return;
-      }
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-      }
-      throw e;
-    } finally {
-      DevtoolsAPI.endAnalysisEvent(document.fileName);
-    }
-  }
-
-  private static async review(document: TextDocument, opts: BinaryOpts) {
-    const { stdout, duration } = await DevtoolsAPI.instance.runBinary(opts);
-    StatsCollector.instance.recordAnalysis(document.fileName, duration);
-    return safeJsonParse(stdout) as Review;
-  }
-
-  static abortReviews(document: TextDocument) {
-    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review', document));
-    DevtoolsAPI.instance.concurrencyLimitingExecutor.abort(taskId('review-base', document));
+  private static removeServerReview(document: TextDocument): void {
+    CsDiagnostics.set(document.uri, []);
+    Reviewer.instance.reviewCache.delete(document.uri.fsPath);
+    fireFileDeletedFromGit(document.uri.fsPath);
   }
 
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
   public static readonly onDidDeltaAnalysisComplete = DevtoolsAPI.deltaAnalysisEmitter.event;
-
-  /**
-   * Runs delta analysis and returns the result. Also fires onDidDeltaAnalysisComplete when analysis is complete.
-   *
-   * @param document
-   * @param updateMonitor whether to update the Code Health Monitor tree view
-   * @param oldScore raw base64 encoded score
-   * @param newScore raw base64 encoded score
-   * @returns Delta if any changes were detected or undefined when no improvements/degradations were found.
-   */
-  static async delta(document: TextDocument, updateMonitor: boolean, oldScore?: string | void, newScore?: string | void) {
-    const inputJsonString = jsonForScores(oldScore, newScore);
-    if (!inputJsonString) {
-      logOutputChannel.debug(`Delta analysis skipped for ${basename(document.fileName)}: no input scores`);
-      return;
-    }
-    const fp = fileParts(document);
-    if (!validateFileParts('delta', fp, document)) {
-      return;
-    }
-
-    DevtoolsAPI.startAnalysisEvent(document.fileName, true);
-    try {
-      const result = await DevtoolsAPI.instance.runBinary({
-        args: ['run-command', 'delta'],
-        input: inputJsonString,
-        taskId: taskId(DELTA_TASK_ID_PREFIX, document),
-        execOptions: { cwd: fp.documentDirectory },
-      });
-      let deltaResult;
-      if (result.stdout && result.stdout.trim() !== '') {
-        const parsedResult = safeJsonParse(result.stdout) as Delta | null;
-        if (parsedResult) {
-          deltaResult = parsedResult;
-          await addRefactorableFunctionsToDeltaResult(document, deltaResult);
-          logOutputChannel.info(`Delta analysis completed for ${basename(document.fileName)}: score-change=${deltaResult['score-change']}`);
-        } else {
-          logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
-        }
-      } else {
-        logOutputChannel.debug(`Delta analysis completed for ${basename(document.fileName)}: no changes detected`);
-      }
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: deltaResult, updateMonitor });
-      return deltaResult;
-    } catch (e) {
-      const error = assertError(e);
-      if (!(e instanceof AbortError)) {
-        logOutputChannel.error(`Delta analysis failed for ${basename(document.fileName)}: ${error.message}`);
-        if (error.stack) {
-          logOutputChannel.error(`Stack trace: ${error.stack}`);
-        }
-      }
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        DevtoolsAPI.handleOfflineBehavior();
-        return;
-      }
-
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.analysisErrorEmitter.fire(assertError(e));
-        reportError({ context: 'Refactoring (delta operation) failed', e });
-      }
-    } finally {
-      DevtoolsAPI.endAnalysisEvent(document.fileName, true);
-    }
-  }
-
-  // Event emitters for devtools API callbacks
   private static readonly preflightRequestEmitter = new vscode.EventEmitter<CsFeature>();
-  public static readonly onDidChangePreflightState = DevtoolsAPI.preflightRequestEmitter.event; // (successful preflight is synonymous with activation)
+  public static readonly onDidChangePreflightState = DevtoolsAPI.preflightRequestEmitter.event;
+  private static preflightJson?: string;
 
-  /**
-   * Do a new preflight request and update the internal json used by subsequent fnsToRefactor calls
-   *
-   * Fires onDidChangePreflightState
-   *
-   * @returns preflightResponse
-   */
   static async preflight() {
-    if (!ACE_ENABLED) {
-      return;
-    }
+    if (!ACE_ENABLED) return;
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
     try {
-      const response = await DevtoolsAPI.instance.executeAsJson<PreFlightResponse>({
-        args: ['run-command', 'preflight'],
-        input: JSON.stringify({}),
-        execOptions: { cwd: getWorkspaceCwd() }
-      });
-      DevtoolsAPI.instance.preflightJson = JSON.stringify(response);
+      const response = await DevtoolsAPI.ideServer.preflight();
+      DevtoolsAPI.preflightJson = JSON.stringify(response);
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
     } catch (e) {
@@ -323,24 +241,18 @@ export class DevtoolsAPI {
         DevtoolsAPI.handleOfflineBehavior();
         return;
       }
-
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error: assertError(e) });
       reportError({ context: 'Unable to enable refactoring capabilities', e });
     }
   }
 
   static aceEnabled() {
-    if (!ACE_ENABLED) {
-      return false;
-    }
-    return DevtoolsAPI.instance.preflightJson !== undefined;
+    return ACE_ENABLED && DevtoolsAPI.preflightJson !== undefined;
   }
 
   static disableAce() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    DevtoolsAPI.instance.preflightJson = undefined;
+    if (!ACE_ENABLED) return;
+    DevtoolsAPI.preflightJson = undefined;
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
   }
 
@@ -348,38 +260,21 @@ export class DevtoolsAPI {
     return this.fnsToRefactor(document, { 'delta-result': delta });
   }
 
-  /**
-   * If no preflight json is available, ACE is considered disabled. No functions will
-   * be presented as refactorable by early return here.
-   */
   static async fnsToRefactor(document: TextDocument, args: { 'delta-result': Delta } | { 'code-smells': [CodeSmell] }) {
     if (!DevtoolsAPI.aceEnabled()) return;
     logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
     const fp = fileParts(document);
-    if (!validateFileParts('fnsToRefactor', fp, document)) {
-      return;
-    }
+    if (!validateFileParts('fnsToRefactor', fp, document)) return;
     const cachePath = DevtoolsAPI.reviewCache.getCachePath();
-
-    const payload = {
+    const ret = await DevtoolsAPI.ideServer.fnsToRefactor({
       'file-name': fp.fileName,
       'file-content': document.getText(),
-      'preflight': JSON.parse(DevtoolsAPI.instance.preflightJson!), // aceEnabled() implies preflightJson is defined
+      preflight: JSON.parse(DevtoolsAPI.preflightJson!),
       ...(cachePath ? { 'cache-path': cachePath } : {}),
       ...args,
-    };
-
-    const baseArgs = ['run-command', 'fns-to-refactor'];
-
-    const ret = await DevtoolsAPI.instance.executeAsJson<FnToRefactor[]>({
-      args: baseArgs,
-      input: JSON.stringify(payload),
-      execOptions: { cwd: fp.documentDirectory },
     });
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
-    logOutputChannel.debug(
-      `Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`
-    );
+    logOutputChannel.debug(`Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`);
     return ret;
   }
 
@@ -388,33 +283,19 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
-  /**
-   * Posts a refactoring using devtools binary
-   *
-   * Fires onDidRefactoringRequest and ondidRefactoringFail events
-   *
-   * @param request refactoring request
-   * @returns refactoring response
-   */
   static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
     this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;
-
-    this.getAuthToken();
-
+    this.getRefactoringAuthToken();
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
       this.logRefactorRequested(fnToRefactor, skipCache);
-
-      const response = await this.executeRefactor(document, fnToRefactor, signal, onProgress);
-
+      const response = await DevtoolsAPI.executeRefactor(document, fnToRefactor, signal, onProgress);
       this.logRefactorDone(fnToRefactor, skipCache, response);
-
       DevtoolsAPI.handleBackOnline();
-
       return response;
     } catch (e) {
-      this.handleRefactorError(e);
+      DevtoolsAPI.handleRefactorError(e);
       throw e;
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
@@ -422,23 +303,15 @@ export class DevtoolsAPI {
   }
 
   private static checkAceEnabled(): void {
-    if (!ACE_ENABLED) {
-      throw new Error('ACE is not available in this build');
-    }
+    if (!ACE_ENABLED) throw new Error('ACE is not available in this build');
   }
 
-  private static getAuthToken(): string {
-    const token = getEffectiveToken();
-    if (!token) {
-      throw new MissingAuthTokenError();
-    }
-    return token;
+  private static getRefactoringAuthToken(): string | undefined {
+    return refactorToken(aceToken(), CsExtensionState.stateProperties.auth);
   }
 
-  private static logRefactorRequested(fnToRefactor: any, skipCache: boolean): void {
-    logOutputChannel.info(
-      `Refactor requested for ${logIdString(fnToRefactor)}${skipCache === true ? ' (retry)' : ''}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((t: any) => t.category).join(', ')}]`
-    );
+  private static logRefactorRequested(fnToRefactor: FnToRefactor, skipCache: boolean): void {
+    logOutputChannel.info(`Refactor requested for ${logIdString(fnToRefactor)}${skipCache ? ' (retry)' : ''}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((target) => target.category).join(', ')}]`);
   }
 
   private static async executeRefactor(
@@ -450,102 +323,52 @@ export class DevtoolsAPI {
     return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal, undefined, onProgress);
   }
 
-  private static logRefactorDone(fnToRefactor: any, skipCache: boolean, response: RefactorResponse): void {
-    logOutputChannel.info(
-      `Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${skipCache === true ? ' (retry)' : ''}`
-    );
+  private static logRefactorDone(fnToRefactor: FnToRefactor, skipCache: boolean, response: RefactorResponse): void {
+    logOutputChannel.info(`Refactor request done ${logIdString(fnToRefactor, response['trace-id'])}${skipCache ? ' (retry)' : ''}`);
   }
 
-  private static handleRefactorError(e: any): void {
-    if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-      DevtoolsAPI.handleOfflineBehavior();
-    } else {
+  private static handleRefactorError(e: unknown): void {
+    if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) DevtoolsAPI.handleOfflineBehavior();
+    else {
       reportError({ context: 'Refactoring error', e, consoleOnly: true });
-      if (!(e instanceof AbortError)) {
-        DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
-      }
+      if (!(e instanceof AbortError)) DevtoolsAPI.refactoringErrorEmitter.fire(assertError(e));
     }
   }
 
-  static postTelemetry(event: TelemetryEvent) {
-    const payload = { event };
-    return DevtoolsAPI.instance.executeAsJson<TelemetryResponse>({
-      args: ['run-command', 'telemetry'],
-      input: JSON.stringify(payload),
-      execOptions: { cwd: getWorkspaceCwd() },
-      taskId: TELEMETRY_POST_TASK_ID
-    });
+  static postTelemetry(event: TelemetryEvent): Promise<TelemetryResponse> {
+    return DevtoolsAPI.ideServer.telemetry(event);
   }
 
   static async getDeviceId() {
-    const result = await DevtoolsAPI.instance.runBinary({
-      args: ['run-command', 'telemetry'],
-      input: JSON.stringify({"device-id": true}),
-      execOptions: { cwd: getWorkspaceCwd() },
-      taskId: TELEMETRY_DEVICE_ID_TASK_ID
-    });
-    const json = safeJsonParse(result.stdout, { command: 'telemetry', args: { 'device-id': true } });
-    return json['device-id'];
+    return (await DevtoolsAPI.ideServer.deviceId())['device-id'];
   }
 
   private static shouldHandleOfflineBehavior(e: unknown): boolean {
-    const message = (e as Error).message;
-
-    if (message === networkErrors.javaConnectException) {
-      return true;
-    }
-
-    return false;
+    return (e as Error).message === networkErrors.javaConnectException;
   }
 
-  /**
-   * Handles the transition of the ACE feature into offline mode.
-   *
-   * This method should be called when a network-related error is detected.
-   * It performs the following actions:
-   * - If not already offline, shows an information message to the user that the extension
-   *   is running in offline mode and some features may be unavailable.
-   * - Logs a warning in the output channel with additional context.
-   * - Fires a preflight event to update the ACE state to `offline`.
-   */
   private static handleOfflineBehavior() {
-    if (!ACE_ENABLED) {
-      return;
+    if (!ACE_ENABLED) return;
+    DevtoolsAPI.lastNetworkError = true;
+    if (CsExtensionState.stateProperties.features.ace.state !== 'offline') {
+      void vscode.window.showInformationMessage('CodeScene extension is running in offline mode. Some features may be unavailable.');
     }
-    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
-
-    // Only show when transitioning to offline mode
-    if (currentState !== 'offline') {
-      void vscode.window.showInformationMessage(
-        'CodeScene extension is running in offline mode. Some features may be unavailable.'
-      );
-    }
-
-    logOutputChannel.warn(
-      'CodeScene extension is running in offline mode. The requested action could not be completed. Please check your internet connection to restore full functionality.'
-    );
-
+    logOutputChannel.warn('CodeScene extension is running in offline mode. The requested action could not be completed. Please check your internet connection to restore full functionality.');
     DevtoolsAPI.preflightRequestEmitter.fire({ state: 'offline' });
   }
 
-  /**
-   * Restores the ACE feature state when the extension comes back online.
-   * This method should be called after a successful request to the CodeScene backend.
-   * No action is taken if the ACE feature state is not `offline`.
-   */
   private static handleBackOnline() {
-    if (!ACE_ENABLED) {
-      return;
-    }
-    const { state: currentState } = CsExtensionState.stateProperties.features.ace;
-    if (currentState === 'offline') {
+    DevtoolsAPI.lastNetworkError = false;
+    if (ACE_ENABLED && CsExtensionState.stateProperties.features.ace.state === 'offline') {
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }
   }
 
   static dispose() {
-    try { DevtoolsAPI.instance?.concurrencyLimitingExecutor.dispose(); } catch {}
+    DevtoolsAPI.pipeline?.dispose();
+    DevtoolsAPI.queueSubscription?.dispose();
+    DevtoolsAPI.ideServer?.dispose();
     try { DevtoolsAPI.analysisStateEmitter.dispose(); } catch {}
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
@@ -556,36 +379,22 @@ export class DevtoolsAPI {
   }
 }
 
-type CmdId = 'review' | 'review-base' | 'delta';
-function taskId(cmdId: CmdId, document: TextDocument) {
-  return `${cmdId} ${document.fileName} v${document.version}`;
-}
-
 interface FileParts {
   fileName: string;
   documentDirectory: string;
 }
-function fileParts(document: vscode.TextDocument): FileParts {
-  const fileName = basename(document.fileName);
 
-  // Get the fsPath of the current document because we want to execute the
-  // 'cs review' command in the same directory as the current document
-  // (i.e. inside the repo to pick up on any .codescene/code-health-config.json file)
-  const documentDirectory = dirname(document.fileName);
-  return { fileName, documentDirectory };
+function fileParts(document: vscode.TextDocument): FileParts {
+  return { fileName: basename(document.fileName), documentDirectory: dirname(document.fileName) };
 }
 
 function validateFileParts(operation: string, fp: FileParts, document: vscode.TextDocument): boolean {
-  if (!fp.documentDirectory?.trim()) { // Cheap check (null / blank string)
+  if (!fp.documentDirectory?.trim()) {
     logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory is empty`);
     return false;
   }
   let exists = true;
-  try {
-    exists = existsSync(fp.documentDirectory);  // Slightly more expensive check (filesystem-based)
-  } catch (e) {
-    // If existsSync throws, default to true (we don't want to foil an operation for an unknown reason)
-  }
+  try { exists = existsSync(fp.documentDirectory); } catch {}
   if (!exists) {
     logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory does not exist: ${fp.documentDirectory}`);
     return false;
@@ -593,36 +402,29 @@ function validateFileParts(operation: string, fp: FileParts, document: vscode.Te
   return true;
 }
 
-export function isCodeSceneSession(x: vscode.AuthenticationSession): x is CodeSceneAuthenticationSession {
-  return (<CodeSceneAuthenticationSession>x).url !== undefined;
+export function aceToken(): string | undefined {
+  return resolveAceToken(getAuthToken(), CsExtensionState.stateProperties.legacySession?.accessToken);
 }
 
-export function getEffectiveToken(): string | undefined {
-  const configToken = getAuthToken();
-  const session = CsExtensionState.stateProperties.session;
-  const sessionToken = session && isCodeSceneSession(session) ? session.accessToken : undefined;
-
-  const token = configToken || sessionToken;
-  return token && token.trim() !== '' ? token : undefined;
+export function aceAvailable(): boolean {
+  return isAceAvailable(aceToken(), CsExtensionState.stateProperties.auth);
 }
 
 export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
-  return `[traceId ${traceId ? traceId : 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
+  return `[traceId ${traceId ?? 'n/a'}] "${fnToRefactor.name}" ${rangeStr(fnToRefactor.vscodeRange)}`;
 }
-
 
 export type AnalysisEvent = {
   state: 'running' | 'idle';
   jobs?: Set<string>;
+  queued?: string[];
+  queueCount?: number;
+  queueDone?: number;
 };
-
-export type ReviewEvent = {
-  document: vscode.TextDocument;
-  result?: Review;
-};
-
+export type ReviewEvent = { document: vscode.TextDocument; result?: Review };
 export type DeltaAnalysisEvent = {
   document: vscode.TextDocument;
   result?: Delta;
-  updateMonitor: boolean; // Please set this to false if triggering reviews due to opening files, and to true if triggering reviews due to Git changes.
+  updateMonitor: boolean;
+  enrichment?: boolean;
 };

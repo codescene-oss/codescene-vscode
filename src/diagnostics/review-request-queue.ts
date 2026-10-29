@@ -24,4 +24,8 @@ export class ReviewRequestQueue {
       return opts;
     }
   }
+
+  cancel(fileName: string): void {
+    this.reviewQueue.delete(fileName);
+  }
 }

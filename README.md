@@ -32,6 +32,10 @@ The **Code Health Monitor** flags for drops in code health in real time and offe
 | **Problems View** | When a file is opened in the editor, it is instantly scanned for existing Code Health issues. All discovered issues are then listed in the IDE Problems View. This way you instantly get an overview of all opportunities a file has for improvements. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/problems.png" alt="Problem View" width="2000px"/> |
 | **Custom Code Health rules** | To customize the code analysis you can either use local [Code Comment Directives](https://codescene.io/docs/guides/technical/code-health.html#disable-local-smells-via-code-comment-directives) or create a `code-health-rules.json` file which applies to the entire project. | <img style="margin: 10px 10px 10px 10px;" src="screenshots/custom_directive.png" alt="ACR" width="2000px"/> |
 
+## Release notes ##
+
+See the [GitHub Releases](https://github.com/codescene-oss/codescene-vscode/releases) page for the release notes of every version.
+
 ## Configuration ##
 
 You can add configuration files to the git repository to customize and control behavior in the Extension. They should be located in a `.codescene` folder, at the repository root. In addition, we also have a Settings page for personalized configuration of the extension.
@@ -46,6 +50,8 @@ You can find more documentation on its content [here](https://codescene.io/docs/
 
 Location: `.codescene/config.json`
 
+The bundled CLI (since 0.29.0) picks the Git merge base used for delta analysis. See [Baseline resolution](docs/baseline-resolution.md) for the full algorithm, examples, and troubleshooting.
+
 Example configuration:
 ```json
 {
@@ -54,7 +60,7 @@ Example configuration:
 ```
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| **baseline_branch** | String | origin/HEAD (default branch) | The name of the branch that the Code Health Monitor should compare against when running its delta analysis. If no origin/HEAD or config present, it will look for the nearest merge-base among common shared branches (main, master, develop etc)
+| **baseline_branch** | String | Automatic (see [Baseline resolution](docs/baseline-resolution.md)) | Branch name used to resolve the merge base with `HEAD` (remote `origin/<branch>` preferred over local). Replaces the default ref list entirely when set.
 
 ### Settings ###
 
@@ -64,11 +70,15 @@ Location: `Code Health Monitor` > `Extension Settings`
 |----------|------|---------|-------------|
 | **Enable Review Code Lenses** | Boolean | true | Enables/Disables showing Code Health Score and Code Smells in the active documents |
 | **Enable Auto Refactor** | Boolean | false | Enables/Disables ACE, CodeScenes automatic refactoring tool |
-| **Auth Token** | String | - | CodeScene PAT Token for authentication. Used for Automatic Refactoring in ACE |
+| **Server URL** | String | - | CodeScene server for browser sign-in. Empty uses `CS_ONPREM_URL`, then CodeScene Cloud. Used when Experimental: Sign In is on. |
+| **Auth Token** | String | - | Personal access token — fallback for WSL, remote and headless environments. Browser sign-in is recommended. Also used for Automatic Refactoring in ACE. |
+| **Experimental: Sign In** | Boolean | false | Sign in to CodeScene in the browser (experimental). Requires a CodeScene IDE server with sign-in support. |
 | **Enable Telemetry** | Boolean | true | Enable/Disable collecting anonymized telemetry for tracking usage and feature engagement. |
 
 ### Debug logging ###
 
-CodeScene follows Visual Studio Codes Log level. To enable debug logging, in the command `Developer: Set Log Level...` to debug
+CodeScene writes diagnostics to the **CodeScene Log** output channel and follows Visual Studio Code's log level (`info`, `debug`, `warn`, and `error`). CLI process lifecycle and JSON-RPC request/response summaries are logged at **Info**. To see workspace, repository, and review decision logs as well, run `Developer: Set Log Level...` and choose **Debug**.
+
+Source code, auth tokens, encoded refactor payloads, returned refactored code, device IDs, and telemetry user identifiers are not written to the log.
 
 _* Available time-limited for non CodeScene customers._

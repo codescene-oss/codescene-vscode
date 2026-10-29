@@ -2,7 +2,7 @@
 
 /**
  * Package the extension for a specific platform/architecture.
- * This script bundles the CLI binary for the specified platform and creates a platform-specific VSIX.
+ * This script bundles the CLI distribution for the specified platform and creates a platform-specific VSIX.
  */
 
 const { execSync } = require('child_process');
@@ -19,54 +19,61 @@ const artifacts = {
 function cleanupOtherBinaries(targetPlatform, targetArch) {
   const projectRoot = path.join(__dirname, '..');
   console.log(`Cleaning up binaries for other platforms...`);
-  
-  // Keep only the target binary
-  const targetBinary = `cs-${targetPlatform}-${targetArch}${targetPlatform === 'win32' ? '.exe' : ''}`;
-  
-  // Remove all other binaries
+
+  const targetBinary = `cs-${targetPlatform}-${targetArch}`;
+
   for (const [platform, arches] of Object.entries(artifacts)) {
     for (const arch of arches) {
-      const binaryName = `cs-${platform}-${arch}${platform === 'win32' ? '.exe' : ''}`;
+      const binaryName = `cs-${platform}-${arch}`;
       const binaryPath = path.join(projectRoot, binaryName);
-      
+
       if (binaryName !== targetBinary && fs.existsSync(binaryPath)) {
-        fs.unlinkSync(binaryPath);
+        fs.rmSync(binaryPath, { recursive: true, force: true });
         console.log(`  Removed: ${binaryName}`);
       }
     }
   }
 }
 
+function applyVscodeIgnoreExceptions(content, targetBinary) {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  const lines = content.replace(/!cs-.*\r?\n/g, '').split(/\r?\n/);
+  const exceptions = ['!cs-cwf/', '!cs-cwf/**', `!${targetBinary}/`, `!${targetBinary}/**`];
+  const zipLineIndex = lines.findIndex(line => line.trim() === '*.zip');
+
+  if (zipLineIndex >= 0) {
+    lines.splice(zipLineIndex + 1, 0, ...exceptions);
+  } else {
+    lines.push(...exceptions);
+  }
+
+  return lines.join(eol);
+}
+
 function updateVscodeIgnore(targetPlatform, targetArch, originalContent) {
   const vscodeIgnorePath = path.join(__dirname, '..', '.vscodeignore');
-  const targetBinary = `cs-${targetPlatform}-${targetArch}${targetPlatform === 'win32' ? '.exe' : ''}`;
-  
-  // Read current .vscodeignore if original not provided
-  let content = originalContent || fs.readFileSync(vscodeIgnorePath, 'utf8');
-  
-  // Remove all binary includes
-  content = content.replace(/!cs-.*\n/g, '');
-  
-  // Add the target binary
-  const lines = content.split('\n');
-  const zipLineIndex = lines.findIndex(line => line.trim() === '*.zip');
-  
-  if (zipLineIndex >= 0) {
-    lines.splice(zipLineIndex + 1, 0, `!${targetBinary}`);
-  } else {
-    lines.push(`!${targetBinary}`);
-  }
-  
-  fs.writeFileSync(vscodeIgnorePath, lines.join('\n'));
+  const targetBinary = `cs-${targetPlatform}-${targetArch}`;
+
+  const content = originalContent || fs.readFileSync(vscodeIgnorePath, 'utf8');
+
+  fs.writeFileSync(vscodeIgnorePath, applyVscodeIgnoreExceptions(content, targetBinary));
   console.log(`Updated .vscodeignore to include only: ${targetBinary}`);
-  
-  return content; // Return original content for restoration
+
+  return content;
 }
 
 function restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgnore, originalPackageJson, originalReadme) {
   console.log('\nRestoring .vscodeignore, package.json, and README...');
   fs.writeFileSync(vscodeIgnorePath, originalVscodeIgnore);
   restoreVariantFiles(projectRoot, originalPackageJson, originalReadme);
+}
+
+function refreshAssets(tokenEnv) {
+  if (process.env.CS_IDE_USE_LOCAL_DISTRIBUTION === 'true') {
+    console.log('Skipping remote asset refresh for local distribution packaging.');
+    return;
+  }
+  execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
 }
 
 function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
@@ -86,10 +93,9 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   console.log('\nStep 3: Updating .vscodeignore...');
   updateVscodeIgnore(platform, arch, originalVscodeIgnore);
 
-  console.log('\nStep 4: Updating docs and webview...');
+  console.log('\nStep 4: Updating webview...');
   const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
-  execSync('npm run updatedocs', { stdio: 'inherit', env: tokenEnv });
-  execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
+  refreshAssets(tokenEnv);
 
   console.log('\nStep 5: Building extension...');
   execSync('npm run build', {
@@ -102,7 +108,7 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   const target = `${platform}-${arch}`;
   const vsixName = `${pkg.name}-${pkg.version}-${target}.vsix`;
 
-  execSync(`vsce package --target ${target} --no-yarn --out ${vsixName}`, {
+  execSync(`npx @vscode/vsce@4.0.0 package --target ${target} --no-yarn --out ${vsixName}`, {
     stdio: 'inherit',
     env: tokenEnv,
   });
@@ -112,7 +118,7 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
 
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.length < 2) {
     console.error('Usage: node package-platform.js <platform> <arch>');
     console.error('Example: node package-platform.js darwin arm64');
@@ -123,17 +129,17 @@ async function main() {
     }
     process.exit(1);
   }
-  
+
   const platform = args[0];
   const arch = args[1];
-  
+
   if (!artifacts[platform] || !artifacts[platform].includes(arch)) {
     console.error(`❌ Unsupported platform/arch: ${platform}/${arch}`);
     process.exit(1);
   }
-  
+
   console.log(`📦 Packaging extension for ${platform}/${arch}...\n`);
-  
+
   const projectRoot = path.join(__dirname, '..');
   const vscodeIgnorePath = path.join(projectRoot, '.vscodeignore');
   const packageJsonPath = path.join(projectRoot, 'package.json');
@@ -147,7 +153,7 @@ async function main() {
     packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore);
   } catch (error) {
     console.error('\n❌ Failed to package:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgnore, originalPackageJson, originalReadme);
   }
@@ -157,8 +163,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { cleanupOtherBinaries, updateVscodeIgnore };
-
-
-
-
+module.exports = { cleanupOtherBinaries, updateVscodeIgnore, applyVscodeIgnoreExceptions };

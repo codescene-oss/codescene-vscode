@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { TelemetryEvent, TelemetryResponse } from '../../devtools-api/telemetry-model';
+import { TelemetryEvent } from '../../devtools-api/telemetry-model';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
 suite('Telemetry Integration Test Suite', () => {
@@ -21,7 +21,7 @@ suite('Telemetry Integration Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
   });
 
   teardown(() => {

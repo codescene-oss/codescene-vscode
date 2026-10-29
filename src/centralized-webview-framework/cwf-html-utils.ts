@@ -2,18 +2,13 @@ import { Webview } from 'vscode';
 import { IdeContextType } from './types';
 import { getUri, nonce } from '../webview-utils';
 import { FeatureFlags } from './types/cwf-feature';
+import { withCwfAuth } from '../auth/cwf-auth';
+import type { MessageType } from './types/messages';
 export const ideType = 'VSCode';
 
-// This flag is used to enable or disable the login flow
-// true: will ignore any session data and always show Code Health Monitor
-// false: will respect any session and display sign in buttons, only showing Code Health Monitor if you are signed in.
-export const ignoreSessionStateFeatureFlag = true;
-
 // Enable Webview devmode with alot of logging
-export const devmode = false;
+export const devmode = process.env.DEVMODE === 'true';
 export const featureFlags: FeatureFlags[] = ['jobs', 'open-settings']; // CS-5597: removed 'commit-baseline'
-if (!ignoreSessionStateFeatureFlag) featureFlags.push('sign-in');
-
 const opacityHexLookup = {
   '1': {
     hex: '03',
@@ -114,6 +109,10 @@ function safeJsonStringify(obj: unknown): string {
   return JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 }
 
+export function updateRendererMessage(payload: IdeContextType): MessageType {
+  return { messageType: 'update-renderer', payload: withCwfAuth(payload) };
+}
+
 export const initialDataContextScriptTag = (ideContext: IdeContextType, scriptNonce: string) => /*html*/ `
   <script nonce="${scriptNonce}">
     function setContext() {
@@ -158,7 +157,7 @@ export function initBaseContent(webView: Webview, initialIdeContext: IdeContextT
       <link rel="stylesheet" type="text/css" href="${stylesUri}">
       <title>VSCode React Webview</title>
       ${ideStylesVars}
-      ${initialDataContextScriptTag(initialIdeContext, scriptNonce)}
+      ${initialDataContextScriptTag(withCwfAuth(initialIdeContext), scriptNonce)}
     </head>
     <body>
       <div id="root"></div>

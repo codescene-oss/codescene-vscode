@@ -4,6 +4,7 @@ import { SimpleExecutor } from '../simple-executor';
 import { getWorkspaceFolder } from '../utils';
 import { IGNORED_DIRECTORIES } from '../review/ignored_dirs';
 import { markGitAsUnavailable, isGitAvailable } from './git-detection';
+import { logOutputChannel } from '../log';
 
 interface PendingCheck {
   resolve: (ignored: boolean) => void;
@@ -209,6 +210,11 @@ export class GitIgnoreChecker {
     }
 
     this.gitExecutorCache.set(filePath, ignored);
+    if (ignored) {
+      logOutputChannel.debug(
+        `[git] ignored path=${filePath} reason=${isGitAvailable() ? 'git' : 'heuristic'}`
+      );
+    }
     return ignored;
   }
 

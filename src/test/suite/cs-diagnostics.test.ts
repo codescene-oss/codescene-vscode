@@ -28,7 +28,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     const binaryPath = await ensureBinary();
     const mockContext = createMockExtensionContext(testDir);
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
     mockCollection = new MockDiagnosticCollection();
     originalCollection = (CsDiagnostics as any).collection;
     (CsDiagnostics as any).collection = mockCollection;
@@ -59,7 +59,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     const testFile = path.resolve(testDir, 'gc.cpp');
     fs.writeFileSync(testFile, fileContent);
     const document = new TestTextDocument(testFile, fileContent, 'cpp');
-    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -125,7 +125,7 @@ return 0;
 `;
     fs.writeFileSync(cleanFile, cleanCode);
     const document = new TestTextDocument(cleanFile, cleanCode, 'cpp');
-    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -134,7 +134,7 @@ return 0;
 
     try {
       CsDiagnostics.review(document, reviewOpts);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await Reviewer.instance.review(document, reviewOpts).diagnostics;
 
       if (analysisError) {
         assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
@@ -153,7 +153,7 @@ return 0;
     const code = `int foo() { return 42; }\n`;
     fs.writeFileSync(cppFile, code);
     const document = new TestTextDocument(cppFile, code, 'cpp');
-    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {
@@ -162,7 +162,7 @@ return 0;
 
     try {
       CsDiagnostics.review(document, reviewOpts);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await Reviewer.instance.review(document, reviewOpts).diagnostics;
 
       if (analysisError) {
         assert.fail(`Analysis failed with error: ${analysisError.message}\n${analysisError.stack}`);
@@ -181,7 +181,7 @@ return 0;
     const content = 'This is just text';
     fs.writeFileSync(txtFile, content);
     const document = new TestTextDocument(txtFile, content, 'plaintext');
-    const reviewOpts: ReviewOpts = { baselineCommit: '', skipMonitorUpdate: true, updateDiagnosticsPane: true };
+    const reviewOpts: ReviewOpts = { skipMonitorUpdate: true, updateDiagnosticsPane: true };
 
     let analysisError: Error | undefined;
     const errorListener = DevtoolsAPI.onDidAnalysisFail((error) => {

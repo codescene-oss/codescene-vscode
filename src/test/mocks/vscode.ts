@@ -159,33 +159,24 @@ export namespace commands {
 }
 
 export namespace window {
-  let _activeTextEditor: MockEditor | undefined;
-  let _visibleTextEditors: MockEditor[] = [];
-  let _tabGroups: any = { all: [] };
-
   export let activeTextEditor: MockEditor | undefined;
   export let visibleTextEditors: MockEditor[] = [];
   export let tabGroups: any = { all: [] };
 
   export function setActiveEditor(editor: MockEditor | undefined) {
-    _activeTextEditor = editor;
     activeTextEditor = editor;
   }
 
   export function setVisibleTextEditors(editors: MockEditor[]) {
-    _visibleTextEditors = editors;
     visibleTextEditors = editors;
   }
 
   export function setTabGroups(groups: any) {
-    _tabGroups = groups;
     tabGroups = groups;
   }
 
   export function resetWindow() {
-    _visibleTextEditors = [];
     visibleTextEditors = [];
-    _tabGroups = { all: [] };
     tabGroups = { all: [] };
   }
 }

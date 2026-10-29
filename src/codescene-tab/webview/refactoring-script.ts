@@ -1,5 +1,5 @@
-import '@vscode-elements/elements/dist/vscode-button';
-import '@vscode-elements/elements/dist/vscode-progress-ring';
+import '@vscode-elements/elements/dist/vscode-button/index.js';
+import '@vscode-elements/elements/dist/vscode-progress-ring/index.js';
 
 window.addEventListener('load', main);
 

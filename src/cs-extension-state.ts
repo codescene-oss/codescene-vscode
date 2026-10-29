@@ -1,4 +1,6 @@
 import vscode, { Uri } from 'vscode';
+import type { LegacySession } from './auth/legacy-session';
+import type { AuthStatus } from './centralized-webview-framework/types/auth';
 import { CsStatusBar } from './cs-statusbar';
 import { AnalysisEvent, DevtoolsAPI } from './devtools-api';
 import { logOutputChannel } from './log';
@@ -17,13 +19,7 @@ export interface CsFeature {
   error?: Error;
 }
 
-export enum Baseline {
-  head = 1,
-  branchCreation = 2,
-  default = 3,
-}
-
-export type AnalysisFeature = CsFeature & { analysisState?: RunnerState };
+export type AnalysisFeature = CsFeature & { analysisState?: RunnerState; queueCount?: number };
 type RunnerState = 'running' | 'idle';
 
 interface CsFeatures {
@@ -31,13 +27,18 @@ interface CsFeatures {
   ace: CsFeature;
 }
 
+export interface ExtensionAuthState {
+  active: boolean;
+  status: AuthStatus | null;
+}
+
 export interface CsStateProperties {
-  session?: vscode.AuthenticationSession;
+  auth: ExtensionAuthState;
+  legacySession?: LegacySession;
   features: CsFeatures;
 }
 
 const acknowledgedAceUsageKey = 'acknowledgedAceUsage';
-const baselineKey = 'baseline';
 const telemetryNoticeShownKey = 'telemetryNoticeShown';
 
 /**
@@ -50,17 +51,15 @@ export class CsExtensionState {
   readonly statusBar: CsStatusBar;
   readonly extensionUri: Uri;
 
-  private baselineChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onBaselineChanged = this.baselineChangedEmitter.event;
-
-  private sessionChangedEmitter = new vscode.EventEmitter<void>();
-  readonly onSessionChanged = this.sessionChangedEmitter.event;
+  private authChangedEmitter = new vscode.EventEmitter<void>();
+  readonly onAuthChanged = this.authChangedEmitter.event;
 
   private aceStateChangedEmitter = new vscode.EventEmitter<void>();
   readonly onAceStateChanged = this.aceStateChangedEmitter.event;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.stateProperties = {
+      auth: { active: false, status: null },
       features: {
         analysis: { state: 'loading' },
         ace: { state: 'loading' },
@@ -78,7 +77,7 @@ export class CsExtensionState {
   }
 
   private setupGlobalStateSync() {
-    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, baselineKey, telemetryNoticeShownKey]);
+    this.context.globalState.setKeysForSync([acknowledgedAceUsageKey, telemetryNoticeShownKey]);
   }
 
   private static _instance: CsExtensionState;
@@ -97,19 +96,6 @@ export class CsExtensionState {
 
   static async setAcknowledgedAceUsage(value?: boolean) {
     await this._instance.context.globalState.update(acknowledgedAceUsageKey, value);
-  }
-
-  static get baseline(): Baseline {
-    return this._instance.context.globalState.get<Baseline>(baselineKey) || Baseline.default;
-  }
-
-  static async setBaseline(value: Baseline) {
-    await this._instance.context.globalState.update(baselineKey, value);
-    this._instance.baselineChangedEmitter.fire();
-  }
-
-  static get onBaselineChanged() {
-    return this._instance.onBaselineChanged;
   }
 
   static get telemetryNoticeShown() {
@@ -164,6 +150,7 @@ export class CsExtensionState {
     CsExtensionState.setAnalysisState({
       ...CsExtensionState.stateProperties.features.analysis,
       analysisState: event.state,
+      queueCount: event.queueCount,
     });
   }
 
@@ -175,39 +162,33 @@ export class CsExtensionState {
     CsExtensionState._instance.statusBar.update();
   }
 
-  /**
-   * Sets session state and updates the codescene.isSignedIn context variable.
-   * It's used in package.json to conditionally enable/disable views.
-   */
-  static setSession(session?: vscode.AuthenticationSession) {
-    const signedIn = isDefined(session);
-    void vscode.commands.executeCommand('setContext', 'codescene.isSignedIn', signedIn);
-    CsExtensionState._instance.stateProperties.session = session;
-    this._instance.sessionChangedEmitter.fire();
-    if (!signedIn) {
-      // this.csWorkspace.clearProjectAssociation(); <- if/when re-working Change Coupling...
-      return;
-    }
-
-    CsExtensionState._instance.updateStatusViews();
+  static setAuth(auth: ExtensionAuthState) {
+    CsExtensionState._instance.stateProperties.auth = auth;
+    CsExtensionState._instance.authChanged();
   }
 
-  static get session(): vscode.AuthenticationSession | undefined {
-    return CsExtensionState.stateProperties.session;
+  static setLegacySession(session: LegacySession | undefined) {
+    CsExtensionState._instance.stateProperties.legacySession = session;
+    CsExtensionState._instance.authChanged();
   }
 
-  static get onSessionChanged() {
-    return this._instance.onSessionChanged;
+  static get onAuthChanged() {
+    return this._instance.onAuthChanged;
+  }
+
+  private authChanged() {
+    this.updateStatusViews();
+    this.authChangedEmitter.fire();
   }
 
   static get onAceStateChanged() {
     return this._instance.onAceStateChanged;
   }
 
-  static setAnalysisState({ analysisState, error, state }: AnalysisFeature) {
+  static setAnalysisState({ analysisState, error, state, queueCount }: AnalysisFeature) {
     CsExtensionState.stateProperties.features = {
       ...CsExtensionState.stateProperties.features,
-      analysis: { state: featureState({ state, error }), error, analysisState },
+      analysis: { state: featureState({ state, error }), error, analysisState, queueCount },
     };
     CsExtensionState._instance.updateStatusViews();
   }

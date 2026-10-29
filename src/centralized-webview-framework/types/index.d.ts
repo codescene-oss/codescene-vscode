@@ -1,8 +1,12 @@
 import { RefactorResponse } from './ace';
+import { AuthPayload } from './auth';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
 
-import { CommitBaselineType } from './messages';
+export interface AuthField {
+  auth?: AuthPayload;
+}
+
 export type IdeTypes = 'VSCode';
 
 //View Props
@@ -26,7 +30,9 @@ export type Job = {
   state: 'running' | 'queued';
 };
 
-export interface HomeContextViewProps {
+export type AnalysisState = 'idle' | 'running' | 'stopped';
+
+export interface HomeContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -40,45 +46,17 @@ export interface HomeContextViewProps {
   data: {
     showOnboarding?: boolean;
     fileDeltaData: FileDeltaData[];
-    commitBaseline?: CommitBaselineType;
     autoRefactor?: AutoRefactorConfig;
     /**jobs allows the UI to act on running och queued native jobs such as runnign deltaAnalysis or autoRefacotr */
     jobs?: Job[];
+    analysisState?: AnalysisState;
+    totalCount?: number;
+    remainingCount?: number;
     user?: { name: string } | undefined | null;
   };
 }
 
-export type LoginFlowStateType = {
-  loginOpen: boolean;
-  loginState: LoginViewProps['data']['state'];
-};
-
-export interface LoginViewProps {
-  ideType: IdeTypes;
-  /**Enable premium UI elements */
-  pro?: boolean;
-  view: 'login';
-  /**devmode will display devtools and log state and messages in the browser console */
-  devmode?: boolean;
-  /** array of feature flags string */
-  featureFlags?: FeatureFlags[];
-  data: {
-    state: 'init' | 'pending' | 'project-selection' | 'summary' | 'error';
-    baseUrl: string;
-    repo?: {
-      name: string;
-    };
-    user?: { name: string } | undefined | null;
-    availableProjects: {
-      name: string;
-      id: number;
-    }[];
-    selectedProjectId?: number;
-    errorMessage?: string;
-  };
-}
-
-export interface DocsContextViewProps {
+export interface DocsContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -98,7 +76,7 @@ export interface DocsContextViewProps {
   };
 }
 
-export interface AceContextViewProps {
+export interface AceContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -119,7 +97,7 @@ export interface AceContextViewProps {
   };
 }
 
-export interface AceAcknowledgeContextViewProps {
+export interface AceAcknowledgeContextViewProps extends AuthField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */
@@ -136,12 +114,21 @@ export interface AceAcknowledgeContextViewProps {
   };
 }
 
+export interface AuthContextViewProps extends AuthField {
+  ideType: IdeTypes;
+  pro?: boolean;
+  view: 'auth';
+  devmode?: boolean;
+  featureFlags?: FeatureFlags[];
+  data?: undefined;
+}
+
 export type WebViewPropsType =
   | HomeContextViewProps
-  | LoginViewProps
   | DocsContextViewProps
   | AceContextViewProps
-  | AceAcknowledgeContextViewProps;
+  | AceAcknowledgeContextViewProps
+  | AuthContextViewProps;
 
 export type IdeContextType = WebViewPropsType;
 

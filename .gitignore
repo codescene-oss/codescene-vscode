@@ -1,6 +1,7 @@
 out
 dist
-docs
+docs/*
+!docs/baseline-resolution.md
 node_modules
 .vscode-test/
 .vscode-exp/
@@ -13,6 +14,7 @@ cs-win32-*
 cs-ide-*
 cs-cwf/
 *.zip
+!src/test/fixtures/*.zip
 .idea/
 test-git-repo/
 test-git-repo-diff-utils/
@@ -20,3 +22,4 @@ test-cs-diagnostics/
 coverage/
 .cs-prod-build
 bin/cs-agent
+bench-results/

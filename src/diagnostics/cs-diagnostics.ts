@@ -24,17 +24,21 @@ export default class CsDiagnostics {
     CsDiagnostics.collection.set(uri, diagnostics);
   }
 
-  static review(document: vscode.TextDocument, reviewOpts: ReviewOpts, skipMonitorUpdateForDelta?: boolean) {
+  static cancel(fileName: string): void {
+    CsDiagnostics.reviewQueue.cancel(fileName);
+  }
+
+  static review(document: vscode.TextDocument, reviewOpts: ReviewOpts) {
     if (vscode.languages.match(CsDiagnostics.documentSelector, document) === 0) {
       return;
     }
 
     if (!CsDiagnostics.reviewQueue.requestReview(document.fileName, reviewOpts)) {
-      logOutputChannel.trace(`Queued up a review of "${document.fileName}"`);
+      logOutputChannel.debug(`[diagnostics] queued review path=${document.fileName}`);
       return;
     }
 
-    void Reviewer.instance.review(document, reviewOpts, skipMonitorUpdateForDelta).diagnostics.then((diagnostics) => {
+    void Reviewer.instance.review(document, reviewOpts).diagnostics.then((diagnostics) => {
       if (reviewOpts.updateDiagnosticsPane) {
         // Only include diagnostics with actual code smells in the diagnostics view.
         const diagnosticsWithCodeSmells = diagnostics.filter((d) => d.codeSmell !== null);
@@ -44,7 +48,7 @@ export default class CsDiagnostics {
       const queuedReviewOpts = CsDiagnostics.reviewQueue.finishReview(document.fileName);
       if (queuedReviewOpts) {
         CsDiagnostics.review(document, queuedReviewOpts);
-        logOutputChannel.trace(`Fired a queued up review of "${document.fileName}"`);
+        logOutputChannel.debug(`[diagnostics] fired queued review path=${document.fileName}`);
       }
     });
   }

@@ -1,4 +1,4 @@
-.PHONY: build package package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64 package-all tsc clean lint watch test pretest pretest-e2e test-e2e updatedocs updatecwf
+.PHONY: build package package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64 package-all tsc clean lint watch test pretest test-release updatecwf benchmark benchmark-isolated
 
 .DEFAULT_GOAL := build
 
@@ -11,7 +11,7 @@ package: lint pretest
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
-	npx @vscode/vsce@3.7.1 package; \
+	npx @vscode/vsce@4.0.0 package; \
 	git checkout .vscodeignore; \
 
 package-darwin-arm64: lint pretest
@@ -48,36 +48,39 @@ tsc:
 lint:
 	npx commitlint --from main --to HEAD --verbose
 	npm run lint
-	@(command -v cs >/dev/null 2>&1 && cs delta main) || true
+	-cs delta main
 
 watch:
 	npm run watch
 
 pretest:
-	rm -rf out/
-	chronic npm run pretest
+	node -e "require('fs').rmSync('out',{recursive:true,force:true})"
+	npm run pretest
 
 test: pretest
 	npm run test
 
-E2E_CLEAN := $(if $(CLEAN),-Clean,)
+# Performance benchmarks. Add "ITERATIONS=n" to override the per scenario iteration count.
+benchmark: pretest
+	$(if $(ITERATIONS),CS_BENCH_ITERATIONS=$(ITERATIONS) )npm run benchmark
 
-# Requires PowerShell 7.0 or higher.
-pretest-e2e:
-	pwsh install-e2e.ps1 $(E2E_CLEAN)
-
-# Add "CLEAN=1" to force re-download of VS Code and extension.
-test-e2e: pretest-e2e
-	dotnet test e2e/Codescene.E2E.Playwright.Tests.csproj	
+# Fresh Node process and cs-ide server per side, repeated CS_BENCH_ROUNDS times (default 3).
+# Requires CS_BENCH_BEFORE_BIN and CS_BENCH_AFTER_BIN.
+benchmark-isolated: pretest
+	node scripts/isolated-benchmark.js
 
 # Runs just one test.
-# Example: make test1 TEST='GitChangeObserver Test Suite'
+# Example: make test1 TEST='workspace-watch'
+ifndef TEST
+test1:
+	$(error TEST parameter is required. Usage: make test1 TEST='test name')
+else
 test1: pretest
-	@test -n "$(TEST)" || (echo "TEST parameter is required. Usage: make test1 TEST='test name'" && exit 1)
-	npm run test -- --grep '$(TEST)'
+	npm run test -- --grep "$(TEST)"
+endif
 
-updatedocs:
-	npm run updatedocs
+test-release:
+	npm run release:test -- $(if $(BUMP),$(BUMP),patch)
 
 updatecwf:
 	node ./scripts/update-cwf.js

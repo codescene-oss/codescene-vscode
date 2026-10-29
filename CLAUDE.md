@@ -19,3 +19,5 @@ This project uses the CodeScene CLI for performing various code analysis tasks, 
 This project used in the past ACE where cs-agent is now used, and can typically be found at `../automated-refactoring`.
 
 When querying external projects, please use subagents.
+
+Commit messages follow Conventional Commits. Keep the subject line (`type: imperative summary`) to at most 100 characters and do not end it with a period. Put the why in the body after a blank line, wrapped near 80 columns. The commit-msg hook rejects messages that fail commitlint. `make lint` checks every commit from `main` to `HEAD`.

@@ -9,7 +9,7 @@ import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
-import { getEffectiveToken } from '../devtools-api';
+import { aceToken } from '../devtools-api';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 
@@ -90,7 +90,7 @@ export class AgentRefactoringService {
 
   private static spawnAgentProcess(workDir: string, ioDir: string): { proc: ChildProcess; binaryPath: string } {
     const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-    const token = getEffectiveToken();
+    const token = aceToken();
     if (!token) {
       throw new Error('No authentication token available for agent');
     }

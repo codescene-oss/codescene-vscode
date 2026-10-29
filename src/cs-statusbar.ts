@@ -1,16 +1,23 @@
 import vscode, { Disposable } from 'vscode';
 import { ACE_ENABLED } from './build-flags';
 import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { getEffectiveToken } from './devtools-api';
+import { aceAvailable } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
-import { onDidChangeConfiguration } from './configuration';
+import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
 
 interface StatusBarOptions {
   text: string;
   tooltip?: string;
   command?: string;
   background?: string;
+}
+
+export function analysisProgressTooltip(queueCount?: number): string {
+  if (queueCount && queueCount > 0) {
+    return `CodeScene analysis in progress (${queueCount} remaining)...`;
+  }
+  return 'CodeScene analysis in progress...';
 }
 
 export class CsStatusBar implements Disposable {
@@ -24,6 +31,7 @@ export class CsStatusBar implements Disposable {
       this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
       this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
     }
+    this.disposables.push(onDidChangeConfiguration('enableAutomaticAnalysis', () => this.update()));
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
       vscode.StatusBarAlignment.Left,
@@ -39,7 +47,7 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAceStatus(ace: CsFeature) {
-    if (!this.aceStatus) {
+    if (!this.aceStatus || !ace) {
       return;
     }
     const item = this.aceStatus;
@@ -48,34 +56,46 @@ export class CsStatusBar implements Disposable {
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
+    if (!analysis) return;
+
     const item = this.analysisStatus;
 
     if (this.handleErrorStates(analysis)) return;
 
-    switch (analysis.analysisState) {
-      case 'running':
-        this.setStatus(item, {
-          text: '$(loading~spin) Analyzing...',
-          tooltip: 'CodeScene analysis in progress...',
-          command: 'codescene.showLogOutput',
-        });
-        return;
-      case 'idle':
-        this.setStatus(item, {
-          text: '$(cs-logo) Analysis',
-          tooltip: 'Code Health Analysis ready',
-          command: 'codescene.homeView.focus',
-        });
-        return;
+    if (!automaticAnalysisEnabled()) {
+      this.setStatus(item, {
+        text: '$(debug-pause) Analysis stopped',
+        tooltip: 'Automatic analysis of changes is stopped. Click to start.',
+        command: 'codescene.startAutomaticAnalysis',
+        background: 'statusBarItem.warningBackground',
+      });
+      return;
     }
 
-    if (analysis.state === 'loading') {
+    if (analysis.analysisState === 'running') {
+      this.setStatus(item, {
+        text: '$(loading~spin) Analyzing...',
+        tooltip: analysisProgressTooltip(analysis.queueCount),
+        command: 'codescene.showLogOutput',
+      });
+      return;
+    }
+
+    if (analysis.state === 'loading' && analysis.analysisState === undefined) {
       this.setStatus(item, {
         text: '$(loading~spin) Initializing...',
         tooltip: 'Analysis feature is initializing...',
         command: 'codescene.showLogOutput',
       });
+      return;
     }
+
+    // A workspace with nothing to review never reports a runner state, so 'enabled' alone means ready.
+    this.setStatus(item, {
+      text: '$(cs-logo) Analysis',
+      tooltip: 'Code Health Analysis ready',
+      command: 'codescene.homeView.focus',
+    });
   }
 
   private handleErrorStates(analysis: AnalysisFeature) {
@@ -145,7 +165,7 @@ export class CsStatusBar implements Disposable {
       });
     },
     enabled: (ace, item) => {
-      const hasToken = !!getEffectiveToken();
+      const hasToken = aceAvailable();
       this.setStatus(item, {
         text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
         command: 'codescene.openSettingsAndFocusToken',

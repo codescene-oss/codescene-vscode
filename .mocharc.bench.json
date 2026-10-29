@@ -1,0 +1,9 @@
+{
+  "ui": "tdd",
+  "color": true,
+  "spec": "out/benchmark/suite/**/*.bench.js",
+  "require": ["out/test/setup.js"],
+  "timeout": 0,
+  "slow": 60000,
+  "exit": true
+}

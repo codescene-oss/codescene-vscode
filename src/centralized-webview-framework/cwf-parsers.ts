@@ -1,30 +1,6 @@
 import { Position } from 'vscode';
-import { Baseline } from '../cs-extension-state';
 import { FileWithIssues } from '../code-health-monitor/file-with-issues';
 import { FileDeltaData, FileMetaType } from './types';
-import { CommitBaselineType } from './types/messages';
-
-/**
- * Convert VSCode commit baseline enum to CWF baseline string
- */
-export function convertVSCodeCommitBaselineToCWF(baseline: Baseline): CommitBaselineType {
-  const payloadConverter: CommitBaselineType[] = ['HEAD', 'branchCreate', 'default'];
-  return payloadConverter[baseline - 1];
-}
-
-/**
- * Convert CWF basleinetring to VSCode enum
- * @param commitBaselineString
- * @returns
- */
-export function convertCWFCommitBaselineToVSCode(commitBaselineString: CommitBaselineType) {
-  const payloadConverter = {
-    HEAD: 1,
-    branchCreate: 2,
-    default: 3,
-  };
-  return payloadConverter[commitBaselineString];
-}
 
 /**
  * Convert VSCode FileWithIssues to CWF delta object
@@ -38,20 +14,6 @@ export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDelta
     },
     delta: event.deltaForFile,
   };
-}
-
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/**
- * Convert docsType format to something the old docsPanel can understand
- * "docs_issues_complex_method" => "Complex Method"
- * @param docType
- * @returns
- */
-export function convertCWFDocTypeToVSCode(docType: string) {
-  return capitalize(docType.replace('docs_', '').replace('issues_', '').replace(/_/g, ' '));
 }
 
 /**

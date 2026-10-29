@@ -1,4 +1,4 @@
-import '@vscode-elements/elements/dist/vscode-button';
+import '@vscode-elements/elements/dist/vscode-button/index.js';
 
 window.addEventListener('load', main);
 

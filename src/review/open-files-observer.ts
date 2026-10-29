@@ -2,17 +2,15 @@ import vscode from 'vscode';
 import { reviewDocumentSelector } from '../language-support';
 import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { FilteringReviewer } from './filtering-reviewer';
-import { getMergeBaseCommitForWorkspace } from '../code-health-monitor/addon';
 import { logOutputChannel } from '../log';
-
-let openFilesObserverInstance: OpenFilesObserver | undefined;
-
-export function getOpenFilesObserverInstance(): OpenFilesObserver | undefined {
-  return openFilesObserverInstance;
-}
+import { DevtoolsAPI } from '../devtools-api';
+import { automaticAnalysisEnabled } from '../configuration';
 
 /**
- * Observes open file events, and triggers reviews accordingly (only meant for Problems, not for the Code Health Monitor).
+ * Observes open file events, and triggers reviews accordingly. Reviews of a file as it is on disk
+ * only feed Problems, since the CLI watch already reports those to the Code Health Monitor. An
+ * unsaved edit is invisible to the CLI, so a review triggered by one owns the monitor entry for
+ * that file until it is saved.
  */
 export class OpenFilesObserver {
   private reviewTimers = new Map<string, NodeJS.Timeout>();
@@ -22,7 +20,7 @@ export class OpenFilesObserver {
 
   // Tracks files that were opened as visible in the UI.
   // The reason for tracking them is that onDidOpenTextDocument does not reflect files open in the UI and can be called at arbitrary times.
-  private visibleDocuments = new Set<string>();
+  private visibleDocuments = new Map<string, vscode.TextDocument>();
   private documentVersions = new Map<string, number>();
 
   // For code to be called just once.
@@ -31,24 +29,36 @@ export class OpenFilesObserver {
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.docSelector = reviewDocumentSelector();
-    openFilesObserverInstance = this;
   }
 
-  private reviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string, skipMonitorUpdateForDelta?: boolean): boolean {
+  private reviewDocument(document: vscode.TextDocument, reason: string, skipMonitorUpdate = true): boolean {
     if (vscode.languages.match(this.docSelector, document) === 0) {
+      logOutputChannel.debug(
+        `[OpenFilesObserver] skipped path=${document.fileName} reason=unsupported-language languageId=${document.languageId}`
+      );
       return false;
     }
-    logOutputChannel.debug(`[OpenFilesObserver] Reviewing ${document.fileName} (${reason}, baseline: ${baselineCommit || 'none'})`);
-    void this.filteringReviewer.reviewDiagnostics(document, { baselineCommit, skipMonitorUpdate: true, updateDiagnosticsPane: true }, skipMonitorUpdateForDelta);
+    logOutputChannel.debug(
+      `[OpenFilesObserver] reviewing path=${document.fileName} reason=${reason} skipMonitor=${skipMonitorUpdate}`
+    );
+    void this.filteringReviewer.reviewDiagnostics(document, { skipMonitorUpdate, updateDiagnosticsPane: true }).then(() => {
+      if (!this.visibleDocuments.has(document.fileName)) {
+        DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
+      }
+    }, () => undefined);
     return true;
   }
 
-  private trackAndReviewDocument(document: vscode.TextDocument, baselineCommit: string, reason: string): void {
+  private trackAndReviewDocument(document: vscode.TextDocument, reason: string): void {
+    if (!isFileDocument(document)) return;
     const fileName = document.fileName;
-    if (!this.visibleDocuments.has(fileName)) {
-      this.visibleDocuments.add(fileName);
-      this.reviewDocument(document, baselineCommit, reason);
+    if (this.visibleDocuments.has(fileName)) {
+      this.visibleDocuments.set(fileName, document);
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${fileName} reason=already-tracked`);
+      return;
     }
+    this.visibleDocuments.set(fileName, document);
+    this.reviewDocument(document, reason);
   }
 
   private getVisibleTabFileNames(): Set<string> {
@@ -83,10 +93,36 @@ export class OpenFilesObserver {
   }
 
   private clearDiagnosticsAndUntrack(fileName: string): void {
-    const uri = vscode.Uri.file(fileName);
-    CsDiagnostics.set(uri, []);
+    logOutputChannel.debug(`[OpenFilesObserver] untrack path=${fileName}`);
+    const document = this.visibleDocuments.get(fileName);
+    clearTimeout(this.reviewTimers.get(fileName));
+    this.reviewTimers.delete(fileName);
+    CsDiagnostics.cancel(fileName);
+    CsDiagnostics.set(vscode.Uri.file(fileName), []);
     this.visibleDocuments.delete(fileName);
     this.documentVersions.delete(fileName);
+    if (document) DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
+  }
+
+  private handleDocumentSaved(document: vscode.TextDocument): void {
+    if (!isFileDocument(document)) return;
+    DevtoolsAPI.releaseBufferMonitorOwnership(document);
+  }
+
+  private untrackIfNotVisible(fileName: string): void {
+    if (!this.visibleDocuments.has(fileName)) return;
+    if (this.getAllVisibleFileNames().has(fileName)) return;
+    this.clearDiagnosticsAndUntrack(fileName);
+  }
+
+  private untrackHiddenDocuments(): void {
+    if (!this.hasInitialized) return;
+    const currentVisibleFiles = this.getAllVisibleFileNames();
+    for (const fileName of [...this.visibleDocuments.keys()]) {
+      if (!currentVisibleFiles.has(fileName)) {
+        this.clearDiagnosticsAndUntrack(fileName);
+      }
+    }
   }
 
   shouldSkipDocumentChange(e: vscode.TextDocumentChangeEvent): boolean {
@@ -103,100 +139,104 @@ export class OpenFilesObserver {
     return false;
   }
 
-  private pollForVisibleEditors(): void {
+  private reviewVisibleEditors(reason: string): void {
     const allVisibleFileNames = this.getAllVisibleFileNames();
-
-    if (allVisibleFileNames.size > 0) {
-      this.hasInitialized = true;
-
-      void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-        const baseline = baselineCommit ?? '';
-        allVisibleFileNames.forEach((filePath) => {
-          const fileUri = vscode.Uri.file(filePath);
-          // Open the document without showing it in UI
-          void vscode.workspace.openTextDocument(fileUri).then((document) => {
-            this.trackAndReviewDocument(document, baseline, 'startup');
-          });
-        });
+    if (allVisibleFileNames.size === 0) return;
+    this.hasInitialized = true;
+    allVisibleFileNames.forEach((filePath) => {
+      const fileUri = vscode.Uri.file(filePath);
+      void vscode.workspace.openTextDocument(fileUri).then((document) => {
+        this.trackAndReviewDocument(document, reason);
       });
-    } else {
-      setTimeout(() => this.pollForVisibleEditors(), 100);
-    }
+    });
   }
 
   start(): void {
-    // This provides the initial diagnostics when a file becomes visible in the UI (which is NOT the same as opened or having a UI tab for it)
+    this.bindActiveEditorListener();
+    this.bindVisibilityListeners();
+    this.reviewVisibleEditors('startup');
+    this.bindClosedEditorListeners();
+    this.bindTextChangeListener();
+    this.bindSaveListener();
+  }
+
+  private bindActiveEditorListener(): void {
     this.context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
-        if (!editor) {
-          return;
-        }
-        void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-          this.trackAndReviewDocument(editor.document, baselineCommit ?? '', 'editor changed');
-        });
+        if (!editor || !isFileDocument(editor.document)) return;
+        this.trackAndReviewDocument(editor.document, 'editor changed');
       })
     );
+  }
 
-    setTimeout(() => this.pollForVisibleEditors(), 100);
-
-    // Detect closed editors (onDidCloseTextDocument event hook cannot be trusted as-is, so we use some extra detection)
+  private bindVisibilityListeners(): void {
     this.context.subscriptions.push(
       vscode.window.onDidChangeVisibleTextEditors(() => {
-        if (!this.hasInitialized) {
-          return;
-        }
-
-        const currentVisibleFiles = this.getAllVisibleFileNames();
-
-        this.visibleDocuments.forEach((candidateFileName) => {
-          if (!currentVisibleFiles.has(candidateFileName)) {
-            this.clearDiagnosticsAndUntrack(candidateFileName);
-          }
-        });
+        if (!this.hasInitialized) this.reviewVisibleEditors('visible editors');
+      }),
+      vscode.window.tabGroups.onDidChangeTabs(() => {
+        if (!this.hasInitialized) this.reviewVisibleEditors('tabs changed');
+        else this.untrackHiddenDocuments();
       })
     );
+  }
 
-    // Additionally to the previous 'closed editors' detection, use onDidCloseTextDocument for extra safety.
-    // Keep in mind that onDidCloseTextDocument is not always triggered.
+  private bindClosedEditorListeners(): void {
     this.context.subscriptions.push(
+      vscode.window.onDidChangeVisibleTextEditors(() => {
+        this.untrackHiddenDocuments();
+      }),
       vscode.workspace.onDidCloseTextDocument((document: vscode.TextDocument) => {
-        if (this.visibleDocuments.has(document.fileName)) {
-          this.clearDiagnosticsAndUntrack(document.fileName);
-        }
+        this.untrackIfNotVisible(document.fileName);
       })
     );
+  }
 
-    // This provides the diagnostics when a file is changed (without waiting for the changes to be saved).
+  private bindSaveListener(): void {
+    this.context.subscriptions.push(
+      vscode.workspace.onDidSaveTextDocument((document: vscode.TextDocument) => {
+        this.handleDocumentSaved(document);
+      })
+    );
+  }
+
+  private bindTextChangeListener(): void {
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
-        const filePath = e.document.fileName;
-        if (!this.visibleDocuments.has(filePath)) {
-          return;
-        }
-        // Verify file has an actual UI tab (not internal buffers like log outputs)
-        const allVisibleTabs = this.getAllVisibleFileNames();
-        if (!allVisibleTabs.has(filePath)) {
-          return;
-        }
-        if (this.shouldSkipDocumentChange(e)) {
-          return;
-        }
-        clearTimeout(this.reviewTimers.get(filePath));
-        // Run review after 1 second of no edits to this file
-        this.reviewTimers.set(
-          filePath,
-          setTimeout(() => {
-            // The `false` param is for CS-6117 - unsaved changes should show up in the Monitor,
-            // but only if they come from a live change (i.e. `onDidChangeTextDocument` callback) -
-            // not from merely opening this file at startup.
-            void getMergeBaseCommitForWorkspace().then((baselineCommit) => {
-              this.reviewDocument(e.document, baselineCommit ?? '', 'text changed', false);
-            });
-          }, 1000)
-        );
+        this.scheduleTextChangeReview(e);
       })
     );
+  }
 
+  private scheduleTextChangeReview(e: vscode.TextDocumentChangeEvent): void {
+    if (!isFileDocument(e.document)) return;
+    const filePath = e.document.fileName;
+    if (!this.visibleDocuments.has(filePath)) return;
+    if (!this.getAllVisibleFileNames().has(filePath)) {
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=not-visible`);
+      return;
+    }
+    if (this.shouldSkipDocumentChange(e)) {
+      const reason = e.contentChanges.length === 0 ? 'empty-change' : 'duplicate-version';
+      logOutputChannel.debug(`[OpenFilesObserver] skipped path=${filePath} reason=${reason}`);
+      return;
+    }
+    clearTimeout(this.reviewTimers.get(filePath));
+    this.reviewTimers.set(
+      filePath,
+      setTimeout(() => {
+        this.reviewChangedDocument(e.document);
+      }, 1000)
+    );
+  }
+
+  private reviewChangedDocument(document: vscode.TextDocument): void {
+    if (document.isDirty) {
+      this.reviewDocument(document, 'text changed', !automaticAnalysisEnabled());
+      return;
+    }
+    this.reviewDocument(document, 'text reverted');
+    DevtoolsAPI.restoreFromDiskIfBufferOwned(document);
   }
 
   dispose(): void {
@@ -205,4 +245,8 @@ export class OpenFilesObserver {
     this.reviewTimers.clear();
     this.filteringReviewer.dispose();
   }
+}
+
+function isFileDocument(document: vscode.TextDocument): boolean {
+  return document.uri.scheme === 'file';
 }

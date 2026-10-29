@@ -17,9 +17,22 @@
 		{
 			"type": "npm",
 			"script": "watch",
-			"problemMatcher": [
-				"$esbuild-watch"
-			],
+			"problemMatcher": {
+				"owner": "esbuild",
+				"pattern": {
+					"regexp": "^([^\\s].*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^\\[watch\\] starting",
+					"endsPattern": "^\\[watch\\] active"
+				}
+			},
 			"isBackground": true,
 			"presentation": {
 				"reveal": "never"

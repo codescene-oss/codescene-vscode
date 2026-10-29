@@ -55,10 +55,6 @@ export function onDidChangeConfiguration(
   });
 }
 
-export function getServerUrl() {
-  return "https://codescene.io";
-}
-
 export function reviewCodeLensesEnabled() {
   return getConfiguration<boolean>('enableReviewCodeLenses');
 }
@@ -107,4 +103,30 @@ export function getAgentModel(): string {
 
 export function getProviderOptions(): Record<string, string> {
   return getConfiguration<Record<string, string>>('providerOptions') ?? {};
+}
+
+export function automaticAnalysisEnabled() {
+  return getConfiguration<boolean>('enableAutomaticAnalysis', true) !== false;
+}
+
+export function setAutomaticAnalysisEnabled(enabled: boolean) {
+  const codesceneConfig = vscode.workspace.getConfiguration('codescene');
+  const inspected = codesceneConfig.inspect<boolean>('enableAutomaticAnalysis');
+  if (inspected?.workspaceValue !== undefined) {
+    logOutputChannel.warn(
+      'codescene.enableAutomaticAnalysis has a workspace value; clearing it so the user setting takes effect'
+    );
+    void codesceneConfig.update('enableAutomaticAnalysis', undefined, vscode.ConfigurationTarget.Workspace).then(
+      () => {},
+      (err) => {
+        logOutputChannel.error(`clearing workspace enableAutomaticAnalysis failed: ${err}`);
+      }
+    );
+  }
+  void codesceneConfig.update('enableAutomaticAnalysis', enabled, vscode.ConfigurationTarget.Global).then(
+    () => {},
+    (err) => {
+      logOutputChannel.error(`setConfiguration(enableAutomaticAnalysis) failed: ${err}`);
+    }
+  );
 }

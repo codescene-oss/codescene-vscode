@@ -2,43 +2,8 @@ import { ChildProcess, execFile, ExecOptions } from 'child_process';
 import { logOutputChannel } from './log';
 import { Command, ExecResult, Executor } from './executor';
 import { isDefined } from './utils';
-import { Stats } from './executor-stats';
 
 const MAX_BUFFER = 50 * 1024 * 1024; // 50 MB
-
-export function parseJsonInput(input: string): any {
-  try {
-    return JSON.parse(input);
-  } catch {
-    return null;
-  }
-}
-
-const SENSITIVE_KEYS = new Set(['token', 'accessToken', 'Authorization']);
-
-function maybeRedactValue(key: string, value: any): any {
-  return SENSITIVE_KEYS.has(key) ? '[REDACTED]' : value;
-}
-
-export function objectToArray(obj: any): any[] {
-  if (Array.isArray(obj)) {
-    return obj;
-  }
-  if (typeof obj === 'object' && obj !== null) {
-    const { 'file-content': _, ...rest } = obj;
-    return Object.entries(rest).flatMap(([key, value]) => [`'${key}'`, maybeRedactValue(key, value)]);
-  }
-  return [];
-}
-
-export function mergeJsonIntoArgs(args: string[], input: string): string[] {
-  const parsed = parseJsonInput(input);
-  if (!parsed || (typeof parsed !== 'object')) {
-    return args;
-  }
-  const arrayToMerge = objectToArray(parsed);
-  return [...args, ...arrayToMerge.map((v) => typeof v === 'string' ? v : JSON.stringify(v))];
-}
 
 export class SimpleExecutor implements Executor {
   private writeInput(childProcess: ChildProcess, input: string) {
@@ -53,50 +18,46 @@ export class SimpleExecutor implements Executor {
     }
   }
 
-  private stats: Stats = new Stats();
-
-  logStats(): void {
-    this.stats.logStats();
-  }
-
   execute(command: Command, options: ExecOptions & { cwd: string }, input?: string) {
-    const mergedArgsForLogging = input ? mergeJsonIntoArgs(command.args, input) : command.args;
-    const logName = [command.command, ...mergedArgsForLogging].join(' ');
-    const trimmedArgsForLogging = mergedArgsForLogging.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
+    const logName = [command.command, ...command.args].join(' ');
+    const trimmedArgsForLogging = command.args.map((arg) => (arg.length > 120 ? arg.slice(0, 120) + '...' : arg));
     const logCommand = [command.command, ...trimmedArgsForLogging].join(' ');
     const allOptions = { maxBuffer: MAX_BUFFER, ...options };
 
+    const executeMessage = `Executing: "${logCommand}" cwd=${options.cwd}`;
+    if (command.command === 'git') { // These can be frequently executed, so demote their log level
+      logOutputChannel.debug(executeMessage);
+    } else {
+      logOutputChannel.info(executeMessage);
+    }
 
     return new Promise<ExecResult>((resolve, reject) => {
       const start = Date.now();
 
       const childProcess = execFile(command.command, command.args, allOptions, (error, stdout, stderr) => {
         if (!command.ignoreError && error) {
-          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error} and options ${JSON.stringify(allOptions)}`);
+          logOutputChannel.error(`[pid ${childProcess?.pid}] "${logName}" failed with error: ${error}`);
           reject(error);
           return;
         }
         const end = Date.now();
+        logOutputChannel.debug(
+          `[pid ${childProcess?.pid}] "${logName}" took ${end - start} ms (exit ${error?.code || 0})`
+        );
 
-        this.stats.addRun(command, end - start);
-
-        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: error?.code || 0, duration: end - start });
+        resolve({
+          stdout: String(stdout).trim(),
+          stderr: String(stderr).trim(),
+          exitCode: error?.code || 0,
+          duration: end - start,
+        });
       });
 
       if (isDefined(input) && childProcess.stdin) {
         this.writeInput(childProcess, input);
       }
 
+      logOutputChannel.debug(`[pid ${childProcess.pid}] "${logName}" started`);
     });
   }
-
-  async executeTask<T>(task: () => Promise<T>): Promise<T> {
-    return task();
-  }
-
-  abortAllTasks(): void {}
-}
-
-export interface Task extends Command {
-  taskId: string;
 }

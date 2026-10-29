@@ -9,10 +9,10 @@
   "author": "CodeScene AB",
   "publisher": "CodeScene",
   "description": "Integrates CodeScene analysis into VS Code. Keeps your code clean and maintainable.",
-  "version": "0.28.0",
+  "version": "0.29.2",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.75.1"
+    "vscode": "^1.105.0"
   },
   "categories": [
     "Programming Languages",
@@ -69,12 +69,16 @@
         "title": "CodeScene: toggle Review CodeLenses"
       },
       {
-        "command": "codescene.showLogOutput",
-        "title": "CodeScene: show output logs"
+        "command": "codescene.stopAutomaticAnalysis",
+        "title": "CodeScene: Stop Automatic Analysis"
       },
       {
-        "command": "codescene.printDevtoolsApiStats",
-        "title": "CodeScene: print Devtools API stats"
+        "command": "codescene.startAutomaticAnalysis",
+        "title": "CodeScene: Start Automatic Analysis"
+      },
+      {
+        "command": "codescene.showLogOutput",
+        "title": "CodeScene: show output logs"
       },
       {
         "command": "codescene.copyDeviceId",
@@ -83,6 +87,18 @@
       {
         "command": "codescene.testConnectivity",
         "title": "CodeScene: test provider connectivity"
+      },
+      {
+        "command": "codescene.browserSignIn",
+        "title": "CodeScene: Sign in"
+      },
+      {
+        "command": "codescene.browserSignOut",
+        "title": "CodeScene: Sign out"
+      },
+      {
+        "command": "codescene.openAccount",
+        "title": "CodeScene: Open CodeScene account"
       }
     ],
     "viewsContainers": {
@@ -118,21 +134,29 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "codescene.codeHealthMonitorView",
-        "contents": "The Code Health Monitor view compares the current state of your code and presents any introduced code smells."
-      }
-    ],
     "menus": {
-      "view/title": [
+      "commandPalette": [
         {
-          "command": "codescene.codeHealthMonitorHelp",
-          "when": "view === codescene.codeHealthMonitorView",
-          "group": "navigation@2"
+          "command": "codescene.stopAutomaticAnalysis",
+          "when": "config.codescene.enableAutomaticAnalysis"
+        },
+        {
+          "command": "codescene.startAutomaticAnalysis",
+          "when": "!config.codescene.enableAutomaticAnalysis"
+        },
+        {
+          "command": "codescene.browserSignIn",
+          "when": "codescene.signInActive"
+        },
+        {
+          "command": "codescene.browserSignOut",
+          "when": "codescene.signInActive"
+        },
+        {
+          "command": "codescene.openAccount",
+          "when": "codescene.signInActive"
         }
-      ],
-      "commandPalette": []
+      ]
     },
     "configuration": {
       "title": "CodeScene",
@@ -142,6 +166,12 @@
           "default": true,
           "description": "Show CodeLenses for review diagnostics",
           "order": 1
+        },
+        "codescene.enableAutomaticAnalysis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically analyze file changes in the workspace. Open editors are still reviewed for diagnostics and CodeLenses when this is off.",
+          "order": 2
         },
         "codescene.enableAutoRefactor": {
           "type": "boolean",
@@ -224,17 +254,37 @@
           "markdownDescription": "Provider-specific options for the Refactoring Agent. Use this to authenticate into your preferred model.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
           "order": 18
         },
+        "codescene.serverUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "CodeScene server for browser sign-in, for example `https://codescene.example.com`. Leave empty to use `CS_ONPREM_URL`, then CodeScene Cloud. Used when `#codescene.experimental.signIn#` is on.",
+          "order": 19.4
+        },
         "codescene.authToken": {
           "type": "string",
           "default": "",
-          "description": "Authentication token for CodeScene Refactoring Agent.",
+          "description": "Personal access token — fallback for WSL, remote and headless environments. Browser sign-in is recommended.",
           "order": 19.5
+        },
+        "codescene.experimental.signIn": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Sign in to CodeScene in the browser (experimental). Requires a CodeScene IDE server with sign-in support.",
+          "tags": ["experimental"],
+          "order": 19.6
         },
         "codescene.enableTelemetry": {
           "type": "boolean",
           "default": true,
           "description": "Enable sending usage telemetry to CodeScene",
           "order": 20
+        },
+        "codescene.serverWorkerThreads": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of worker threads used by the CodeScene IDE server. Set to 0 to use half of the available logical CPU cores.",
+          "order": 21
         }
       }
     },
@@ -249,8 +299,9 @@
     }
   },
   "scripts": {
+    "prepare": "husky",
     "vscode:prepublish": "npm run package",
-    "prepackage": "npm run updatedocs && npm run updatecwf && npm run tsc && npm run lint && npm run clean",
+    "prepackage": "npm run updatecwf && npm run tsc && npm run lint && npm run clean",
     "package": "NODE_ENV=production node ./esbuild.js",
     "bundle-cli": "node ./scripts/bundle-cli.js",
     "package-platform": "node ./scripts/package-platform.js",
@@ -258,55 +309,52 @@
     "build": "node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",
     "tsc": "tsc -p ./",
-    "lint": "eslint src --ext ts --max-warnings=0",
-    "check-cwf": "test -f cs-cwf/index.html || (echo 'CWF files missing. Run: npm run updatecwf' && exit 1)",
-    "maybe-check-cwf": "test -n \"$CI\" || npm run check-cwf",
+    "lint": "eslint src --max-warnings=0",
+    "check-cwf": "node -e \"if (!require('fs').existsSync('cs-cwf/index.html')) { console.error('CWF files missing. Run: npm run updatecwf'); process.exit(1); }\"",
+    "maybe-check-cwf": "node -e \"if (!process.env.CI && !require('fs').existsSync('cs-cwf/index.html')) { console.error('CWF files missing. Run: npm run updatecwf'); process.exit(1); }\"",
     "pretest": "npm run maybe-check-cwf && npm run tsc && npm run lint && npm run build && npm run bundle-cli-test",
     "bundle-cli-test": "node ./scripts/bundle-cli-for-current-platform.js",
     "test": "mocha",
+    "benchmark": "mocha --config .mocharc.bench.json",
     "test:coverage": "c8 npm run test",
     "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
-    "updatedocs": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics codescene-ide-protocol",
-    "updatecwf": "node ./node_modules/@terascope/fetch-github-release/dist/src/cli.js empear-analytics cs-webview ./cs-cwf",
-    "release:minor": "standard-version --release-as minor",
-    "release:patch": "standard-version --release-as patch",
-    "release:major": "standard-version --release-as major"
+    "updatecwf": "node scripts/update-cwf.js",
+    "release:test": "node ./scripts/create-test-release.js"
   },
   "extensionDependencies": [
     "vscode.git"
   ],
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "@terascope/fetch-github-release": "^1.0.0",
-    "@types/glob": "^8.0.0",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@types/follow-redirects": "^1.14.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
-    "@types/uuid": "^9.0.1",
-    "@types/vscode": "1.75.1",
-    "@typescript-eslint/eslint-plugin": "^5.51.0",
-    "@typescript-eslint/parser": "^5.45.0",
-    "c8": "^10.1.3",
-    "esbuild": "^0.25.1",
+    "@types/node": "22.19.21",
+    "@types/pidusage": "^2.0.5",
+    "@types/vscode": "1.105.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "c8": "^12.0.0",
+    "esbuild": "^0.28.2",
     "esbuild-plugin-copy": "^2.1.1",
-    "eslint": "^8.33.0",
-    "glob": "^8.0.3",
-    "mocha": "^10.8.2",
-    "standard-version": "^9.5.0",
-    "typescript": "^4.9.5"
+    "eslint": "^10.11.0",
+    "extract-zip": "^2.0.1",
+    "follow-redirects": "^1.16.0",
+    "husky": "^9.1.7",
+    "mocha": "^12.0.2",
+    "pidusage": "^4.0.1",
+    "typescript": "~6.0.3"
   },
   "dependencies": {
-    "@types/follow-redirects": "^1.14.1",
     "@types/lodash.debounce": "^4.0.7",
     "@types/lodash.throttle": "^4.1.9",
     "@types/vscode-webview": "^1.57.5",
-    "@vscode-elements/elements": "^1.8.0",
+    "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.44",
-    "axios": "^1.12.0",
-    "extract-zip": "^2.0.1",
-    "follow-redirects": "^1.15.6",
+    "axios": "^1.20.0",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
-    "uuid": "^9.0.0"
+    "uuid": "^14.0.2",
+    "vscode-jsonrpc": "^9.0.3"
   }
 }

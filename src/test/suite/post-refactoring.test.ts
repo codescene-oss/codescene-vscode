@@ -7,7 +7,6 @@ import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspac
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { RefactoringRequest } from '../../refactoring/request';
-import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { ChangeType } from '../../devtools-api/delta-model';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
@@ -80,7 +79,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
-        session: undefined,
+        auth: { active: false, status: null },
         features: {
           analysis: { state: 'enabled' },
           ace: { state: 'enabled' }
@@ -89,7 +88,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       configurable: true
     });
 
-    DevtoolsAPI.init(binaryPath, mockContext, async () => false);
+    DevtoolsAPI.init(binaryPath, mockContext);
 
     analysisError = undefined;
     refactoringError = undefined;
@@ -130,7 +129,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
 
     const doc = createTestFile('complex.cpp', complexContent);
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const review = await DevtoolsAPI.reviewWithServer(doc);
 
     assert.ok(review, 'Review should return a result');
     assert.ok(review?.['raw-score'], 'Review should have a raw-score');
@@ -187,7 +186,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     const content = 'int nested(int x) {\n  if (x > 0) {\n    if (x > 1) {\n      if (x > 2) {\n        return x * 2;\n      }\n    }\n  }\n  return 0;\n}\n';
 
     const doc = createTestFile('nested.cpp', content);
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const review = await DevtoolsAPI.reviewWithServer(doc);
 
     assert.ok(review?.['raw-score'], 'Review should have a raw-score');
 
@@ -240,7 +239,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     const content = 'int complex(int a, int b, int c, int d, int e) {\n  if (a > 0) {\n    if (b > 0) {\n      if (c > 0) {\n        if (d > 0) {\n          if (e > 0) {\n            return a + b + c + d + e;\n          }\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
 
     const doc = createTestFile('targets.cpp', content);
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const review = await DevtoolsAPI.reviewWithServer(doc);
 
     assert.ok(review?.['raw-score'], 'Review should have a raw-score');
 
@@ -291,7 +290,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     const content = 'int test(int x) {\n  if (x > 0) {\n    if (x > 1) {\n      if (x > 2) {\n        return x;\n      }\n    }\n  }\n  return 0;\n}\n';
 
     const doc = createTestFile('confidence.cpp', content);
-    const review = await DevtoolsAPI.reviewContent(doc);
+    const review = await DevtoolsAPI.reviewWithServer(doc);
 
     assert.ok(review?.['raw-score'], 'Review should have a raw-score');
 

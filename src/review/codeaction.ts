@@ -1,13 +1,12 @@
 import * as vscode from 'vscode';
 import { ACE_ENABLED } from '../build-flags';
-import { DevtoolsAPI } from '../devtools-api';
 import { Review } from '../devtools-api/review-model';
 import { CsDiagnostic } from '../diagnostics/cs-diagnostic';
 import { toDocsParamsRanged } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { isDefined } from '../utils';
 import Reviewer from './reviewer';
-import { getAuthToken } from '../configuration';
+import { aceAvailable } from '../devtools-api';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { buildInsertText, getLineIndentation } from '../utils/codeaction-utils';
 
@@ -47,6 +46,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ) {
+    if (!Reviewer.instance) return;
     const reviewCacheItem = Reviewer.instance.reviewCache.get(document, "any");
     if (!reviewCacheItem) return;
 
@@ -79,7 +79,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       return;
     }
 
-    const authToken = getAuthToken();
+    const aceUsable = aceAvailable();
     const fnsToRefactor = await Promise.all(
       codeSmells.map((codeSmell) => fnsToRefactorCache.fnsToRefactor(document, codeSmell))
     );
@@ -95,7 +95,7 @@ export class ReviewCodeActionProvider implements vscode.CodeActionProvider, vsco
       title: 'Refactor using CodeScene Agent',
       arguments: [document, 'codeaction', fnToRefactor],
     };
-    refactorAction.disabled = !authToken
+    refactorAction.disabled = !aceUsable
       ? {
           reason: 'Activate the refactoring agent by providing your authentication token in Workspace settings.',
         }

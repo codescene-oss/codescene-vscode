@@ -6,6 +6,8 @@ import { BackgroundServiceView } from '../../code-health-monitor/background-view
 import { CsExtensionState } from '../../cs-extension-state';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
+import { getMessageCategory } from '../../code-health-monitor/home/cwf-message-categories';
+import { clearMockGitRepositories, setMockGitRepositories } from '../setup';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -193,5 +195,141 @@ suite('HomeView', () => {
 
       assert.strictEqual(badgeCount, 1, 'Expected badge count to be 1 after removing 2 files');
     });
+
+    test('clears monitored files when analysis is stopped', () => {
+      let badgeCount: number | undefined;
+      mockBackgroundServiceView.updateBadge = (count: number) => {
+        badgeCount = count;
+      };
+
+      addFileToHomeView('/workspace/fileA.ts');
+      addFileToHomeView('/workspace/fileB.ts');
+
+      (homeView as any).setStoppedAnalysis();
+
+      assert.strictEqual(homeView.getFileIssueMap().size, 0);
+      assert.deepStrictEqual((homeView as any).ideContextData.fileDeltaData, []);
+      assert.strictEqual((homeView as any).ideContextData.analysisState, 'stopped');
+      assert.strictEqual(badgeCount, 0);
+    });
+
+    const enrichmentCases = [
+      {
+        name: 'adds a file on its first delta',
+        initialFiles: [] as string[],
+        enrichment: false,
+        expectedFiles: ['/workspace/fileA.ts'],
+      },
+      {
+        name: 'does not resurrect a file removed while its delta was being enriched',
+        initialFiles: [] as string[],
+        enrichment: true,
+        expectedFiles: [] as string[],
+      },
+      {
+        name: 'updates a file that is still monitored when its enriched delta arrives',
+        initialFiles: ['/workspace/fileA.ts'],
+        enrichment: true,
+        expectedFiles: ['/workspace/fileA.ts'],
+      },
+    ];
+
+    enrichmentCases.forEach(({ name, initialFiles, enrichment, expectedFiles }) => {
+      test(name, () => {
+        initialFiles.forEach(addFileToHomeView);
+
+        (homeView as any).updateFileDeltaData({
+          document: mockDocument('/workspace/fileA.ts'),
+          result: mockDeltaResult,
+          updateMonitor: true,
+          enrichment,
+        });
+
+        assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], expectedFiles);
+      });
+    });
   });
+
+  suite('review progress', () => {
+    let homeView: HomeView;
+    const root = path.join('/repo');
+
+    setup(() => {
+      const mockContext = createMockExtensionContext(root);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext);
+      }
+      setMockGitRepositories([{ rootUri: { fsPath: root } }]);
+      homeView = new HomeView(mockContext, { updateBadge: () => {}, dispose: () => {} } as any);
+    });
+
+    teardown(() => {
+      clearMockGitRepositories();
+    });
+
+    const cases: Array<{
+      name: string;
+      event: {
+        state: 'running' | 'idle';
+        jobs: string[];
+        queued: string[];
+        queueCount: number;
+        queueDone: number;
+      };
+      analysisState: 'running' | 'idle';
+      remainingCount: number;
+      totalCount?: number;
+      jobs: Array<{ fileName: string; state: 'running' | 'queued' }>;
+    }> = [
+      {
+        name: 'shows remaining, total, and the job list from review progress',
+        event: {
+          state: 'running',
+          jobs: [path.join(root, 'dirty.ts')],
+          queued: ['a.ts'],
+          queueCount: 2,
+          queueDone: 1,
+        },
+        analysisState: 'running',
+        remainingCount: 3,
+        totalCount: 4,
+        jobs: [
+          { fileName: path.join(root, 'a.ts'), state: 'queued' },
+          { fileName: path.join(root, 'dirty.ts'), state: 'running' },
+        ],
+      },
+      {
+        name: 'clears the counts when the batch has drained',
+        event: { state: 'idle', jobs: [], queued: [], queueCount: 0, queueDone: 3 },
+        analysisState: 'idle',
+        remainingCount: 0,
+        jobs: [],
+      },
+    ];
+
+    for (const { name, event, analysisState, remainingCount, totalCount, jobs } of cases) {
+      test(name, () => {
+        (homeView as any).applyAnalysisEvent({ ...event, jobs: new Set(event.jobs) });
+        const data = (homeView as any).ideContextData;
+        assert.strictEqual(data.analysisState, analysisState);
+        assert.strictEqual(data.remainingCount, remainingCount);
+        assert.strictEqual(data.totalCount, totalCount);
+        assert.deepStrictEqual(
+          data.jobs.map((job: { file: { fileName: string }; state: string }) => ({
+            fileName: job.file.fileName,
+            state: job.state,
+          })),
+          jobs
+        );
+      });
+    }
+  });
+});
+
+suite('Home view legacy login messages', () => {
+  for (const messageType of ['open-login', 'init-login', 'open-home']) {
+    test(`${messageType} is not handled by the home view`, () => {
+      assert.strictEqual(getMessageCategory(messageType), 'unknown');
+    });
+  }
 });

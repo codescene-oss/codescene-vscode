@@ -1,6 +1,6 @@
 import Module from 'module';
+import * as assert from 'assert';
 import * as fs from 'fs';
-import * as path from 'path';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
@@ -12,10 +12,63 @@ import { CodeLensStub } from './stubs/code-lens-stub';
 import { ThemeColorStub } from './stubs/theme-color-stub';
 import { ThemeIconStub } from './stubs/theme-icon-stub';
 import { TreeItemStub } from './stubs/tree-item-stub';
+import { DisposableStub } from './stubs/disposable-stub';
 
 export let enableTestLogging = false;
 export function setEnableTestLogging(value: boolean) {
   enableTestLogging = value;
+}
+
+export type CapturedLogLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+export type CapturedLog = { level: CapturedLogLevel; message: string };
+
+let capturedLogs: CapturedLog[] = [];
+
+export function resetCapturedLogs() {
+  capturedLogs = [];
+}
+
+export function getCapturedLogs(): readonly CapturedLog[] {
+  return capturedLogs;
+}
+
+export function capturedLogText(level?: CapturedLogLevel): string {
+  return capturedLogs
+    .filter((entry) => !level || entry.level === level)
+    .map((entry) => `[${entry.level}] ${entry.message}`)
+    .join('\n');
+}
+
+export function assertLogContains(level: CapturedLogLevel, snippet: string) {
+  const match = capturedLogs.find((entry) => entry.level === level && entry.message.includes(snippet));
+  assert.ok(match, `expected ${level} log containing ${JSON.stringify(snippet)}, got:\n${capturedLogText()}`);
+}
+
+export function assertLogOmits(snippet: string) {
+  const match = capturedLogs.find((entry) => entry.message.includes(snippet));
+  assert.ok(!match, `did not expect any log containing ${JSON.stringify(snippet)}: ${match?.message}`);
+}
+
+function formatLogArg(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function captureLog(name: string, level: CapturedLogLevel, message: string, extraArgs: unknown[]) {
+  const extras = extraArgs.map(formatLogArg).filter((part) => part.length > 0).join(' ');
+  const text = extras ? `${message} ${extras}` : String(message);
+  capturedLogs.push({ level, message: text });
+  if (!enableTestLogging) return;
+  const line = `[${name}] ${level.toUpperCase()}: ${text}`;
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
 }
 
 const defaultWorkspaceFolders = [
@@ -47,12 +100,66 @@ export function setMockVisibleTextEditors(editors: any[]) {
 }
 
 export function setMockTabGroups(tabGroups: any[]) {
-  vscodeStub.window.tabGroups = { all: tabGroups };
+  vscodeStub.window.tabGroups.all = tabGroups;
 }
 
 export function resetMockWindow() {
   vscodeStub.window.visibleTextEditors = [];
-  vscodeStub.window.tabGroups = { all: [] };
+  vscodeStub.window.tabGroups.all = [];
+  resetMockEvents();
+}
+
+function createMockEvent<T = any>() {
+  const listeners: Array<(e: T) => any> = [];
+  return {
+    event: (listener: (e: T) => any) => {
+      listeners.push(listener);
+      return {
+        dispose: () => {
+          const index = listeners.indexOf(listener);
+          if (index >= 0) listeners.splice(index, 1);
+        },
+      };
+    },
+    fire: (data?: T) => {
+      listeners.slice().forEach((listener) => listener(data as T));
+    },
+    reset: () => {
+      listeners.length = 0;
+    },
+  };
+}
+
+const didSaveTextDocument = createMockEvent();
+const didCloseTextDocument = createMockEvent();
+const didChangeTextDocument = createMockEvent();
+const didChangeVisibleTextEditors = createMockEvent();
+const didChangeActiveTextEditor = createMockEvent();
+const didChangeTabs = createMockEvent();
+
+export function fireDidSaveTextDocument(document: any) {
+  didSaveTextDocument.fire(document);
+}
+
+export function fireDidCloseTextDocument(document: any) {
+  didCloseTextDocument.fire(document);
+}
+
+export function fireDidChangeVisibleTextEditors() {
+  didChangeVisibleTextEditors.fire(undefined);
+}
+
+export function fireDidChangeTabs() {
+  didChangeTabs.fire(undefined);
+}
+
+export function resetMockEvents() {
+  didSaveTextDocument.reset();
+  didCloseTextDocument.reset();
+  didChangeTextDocument.reset();
+  didChangeVisibleTextEditors.reset();
+  didChangeActiveTextEditor.reset();
+  didChangeTabs.reset();
 }
 
 let mockGitRepositories: any[] = [];
@@ -153,6 +260,8 @@ function createMockGitApi() {
       const fsPath = uri.fsPath || uri.path || '';
       return mockGitRepositories.find((repo) => fsPath.startsWith(repo.rootUri.fsPath)) || null;
     },
+    onDidOpenRepository: () => ({ dispose: () => {} }),
+    onDidCloseRepository: () => ({ dispose: () => {} }),
   };
 }
 
@@ -179,7 +288,7 @@ const vscodeStub = {
   },
   window: {
     visibleTextEditors: [] as any[],
-    tabGroups: { all: [] as any[] },
+    tabGroups: { all: [] as any[], onDidChangeTabs: didChangeTabs.event },
     state: {
       focused: true,
     },
@@ -187,18 +296,21 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
+    onDidChangeActiveTextEditor: didChangeActiveTextEditor.event,
+    onDidChangeVisibleTextEditors: didChangeVisibleTextEditors.event,
+    registerUriHandler: () => ({ dispose: () => {} }),
     createOutputChannel: (name: string) => ({
-      append: (text: string) => enableTestLogging && process.stdout.write(`[${name}] ${text}`),
-      appendLine: (text: string) => enableTestLogging && console.log(`[${name}] ${text}`),
+      append: (text: string) => captureLog(name, 'info', text, []),
+      appendLine: (text: string) => captureLog(name, 'info', text, []),
       clear: () => {},
       show: () => {},
       hide: () => {},
       dispose: () => {},
-      error: (text: string) => enableTestLogging && console.error(`[${name}] ERROR: ${text}`),
-      warn: (text: string) => enableTestLogging && console.warn(`[${name}] WARN: ${text}`),
-      info: (text: string) => enableTestLogging && console.log(`[${name}] INFO: ${text}`),
-      debug: (text: string) => enableTestLogging && console.log(`[${name}] DEBUG: ${text}`),
-      trace: (text: string) => enableTestLogging && console.log(`[${name}] TRACE: ${text}`),
+      error: (text: string, ...args: unknown[]) => captureLog(name, 'error', text, args),
+      warn: (text: string, ...args: unknown[]) => captureLog(name, 'warn', text, args),
+      info: (text: string, ...args: unknown[]) => captureLog(name, 'info', text, args),
+      debug: (text: string, ...args: unknown[]) => captureLog(name, 'debug', text, args),
+      trace: (text: string, ...args: unknown[]) => captureLog(name, 'trace', text, args),
     }),
     setStatusBarMessage: (text: string, timeout?: number) => ({ dispose: () => {} }),
     showErrorMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
@@ -244,6 +356,7 @@ const vscodeStub = {
   },
   ViewColumn: { Beside: 2, Active: 1, One: 1, Two: 2, Three: 3 },
   StatusBarAlignment: { Left: 1, Right: 2 },
+  ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),
     executeCommand: () => Promise.resolve(),
@@ -322,10 +435,15 @@ const vscodeStub = {
       void listener;
       return { dispose: () => {} };
     },
-    onDidCloseTextDocument: (listener: any) => {
+    onDidCloseTextDocument: didCloseTextDocument.event,
+    onDidSaveTextDocument: didSaveTextDocument.event,
+    onDidChangeTextDocument: didChangeTextDocument.event,
+    onDidChangeWorkspaceFolders: (listener: any) => {
       void listener;
       return { dispose: () => {} };
     },
+    textDocuments: [],
+    registerTextDocumentContentProvider: () => ({ dispose: () => {} }),
     createFileSystemWatcher: () => ({
       onDidCreate: () => ({ dispose: () => {} }),
       onDidChange: () => ({ dispose: () => {} }),
@@ -424,8 +542,18 @@ const vscodeStub = {
     SourceOrganizeImports: 'source.organizeImports',
     Empty: '',
   },
+  Disposable: DisposableStub,
+  authentication: {
+    registerAuthenticationProvider: () => ({ dispose: () => {} }),
+    getSession: async () => undefined,
+  },
   env: {
     appName: 'Visual Studio Code',
+    createTelemetryLogger: () => ({
+      logUsage: () => {},
+      logError: () => {},
+      dispose: () => {},
+    }),
   },
   Uri: {
     parse: (value: string) => ({
@@ -501,17 +629,12 @@ const originalRequire = Module.prototype.require;
   return originalRequire.apply(this, arguments as any);
 };
 
-const testDirsToCleanup = [
-  path.join(__dirname, '../../test-git-repo'),
-  path.join(__dirname, '../../test-git-repo-integration'),
-];
-
 export const mochaHooks = {
-  afterAll() {
-    for (const dir of testDirsToCleanup) {
-      if (fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
-    }
+  beforeEach() {
+    resetCapturedLogs();
+  },
+  async afterAll() {
+    const api = await import('../devtools-api');
+    api.DevtoolsAPI.dispose();
   },
 };

@@ -16,6 +16,8 @@ out/test/**
 ## Ignore executables and zips created (in the download process) when running the extension in dev mode
 cs-*
 *.zip
+!cs-cwf/
+!cs-cwf/**
 
 ## Include the agent binary
 !bin/
@@ -25,7 +27,6 @@ cs-*
 Makefile
 commitlint.config.js
 .github/**
-.versionrc.json
 .codescene/
 .c8rc.json
 .nvmrc

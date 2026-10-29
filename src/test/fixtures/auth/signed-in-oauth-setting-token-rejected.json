@@ -1,0 +1,14 @@
+{
+  "state": "signed-in",
+  "credential-source": "oauth",
+  "env-token-present": false,
+  "server": { "url": "https://codescene.acme.internal", "onprem": true, "source": "setting", "pat-url": "https://codescene.acme.internal/configuration/user/token" },
+  "oauth-supported": true,
+  "user": { "id": "17", "name": "Ada Lovelace" },
+  "account": null,
+  "license": { "pro": true },
+  "ace-credential": false,
+  "expires-at": 1792000000,
+  "login": null,
+  "error": { "code": "auth/invalid-token", "message": "The access token was rejected by CodeScene." }
+}

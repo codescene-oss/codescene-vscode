@@ -11,7 +11,6 @@ import vscode, {
 import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
 import { isDefined } from '../utils';
 import { RefactoringRequest } from './request';
-import { DevtoolsAPI } from '../devtools-api';
 import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { CodeSmell } from '../devtools-api/review-model';
 

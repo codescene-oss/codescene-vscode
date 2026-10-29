@@ -3,7 +3,9 @@ import { InteractiveDocsParams } from '../../../documentation/commands';
 import { reportError, showDocAtPosition } from '../../../utils';
 import { commonResourceRoots } from '../../../webview-utils';
 import { MessageToIDEType } from '../../../centralized-webview-framework/types/messages';
-import { initBaseContent } from '../../../centralized-webview-framework/cwf-html-utils';
+import { initBaseContent, updateRendererMessage } from '../../../centralized-webview-framework/cwf-html-utils';
+import { onDidChangeCwfAuth } from '../../../auth/cwf-auth';
+import { routeAuthMessage } from '../../../auth/auth-message-handler';
 import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
@@ -47,9 +49,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.webViewPanelDisposable = this.webViewPanel.onDidDispose(() => this.dispose());
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
+    this.disposables.push(onDidChangeCwfAuth(() => this.refreshAceState()));
     if (ACE_ENABLED) {
       this.disposables.push(
         CsExtensionState.onAceStateChanged(() => this.refreshAceState()),
+        CsExtensionState.onAuthChanged(() => this.refreshAceState()),
         onDidChangeConfiguration('authToken', () => this.refreshAceState())
       );
     }
@@ -66,6 +70,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
   // MESSAGES
   private async handleMessages(message: MessageToIDEType) {
     try {
+      if (await routeAuthMessage(message)) return;
       if (!this.state) return;
       await this.handleDocumentationMessage(this.state, message);
     } catch (e) {
@@ -75,10 +80,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
 
   private async refreshAceState() {
     if (this.state) {
-      await this.webViewPanel.webview.postMessage({
-        messageType: 'update-renderer',
-        payload: await getDocsData(this.state),
-      });
+      await this.webViewPanel.webview.postMessage(updateRendererMessage(await getDocsData(this.state)));
     }
   }
 
@@ -90,10 +92,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
 
           // Refresh to latest data when tab is visible again to render correct data
           if (this.state) {
-            await this.webViewPanel.webview.postMessage({
-              messageType: 'update-renderer',
-              payload: await getDocsData(this.state),
-            });
+            await this.webViewPanel.webview.postMessage(updateRendererMessage(await getDocsData(this.state)));
           }
         }
       },
@@ -156,10 +155,7 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.state = { ...params };
 
     if (this.isActive()) {
-      await this.webViewPanel.webview.postMessage({
-        messageType: 'update-renderer',
-        payload: await getDocsData(this.state),
-      });
+      await this.webViewPanel.webview.postMessage(updateRendererMessage(await getDocsData(this.state)));
     } else {
       const docsData = await getDocsData(this.state);
       const htmlContent = initBaseContent(this.webViewPanel.webview, docsData);
