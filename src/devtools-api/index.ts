@@ -240,6 +240,10 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
+  static authToken() {
+    return DevtoolsAPI.ideServer.authToken();
+  }
+
   static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
     this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;

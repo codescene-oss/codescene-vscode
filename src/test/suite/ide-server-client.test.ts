@@ -105,6 +105,7 @@ suite('CsIdeServerClient Test Suite', () => {
     assert.deepStrictEqual(refactor.confidence['recommended-action'], { description: 'Apply', details: 'Safe change' });
     assert.deepStrictEqual(await client.telemetry(telemetry), { status: 202, params: { event: telemetry } });
     assert.deepStrictEqual(await client.deviceId(), { 'device-id': 'device-42' });
+    assert.deepStrictEqual(await client.authToken(), { 'credential-source': 'oauth', 'access-token': 'fixture-access-token' });
     assert.deepStrictEqual(await client.codeHealthRulesTemplate(), { template: '{"rule_sets":[]}' });
     assert.deepStrictEqual(await client.checkRules('/repo', 'src/file.ts'), {
       result: 'matched',
@@ -307,6 +308,7 @@ suite('CsIdeServerClient Test Suite', () => {
     await client.refactor({ token: 'secret-token', 'fn-to-refactor-nippy-b64': 'encoded', 'skip-cache': true });
     await client.telemetry({ 'editor-type': 'VSCode', 'event-name': 'test-event', 'extension-version': '1.0.0', 'user-id': 'user-99' });
     await client.deviceId();
+    await client.authToken();
     await client.codeHealthRulesTemplate();
     await client.checkRules('/repo', 'src/file.ts');
     await client.getWatchInventory('/repo');
@@ -325,6 +327,8 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogContains('info', 'method=cs-ide/device-id');
     assertLogContains('info', 'method=cs-ide/device-id durationMs=');
     assertLogContains('info', 'ok=true');
+    assertLogContains('info', 'method=cs-ide/auth-token durationMs=');
+    assertLogContains('info', 'source=oauth');
     assertLogContains('info', 'method=cs-ide/check-rules repoRoot=/repo path=src/file.ts');
     assertLogContains('info', 'method=cs-ide/getWatchInventory repoRoot=/repo');
     assertLogContains('info', 'count=1 files=requested.ts');
@@ -333,6 +337,7 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogOmits('function f() {}');
     assertLogOmits('encoded');
     assertLogOmits('device-42');
+    assertLogOmits('fixture-access-token');
     assertLogOmits('user-99');
     assertLogOmits('{"rule_sets":[]}');
     assert.ok(!capturedLogText().includes('file-content'), capturedLogText());

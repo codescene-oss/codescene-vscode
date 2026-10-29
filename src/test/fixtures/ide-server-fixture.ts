@@ -183,6 +183,7 @@ const signedOutStatus = {
   error: null,
 };
 connection.onRequest('cs-ide/auth-status', () => signedOutStatus);
+connection.onRequest('cs-ide/auth-token', () => ({ 'credential-source': 'oauth', 'access-token': 'fixture-access-token' }));
 connection.onRequest('cs-ide/auth-configure', () => signedOutStatus);
 connection.onRequest('cs-ide/auth-login', () => {
   throw new ResponseError(-32803, 'This CodeScene server does not support browser sign-in.', { code: 'auth/oauth-unsupported' });

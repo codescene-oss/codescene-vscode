@@ -2,6 +2,7 @@ import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
+import type { AuthTokenResponse } from '../auth/auth-token';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import { formatLogFields, logOutputChannel } from '../log';
 import { redactSecrets } from '../log-redaction';
@@ -264,6 +265,10 @@ export class CsIdeServerClient implements vscode.Disposable {
 
   async telemetry(event: TelemetryEvent): Promise<TelemetryResponse> {
     return this.sendRequest('cs-ide/telemetry', { event });
+  }
+
+  authToken(): Promise<AuthTokenResponse> {
+    return this.sendRequest('cs-ide/auth-token', {});
   }
 
   async deviceId(): Promise<{ 'device-id': string }> {
