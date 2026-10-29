@@ -44,6 +44,9 @@ export class AgentRefactoringService {
     skipCleanup?: boolean,
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
+    if (document.isDirty) {
+      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
+    }
     const taskId = `refactor-${uuidv4()}`;
     const gitApi = acquireGitApi();
     const repo = gitApi?.getRepository(document.uri);

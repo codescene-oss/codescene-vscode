@@ -274,6 +274,17 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     });
   }
 
+  test('runRefactoring rejects a document with unsaved changes', async () => {
+    const fnBody = 'function test() { oldCode; }';
+    const fnToRefactor = createMockFnToRefactor(fnBody);
+    const document = { ...createMockDocument('/test/test.ts', fnBody), isDirty: true };
+
+    await assert.rejects(
+      () => AgentRefactoringService.runRefactoring(document, fnToRefactor),
+      /Save .*test\.ts.* before refactoring/
+    );
+  });
+
   test('mapOutputToResponse sets metadata cached to false', () => {
     const output: AgentOutput = {
       '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
