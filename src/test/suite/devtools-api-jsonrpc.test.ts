@@ -2,7 +2,6 @@ import * as assert from 'assert';
 import * as path from 'path';
 import { AnalysisEvent, DevtoolsAPI } from '../../devtools-api';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
-import { aceTest } from '../ace-test-suite';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 
 suite('DevtoolsAPI JSON-RPC Test Suite', () => {
@@ -60,9 +59,5 @@ suite('DevtoolsAPI JSON-RPC Test Suite', () => {
       queueCount: 0,
       queueDone: 0,
     });
-  });
-
-  aceTest('uses the shared server for preflight', async () => {
-    assert.strictEqual((await DevtoolsAPI.preflight())?.version, 2);
   });
 });

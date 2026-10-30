@@ -79,11 +79,11 @@ suite('Delta presentation Test Suite', () => {
 
   const testCases = [
     {
-      name: 'presents an enriched delta to the monitor when the review owns the monitor entry',
+      name: 'presents the delta to the monitor when the review owns the monitor entry',
       updateMonitor: true,
     },
     {
-      name: 'keeps an enriched delta out of the monitor when the review does not own the monitor entry',
+      name: 'keeps the delta out of the monitor when the review does not own the monitor entry',
       updateMonitor: false,
     },
   ];
@@ -104,10 +104,10 @@ suite('Delta presentation Test Suite', () => {
       server.deltaEmitter.fire({ id, repoRoot, path: 'src/file.ts', result: degradation() });
       await review;
 
-      await waitUntil(() => events.length === 2);
+      await waitUntil(() => events.length === 1);
       assert.deepStrictEqual(
         events.map((event) => event.updateMonitor),
-        [updateMonitor, updateMonitor]
+        [updateMonitor]
       );
     });
   });

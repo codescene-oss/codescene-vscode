@@ -21,4 +21,5 @@ test-git-repo-diff-utils/
 test-cs-diagnostics/
 coverage/
 .cs-prod-build
+bin/cs-agent
 bench-results/

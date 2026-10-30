@@ -118,7 +118,16 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
         cloud: disabledWith(authStatusFixture('signed-in-oauth')),
         onpremPat: disabledWith(authStatusFixture('signed-in-setting-token-onprem')),
       },
-      { cloud: false, onpremPat: true }
+      { cloud: false, onpremPat: false }
     );
+  });
+
+  test('visible requires an authenticated user', () => {
+    mockAcknowledged(true);
+    const visibleWith = (token: string) => {
+      mockToken(token);
+      return getAutoRefactorConfig().visible;
+    };
+    assert.deepStrictEqual({ authenticated: visibleWith('secret'), unauthenticated: visibleWith('') }, { authenticated: true, unauthenticated: false });
   });
 });

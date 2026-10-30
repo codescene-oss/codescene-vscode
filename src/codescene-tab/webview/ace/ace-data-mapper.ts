@@ -11,10 +11,11 @@ interface CwfAceData {
   isStale: boolean;
   error?: string;
   loading: boolean;
+  progressMessage?: string;
 }
 
 export function getAceData(data: CwfAceData): AceContextViewProps {
-  const { request, result, isStale, error, loading } = data;
+  const { request, result, isStale, error, loading, progressMessage } = data;
 
   return {
     view: 'ace',
@@ -40,6 +41,7 @@ export function getAceData(data: CwfAceData): AceContextViewProps {
       isStale,
       loading,
       error,
+      progressMessage,
     },
   };
 }

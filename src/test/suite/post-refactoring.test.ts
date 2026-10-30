@@ -8,6 +8,7 @@ import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { RefactoringRequest } from '../../refactoring/request';
 import { ChangeType } from '../../devtools-api/delta-model';
+import { fnToRefactorForFinding } from '../../refactoring/fn-to-refactor';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
 import { createTestDir, ensureBinary } from '../integration_helper';
@@ -22,9 +23,17 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
   let errorListener: vscode.Disposable;
   let refactoringErrorListener: vscode.Disposable;
   let originalGetAuthToken: any;
+  let originalGetExtensionPath: any;
+  const projectRoot = path.join(__dirname, '..', '..', '..');
 
   if (!testToken) {
     console.log('Skipping PostRefactoring tests: CODESCENE_TEST_TOKEN environment variable not set');
+    return;
+  }
+
+  const agentBinaryPath = path.join(__dirname, '..', '..', '..', 'bin', 'cs-agent');
+  if (!fs.existsSync(agentBinaryPath)) {
+    console.log('Skipping PostRefactoring tests: cs-agent binary not found at ' + agentBinaryPath);
     return;
   }
 
@@ -53,6 +62,11 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
     }
     fs.mkdirSync(testDir, { recursive: true });
 
+    const { execSync } = require('child_process');
+    execSync('git init', { cwd: testDir });
+    execSync('git config user.email "test@test.com"', { cwd: testDir });
+    execSync('git config user.name "Test"', { cwd: testDir });
+
     mockWorkspaceFolders([createMockWorkspaceFolder(testDir)]);
 
     const binaryPath = await ensureBinary();
@@ -60,6 +74,9 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     originalGetAuthToken = configModule.getAuthToken;
     (configModule as any).getAuthToken = () => testToken;
+
+    originalGetExtensionPath = csExtensionState.getExtensionPath;
+    (csExtensionState as any).getExtensionPath = () => projectRoot;
 
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
@@ -85,7 +102,7 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       refactoringError = error;
     });
 
-    await DevtoolsAPI.preflight();
+    DevtoolsAPI.enableAce();
   });
 
   teardown(() => {
@@ -94,6 +111,10 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
 
     if (originalGetAuthToken) {
       (configModule as any).getAuthToken = originalGetAuthToken;
+    }
+
+    if (originalGetExtensionPath) {
+      (csExtensionState as any).getExtensionPath = originalGetExtensionPath;
     }
 
     if (fs.existsSync(testDir)) {
@@ -136,14 +157,11 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       }]
     };
 
-    const fnsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const fnToRefactor = fnToRefactorForFinding(doc, deltaResult['function-level-findings'][0]);
 
     assertNoAnalysisError();
+    assert.ok(fnToRefactor, 'Should find a refactorable function');
 
-    assert.ok(Array.isArray(fnsToRefactor), 'Result should be an array');
-    assert.ok(fnsToRefactor.length > 0, 'Should find at least one refactorable function');
-
-    const fnToRefactor = fnsToRefactor[0];
     const request = new RefactoringRequest(fnToRefactor, doc, false);
 
     const response = await request.promise;
@@ -192,12 +210,10 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       }]
     };
 
-    const fnsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const fnToRefactor = fnToRefactorForFinding(doc, deltaResult['function-level-findings'][0]);
 
     assertNoAnalysisError();
-    assert.ok(fnsToRefactor && fnsToRefactor.length > 0, 'Should find refactorable functions');
-
-    const fnToRefactor = fnsToRefactor[0];
+    assert.ok(fnToRefactor, 'Should find a refactorable function');
 
     const request1 = new RefactoringRequest(fnToRefactor, doc, false);
     const response1 = await request1.promise;
@@ -245,12 +261,10 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       }]
     };
 
-    const fnsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const fnToRefactor = fnToRefactorForFinding(doc, deltaResult['function-level-findings'][0]);
 
     assertNoAnalysisError();
-    assert.ok(fnsToRefactor && fnsToRefactor.length > 0, 'Should find refactorable functions');
-
-    const fnToRefactor = fnsToRefactor[0];
+    assert.ok(fnToRefactor, 'Should find a refactorable function');
     assert.ok(fnToRefactor['refactoring-targets'].length > 0, 'Should have refactoring targets');
 
     const request = new RefactoringRequest(fnToRefactor, doc, false);
@@ -296,12 +310,10 @@ aceSuite('PostRefactoring Integration Test Suite', () => {
       }]
     };
 
-    const fnsToRefactor = await DevtoolsAPI.fnsToRefactorFromDelta(doc, deltaResult);
+    const fnToRefactor = fnToRefactorForFinding(doc, deltaResult['function-level-findings'][0]);
 
     assertNoAnalysisError();
-    assert.ok(fnsToRefactor && fnsToRefactor.length > 0, 'Should find refactorable functions');
-
-    const fnToRefactor = fnsToRefactor[0];
+    assert.ok(fnToRefactor, 'Should find a refactorable function');
     const request = new RefactoringRequest(fnToRefactor, doc, false);
     const response = await request.promise;
 

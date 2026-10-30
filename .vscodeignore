@@ -19,6 +19,9 @@ cs-*
 !cs-cwf/
 !cs-cwf/**
 
+## Include the agent binary
+!bin/
+
 ## Misc dotfiles
 .mocharc.json
 Makefile

@@ -1,9 +1,7 @@
-import { CodeSmell, Review } from './review-model';
+import { Review } from './review-model';
 import { assertError, getWorkspaceCwd, networkErrors, rangeStr, reportError } from '../utils';
 import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import { FnToRefactor, RefactorResponse } from './refactor-models';
-import { basename, dirname } from 'path';
-import { existsSync } from 'fs';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { isAceAvailable, refactorToken, resolveAceToken } from '../auth/ace-credential';
 import { ACE_ENABLED } from '../build-flags';
@@ -11,15 +9,14 @@ import { getAuthToken, automaticAnalysisEnabled } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
 import { RefactoringRequest } from '../refactoring/request';
-import { vscodeRange } from '../review/utils';
+import { AgentRefactoringService, ProgressCallback } from '../refactoring/agent-service';
 import { Delta } from './delta-model';
-import { addRefactorableFunctionsToDeltaResult } from './delta-utils';
+import { fnToRefactorForFinding } from '../refactoring/fn-to-refactor';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
-import { ReviewCache } from './review-cache';
 import { AbortError } from './abort-error';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CsIdeServerClient, RefactorParams, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
+import { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
 import { v4 as uuid } from 'uuid';
 import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
 import { CsReview } from '../review/cs-review';
@@ -27,7 +24,6 @@ import CsDiagnostics from '../diagnostics/cs-diagnostics';
 import { relativePosix } from '../utils/fs-paths';
 
 export class DevtoolsAPI {
-  private static reviewCache: ReviewCache;
   private static ideServer: CsIdeServerClient;
   private static pipeline: ReviewPipeline;
   private static queueSubscription?: vscode.Disposable;
@@ -37,7 +33,6 @@ export class DevtoolsAPI {
     DevtoolsAPI.pipeline?.dispose();
     DevtoolsAPI.queueSubscription?.dispose();
     DevtoolsAPI.ideServer?.dispose();
-    DevtoolsAPI.reviewCache = new ReviewCache(context);
     DevtoolsAPI.ideServer = ideServer ?? new CsIdeServerClient(binaryPath);
     DevtoolsAPI.pipeline = new ReviewPipeline(DevtoolsAPI.ideServer, DevtoolsAPI.pipelinePresentation(), uuid);
     DevtoolsAPI.queueCount = 0;
@@ -201,18 +196,15 @@ export class DevtoolsAPI {
       normalized['file-level-findings'] ??= [];
       normalized['function-level-findings'] ??= [];
     }
+    if (normalized && DevtoolsAPI.aceEnabled()) DevtoolsAPI.addRefactorableFunctions(document, normalized);
     Reviewer.instance.reviewCache.get(document, 'any')?.setDelta(normalized);
     DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result: normalized, updateMonitor });
-    if (normalized) void DevtoolsAPI.enrichServerDelta(document, normalized, updateMonitor);
   }
 
-  private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
-    try {
-      await addRefactorableFunctionsToDeltaResult(document, result);
-      DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor, enrichment: true });
-    } catch (error) {
-      logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);
-    }
+  private static addRefactorableFunctions(document: TextDocument, delta: Delta): void {
+    delta['function-level-findings'].forEach((finding) => {
+      finding.refactorableFn = fnToRefactorForFinding(document, finding);
+    });
   }
 
   private static removeServerReview(document: TextDocument): void {
@@ -223,58 +215,24 @@ export class DevtoolsAPI {
 
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
   public static readonly onDidDeltaAnalysisComplete = DevtoolsAPI.deltaAnalysisEmitter.event;
-  private static readonly preflightRequestEmitter = new vscode.EventEmitter<CsFeature>();
-  public static readonly onDidChangePreflightState = DevtoolsAPI.preflightRequestEmitter.event;
-  private static preflightJson?: string;
+  private static readonly aceStateEmitter = new vscode.EventEmitter<CsFeature>();
+  public static readonly onDidChangeAceState = DevtoolsAPI.aceStateEmitter.event;
+  private static aceActive = false;
 
-  static async preflight() {
+  static enableAce() {
     if (!ACE_ENABLED) return;
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'loading' });
-    try {
-      const response = await DevtoolsAPI.ideServer.preflight();
-      DevtoolsAPI.preflightJson = JSON.stringify(response);
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
-      return response;
-    } catch (e) {
-      if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
-        DevtoolsAPI.handleOfflineBehavior();
-        return;
-      }
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'error', error: assertError(e) });
-      reportError({ context: 'Unable to enable refactoring capabilities', e });
-    }
+    DevtoolsAPI.aceActive = true;
+    DevtoolsAPI.aceStateEmitter.fire({ state: 'enabled' });
   }
 
   static aceEnabled() {
-    return ACE_ENABLED && DevtoolsAPI.preflightJson !== undefined;
+    return ACE_ENABLED && DevtoolsAPI.aceActive;
   }
 
   static disableAce() {
     if (!ACE_ENABLED) return;
-    DevtoolsAPI.preflightJson = undefined;
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
-  }
-
-  static async fnsToRefactorFromDelta(document: TextDocument, delta: Delta) {
-    return this.fnsToRefactor(document, { 'delta-result': delta });
-  }
-
-  static async fnsToRefactor(document: TextDocument, args: { 'delta-result': Delta } | { 'code-smells': [CodeSmell] }) {
-    if (!DevtoolsAPI.aceEnabled()) return;
-    logOutputChannel.debug(`Calling fns-to-refactor for ${basename(document.fileName)}`);
-    const fp = fileParts(document);
-    if (!validateFileParts('fnsToRefactor', fp, document)) return;
-    const cachePath = DevtoolsAPI.reviewCache.getCachePath();
-    const ret = await DevtoolsAPI.ideServer.fnsToRefactor({
-      'file-name': fp.fileName,
-      'file-content': document.getText(),
-      preflight: JSON.parse(DevtoolsAPI.preflightJson!),
-      ...(cachePath ? { 'cache-path': cachePath } : {}),
-      ...args,
-    });
-    ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
-    logOutputChannel.debug(`Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`);
-    return ret;
+    DevtoolsAPI.aceActive = false;
+    DevtoolsAPI.aceStateEmitter.fire({ state: 'disabled' });
   }
 
   private static readonly refactoringRequestEmitter = new vscode.EventEmitter<AceRequestEvent>();
@@ -282,24 +240,18 @@ export class DevtoolsAPI {
   private static readonly refactoringErrorEmitter = new vscode.EventEmitter<Error>();
   public static readonly onDidRefactoringFail = DevtoolsAPI.refactoringErrorEmitter.event;
 
-  private static buildRefactoringPayload(fnToRefactor: FnToRefactor, skipCache: boolean, token: string | undefined): RefactorParams {
-    const payload: RefactorParams = token ? { token } : {};
-    if (fnToRefactor['nippy-b64']) payload['fn-to-refactor-nippy-b64'] = fnToRefactor['nippy-b64'];
-    else payload['fn-to-refactor'] = fnToRefactor;
-    if (skipCache) payload['skip-cache'] = true;
-    return payload;
+  static authToken() {
+    return DevtoolsAPI.ideServer.authToken();
   }
 
-  static async postRefactoring(request: RefactoringRequest): Promise<RefactorResponse> {
+  static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
     this.checkAceEnabled();
     const { document, fnToRefactor, skipCache, signal } = request;
-    const token = this.getRefactoringAuthToken();
+    this.getRefactoringAuthToken();
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
-      const payload = DevtoolsAPI.buildRefactoringPayload(fnToRefactor, skipCache, token);
       this.logRefactorRequested(fnToRefactor, skipCache);
-      this.validateRefactoringDocument(document);
-      const response = await DevtoolsAPI.ideServer.refactor(payload, signal);
+      const response = await DevtoolsAPI.executeRefactor(document, fnToRefactor, signal, onProgress);
       this.logRefactorDone(fnToRefactor, skipCache, response);
       DevtoolsAPI.handleBackOnline();
       return response;
@@ -323,11 +275,13 @@ export class DevtoolsAPI {
     logOutputChannel.info(`Refactor requested for ${logIdString(fnToRefactor)}${skipCache ? ' (retry)' : ''}, with refactoring targets: [${fnToRefactor['refactoring-targets'].map((target) => target.category).join(', ')}]`);
   }
 
-  private static validateRefactoringDocument(document: TextDocument): void {
-    const fp = fileParts(document);
-    if (!validateFileParts('postRefactoring', fp, document)) {
-      throw new Error('Invalid file parts: document directory is missing or does not exist');
-    }
+  private static async executeRefactor(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    signal: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal, undefined, onProgress);
   }
 
   private static logRefactorDone(fnToRefactor: FnToRefactor, skipCache: boolean, response: RefactorResponse): void {
@@ -361,13 +315,13 @@ export class DevtoolsAPI {
       void vscode.window.showInformationMessage('CodeScene extension is running in offline mode. Some features may be unavailable.');
     }
     logOutputChannel.warn('CodeScene extension is running in offline mode. The requested action could not be completed. Please check your internet connection to restore full functionality.');
-    DevtoolsAPI.preflightRequestEmitter.fire({ state: 'offline' });
+    DevtoolsAPI.aceStateEmitter.fire({ state: 'offline' });
   }
 
   private static handleBackOnline() {
     DevtoolsAPI.lastNetworkError = false;
     if (ACE_ENABLED && CsExtensionState.stateProperties.features.ace.state === 'offline') {
-      DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
+      DevtoolsAPI.aceStateEmitter.fire({ state: 'enabled' });
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }
   }
@@ -380,33 +334,10 @@ export class DevtoolsAPI {
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
     try { DevtoolsAPI.deltaAnalysisEmitter.dispose(); } catch {}
-    try { DevtoolsAPI.preflightRequestEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.aceStateEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringRequestEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringErrorEmitter.dispose(); } catch {}
   }
-}
-
-interface FileParts {
-  fileName: string;
-  documentDirectory: string;
-}
-
-function fileParts(document: vscode.TextDocument): FileParts {
-  return { fileName: basename(document.fileName), documentDirectory: dirname(document.fileName) };
-}
-
-function validateFileParts(operation: string, fp: FileParts, document: vscode.TextDocument): boolean {
-  if (!fp.documentDirectory?.trim()) {
-    logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory is empty`);
-    return false;
-  }
-  let exists = true;
-  try { exists = existsSync(fp.documentDirectory); } catch {}
-  if (!exists) {
-    logOutputChannel.warn(`Operation ${operation} skipped for ${basename(document.fileName)}: document directory does not exist: ${fp.documentDirectory}`);
-    return false;
-  }
-  return true;
 }
 
 export function aceToken(): string | undefined {
@@ -415,6 +346,10 @@ export function aceToken(): string | undefined {
 
 export function aceAvailable(): boolean {
   return isAceAvailable(aceToken(), CsExtensionState.stateProperties.auth);
+}
+
+export function aceUsable(): boolean {
+  return DevtoolsAPI.aceEnabled() && aceAvailable();
 }
 
 export function logIdString(fnToRefactor: FnToRefactor, traceId?: string) {
@@ -433,5 +368,4 @@ export type DeltaAnalysisEvent = {
   document: vscode.TextDocument;
   result?: Delta;
   updateMonitor: boolean;
-  enrichment?: boolean;
 };

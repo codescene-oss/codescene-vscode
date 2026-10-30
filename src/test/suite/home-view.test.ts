@@ -213,40 +213,14 @@ suite('HomeView', () => {
       assert.strictEqual(badgeCount, 0);
     });
 
-    const enrichmentCases = [
-      {
-        name: 'adds a file on its first delta',
-        initialFiles: [] as string[],
-        enrichment: false,
-        expectedFiles: ['/workspace/fileA.ts'],
-      },
-      {
-        name: 'does not resurrect a file removed while its delta was being enriched',
-        initialFiles: [] as string[],
-        enrichment: true,
-        expectedFiles: [] as string[],
-      },
-      {
-        name: 'updates a file that is still monitored when its enriched delta arrives',
-        initialFiles: ['/workspace/fileA.ts'],
-        enrichment: true,
-        expectedFiles: ['/workspace/fileA.ts'],
-      },
-    ];
-
-    enrichmentCases.forEach(({ name, initialFiles, enrichment, expectedFiles }) => {
-      test(name, () => {
-        initialFiles.forEach(addFileToHomeView);
-
-        (homeView as any).updateFileDeltaData({
-          document: mockDocument('/workspace/fileA.ts'),
-          result: mockDeltaResult,
-          updateMonitor: true,
-          enrichment,
-        });
-
-        assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], expectedFiles);
+    test('adds a file on its first delta', () => {
+      (homeView as any).updateFileDeltaData({
+        document: mockDocument('/workspace/fileA.ts'),
+        result: mockDeltaResult,
+        updateMonitor: true,
       });
+
+      assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], ['/workspace/fileA.ts']);
     });
   });
 

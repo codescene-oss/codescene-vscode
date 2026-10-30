@@ -1,6 +1,7 @@
 import vscode, { Uri } from 'vscode';
 import { ACE_ENABLED } from '../build-flags';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
+import { aceUsable } from '../devtools-api';
 import { issueToDocsParams } from '../documentation/commands';
 import { reviewDocumentSelector } from '../language-support';
 import { DeltaFunctionInfo } from './delta-function-info';
@@ -16,6 +17,10 @@ export function register(context: vscode.ExtensionContext) {
       codeLensProvider.dismiss(documentUri);
     })
   );
+}
+
+function canOfferRefactoring(functionInfo: DeltaFunctionInfo): boolean {
+  return ACE_ENABLED && aceUsable() && functionInfo.isRefactoringSupported;
 }
 
 export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode.CodeLens> {
@@ -55,7 +60,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
     const functionStartLine = functionInfo.range.start.with({ character: 0 });
 
     const requestAceLens = new vscode.CodeLens(new vscode.Range(functionStartLine, functionStartLine), {
-      title: '$(sparkle) CodeScene ACE',
+      title: '$(sparkle) CodeScene Agent',
       command: 'codescene.requestAndPresentRefactoring',
       arguments: [functionInfo.parent.document, 'codelens (code-health-monitor)', functionInfo.fnToRefactor],
     });
@@ -65,7 +70,7 @@ export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode
       arguments: [functionInfo.parent.document.uri],
     });
 
-    if (ACE_ENABLED && functionInfo.fnToRefactor) {
+    if (canOfferRefactoring(functionInfo)) {
       codeLenses.push(requestAceLens, dismissAceLens);
     }
     let order = 1;
