@@ -16,6 +16,7 @@ export interface LoginStart {
 
 export interface ProjectLink {
   project: Project | null;
+  source?: 'link' | 'remote';
 }
 
 export class AuthRpc {
