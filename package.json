@@ -191,7 +191,9 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Sign in to CodeScene in the browser (experimental). Requires a CodeScene IDE server with sign-in support.",
-          "tags": ["experimental"],
+          "tags": [
+            "experimental"
+          ],
           "order": 19.6
         },
         "codescene.enableTelemetry": {
