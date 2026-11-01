@@ -3,6 +3,7 @@ import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
+import { ensureSavedForRefactoring } from './unsaved-changes';
 import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
 import { reportError } from '../utils';
 import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webview-ace-panel';
@@ -53,6 +54,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
       logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
       return;
     }
+
+    if (!(await ensureSavedForRefactoring(document))) return;
 
     if (!CsExtensionState.acknowledgedAceUsage) {
       Telemetry.logUsage('ace-info/presented', { source });

@@ -93,6 +93,7 @@ export interface AceContextViewProps extends AuthField {
     error?: string;
     isStale: boolean;
     loading: boolean;
+    progressMessage?: string;
   };
 }
 

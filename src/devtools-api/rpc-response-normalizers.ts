@@ -1,13 +1,5 @@
 import { ChangeDetail, ChangeType, Delta, FunctionFinding } from './delta-model';
 import { CheckRulesResponse } from './model';
-import {
-  Confidence,
-  FnToRefactor,
-  PreFlightResponse,
-  RefactorResponse,
-  RefactorSupport,
-  RefactoringProperties,
-} from './refactor-models';
 import { CodeSmell, Function as ReviewFunction, Range, Review } from './review-model';
 
 type WireObject = Record<string, any>;
@@ -89,75 +81,6 @@ export function deltaResponse(value: WireObject): Delta {
     ...(field(value, 'newGitBlobSha', 'new-git-blob-sha') === undefined
       ? {}
       : { 'new-git-blob-sha': field<string>(value, 'newGitBlobSha', 'new-git-blob-sha') }),
-  };
-}
-
-function refactorSupport(value: WireObject): RefactorSupport {
-  return {
-    'max-input-loc': field<number>(value, 'maxInputLoc', 'max-input-loc')!,
-    'code-smells': field<string[]>(value, 'codeSmells', 'code-smells') ?? [],
-  };
-}
-
-export function preflightResponse(value: WireObject): PreFlightResponse {
-  const languageSpecific = field<Record<string, WireObject>>(value, 'languageSpecific', 'language-specific');
-  return {
-    version: value.version,
-    'file-types': field<string[]>(value, 'fileTypes', 'file-types') ?? [],
-    'language-common': refactorSupport(field(value, 'languageCommon', 'language-common')!),
-    ...(languageSpecific
-      ? { 'language-specific': Object.fromEntries(Object.entries(languageSpecific).map(([language, support]) => [language, refactorSupport(support)])) }
-      : {}),
-  };
-}
-
-export function fnToRefactorResponse(value: WireObject): FnToRefactor {
-  return {
-    body: value.body,
-    name: value.name,
-    'file-type': field<string>(value, 'fileType', 'file-type')!,
-    ...(field(value, 'functionType', 'function-type') === undefined
-      ? {}
-      : { 'function-type': field<string>(value, 'functionType', 'function-type') }),
-    ...(field(value, 'nippyB64', 'nippy-b64') === undefined && value['nippy-b-64'] === undefined
-      ? {}
-      : { 'nippy-b64': field<string>(value, 'nippyB64', 'nippy-b64') ?? value['nippy-b-64'] }),
-    range: range(value.range)!,
-    'refactoring-targets': field(value, 'refactoringTargets', 'refactoring-targets') ?? [],
-    vscodeRange: undefined!,
-  };
-}
-
-function confidence(value: WireObject): Confidence {
-  return {
-    level: value.level,
-    title: value.title,
-    'recommended-action': field(value, 'recommendedAction', 'recommended-action')!,
-    ...(field(value, 'reviewHeader', 'review-header') === undefined
-      ? {}
-      : { 'review-header': field<string>(value, 'reviewHeader', 'review-header') }),
-  };
-}
-
-function refactoringProperties(value: WireObject): RefactoringProperties {
-  return {
-    'added-code-smells': field(value, 'addedCodeSmells', 'added-code-smells') ?? [],
-    'removed-code-smells': field(value, 'removedCodeSmells', 'removed-code-smells') ?? [],
-  };
-}
-
-export function refactorResponse(value: WireObject): RefactorResponse {
-  return {
-    code: value.code,
-    confidence: confidence(value.confidence),
-    ...(value.declarations === undefined ? {} : { declarations: value.declarations }),
-    metadata: value.metadata,
-    reasons: value.reasons ?? [],
-    'refactoring-properties': refactoringProperties(field(value, 'refactoringProperties', 'refactoring-properties')!),
-    'trace-id': field<string>(value, 'traceId', 'trace-id')!,
-    ...(field(value, 'creditsInfo', 'credits-info') === undefined
-      ? {}
-      : { 'credits-info': field(value, 'creditsInfo', 'credits-info') }),
   };
 }
 

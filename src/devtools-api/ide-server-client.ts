@@ -1,46 +1,28 @@
 import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
-import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
+import { createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
+import type { AuthTokenResponse } from '../auth/auth-token';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import { formatLogFields, logOutputChannel } from '../log';
 import { redactSecrets } from '../log-redaction';
 import { authRequestSummaries, authResponseSummaries, authStatusSummary } from './auth-log-summaries';
 import { relativePosix, toPosixRelPath } from '../utils/fs-paths';
-import { AbortError } from './abort-error';
 import { Delta } from './delta-model';
-import { DevtoolsError } from './devtools-error';
 import { CheckRulesResponse, CodeHealthRulesTemplateResponse } from './model';
-import { FnToRefactor, PreFlightResponse, RefactorResponse } from './refactor-models';
 import { Review } from './review-model';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import {
   checkRulesResponse,
   deltaResponse,
   deviceIdResponse,
-  fnToRefactorResponse,
   notificationRepoRoot,
-  preflightResponse,
-  refactorResponse,
   reviewProgressResponse,
   reviewResponse,
   watchInventoryResponse,
 } from './rpc-response-normalizers';
 
 const STARTUP_TIMEOUT_MS = 30000;
-const HTTP_FAILURE = /^Request failed \[(\d{3})\]/;
-
-/**
- * cs-ide reports failed backend calls as a JSON-RPC error with the HTTP status only in the message.
- * Callers tell auth failures apart through `DevtoolsError.status`, as they did before the cs-ide server.
- */
-function httpFailure(error: unknown): DevtoolsError | undefined {
-  if (!(error instanceof Error)) return;
-  const match = HTTP_FAILURE.exec(error.message);
-  if (!match) return;
-  return new DevtoolsError({ message: error.message, status: Number(match[1]) });
-}
-
 export function distributionServerCommand(
   distributionPath: string,
   serverArgs: string[] = ['server']
@@ -111,22 +93,6 @@ export interface ReviewParams {
 export interface DeltaParams {
   'old-score'?: string;
   'new-score'?: string;
-}
-
-export interface FnsToRefactorParams {
-  'file-name': string;
-  'file-content': string;
-  preflight: PreFlightResponse;
-  'cache-path'?: string;
-  'delta-result'?: Delta;
-  'code-smells'?: unknown[];
-}
-
-export interface RefactorParams {
-  token?: string;
-  'fn-to-refactor'?: FnToRefactor;
-  'fn-to-refactor-nippy-b64'?: string;
-  'skip-cache'?: boolean;
 }
 
 interface ResultNotification<T> {
@@ -262,28 +228,12 @@ export class CsIdeServerClient implements vscode.Disposable {
     return response ? deltaResponse(response) : null;
   }
 
-  async preflight(params: { force?: boolean } = {}): Promise<PreFlightResponse> {
-    return preflightResponse(await this.sendRequest('cs-ide/preflight', params));
-  }
-
-  async fnsToRefactor(params: FnsToRefactorParams): Promise<FnToRefactor[]> {
-    const response = await this.sendRequest<Record<string, any>[]>('cs-ide/fns-to-refactor', params);
-    return response.map(fnToRefactorResponse);
-  }
-
-  async refactor(params: RefactorParams, signal?: AbortSignal): Promise<RefactorResponse> {
-    const cancellation = this.bindRefactorCancellation(signal);
-    try {
-      return refactorResponse(await this.sendRequest('cs-ide/refactor', params, cancellation.token));
-    } catch (error) {
-      throw this.refactorRejection(error, signal);
-    } finally {
-      cancellation.dispose();
-    }
-  }
-
   async telemetry(event: TelemetryEvent): Promise<TelemetryResponse> {
     return this.sendRequest('cs-ide/telemetry', { event });
+  }
+
+  authToken(): Promise<AuthTokenResponse> {
+    return this.sendRequest('cs-ide/auth-token', {});
   }
 
   async deviceId(): Promise<{ 'device-id': string }> {
@@ -361,26 +311,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.authStatusEmitter.dispose();
   }
 
-  private bindRefactorCancellation(signal?: AbortSignal): { token: CancellationToken; dispose: () => void } {
-    const cancellation = new CancellationTokenSource();
-    const cancel = () => cancellation.cancel();
-    signal?.addEventListener('abort', cancel);
-    if (signal?.aborted) cancel();
-    return {
-      token: cancellation.token,
-      dispose: () => {
-        signal?.removeEventListener('abort', cancel);
-        cancellation.dispose();
-      },
-    };
-  }
-
-  private refactorRejection(error: unknown, signal?: AbortSignal): unknown {
-    if (signal?.aborted) return new AbortError();
-    return httpFailure(error) ?? error;
-  }
-
-  private async sendRequest<T>(method: string, params: unknown, token?: CancellationToken): Promise<T> {
+  private async sendRequest<T>(method: string, params: unknown): Promise<T> {
     await this.start();
     if (!this.connection) throw new Error('CodeScene IDE server is not running');
     const id = ++this.requestSeq;
@@ -390,9 +321,7 @@ export class CsIdeServerClient implements vscode.Disposable {
       `[cs-ide] sending id=${id} method=${method}${requestSummary ? ` ${requestSummary}` : ''}`
     );
     try {
-      const result = token === undefined
-        ? await this.connection.sendRequest<T>(method, params)
-        : await this.connection.sendRequest<T>(method, params, token);
+      const result = await this.connection.sendRequest<T>(method, params);
       const responseSummary = summarizeResponse(method, result);
       logOutputChannel.info(
         `[cs-ide] received id=${id} method=${method} durationMs=${Date.now() - started}${responseSummary ? ` ${responseSummary}` : ''}`
@@ -612,25 +541,6 @@ function isWireObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function wireField<T>(value: Record<string, unknown>, ...keys: string[]): T | undefined {
-  for (const key of keys) {
-    if (value[key] !== undefined) return value[key] as T;
-  }
-  return undefined;
-}
-
-function fnsToRefactorInput(value: Record<string, unknown>): string {
-  if (value['delta-result'] !== undefined) return 'delta-result';
-  if (Array.isArray(value['code-smells'])) return 'code-smells';
-  return 'none';
-}
-
-function refactorPayloadFormat(value: Record<string, unknown>): string {
-  if (value['fn-to-refactor-nippy-b64'] !== undefined) return 'nippy-b64';
-  if (value['fn-to-refactor'] !== undefined) return 'json';
-  return 'none';
-}
-
 function telemetryEventName(value: Record<string, unknown>): unknown {
   return isWireObject(value.event) ? value.event['event-name'] : undefined;
 }
@@ -645,17 +555,6 @@ const requestSummaries: Record<string, (value: Record<string, unknown>) => strin
     hasOldScore: value['old-score'] !== undefined,
     hasNewScore: value['new-score'] !== undefined,
   }),
-  'cs-ide/preflight': (value) => formatLogFields({ force: value.force === true }),
-  'cs-ide/fns-to-refactor': (value) => formatLogFields({
-    fileName: value['file-name'],
-    input: fnsToRefactorInput(value),
-    smellCount: Array.isArray(value['code-smells']) ? value['code-smells'].length : undefined,
-    hasCachePath: value['cache-path'] !== undefined,
-  }),
-  'cs-ide/refactor': (value) => formatLogFields({
-    format: refactorPayloadFormat(value),
-    skipCache: value['skip-cache'] === true,
-  }),
   'cs-ide/telemetry': (value) => formatLogFields({ eventName: telemetryEventName(value) }),
   'cs-ide/check-rules': (value) => formatLogFields({ repoRoot: value['repo-root'], path: value.path }),
   'cs-ide/getWatchInventory': (value) => formatLogFields({ repoRoot: value['repo-root'] }),
@@ -667,36 +566,9 @@ function summarizeRequest(method: string, params: unknown): string {
   return requestSummaries[method]?.(params) ?? '';
 }
 
-function summarizeFnsToRefactorResponse(result: unknown[]): string {
-  return formatLogFields({
-    count: result.length,
-    functions: result.map(summarizeFnToRefactor),
-  });
-}
-
 const responseSummaries: Record<string, (value: Record<string, unknown>) => string> = {
   'cs-ide/review': (value) => formatLogFields(reviewSummary(reviewResponse(value))),
   'cs-ide/delta': (value) => formatLogFields(deltaSummary(deltaResponse(value))),
-  'cs-ide/preflight': (value) => {
-    const response = preflightResponse(value);
-    return formatLogFields({
-      version: response.version,
-      fileTypes: response['file-types'],
-      codeSmellCount: response['language-common']['code-smells'].length,
-      maxInputLoc: response['language-common']['max-input-loc'],
-    });
-  },
-  'cs-ide/refactor': (value) => {
-    const response = refactorResponse(value);
-    return formatLogFields({
-      traceId: response['trace-id'],
-      confidence: response.confidence.level,
-      cached: response.metadata['cached?'] === true,
-      reasonCount: response.reasons.length,
-      added: response['refactoring-properties']['added-code-smells'],
-      removed: response['refactoring-properties']['removed-code-smells'],
-    });
-  },
   'cs-ide/telemetry': (value) => formatLogFields({ status: value.status }),
   'cs-ide/device-id': () => formatLogFields({ ok: true }),
   'cs-ide/code-health-rules-template': () => formatLogFields({ ok: true }),
@@ -715,9 +587,6 @@ const responseSummaries: Record<string, (value: Record<string, unknown>) => stri
 };
 
 function summarizeResponse(method: string, result: unknown): string {
-  if (method === 'cs-ide/fns-to-refactor' && Array.isArray(result)) {
-    return summarizeFnsToRefactorResponse(result);
-  }
   if (!isWireObject(result)) return '';
   return responseSummaries[method]?.(result) ?? '';
 }
@@ -749,27 +618,4 @@ function deltaSummary(
     fileFindings: result['file-level-findings'].length,
     functionFindings: result['function-level-findings'].length,
   };
-}
-
-function summarizeFnToRefactor(value: unknown): string {
-  if (!isWireObject(value)) return '(invalid)';
-  const name = typeof value.name === 'string' ? value.name : '(unnamed)';
-  const rangeLabel = fnRangeLabel(value.range);
-  const categories = refactoringTargetCategories(value);
-  return `${name}${rangeLabel ? `@${rangeLabel}` : ''}${categories.length ? `[${categories.join(', ')}]` : ''}`;
-}
-
-function fnRangeLabel(range: unknown): string | undefined {
-  if (!isWireObject(range)) return undefined;
-  const startLine = wireField<number>(range, 'startLine', 'start-line');
-  const startColumn = wireField<number>(range, 'startColumn', 'start-column');
-  const endLine = wireField<number>(range, 'endLine', 'end-line');
-  const endColumn = wireField<number>(range, 'endColumn', 'end-column');
-  if ([startLine, startColumn, endLine, endColumn].includes(undefined)) return undefined;
-  return `${startLine}:${startColumn}-${endLine}:${endColumn}`;
-}
-
-function refactoringTargetCategories(fn: Record<string, unknown>): string[] {
-  const targets = wireField<Array<{ category?: string }>>(fn, 'refactoringTargets', 'refactoring-targets') ?? [];
-  return targets.map((target) => target.category).filter((category): category is string => !!category);
 }

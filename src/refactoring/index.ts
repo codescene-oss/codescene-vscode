@@ -1,42 +1,51 @@
 import vscode from 'vscode';
-import { getConfiguration } from '../configuration';
+import { getConfiguration, onDidChangeConfiguration } from '../configuration';
 import { CsExtensionState } from '../cs-extension-state';
-import { DevtoolsAPI } from '../devtools-api';
+import { aceUsable, DevtoolsAPI } from '../devtools-api';
 import { logOutputChannel } from '../log';
 import { CsRefactoringCommands } from './commands';
 import { createTmpDiffUriScheme } from './utils';
 
 /**
- * Initialize commands and diff scheme and try to enable ACE by requesting a preflight from the
- * Devtools API.
+ * Initialize commands and diff scheme and enable ACE.
  * Provides the codescene.ace.setEnabled command to enable/disable ACE, which respects
  * the enableAutoRefactor configuration setting.
  *
  * @param context
  */
+export const ACE_USABLE_CONTEXT_KEY = 'codescene.aceUsable';
+
+function updateAceUsableContext() {
+  void vscode.commands.executeCommand('setContext', ACE_USABLE_CONTEXT_KEY, aceUsable());
+}
+
 export function initAce(context: vscode.ExtensionContext) {
   context.subscriptions.push(
+    CsExtensionState.onAceStateChanged(updateAceUsableContext),
+    CsExtensionState.onAuthChanged(updateAceUsableContext),
+    onDidChangeConfiguration('authToken', updateAceUsableContext),
     vscode.commands.registerCommand('codescene.ace.setEnabled', (enable = true) => {
-      enable ? void enableAce() : disableAce();
+      enable ? enableAce() : disableAce();
     }),
     new CsRefactoringCommands(),
     createTmpDiffUriScheme(),
-    DevtoolsAPI.onDidChangePreflightState((event) => {
+    DevtoolsAPI.onDidChangeAceState((event) => {
       CsExtensionState.setACEState(event);
     })
   );
 
-  void enableAce();
+  enableAce();
+  updateAceUsableContext();
 }
 
-async function enableAce() {
+function enableAce() {
   const enableACE = getConfiguration('enableAutoRefactor');
   if (!enableACE) {
     DevtoolsAPI.disableAce();
     return;
   }
-  const preflight = await DevtoolsAPI.preflight();
-  if (preflight) logOutputChannel.info('ACE enabled!');
+  DevtoolsAPI.enableAce();
+  logOutputChannel.info('ACE enabled!');
 }
 
 function disableAce() {

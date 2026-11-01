@@ -1,7 +1,7 @@
 import vscode, { Disposable } from 'vscode';
 import { ACE_ENABLED } from './build-flags';
 import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { aceAvailable } from './devtools-api';
+import { aceUsable } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
@@ -51,6 +51,11 @@ export class CsStatusBar implements Disposable {
       return;
     }
     const item = this.aceStatus;
+    if (!aceUsable()) {
+      item.hide();
+      return;
+    }
+    item.show();
     const handler = this.aceStateHandlers[ace.state] || (() => {});
     handler(ace, item);
   }
@@ -150,14 +155,6 @@ export class CsStatusBar implements Disposable {
         background: 'statusBarItem.warningBackground',
       });
     },
-    disabled: (ace, item) => {
-      this.setStatus(item, {
-        text: `$(error) ACE ${toUppercase(ace.state)}`,
-        tooltip: 'Enable ACE in the extension settings',
-        command: 'codescene.ace.setEnabled',
-        background: 'statusBarItem.warningBackground',
-      });
-    },
     loading: (ace, item) => {
       this.setStatus(item, {
         text: '$(loading~spin) ACE',
@@ -165,12 +162,9 @@ export class CsStatusBar implements Disposable {
       });
     },
     enabled: (ace, item) => {
-      const hasToken = aceAvailable();
       this.setStatus(item, {
-        text: `$(${hasToken ? 'cs-logo' : 'error'}) ACE`,
-        command: 'codescene.openSettingsAndFocusToken',
-        background: hasToken ? undefined : 'statusBarItem.warningBackground',
-        tooltip: hasToken ? 'CodeScene ACE is active' : 'Configure ACE auth token in extension Workspace settings',
+        text: '$(cs-logo) ACE',
+        tooltip: 'CodeScene Agent is active',
       });
     },
   };

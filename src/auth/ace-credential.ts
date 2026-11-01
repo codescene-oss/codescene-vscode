@@ -3,7 +3,7 @@ import { MissingAuthTokenError } from '../missing-auth-token-error';
 
 export interface AceAuthState {
   active: boolean;
-  status: Pick<AuthStatus, 'ace-credential'> | null;
+  status: Pick<AuthStatus, 'state'> | null;
 }
 
 function nonBlank(value: string | undefined): string | undefined {
@@ -16,7 +16,7 @@ export function resolveAceToken(settingToken: string | undefined, legacyToken: s
 }
 
 export function isAceAvailable(token: string | undefined, auth: AceAuthState): boolean {
-  return token !== undefined || (auth.active && auth.status?.['ace-credential'] === true);
+  return token !== undefined || (auth.active && auth.status?.state === 'signed-in');
 }
 
 export function refactorToken(token: string | undefined, auth: AceAuthState): string | undefined {
