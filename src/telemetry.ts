@@ -7,6 +7,7 @@ import { DevtoolsAPI } from './devtools-api';
 import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
 import { serializeError } from './utils';
+import { kebabKeys } from './utils/kebab-keys';
 
 function telemetryUserId({ auth, legacySession }: CsStateProperties): string | undefined {
   return auth.status?.user?.id ?? legacySession?.userId;
@@ -147,7 +148,8 @@ export default class Telemetry {
       return;
     }
     const telemetryEvent: TelemetryEvent = {
-      ...eventData,
+      // Event properties are free-form and come from many call sites; the protocol takes kebab-case keys.
+      ...kebabKeys(eventData),
       'event-time': new Date().toISOString(),
       'event-name': eventName,
       'editor-type': 'vscode',
