@@ -77,6 +77,11 @@ suite('withCwfAuth', () => {
     assert.strictEqual(cwfAuthSurface(), 'monitor');
   });
 
+  test('cwfAuthSurface stays on the monitor while browser sign-in is inactive', () => {
+    setCwfAuth(undefined, flow, 'auth');
+    assert.strictEqual(cwfAuthSurface(), 'monitor');
+  });
+
   test('notifies listeners when only the surface or only the flow changes', () => {
     const payload = authPayloadFixture('auth-payload-linked-project');
     setCwfAuth(payload, flow, 'monitor');

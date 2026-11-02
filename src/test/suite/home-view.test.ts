@@ -7,7 +7,20 @@ import { CsExtensionState } from '../../cs-extension-state';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
 import { getMessageCategory } from '../../code-health-monitor/home/cwf-message-categories';
-import { clearMockGitRepositories, setMockGitRepositories } from '../setup';
+import {
+  clearMockGitRepositories,
+  createMockWebviewView,
+  getWebviewMessageHandler,
+  getWebviewPostMessageCalls,
+  resetWebviewPanelMocks,
+  setMockGitRepositories,
+  type MockWebviewView,
+} from '../setup';
+import { setCwfAuth } from '../../auth/cwf-auth';
+import type { AuthSurface } from '../../auth/auth-flow';
+import type { AuthFlow } from '../../centralized-webview-framework/types/auth';
+import { flushPromises } from '../fakes/fake-auth-transport';
+import { authPayloadFixture } from '../fixtures/auth/auth-fixtures';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -323,6 +336,144 @@ suite('HomeView', () => {
         );
       });
     }
+  });
+});
+
+suite('HomeView auth surface', () => {
+  const payload = authPayloadFixture('auth-payload-linked-project');
+  const flow: AuthFlow = { step: 'summary', context: 'sign-in', 'project-source': null, syncing: false };
+  const filePath = '/workspace/monitored.ts';
+  let homeView: HomeView;
+  let view: MockWebviewView;
+
+  type Rendered = { messageType: string; payload: { view: string; auth?: unknown; data?: any } };
+
+  suiteSetup(() => {
+    if (!CsExtensionState.hasInstance) {
+      CsExtensionState.init(createMockExtensionContext(path.join(__dirname, '../../../test-home-view-repo')));
+    }
+  });
+
+  setup(() => {
+    resetWebviewPanelMocks();
+    setCwfAuth(payload, flow, 'monitor');
+    homeView = new HomeView(createMockExtensionContext('/repo'), { updateBadge: () => {}, dispose: () => {} } as any);
+    view = createMockWebviewView();
+  });
+
+  teardown(() => {
+    homeView.update.cancel();
+    homeView.dispose();
+    setCwfAuth(undefined);
+    resetWebviewPanelMocks();
+  });
+
+  async function render() {
+    homeView.update.flush();
+    await flushPromises();
+  }
+
+  async function resolve() {
+    homeView.resolveWebviewView(view as any, {} as any, {} as any);
+    await render();
+  }
+
+  async function initialize() {
+    await resolve();
+    await getWebviewMessageHandler()!({ messageType: 'init', payload: 'home' });
+    await render();
+  }
+
+  async function showSurface(surface: AuthSurface) {
+    setCwfAuth(payload, flow, surface);
+    await render();
+  }
+
+  async function addMonitoredFile() {
+    (homeView as any).handleDeltaUpdate({
+      document: { uri: Uri.file(filePath), fileName: filePath },
+      result: { 'old-score': 9.0, 'new-score': 8.0, 'score-change': -1.0, 'file-level-findings': [], 'function-level-findings': [] },
+      updateMonitor: true,
+    });
+    await render();
+  }
+
+  function lastRendered(): Rendered {
+    return getWebviewPostMessageCalls().at(-1) as Rendered;
+  }
+
+  function monitoredFiles(rendered: Rendered): string[] {
+    return rendered.payload.data.fileDeltaData.map((item: { file: { fileName: string } }) => item.file.fileName);
+  }
+
+  test('posts the auth view while the surface is auth', async () => {
+    await initialize();
+    await showSurface('auth');
+    assert.strictEqual(lastRendered().messageType, 'update-renderer');
+    assert.strictEqual(lastRendered().payload.view, 'auth');
+    assert.deepStrictEqual(lastRendered().payload.auth, payload);
+  });
+
+  test('returns to the monitor with the monitor data gathered while the auth view was shown', async () => {
+    await initialize();
+    await showSurface('auth');
+    await addMonitoredFile();
+    assert.strictEqual(lastRendered().payload.view, 'auth');
+    await showSurface('monitor');
+    assert.strictEqual(lastRendered().payload.view, 'home');
+    assert.deepStrictEqual(monitoredFiles(lastRendered()), [filePath]);
+  });
+
+  const visibilityCases: Array<{ name: string; surfaces: AuthSurface[]; expected: string[] }> = [
+    { name: 'the auth view while the surface is auth', surfaces: ['auth'], expected: ['"view":"auth"'] },
+    {
+      name: 'the monitor with current data after returning from auth',
+      surfaces: ['auth', 'monitor'],
+      expected: ['"view":"home"', filePath],
+    },
+  ];
+
+  for (const { name, surfaces, expected } of visibilityCases) {
+    test(`a visibility reset rebuilds the HTML as ${name}`, async () => {
+      await initialize();
+      await addMonitoredFile();
+      for (const surface of surfaces) await showSurface(surface);
+      view.setVisible(false);
+      for (const fragment of expected) assert.ok(view.webview.html.includes(fragment), fragment);
+    });
+  }
+
+  test('showing the view again keeps the HTML it was given while hidden', async () => {
+    await initialize();
+    await showSurface('auth');
+    view.setVisible(false);
+    const hidden = view.webview.html;
+    view.setVisible(true);
+    await render();
+    assert.strictEqual(view.webview.html, hidden);
+  });
+
+  test('renders the auth HTML on first resolve after an earlier surface change', async () => {
+    await showSurface('auth');
+    await resolve();
+    assert.ok(view.webview.html.includes('"view":"auth"'), view.webview.html);
+  });
+
+  test('a surface change before init replaces the HTML, other updates keep it', async () => {
+    await resolve();
+    const monitorHtml = view.webview.html;
+    await addMonitoredFile();
+    assert.strictEqual(view.webview.html, monitorHtml);
+    await showSurface('auth');
+    assert.ok(view.webview.html.includes('"view":"auth"'), view.webview.html);
+  });
+
+  test('stays on the monitor when the surface is auth but browser sign-in is inactive', async () => {
+    setCwfAuth(undefined, undefined, 'auth');
+    await initialize();
+    assert.ok(view.webview.html.includes('"view":"home"'), view.webview.html);
+    assert.strictEqual(lastRendered().payload.view, 'home');
+    assert.ok(!view.webview.html.includes('ide-auth'));
   });
 });
 

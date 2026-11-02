@@ -21,7 +21,7 @@ export function setCwfAuth(payload: AuthPayload | undefined, flow?: AuthFlow, su
 }
 
 export function cwfAuthSurface(): AuthSurface {
-  return currentSurface;
+  return currentPayload ? currentSurface : 'monitor';
 }
 
 export function cwfAuthActive(): boolean {
