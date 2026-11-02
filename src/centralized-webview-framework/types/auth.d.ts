@@ -51,3 +51,14 @@ export type AuthPayload = {
   repo: { path: string; name: string } | null;
   'linked-project': Project | null;
 };
+
+export type AuthStep = 'summary' | 'resolving' | 'pick-account' | 'pick-project';
+
+export type ProjectSource = 'link' | 'remote';
+
+export type AuthFlow = {
+  step: AuthStep;
+  context: 'sign-in' | 'manual';
+  'project-source': ProjectSource | null;
+  syncing: boolean;
+};

@@ -1,10 +1,11 @@
 import { RefactorResponse } from './ace';
-import { AuthPayload } from './auth';
+import { AuthFlow, AuthPayload } from './auth';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
 
 export interface AuthField {
   auth?: AuthPayload;
+  authFlow?: AuthFlow;
 }
 
 export type IdeTypes = 'VSCode';

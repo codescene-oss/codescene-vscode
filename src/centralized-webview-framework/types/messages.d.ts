@@ -77,7 +77,9 @@ export type MessageToIDEType =
   | {
       messageType: 'start-analysis';
     }
-  | { messageType: 'open-auth' }
+  | { messageType: 'open-auth'; payload?: { screen?: 'account' | 'project' } }
+  | { messageType: 'auth-close' }
+  | { messageType: 'auth-skip-project' }
   | { messageType: 'auth-sign-in' }
   | { messageType: 'auth-open-browser-again' }
   | { messageType: 'auth-cancel-sign-in' }
