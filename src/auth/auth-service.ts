@@ -15,6 +15,10 @@ export const AUTH_CAPABILITY = 'auth-v1';
 
 const MANUAL_FLOW_KINDS = { account: 'manual-account', project: 'manual-project' } as const;
 
+function flowKindFor(screen: unknown): FlowState['kind'] {
+  return screen === 'account' || screen === 'project' ? MANUAL_FLOW_KINDS[screen] : 'idle';
+}
+
 export interface AuthServiceDeps {
   transport: AuthTransport;
   settings: AuthSettings;
@@ -99,7 +103,7 @@ export class AuthService implements vscode.Disposable {
   openAuth(screen?: 'account' | 'project'): void {
     if (!this.enabled) return;
     if (this.flow.kind === 'sign-in') this.publish({ ...this.snapshot, surface: 'auth' });
-    else this.startFlow({ ...IDLE_FLOW, kind: screen ? MANUAL_FLOW_KINDS[screen] : 'idle' });
+    else this.startFlow({ ...IDLE_FLOW, kind: flowKindFor(screen) });
     this.requestEmitter.fire();
   }
 

@@ -1054,22 +1054,24 @@ suite('AuthService sign-in flow', () => {
   const manualOptions: FlowOptions = { configure: signedIn, accounts: [accountA, accountBLocal] };
   const manualView = (surface: string, step: string) => ({ surface, step, context: 'manual', syncing: false });
 
-  const openings: Array<{ name: string; screen?: 'account' | 'project'; expected: object }> = [
+  const openings: Array<{ name: string; screen?: string; expected: object }> = [
     { name: 'no screen opens the summary', expected: manualView('auth', 'summary') },
     { name: 'the project screen opens the project picker', screen: 'project', expected: manualView('auth', 'pick-project') },
     { name: 'the account screen opens the account picker', screen: 'account', expected: manualView('auth', 'pick-account') },
+    { name: 'an unknown screen opens the summary', screen: 'bogus', expected: manualView('auth', 'summary') },
+    { name: 'an inherited property name opens the summary', screen: 'toString', expected: manualView('auth', 'summary') },
   ];
 
   openings.forEach(({ name, screen, expected }) => {
     test(`opening the auth view: ${name}`, async () => {
       await prepare(manualOptions);
-      harness.service.openAuth(screen);
+      harness.service.openAuth(screen as 'account' | 'project');
       assert.deepStrictEqual(view(), expected);
     });
 
     test(`closing a manual step returns to the monitor: ${name}`, async () => {
       await prepare(manualOptions);
-      harness.service.openAuth(screen);
+      harness.service.openAuth(screen as 'account' | 'project');
       await harness.service.closeAuth();
       assert.deepStrictEqual(view(), monitor);
     });
