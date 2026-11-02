@@ -1,11 +1,10 @@
-import type { Project } from '../centralized-webview-framework/types/auth';
 import { logOutputChannel } from '../log';
 import type { AuthRepo, AuthSnapshot } from './auth-payload';
-import { authErrorCode, type AuthRpc } from './auth-rpc';
+import { authErrorCode, type AuthRpc, type ProjectLink } from './auth-rpc';
 
-export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects' | 'linkedProject'>;
+export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects' | 'linkedProject' | 'projectSource'>;
 
-export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, linkedProject: null };
+export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, linkedProject: null, projectSource: null };
 
 async function optional<T>(request: Promise<T>): Promise<T | null> {
   try {
@@ -16,17 +15,21 @@ async function optional<T>(request: Promise<T>): Promise<T | null> {
   }
 }
 
-export async function fetchLinkedProject(rpc: AuthRpc, repo: AuthRepo | null): Promise<Project | null> {
+export async function fetchProjectLink(rpc: AuthRpc, repo: AuthRepo | null): Promise<ProjectLink | null> {
   if (!repo) return null;
-  const link = await optional(rpc.getProjectLink(repo.path));
-  return link?.project ?? null;
+  return optional(rpc.getProjectLink(repo.path));
+}
+
+export function linkFields(link: ProjectLink | null): Pick<AuthSnapshot, 'linkedProject' | 'projectSource'> {
+  const linkedProject = link?.project ?? null;
+  return { linkedProject, projectSource: linkedProject ? (link?.source ?? null) : null };
 }
 
 export async function fetchAccountData(rpc: AuthRpc, repo: AuthRepo | null): Promise<AccountData> {
-  const [accounts, projects, linkedProject] = await Promise.all([
+  const [accounts, projects, link] = await Promise.all([
     optional(rpc.listAccounts()),
     optional(rpc.listProjects()),
-    fetchLinkedProject(rpc, repo),
+    fetchProjectLink(rpc, repo),
   ]);
-  return { accounts, projects, linkedProject };
+  return { accounts, projects, ...linkFields(link) };
 }

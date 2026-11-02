@@ -1,4 +1,4 @@
-import type { Account, AuthPayload, AuthStatus, Project } from '../centralized-webview-framework/types/auth';
+import type { Account, AuthPayload, AuthStatus, Project, ProjectSource } from '../centralized-webview-framework/types/auth';
 
 export interface AuthRepo {
   path: string;
@@ -12,6 +12,7 @@ export interface AuthSnapshot {
   projects: Project[] | null;
   repo: AuthRepo | null;
   linkedProject: Project | null;
+  projectSource: ProjectSource | null;
 }
 
 export const INACTIVE_SNAPSHOT: AuthSnapshot = {
@@ -21,6 +22,7 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   projects: null,
   repo: null,
   linkedProject: null,
+  projectSource: null,
 };
 
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {

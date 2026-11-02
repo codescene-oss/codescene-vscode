@@ -319,6 +319,58 @@ suite('AuthService account data', () => {
     );
   });
 
+  test('publishes how the link was found when account data loads', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    const cases = [
+      { name: 'git remote', response: { project, source: 'remote' }, expected: { linkedProject: project, projectSource: 'remote' } },
+      { name: 'manual link', response: { project, source: 'link' }, expected: { linkedProject: project, projectSource: 'link' } },
+      { name: 'no link', response: { project: null }, expected: { linkedProject: null, projectSource: null } },
+    ];
+    for (const { name, response, expected } of cases) {
+      harness = createHarness();
+      harness.transport.respond('cs-ide/project-link-get', () => response);
+      await harness.service.setRepo(repo);
+      await harness.service.start();
+      harness.transport.notify(authStatusFixture('signed-in-oauth'));
+      await flushPromises();
+      const { linkedProject, projectSource } = harness.service.current;
+      assert.deepStrictEqual({ linkedProject, projectSource }, expected, name);
+      harness.service.dispose();
+    }
+  });
+
+  test('publishes the source of the link for a newly selected repo', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-get', (params) =>
+      params['repo-path'] === repo.path ? { project, source: 'remote' } : { project: null }
+    );
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.setRepo(repo);
+    assert.deepStrictEqual(
+      { linkedProject: harness.service.current.linkedProject, projectSource: harness.service.current.projectSource },
+      { linkedProject: project, projectSource: 'remote' }
+    );
+  });
+
+  test('clears the link and source when the next repo has no link', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-get', () => ({ project, source: 'remote' }));
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.setRepo(repo);
+    harness.transport.respond('cs-ide/project-link-get', () => ({ project: null }));
+    await harness.service.setRepo({ path: 'C:\git\other-web', name: 'other-web' });
+    assert.deepStrictEqual(
+      { linkedProject: harness.service.current.linkedProject, projectSource: harness.service.current.projectSource },
+      { linkedProject: null, projectSource: null }
+    );
+  });
+
   test('keeps working when account requests fail', async () => {
     harness = createHarness();
     harness.transport.respond('cs-ide/auth-list-accounts', () => {
@@ -577,6 +629,46 @@ suite('AuthService actions', () => {
         linked: { id: '102', name: 'acme-frontend' },
       }
     );
+  });
+
+  test('link-project marks a chosen project as manually linked', async () => {
+    const repo = { path: 'C:\git\acme-backend', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-set', () => ({ project: { id: '102', name: 'acme-frontend' } }));
+    await harness.service.start();
+    await harness.service.setRepo(repo);
+    await harness.service.linkProject('102');
+    assert.deepStrictEqual(
+      { project: harness.service.current.linkedProject, source: harness.service.current.projectSource },
+      { project: { id: '102', name: 'acme-frontend' }, source: 'link' }
+    );
+  });
+
+  test('link-project with null resets the link and publishes the re-read result', async () => {
+    const repo = { path: 'C:\git\acme-backend', name: 'acme-backend' };
+    const project = { id: '101', name: 'acme-backend' };
+    const cases = [
+      { name: 'git remote match', get: { project, source: 'remote' }, expected: { project, source: 'remote' } },
+      { name: 'nothing found', get: { project: null }, expected: { project: null, source: null } },
+    ];
+    for (const { name, get, expected } of cases) {
+      harness = createHarness();
+      harness.transport.respond('cs-ide/project-link-set', () => ({ project: null }));
+      await harness.service.start();
+      await harness.service.setRepo(repo);
+      harness.transport.respond('cs-ide/project-link-get', () => get);
+      await harness.service.linkProject(null);
+      assert.deepStrictEqual(
+        {
+          methods: harness.transport.methods().slice(-2),
+          project: harness.service.current.linkedProject,
+          source: harness.service.current.projectSource,
+        },
+        { methods: ['cs-ide/project-link-set', 'cs-ide/project-link-get'], ...expected },
+        name
+      );
+      harness.service.dispose();
+    }
   });
 
   test('setting and removing the access token writes the setting and configures cs-ide again', async () => {

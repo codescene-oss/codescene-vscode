@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'util';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
-import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchLinkedProject } from './account-data';
+import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchProjectLink, linkFields } from './account-data';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
 import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
 import { authConfiguration, type AuthSettings } from './auth-settings';
@@ -101,8 +101,9 @@ export class AuthService implements vscode.Disposable {
   async linkProject(projectId: string | null): Promise<void> {
     const repo = this.snapshot.repo;
     if (!this.enabled || !repo) return;
-    const link = await this.rpc.setProjectLink(repo.path, projectId);
-    this.publish({ ...this.snapshot, linkedProject: link.project });
+    const set = await this.rpc.setProjectLink(repo.path, projectId);
+    const link = projectId === null ? await fetchProjectLink(this.rpc, repo) : { ...set, source: 'link' as const };
+    this.publish({ ...this.snapshot, ...linkFields(link) });
   }
 
   async setAccessToken(token: string): Promise<void> {
@@ -117,11 +118,11 @@ export class AuthService implements vscode.Disposable {
 
   async setRepo(repo: AuthRepo | null): Promise<void> {
     if (isDeepStrictEqual(repo, this.snapshot.repo)) return;
-    this.publish({ ...this.snapshot, repo, linkedProject: null });
+    this.publish({ ...this.snapshot, repo, linkedProject: null, projectSource: null });
     if (!this.loadedKey) return;
     if (await this.syncAccount()) return;
-    const linkedProject = await fetchLinkedProject(this.rpc, repo);
-    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, linkedProject });
+    const link = await fetchProjectLink(this.rpc, repo);
+    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
   }
 
   dispose(): void {
