@@ -4,6 +4,7 @@ import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
 import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchProjectLink, linkFields } from './account-data';
+import { IDLE_FLOW, nextStep, type FlowState } from './auth-flow';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
 import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
 import { authConfiguration, type AuthSettings } from './auth-settings';
@@ -32,6 +33,12 @@ export class AuthService implements vscode.Disposable {
   private syncSupported = true;
   private configureSeq = 0;
   private loadedKey: string | undefined;
+  private accountLoad: Promise<void> = Promise.resolve();
+  private flow: FlowState = IDLE_FLOW;
+  private flowGen = 0;
+  private settlingGen: number | undefined;
+  private repoSeq = 0;
+  private repoSyncing = false;
   readonly onDidChange = this.emitter.event;
 
   constructor(private readonly deps: AuthServiceDeps) {
@@ -57,6 +64,7 @@ export class AuthService implements vscode.Disposable {
   async signIn(): Promise<void> {
     if (!this.enabled) return;
     this.syncOnSignIn = true;
+    this.startFlow({ ...IDLE_FLOW, kind: 'sign-in' });
     this.deps.logUsage('auth/sign-in-started');
     try {
       const login = await this.rpc.login();
@@ -77,6 +85,17 @@ export class AuthService implements vscode.Disposable {
     if (loginId) this.applyStatus(await this.rpc.cancelLogin(loginId));
   }
 
+  async closeAuth(): Promise<void> {
+    this.endFlow();
+    await this.cancelSignIn();
+  }
+
+  skipProject(): void {
+    if (this.flow.kind !== 'sign-in') return;
+    this.flow = { ...this.flow, projectSkipped: true };
+    this.publish(this.snapshot);
+  }
+
   async signOut(): Promise<void> {
     if (!this.enabled) return;
     this.deps.logUsage('auth/sign-out');
@@ -90,7 +109,9 @@ export class AuthService implements vscode.Disposable {
 
   async selectAccount(accountId: string): Promise<void> {
     if (!this.enabled) return;
+    const gen = this.flowGen;
     const status = await this.rpc.selectAccount(accountId);
+    if (gen === this.flowGen) this.chooseAccount();
     this.applyStatus(status);
     const url = status.login?.['authorize-url'];
     if (!url) return;
@@ -101,9 +122,11 @@ export class AuthService implements vscode.Disposable {
   async linkProject(projectId: string | null): Promise<void> {
     const repo = this.snapshot.repo;
     if (!this.enabled || !repo) return;
+    const gen = this.flowGen;
     const set = await this.rpc.setProjectLink(repo.path, projectId);
     const link = projectId === null ? await fetchProjectLink(this.rpc, repo) : { ...set, source: 'link' as const };
     this.publish({ ...this.snapshot, ...linkFields(link) });
+    if (gen === this.flowGen && this.flow.kind === 'manual-project') this.endFlow();
   }
 
   async setAccessToken(token: string): Promise<void> {
@@ -118,16 +141,31 @@ export class AuthService implements vscode.Disposable {
 
   async setRepo(repo: AuthRepo | null): Promise<void> {
     if (isDeepStrictEqual(repo, this.snapshot.repo)) return;
+    const seq = ++this.repoSeq;
+    this.repoSyncing = this.loadedKey !== undefined;
     this.publish({ ...this.snapshot, repo, linkedProject: null, projectSource: null });
     if (!this.loadedKey) return;
-    if (await this.syncAccount()) return;
-    const link = await fetchProjectLink(this.rpc, repo);
-    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
+    try {
+      await this.lookUpRepo(repo);
+    } finally {
+      if (seq === this.repoSeq) this.stopRepoSyncing();
+    }
   }
 
   dispose(): void {
     this.disposables.forEach((disposable) => disposable.dispose());
     this.emitter.dispose();
+  }
+
+  private async lookUpRepo(repo: AuthRepo | null): Promise<void> {
+    if (await this.syncAccount()) return this.accountDataSettled();
+    const link = await fetchProjectLink(this.rpc, repo);
+    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
+  }
+
+  private stopRepoSyncing(): void {
+    this.repoSyncing = false;
+    this.publish(this.snapshot);
   }
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {
@@ -145,6 +183,8 @@ export class AuthService implements vscode.Disposable {
       return;
     }
     this.loadedKey = undefined;
+    this.repoSyncing = false;
+    this.resetFlow();
     this.publish({ ...INACTIVE_SNAPSHOT, repo: this.snapshot.repo });
     await this.optOut();
   }
@@ -177,10 +217,62 @@ export class AuthService implements vscode.Disposable {
     this.logEvent(signInOutcome(this.snapshot.status, status));
     this.publish({ ...this.snapshot, active: true, status });
     void this.loadAccountData(status, reloadAccountData);
-    if (this.syncOnSignIn && accountDataKey(status)) {
-      this.syncOnSignIn = false;
-      void this.syncAccount();
-    }
+    const signedIn = accountDataKey(status) !== undefined;
+    const sync = this.takeSignInSync(signedIn);
+    if (sync || this.awaitsResolution(signedIn)) void this.settle(sync);
+  }
+
+  private takeSignInSync(signedIn: boolean): boolean {
+    const sync = this.syncOnSignIn && signedIn;
+    if (sync) this.syncOnSignIn = false;
+    return sync;
+  }
+
+  private awaitsResolution(signedIn: boolean): boolean {
+    const unresolved = this.flow.kind === 'sign-in' && !this.flow.resolved;
+    return signedIn && unresolved && this.settlingGen !== this.flowGen;
+  }
+
+  private async settle(sync: boolean): Promise<void> {
+    const gen = this.flowGen;
+    this.settlingGen = gen;
+    if (sync) await this.syncAccount();
+    await this.accountDataSettled();
+    if (gen !== this.flowGen) return;
+    this.settlingGen = undefined;
+    if (this.flow.kind !== 'sign-in') return;
+    this.flow = { ...this.flow, resolved: true };
+    this.publish(this.snapshot);
+  }
+
+  private async accountDataSettled(): Promise<void> {
+    let pending: Promise<void>;
+    do {
+      pending = this.accountLoad;
+      await pending;
+    } while (pending !== this.accountLoad);
+  }
+
+  private chooseAccount(): void {
+    if (this.flow.kind === 'idle') return;
+    const resolved = this.flow.kind === 'sign-in' ? false : this.flow.resolved;
+    this.flow = { ...this.flow, accountChosen: true, resolved };
+  }
+
+  private startFlow(flow: FlowState): void {
+    this.flowGen++;
+    this.flow = flow;
+    this.publish({ ...this.snapshot, surface: 'auth' });
+  }
+
+  private endFlow(): void {
+    this.resetFlow();
+    this.publish({ ...this.snapshot, surface: 'monitor' });
+  }
+
+  private resetFlow(): void {
+    this.flowGen++;
+    this.flow = IDLE_FLOW;
   }
 
   private syncableRepo(): AuthRepo | null {
@@ -203,10 +295,15 @@ export class AuthService implements vscode.Disposable {
     }
   }
 
-  private async loadAccountData(status: AuthStatus, reload: boolean): Promise<void> {
+  private loadAccountData(status: AuthStatus, reload: boolean): Promise<void> {
     const key = accountDataKey(status);
-    if (!reload && key === this.loadedKey) return;
+    if (!reload && key === this.loadedKey) return this.accountLoad;
     this.loadedKey = key;
+    this.accountLoad = this.fetchAccountDataFor(key);
+    return this.accountLoad;
+  }
+
+  private async fetchAccountDataFor(key: string | undefined): Promise<void> {
     const data = key ? await fetchAccountData(this.rpc, this.snapshot.repo) : EMPTY_ACCOUNT_DATA;
     if (key === this.loadedKey) this.publish({ ...this.snapshot, ...data });
   }
@@ -215,9 +312,22 @@ export class AuthService implements vscode.Disposable {
     if (event) this.deps.logUsage(event.name, event.data);
   }
 
+  private present(next: AuthSnapshot): AuthSnapshot {
+    const step = nextStep(this.flow, next);
+    if (step === 'done') this.resetFlow();
+    return {
+      ...next,
+      surface: step === 'done' ? 'monitor' : next.surface,
+      step: step === 'done' ? 'summary' : step,
+      context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
+      syncing: this.repoSyncing || (this.flow.kind === 'sign-in' && !this.flow.resolved),
+    };
+  }
+
   private publish(next: AuthSnapshot): void {
-    if (isDeepStrictEqual(next, this.snapshot)) return;
-    this.snapshot = next;
-    this.emitter.fire(next);
+    const presented = this.present(next);
+    if (isDeepStrictEqual(presented, this.snapshot)) return;
+    this.snapshot = presented;
+    this.emitter.fire(presented);
   }
 }

@@ -1,8 +1,8 @@
 import * as assert from 'assert';
-import { INACTIVE_SNAPSHOT, toAuthPayload } from '../../auth/auth-payload';
+import { INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload, type AuthRepo, type AuthSnapshot } from '../../auth/auth-payload';
 import { AuthService } from '../../auth/auth-service';
 import { FakeAuthSettings } from '../fakes/fake-auth-settings';
-import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
+import type { Account, AuthStatus, Project } from '../../centralized-webview-framework/types/auth';
 import { authRpcError, FakeAuthTransport, flushPromises } from '../fakes/fake-auth-transport';
 import { authPayloadFixture, authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { assertLogOmits } from '../setup';
@@ -692,5 +692,259 @@ suite('AuthService actions', () => {
         events: [{ name: 'auth/pat-set' }, { name: 'auth/pat-removed' }],
       }
     );
+  });
+});
+
+suite('AuthService sign-in flow', () => {
+  const repo = { path: 'C:\\git\\acme-backend', name: 'acme-backend' };
+  const project = { id: '101', name: 'acme-backend' };
+  const projects: Project[] = [project, { id: '102', name: 'acme-frontend' }];
+  const accountA: Account = { id: '42', name: 'Acme Corp', 'signed-in-locally': true };
+  const accountB: Account = { id: '7', name: 'CodeScene OSS', 'signed-in-locally': false };
+  const signedIn = authStatusFixture('signed-in-oauth');
+  const switched: AuthStatus = { ...signedIn, account: { id: '7', name: 'CodeScene OSS' } };
+  let harness: Harness;
+  let published: AuthSnapshot[];
+
+  interface FlowOptions {
+    accounts?: Account[];
+    link?: () => unknown;
+    repo?: AuthRepo | null;
+    sync?: () => unknown;
+    configure?: AuthStatus;
+  }
+
+  teardown(() => harness.service.dispose());
+
+  const view = () => {
+    const { surface, step, context, syncing } = harness.service.current;
+    return { surface, step, context, syncing };
+  };
+
+  const trail = () => published.map((snapshot) => snapshot.step).filter((step, index, all) => step !== all[index - 1]);
+
+  async function prepare(options: FlowOptions = {}): Promise<void> {
+    harness = createHarness();
+    harness.transport
+      .respond('cs-ide/auth-configure', () => options.configure ?? authStatusFixture('signed-out'))
+      .respond('cs-ide/auth-login', () => ({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' }))
+      .respond('cs-ide/auth-list-accounts', () => options.accounts ?? [accountA])
+      .respond('cs-ide/projects-list', () => projects)
+      .respond('cs-ide/project-link-get', options.link ?? (() => ({ project: null })));
+    if (options.sync) harness.transport.respond('cs-ide/auth-sync-account', options.sync);
+    published = [];
+    harness.service.onDidChange((snapshot) => published.push(snapshot));
+    if (options.repo !== null) await harness.service.setRepo(options.repo ?? repo);
+    await harness.service.start();
+    await flushPromises();
+  }
+
+  async function signInWith(options: FlowOptions = {}): Promise<void> {
+    await prepare(options);
+    await harness.service.signIn();
+    harness.transport.notify(signedIn);
+    await flushPromises();
+  }
+
+  const syncSwitchingToOwner = (): FlowOptions => {
+    let synced = false;
+    return {
+      accounts: [accountA, accountB],
+      sync: async () => {
+        await flushPromises();
+        synced = true;
+        return switched;
+      },
+      link: () => (synced ? { project, source: 'remote' } : { project: null }),
+    };
+  };
+
+  const twoAccountsUnlinked: FlowOptions = { accounts: [accountA, accountB], sync: () => signedIn };
+
+  const monitor = { surface: 'monitor', step: 'summary', context: 'manual', syncing: false };
+
+  test('starting a sign-in opens the auth view', async () => {
+    await prepare();
+    await harness.service.signIn();
+    assert.deepStrictEqual(view(), { surface: 'auth', step: 'summary', context: 'sign-in', syncing: true });
+  });
+
+  const resolutions: Array<{ name: string; options: () => FlowOptions; expected: { view: object; trail: string[] } }> = [
+    {
+      name: 'one account and a project found from the git remote returns to the monitor without a picker',
+      options: () => ({ link: () => ({ project, source: 'remote' }) }),
+      expected: { view: monitor, trail: ['summary', 'resolving', 'summary'] },
+    },
+    {
+      name: 'two accounts where the sync moves to the owner and the project resolves skip the account picker',
+      options: syncSwitchingToOwner,
+      expected: { view: monitor, trail: ['summary', 'resolving', 'summary'] },
+    },
+    {
+      name: 'two accounts where the sync changes nothing and no project resolves offer the account picker',
+      options: () => twoAccountsUnlinked,
+      expected: {
+        view: { surface: 'auth', step: 'pick-account', context: 'sign-in', syncing: false },
+        trail: ['summary', 'resolving', 'pick-account'],
+      },
+    },
+    {
+      name: 'an unsupported account sync with one account and no project offers the project picker',
+      options: () => ({}),
+      expected: {
+        view: { surface: 'auth', step: 'pick-project', context: 'sign-in', syncing: false },
+        trail: ['summary', 'resolving', 'pick-project'],
+      },
+    },
+    {
+      name: 'an unsupported account sync without a repo returns to the monitor',
+      options: () => ({ repo: null }),
+      expected: { view: monitor, trail: ['summary', 'resolving', 'summary'] },
+    },
+  ];
+
+  resolutions.forEach(({ name, options, expected }) => {
+    test(name, async () => {
+      await signInWith(options());
+      assert.deepStrictEqual({ view: view(), trail: trail() }, expected);
+    });
+  });
+
+  test('choosing an account re-resolves the project and offers the project picker when still unlinked', async () => {
+    await signInWith(twoAccountsUnlinked);
+    harness.transport.respond('cs-ide/auth-select-account', () => switched);
+    await harness.service.selectAccount('7');
+    await flushPromises();
+    assert.deepStrictEqual(
+      { view: view(), trail: trail() },
+      {
+        view: { surface: 'auth', step: 'pick-project', context: 'sign-in', syncing: false },
+        trail: ['summary', 'resolving', 'pick-account', 'resolving', 'pick-project'],
+      }
+    );
+  });
+
+  test('choosing an account that needs a browser login does not offer the account picker again', async () => {
+    await signInWith(twoAccountsUnlinked);
+    harness.transport.respond('cs-ide/auth-select-account', () => authStatusFixture('signing-in'));
+    await harness.service.selectAccount('7');
+    harness.transport.notify(switched);
+    await flushPromises();
+    assert.deepStrictEqual(
+      { view: view(), trail: trail() },
+      {
+        view: { surface: 'auth', step: 'pick-project', context: 'sign-in', syncing: false },
+        trail: ['summary', 'resolving', 'pick-account', 'summary', 'resolving', 'pick-project'],
+      }
+    );
+  });
+
+  test('skipping the project step returns to the monitor', async () => {
+    await signInWith();
+    const before = view().step;
+    harness.service.skipProject();
+    assert.deepStrictEqual({ before, after: view() }, { before: 'pick-project', after: monitor });
+  });
+
+  test('linking a project in the project step returns to the monitor', async () => {
+    await signInWith();
+    harness.transport.respond('cs-ide/project-link-set', () => ({ project }));
+    const before = view().step;
+    await harness.service.linkProject(project.id);
+    assert.deepStrictEqual(
+      { before, after: view(), linked: harness.service.current.linkedProject },
+      { before: 'pick-project', after: monitor, linked: project }
+    );
+  });
+
+  test('closing while resolving ignores the late sync result', async () => {
+    let release: (status: AuthStatus) => void = () => undefined;
+    const pending = new Promise<AuthStatus>((resolve) => (release = resolve));
+    await signInWith({ ...syncSwitchingToOwner(), sync: () => pending });
+    const before = view();
+    await harness.service.closeAuth();
+    const closedAt = published.length;
+    release(switched);
+    await flushPromises();
+    assert.deepStrictEqual(
+      {
+        before,
+        after: view(),
+        reopened: published.slice(closedAt).some((snapshot) => snapshot.surface === 'auth'),
+        account: harness.service.current.status?.account,
+      },
+      {
+        before: { surface: 'auth', step: 'resolving', context: 'sign-in', syncing: true },
+        after: monitor,
+        reopened: false,
+        account: switched.account,
+      }
+    );
+  });
+
+  test('closing while signing in cancels the pending login and ends the flow', async () => {
+    await prepare();
+    harness.transport.respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    await harness.service.signIn();
+    harness.transport.notify(authStatusFixture('signing-in'));
+    await harness.service.closeAuth();
+    assert.deepStrictEqual(
+      { last: harness.transport.requests.at(-1), view: view() },
+      { last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': '3f1c9a2e' } }, view: monitor }
+    );
+  });
+
+  test('a session already signed in at startup does not start the flow', async () => {
+    await prepare({ ...twoAccountsUnlinked, configure: signedIn });
+    assert.deepStrictEqual({ view: view(), trail: trail() }, { view: monitor, trail: ['summary'] });
+  });
+
+  test('turning the toggle off while the auth view is open returns to the monitor', async () => {
+    await signInWith(twoAccountsUnlinked);
+    const before = view().surface;
+    harness.settings.update({ signInEnabled: false });
+    await flushPromises();
+    assert.deepStrictEqual({ before, after: view() }, { before: 'auth', after: monitor });
+  });
+
+  test('reports syncing while a newly selected repo looks up its link', async () => {
+    let release: (link: unknown) => void = () => undefined;
+    await prepare({ configure: signedIn, repo: null });
+    harness.transport.respond('cs-ide/project-link-get', () => new Promise((resolve) => (release = resolve)));
+    const selecting = harness.service.setRepo(repo);
+    await flushPromises();
+    const during = harness.service.current.syncing;
+    release({ project, source: 'remote' });
+    await selecting;
+    assert.deepStrictEqual(
+      { during, after: harness.service.current.syncing, linked: harness.service.current.linkedProject },
+      { during: true, after: false, linked: project }
+    );
+  });
+});
+
+suite('AuthService flow payload', () => {
+  const active: AuthSnapshot = {
+    ...INACTIVE_SNAPSHOT,
+    active: true,
+    status: authStatusFixture('signed-in-oauth'),
+    projectSource: 'remote',
+    step: 'pick-project',
+    context: 'sign-in',
+    syncing: true,
+  };
+  const cases: Array<{ name: string; snapshot: AuthSnapshot; expected: unknown }> = [
+    { name: 'inactive', snapshot: INACTIVE_SNAPSHOT, expected: undefined },
+    {
+      name: 'active',
+      snapshot: active,
+      expected: { step: 'pick-project', context: 'sign-in', 'project-source': 'remote', syncing: true },
+    },
+  ];
+
+  cases.forEach(({ name, snapshot, expected }) => {
+    test(`maps the ${name} snapshot to the auth flow`, () => {
+      assert.deepStrictEqual(toAuthFlow(snapshot), expected);
+    });
   });
 });

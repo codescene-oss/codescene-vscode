@@ -1,4 +1,13 @@
-import type { Account, AuthPayload, AuthStatus, Project, ProjectSource } from '../centralized-webview-framework/types/auth';
+import type {
+  Account,
+  AuthFlow,
+  AuthPayload,
+  AuthStatus,
+  AuthStep,
+  Project,
+  ProjectSource,
+} from '../centralized-webview-framework/types/auth';
+import type { AuthSurface } from './auth-flow';
 
 export interface AuthRepo {
   path: string;
@@ -13,6 +22,10 @@ export interface AuthSnapshot {
   repo: AuthRepo | null;
   linkedProject: Project | null;
   projectSource: ProjectSource | null;
+  surface: AuthSurface;
+  step: AuthStep;
+  context: AuthFlow['context'];
+  syncing: boolean;
 }
 
 export const INACTIVE_SNAPSHOT: AuthSnapshot = {
@@ -23,6 +36,10 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   repo: null,
   linkedProject: null,
   projectSource: null,
+  surface: 'monitor',
+  step: 'summary',
+  context: 'manual',
+  syncing: false,
 };
 
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {
@@ -33,6 +50,16 @@ export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {
     projects: snapshot.projects,
     repo: snapshot.repo,
     'linked-project': snapshot.linkedProject,
+  };
+}
+
+export function toAuthFlow(snapshot: AuthSnapshot): AuthFlow | undefined {
+  if (!snapshot.active) return undefined;
+  return {
+    step: snapshot.step,
+    context: snapshot.context,
+    'project-source': snapshot.projectSource,
+    syncing: snapshot.syncing,
   };
 }
 
