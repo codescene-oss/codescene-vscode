@@ -34,6 +34,11 @@ function nativeArtifactName(platform, arch) {
   return `cs-ide-${osName}-${archName}-${requiredDevtoolsVersion}.zip`;
 }
 
+/** The contract bundle (schemas, wire manifest, fixtures) the CLI publishes next to its zips at the same SHA. */
+function contractArtifactName() {
+  return `cs-ide-contract-${requiredDevtoolsVersion}.zip`;
+}
+
 const artifacts = {
   darwin: {
     x64: nativeArtifactName('darwin', 'x64'),
@@ -51,6 +56,7 @@ const artifacts = {
 module.exports = {
   requiredDevtoolsVersion,
   artifacts,
+  contractArtifactName,
   nativeBinaryFileName,
   requiredSidecarFileNames,
 };

@@ -50,6 +50,14 @@ cs-<platform>-<arch>/
 
 **Note:** You only need to run this once, or when switching platforms / CLI versions.
 
+### Contract Bundle (`CS_IDE_CONTRACT_BUNDLE`)
+
+`npm run pretest` runs `scripts/fetch-contract.js`, which downloads `cs-ide-contract-<requiredDevtoolsVersion>.zip` (schemas, wire manifest and fixtures the contract tests validate against) and unpacks it to `cs-ide-contract/`. To test against a bundle you built locally (`bb gen-json-schemas` in the CLI repo, output `cli/target/cs-ide-contract/`), point `CS_IDE_CONTRACT_BUNDLE` at the unpacked directory or a bundle zip:
+
+```bash
+CS_IDE_CONTRACT_BUNDLE=/path/to/cs-ide-contract npm run fetch-contract
+```
+
 ### Using a Local CLI Distribution (`CS_IDE_USE_LOCAL_DISTRIBUTION`)
 
 Use this when you have built `cs-ide` yourself (for example from the `cli-server` branch) and do not want `bundle-cli` to download a published zip.

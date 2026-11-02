@@ -13,6 +13,8 @@ cs-linux-*
 cs-win32-*
 cs-ide-*
 cs-cwf/
+## Contract bundle (schemas, wire manifest, fixtures) fetched by scripts/fetch-contract.js
+cs-ide-contract/
 *.zip
 !src/test/fixtures/*.zip
 .idea/
