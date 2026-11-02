@@ -708,7 +708,8 @@ suite('AuthService sign-in flow', () => {
 
   interface FlowOptions {
     accounts?: Account[];
-    link?: () => unknown;
+    projects?: () => unknown;
+    link?: (params: Record<string, unknown>) => unknown;
     repo?: AuthRepo | null;
     sync?: () => unknown;
     configure?: AuthStatus;
@@ -729,7 +730,7 @@ suite('AuthService sign-in flow', () => {
       .respond('cs-ide/auth-configure', () => options.configure ?? authStatusFixture('signed-out'))
       .respond('cs-ide/auth-login', () => ({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' }))
       .respond('cs-ide/auth-list-accounts', () => options.accounts ?? [accountA])
-      .respond('cs-ide/projects-list', () => projects)
+      .respond('cs-ide/projects-list', options.projects ?? (() => projects))
       .respond('cs-ide/project-link-get', options.link ?? (() => ({ project: null })));
     if (options.sync) harness.transport.respond('cs-ide/auth-sync-account', options.sync);
     published = [];
@@ -957,6 +958,44 @@ suite('AuthService sign-in flow', () => {
     assert.deepStrictEqual(
       { during, after: harness.service.current.syncing, linked: harness.service.current.linkedProject },
       { during: true, after: false, linked: project }
+    );
+  });
+
+  const otherRepo = { path: 'C:\\git\\other-web', name: 'other-web' };
+  const otherProject = { id: '201', name: 'other-web' };
+  const linkByRepo = (params: Record<string, unknown>) =>
+    params['repo-path'] === otherRepo.path ? { project: otherProject, source: 'remote' } : { project: null };
+
+  test('an account data load that finishes after a repo switch keeps the new repo link', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    await prepare({
+      configure: signedIn,
+      repo: null,
+      link: linkByRepo,
+      projects: () => new Promise((resolve) => (release = resolve)),
+    });
+    await harness.service.setRepo(otherRepo);
+    release(projects);
+    await flushPromises();
+    const { linkedProject, projectSource, projects: loaded } = harness.service.current;
+    assert.deepStrictEqual(
+      { linkedProject, projectSource, loaded },
+      { linkedProject: otherProject, projectSource: 'remote', loaded: projects }
+    );
+  });
+
+  test('a project link that finishes after a repo switch is not shown on the new repo', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    await prepare({ configure: signedIn, link: linkByRepo });
+    harness.transport.respond('cs-ide/project-link-set', () => new Promise((resolve) => (release = resolve)));
+    const linking = harness.service.linkProject(project.id);
+    await harness.service.setRepo(otherRepo);
+    release({ project });
+    await linking;
+    const { repo: current, linkedProject, projectSource } = harness.service.current;
+    assert.deepStrictEqual(
+      { current, linkedProject, projectSource },
+      { current: otherRepo, linkedProject: otherProject, projectSource: 'remote' }
     );
   });
 

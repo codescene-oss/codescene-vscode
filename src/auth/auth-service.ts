@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'util';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
-import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchProjectLink, linkFields } from './account-data';
+import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchProjectLink, linkFields, type AccountData } from './account-data';
 import { IDLE_FLOW, nextStep, type FlowState } from './auth-flow';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
 import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
@@ -148,7 +148,7 @@ export class AuthService implements vscode.Disposable {
     const gen = this.flowGen;
     const set = await this.rpc.setProjectLink(repo.path, projectId);
     const link = projectId === null ? await fetchProjectLink(this.rpc, repo) : { ...set, source: 'link' as const };
-    this.publish({ ...this.snapshot, ...linkFields(link) });
+    if (this.isCurrentRepo(repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
     if (gen === this.flowGen && this.flow.kind === 'manual-project') this.endFlow();
   }
 
@@ -184,7 +184,11 @@ export class AuthService implements vscode.Disposable {
   private async lookUpRepo(repo: AuthRepo | null): Promise<void> {
     if (await this.syncAccount()) return this.accountDataSettled();
     const link = await fetchProjectLink(this.rpc, repo);
-    if (isDeepStrictEqual(repo, this.snapshot.repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
+    if (this.isCurrentRepo(repo)) this.publish({ ...this.snapshot, ...linkFields(link) });
+  }
+
+  private isCurrentRepo(repo: AuthRepo | null): boolean {
+    return isDeepStrictEqual(repo, this.snapshot.repo);
   }
 
   private stopRepoSyncing(): void {
@@ -329,8 +333,14 @@ export class AuthService implements vscode.Disposable {
   }
 
   private async fetchAccountDataFor(key: string | undefined): Promise<void> {
-    const data = key ? await fetchAccountData(this.rpc, this.snapshot.repo) : EMPTY_ACCOUNT_DATA;
-    if (key === this.loadedKey) this.publish({ ...this.snapshot, ...data });
+    const repo = this.snapshot.repo;
+    const data = key ? await fetchAccountData(this.rpc, repo) : EMPTY_ACCOUNT_DATA;
+    if (key === this.loadedKey) this.publish({ ...this.snapshot, ...this.forCurrentRepo(data, repo) });
+  }
+
+  private forCurrentRepo(data: AccountData, repo: AuthRepo | null): Partial<AccountData> {
+    if (this.isCurrentRepo(repo)) return data;
+    return { accounts: data.accounts, projects: data.projects };
   }
 
   private logEvent(event: AuthTelemetryEvent | undefined): void {
