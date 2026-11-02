@@ -1051,6 +1051,72 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  const signInOpenings: Array<{ name: string; screen?: 'account' | 'project' }> = [
+    { name: 'no screen' },
+    { name: 'the project screen', screen: 'project' },
+    { name: 'the account screen', screen: 'account' },
+  ];
+
+  signInOpenings.forEach(({ name, screen }) => {
+    test(`opening the auth view with ${name} during a sign-in keeps the sign-in flow`, async () => {
+      await prepare({ link: () => ({ project, source: 'remote' }) });
+      await harness.service.signIn();
+      harness.service.openAuth(screen);
+      const during = view();
+      harness.transport.notify(signedIn);
+      await flushPromises();
+      assert.deepStrictEqual(
+        { during, after: view(), trail: trail() },
+        {
+          during: { surface: 'auth', step: 'summary', context: 'sign-in', syncing: true },
+          after: monitor,
+          trail: ['summary', 'resolving', 'summary'],
+        }
+      );
+    });
+  });
+
+  test('turning the feature off while the login request is pending cancels that login', async () => {
+    let release: (login: unknown) => void = () => undefined;
+    await prepare();
+    harness.transport
+      .respond('cs-ide/auth-login', () => new Promise((resolve) => (release = resolve)))
+      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    const signingIn = harness.service.signIn();
+    harness.settings.update({ signInEnabled: false });
+    await flushPromises();
+    release({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' });
+    await signingIn;
+    assert.deepStrictEqual(
+      { opened: harness.opened, last: harness.transport.requests.at(-1) },
+      { opened: [], last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': 'abc' } } }
+    );
+  });
+
+  test('a second sign-in cancels the first pending login by its id', async () => {
+    const releases: Array<(login: unknown) => void> = [];
+    await prepare();
+    harness.transport
+      .respond('cs-ide/auth-login', () => new Promise((resolve) => releases.push(resolve)))
+      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    const first = harness.service.signIn();
+    const second = harness.service.signIn();
+    await flushPromises();
+    releases[0]({ 'login-id': 'first', 'authorize-url': 'https://codescene.io/first' });
+    releases[1]({ 'login-id': 'second', 'authorize-url': 'https://codescene.io/second' });
+    await Promise.all([first, second]);
+    assert.deepStrictEqual(
+      {
+        opened: harness.opened,
+        cancelled: harness.transport.requests.filter((request) => request.method === 'cs-ide/auth-cancel-login'),
+      },
+      {
+        opened: ['https://codescene.io/second'],
+        cancelled: [{ method: 'cs-ide/auth-cancel-login', params: { 'login-id': 'first' } }],
+      }
+    );
+  });
+
   test('finishing a manual flow does not cancel the login of a pending account choice', async () => {
     let release: (status: AuthStatus) => void = () => undefined;
     await prepare(manualOptions);

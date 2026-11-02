@@ -93,6 +93,7 @@ export class AuthService implements vscode.Disposable {
 
   openAuth(screen?: 'account' | 'project'): void {
     if (!this.enabled) return;
+    if (this.flow.kind === 'sign-in') return this.publish({ ...this.snapshot, surface: 'auth' });
     const kind = screen ? MANUAL_FLOW_KINDS[screen] : 'idle';
     this.startFlow({ ...IDLE_FLOW, kind });
   }
