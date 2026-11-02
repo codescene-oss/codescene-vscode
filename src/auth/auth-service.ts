@@ -13,6 +13,8 @@ import type { AuthTransport } from './auth-transport';
 
 export const AUTH_CAPABILITY = 'auth-v1';
 
+const MANUAL_FLOW_KINDS = { account: 'manual-account', project: 'manual-project' } as const;
+
 export interface AuthServiceDeps {
   transport: AuthTransport;
   settings: AuthSettings;
@@ -36,6 +38,7 @@ export class AuthService implements vscode.Disposable {
   private accountLoad: Promise<void> = Promise.resolve();
   private flow: FlowState = IDLE_FLOW;
   private flowGen = 0;
+  private loginEpoch = 0;
   private settlingGen: number | undefined;
   private repoSeq = 0;
   private repoSyncing = false;
@@ -64,12 +67,13 @@ export class AuthService implements vscode.Disposable {
   async signIn(): Promise<void> {
     if (!this.enabled) return;
     this.syncOnSignIn = true;
+    this.loginEpoch++;
     this.startFlow({ ...IDLE_FLOW, kind: 'sign-in' });
-    const gen = this.flowGen;
+    const epoch = this.loginEpoch;
     this.deps.logUsage('auth/sign-in-started');
     try {
       const login = await this.rpc.login();
-      if (gen !== this.flowGen) return await this.abandonLogin(login['login-id']);
+      if (epoch !== this.loginEpoch) return await this.abandonLogin(login['login-id']);
       await this.deps.openExternal(login['authorize-url']);
     } catch (error) {
       this.logEvent(signInFailed(authErrorCode(error)));
@@ -87,7 +91,14 @@ export class AuthService implements vscode.Disposable {
     if (loginId) this.applyStatus(await this.rpc.cancelLogin(loginId));
   }
 
+  openAuth(screen?: 'account' | 'project'): void {
+    if (!this.enabled) return;
+    const kind = screen ? MANUAL_FLOW_KINDS[screen] : 'idle';
+    this.startFlow({ ...IDLE_FLOW, kind });
+  }
+
   async closeAuth(): Promise<void> {
+    this.loginEpoch++;
     this.endFlow();
     await this.cancelSignIn();
   }
@@ -112,12 +123,13 @@ export class AuthService implements vscode.Disposable {
   async selectAccount(accountId: string): Promise<void> {
     if (!this.enabled) return;
     const gen = this.flowGen;
+    const epoch = this.loginEpoch;
     const status = await this.rpc.selectAccount(accountId);
     if (gen === this.flowGen) this.chooseAccount();
     this.applyStatus(status);
     const login = status.login;
     if (!login) return;
-    if (gen !== this.flowGen) return this.abandonLogin(login['login-id']);
+    if (epoch !== this.loginEpoch) return this.abandonLogin(login['login-id']);
     this.deps.logUsage('auth/sign-in-started');
     await this.deps.openExternal(login['authorize-url']);
   }
@@ -191,6 +203,7 @@ export class AuthService implements vscode.Disposable {
     }
     this.loadedKey = undefined;
     this.repoSyncing = false;
+    this.loginEpoch++;
     this.resetFlow();
     this.publish({ ...INACTIVE_SNAPSHOT, repo: this.snapshot.repo });
     await this.optOut();

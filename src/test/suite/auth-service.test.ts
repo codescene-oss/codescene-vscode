@@ -959,6 +959,119 @@ suite('AuthService sign-in flow', () => {
       { during: true, after: false, linked: project }
     );
   });
+
+  const accountBLocal: Account = { ...accountB, 'signed-in-locally': true };
+  const manualOptions: FlowOptions = { configure: signedIn, accounts: [accountA, accountBLocal] };
+  const manualView = (surface: string, step: string) => ({ surface, step, context: 'manual', syncing: false });
+
+  const openings: Array<{ name: string; screen?: 'account' | 'project'; expected: object }> = [
+    { name: 'no screen opens the summary', expected: manualView('auth', 'summary') },
+    { name: 'the project screen opens the project picker', screen: 'project', expected: manualView('auth', 'pick-project') },
+    { name: 'the account screen opens the account picker', screen: 'account', expected: manualView('auth', 'pick-account') },
+  ];
+
+  openings.forEach(({ name, screen, expected }) => {
+    test(`opening the auth view: ${name}`, async () => {
+      await prepare(manualOptions);
+      harness.service.openAuth(screen);
+      assert.deepStrictEqual(view(), expected);
+    });
+
+    test(`closing a manual step returns to the monitor: ${name}`, async () => {
+      await prepare(manualOptions);
+      harness.service.openAuth(screen);
+      await harness.service.closeAuth();
+      assert.deepStrictEqual(view(), monitor);
+    });
+  });
+
+  test('opening the auth view while the feature is inactive does nothing', async () => {
+    harness = createHarness({ signInEnabled: false });
+    published = [];
+    harness.service.onDidChange((snapshot) => published.push(snapshot));
+    await harness.service.start();
+    harness.service.openAuth('project');
+    assert.deepStrictEqual(
+      { current: harness.service.current, published: published.length },
+      { current: { ...INACTIVE_SNAPSHOT }, published: 0 }
+    );
+  });
+
+  test('a manual project pick keeps the picker when the project list refreshes', async () => {
+    await prepare(manualOptions);
+    harness.service.openAuth('project');
+    harness.transport.notify(signedIn);
+    await flushPromises();
+    assert.deepStrictEqual(view(), manualView('auth', 'pick-project'));
+  });
+
+  const linkings: Array<{ name: string; projectId: string | null; link: () => unknown; expected: unknown }> = [
+    { name: 'a project', projectId: '102', link: () => ({ project: projects[1] }), expected: projects[1] },
+    { name: 'reset to automatic', projectId: null, link: () => ({ project, source: 'remote' }), expected: project },
+  ];
+
+  linkings.forEach(({ name, projectId, link, expected }) => {
+    test(`linking ${name} during a manual project pick returns to the monitor`, async () => {
+      await prepare({ ...manualOptions, link: () => ({ project: null }) });
+      harness.transport.respond('cs-ide/project-link-set', link).respond('cs-ide/project-link-get', link);
+      harness.service.openAuth('project');
+      const before = view();
+      await harness.service.linkProject(projectId);
+      assert.deepStrictEqual(
+        { before, after: view(), linked: harness.service.current.linkedProject },
+        { before: manualView('auth', 'pick-project'), after: monitor, linked: expected }
+      );
+    });
+  });
+
+  test('choosing a local account during a manual account pick returns to the monitor', async () => {
+    await prepare(manualOptions);
+    harness.transport.respond('cs-ide/auth-select-account', () => switched);
+    harness.service.openAuth('account');
+    const before = view();
+    await harness.service.selectAccount('7');
+    await flushPromises();
+    assert.deepStrictEqual(
+      { before, after: view(), account: harness.service.current.status?.account },
+      { before: manualView('auth', 'pick-account'), after: monitor, account: switched.account }
+    );
+  });
+
+  test('choosing an account that needs a browser login returns to the monitor once signed in', async () => {
+    await prepare(manualOptions);
+    harness.transport.respond('cs-ide/auth-select-account', () => authStatusFixture('signing-in'));
+    harness.service.openAuth('account');
+    await harness.service.selectAccount('7');
+    const during = view();
+    harness.transport.notify(switched);
+    await flushPromises();
+    assert.deepStrictEqual(
+      { during, after: view(), opened: harness.opened.length },
+      { during: manualView('auth', 'summary'), after: monitor, opened: 1 }
+    );
+  });
+
+  test('finishing a manual flow does not cancel the login of a pending account choice', async () => {
+    let release: (status: AuthStatus) => void = () => undefined;
+    await prepare(manualOptions);
+    harness.transport
+      .respond('cs-ide/auth-select-account', () => new Promise((resolve) => (release = resolve)))
+      .respond('cs-ide/project-link-set', () => ({ project }))
+      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    harness.service.openAuth('project');
+    const selecting = harness.service.selectAccount('7');
+    await harness.service.linkProject(project.id);
+    release(authStatusFixture('signing-in'));
+    await selecting;
+    await flushPromises();
+    assert.deepStrictEqual(
+      {
+        opened: harness.opened.length,
+        cancelled: harness.transport.requests.some((request) => request.method === 'cs-ide/auth-cancel-login'),
+      },
+      { opened: 1, cancelled: false }
+    );
+  });
 });
 
 suite('AuthService flow payload', () => {
