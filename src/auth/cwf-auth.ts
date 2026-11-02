@@ -1,18 +1,27 @@
 import vscode from 'vscode';
 import type { AuthField } from '../centralized-webview-framework/types';
-import type { AuthPayload } from '../centralized-webview-framework/types/auth';
+import type { AuthFlow, AuthPayload } from '../centralized-webview-framework/types/auth';
 import type { FeatureFlags } from '../centralized-webview-framework/types/cwf-feature';
+import type { AuthSurface } from './auth-flow';
 
 export const IDE_AUTH_FLAG: FeatureFlags = 'ide-auth';
 
 let currentPayload: AuthPayload | undefined;
+let currentFlow: AuthFlow | undefined;
+let currentSurface: AuthSurface = 'monitor';
 const changeEmitter = new vscode.EventEmitter<void>();
 
 export const onDidChangeCwfAuth = changeEmitter.event;
 
-export function setCwfAuth(payload: AuthPayload | undefined): void {
+export function setCwfAuth(payload: AuthPayload | undefined, flow?: AuthFlow, surface: AuthSurface = 'monitor'): void {
   currentPayload = payload;
+  currentFlow = flow;
+  currentSurface = surface;
   changeEmitter.fire();
+}
+
+export function cwfAuthSurface(): AuthSurface {
+  return currentSurface;
 }
 
 export function cwfAuthActive(): boolean {
@@ -21,5 +30,10 @@ export function cwfAuthActive(): boolean {
 
 export function withCwfAuth<T extends AuthField & { featureFlags?: FeatureFlags[] }>(props: T): T {
   if (!currentPayload) return props;
-  return { ...props, featureFlags: [...(props.featureFlags ?? []), IDE_AUTH_FLAG], auth: currentPayload };
+  return {
+    ...props,
+    featureFlags: [...(props.featureFlags ?? []), IDE_AUTH_FLAG],
+    auth: currentPayload,
+    ...(currentFlow ? { authFlow: currentFlow } : {}),
+  };
 }

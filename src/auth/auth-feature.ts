@@ -6,7 +6,7 @@ import Telemetry from '../telemetry';
 import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
 import { registerAuthMessages } from './auth-message-handler';
 import { AuthNotices } from './auth-notices';
-import { toAuthPayload, type AuthSnapshot } from './auth-payload';
+import { toAuthFlow, toAuthPayload, type AuthSnapshot } from './auth-payload';
 import { pickRepo } from './auth-repo';
 import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
@@ -23,7 +23,7 @@ function openSetting(id: string): Thenable<unknown> {
 
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
-  setCwfAuth(toAuthPayload(snapshot));
+  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface);
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
 }
