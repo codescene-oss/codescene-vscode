@@ -7,7 +7,7 @@ suite('withCwfAuth', () => {
   const homeProps = (): HomeContextViewProps => ({
     ideType: 'VSCode',
     view: 'home',
-    featureFlags: ['jobs'],
+    featureFlags: ['onboarding'],
     data: { fileDeltaData: [] },
   });
 
@@ -24,7 +24,7 @@ suite('withCwfAuth', () => {
     assert.deepStrictEqual(withCwfAuth(homeProps()), {
       ideType: 'VSCode',
       view: 'home',
-      featureFlags: ['jobs', 'ide-auth'],
+      featureFlags: ['onboarding', 'ide-auth'],
       data: { fileDeltaData: [] },
       auth: payload,
     });

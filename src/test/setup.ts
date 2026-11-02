@@ -521,6 +521,7 @@ const vscodeStub = {
   Range: RangeStub,
   Position: PositionStub,
   Selection: SelectionStub,
+  TextEditorRevealType: { Default: 0, InCenter: 1, InCenterIfOutsideViewport: 2, AtTop: 3 },
   WorkspaceEdit: WorkspaceEditStub,
   CodeAction: CodeActionStub,
   CodeLens: CodeLensStub,

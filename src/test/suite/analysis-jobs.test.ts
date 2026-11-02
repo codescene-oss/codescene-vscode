@@ -120,7 +120,7 @@ suite('getHomeData', () => {
       view: 'home',
       devmode: false,
       pro: true,
-      featureFlags: ['jobs', 'open-settings'],
+      featureFlags: [],
       data: {
         fileDeltaData: [],
         jobs: [],

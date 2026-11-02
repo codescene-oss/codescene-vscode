@@ -58,6 +58,10 @@ cs-<platform>-<arch>/
 CS_IDE_CONTRACT_BUNDLE=/path/to/cs-ide-contract npm run fetch-contract
 ```
 
+### Webview Schemas (`cs-cwf/`)
+
+The webview boundary tests (`contract-webview.test.ts`) validate what the extension sends to the webview and what it receives from it against `webview-schema.json` and `message-schema.json` in `cs-cwf/`. `npm run updatecwf` puts them there: it builds `../cs-webview` when that checkout exists (and `CI` is not set), otherwise it downloads the release pinned in `cwf.version` and needs `GITHUB_TOKEN`. The tests fail, not skip, when the schema files are missing.
+
 ### Using a Local CLI Distribution (`CS_IDE_USE_LOCAL_DISTRIBUTION`)
 
 Use this when you have built `cs-ide` yourself (for example from the `cli-server` branch) and do not want `bundle-cli` to download a published zip.

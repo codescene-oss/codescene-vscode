@@ -23,7 +23,7 @@ suite('AuthPanel', () => {
     view: 'auth',
     devmode: false,
     pro: true,
-    featureFlags: ['jobs', 'open-settings', 'ide-auth'],
+    featureFlags: ['ide-auth'],
     auth,
   });
 

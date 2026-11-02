@@ -42,6 +42,13 @@ jobs:
     - name: Configure Git
       run: git config --global advice.defaultBranchName false
 
+    # The contract tests validate against webview-schema.json and message-schema.json from the bundled CWF zip
+    - name: Fetch the bundled webview (CWF)
+      run: npm run updatecwf
+      env:
+        CI: true
+        GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
+
     - run: npm run pretest
       env:
         CI: true
@@ -76,6 +83,13 @@ jobs:
 
     - name: Configure Git
       run: git config --global advice.defaultBranchName false
+
+    # The contract tests validate against webview-schema.json and message-schema.json from the bundled CWF zip
+    - name: Fetch the bundled webview (CWF)
+      run: npm run updatecwf
+      env:
+        CI: true
+        GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
 
     - run: npm run pretest
       env:
