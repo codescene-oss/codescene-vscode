@@ -997,6 +997,39 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  const requests: Array<{ name: string; steps: Array<'open' | 'sign-in' | 'status'>; expected: number }> = [
+    { name: 'opening the auth view', steps: ['open'], expected: 1 },
+    { name: 'opening the auth view again while it is shown', steps: ['open', 'open'], expected: 2 },
+    { name: 'starting a sign-in', steps: ['sign-in'], expected: 1 },
+    { name: 'opening the auth view while a sign-in is running', steps: ['sign-in', 'open'], expected: 2 },
+    { name: 'a status update while the auth view is shown', steps: ['open', 'status'], expected: 1 },
+  ];
+
+  requests.forEach(({ name, steps, expected }) => {
+    test(`requests the auth view ${expected} time(s) for ${name}`, async () => {
+      await prepare(manualOptions);
+      let requested = 0;
+      harness.service.onDidRequestAuth(() => requested++);
+      for (const step of steps) {
+        if (step === 'open') harness.service.openAuth();
+        if (step === 'sign-in') await harness.service.signIn();
+        if (step === 'status') harness.transport.notify(signedIn);
+        await flushPromises();
+      }
+      assert.strictEqual(requested, expected);
+    });
+  });
+
+  test('does not request the auth view while the feature is inactive', async () => {
+    harness = createHarness({ signInEnabled: false });
+    await harness.service.start();
+    let requested = 0;
+    harness.service.onDidRequestAuth(() => requested++);
+    harness.service.openAuth();
+    await harness.service.signIn();
+    assert.strictEqual(requested, 0);
+  });
+
   test('a manual project pick keeps the picker when the project list refreshes', async () => {
     await prepare(manualOptions);
     harness.service.openAuth('project');

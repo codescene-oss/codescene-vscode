@@ -11,7 +11,7 @@ import { pickRepo } from './auth-repo';
 import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
 import type { AuthTransport } from './auth-transport';
-import { cwfAuthSurface, setCwfAuth } from './cwf-auth';
+import { setCwfAuth } from './cwf-auth';
 
 const HOME_VIEW_FOCUS_COMMAND = 'codescene.homeView.focus';
 
@@ -23,13 +23,15 @@ function openSetting(id: string): Thenable<unknown> {
   return vscode.commands.executeCommand('workbench.action.openSettings', id);
 }
 
-export function publishAuth(snapshot: AuthSnapshot, notices: AuthNotices): void {
-  const wasShowingAuth = cwfAuthSurface() === 'auth';
+function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
   setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface);
-  if (!wasShowingAuth && cwfAuthSurface() === 'auth') void vscode.commands.executeCommand(HOME_VIEW_FOCUS_COMMAND);
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
+}
+
+export function revealOnAuthRequest(service: Pick<AuthService, 'onDidRequestAuth'>): vscode.Disposable {
+  return service.onDidRequestAuth(() => void vscode.commands.executeCommand(HOME_VIEW_FOCUS_COMMAND));
 }
 
 function watchRepository(service: AuthService): vscode.Disposable[] {
@@ -60,7 +62,8 @@ export function activateAuth(context: vscode.ExtensionContext, transport: AuthTr
   const disposables: vscode.Disposable[] = [
     settings,
     service,
-    service.onDidChange((snapshot) => publishAuth(snapshot, notices)),
+    service.onDidChange((snapshot) => publish(snapshot, notices)),
+    revealOnAuthRequest(service),
     registerAuthMessages(service, {
       openServerSetting: () => openSetting('codescene.serverUrl'),
       openExternal: openInBrowser,

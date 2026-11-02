@@ -43,6 +43,8 @@ export class AuthService implements vscode.Disposable {
   private repoSeq = 0;
   private repoSyncing = false;
   readonly onDidChange = this.emitter.event;
+  private readonly requestEmitter = new vscode.EventEmitter<void>();
+  readonly onDidRequestAuth = this.requestEmitter.event;
 
   constructor(private readonly deps: AuthServiceDeps) {
     this.rpc = new AuthRpc(deps.transport);
@@ -69,6 +71,7 @@ export class AuthService implements vscode.Disposable {
     this.syncOnSignIn = true;
     this.loginEpoch++;
     this.startFlow({ ...IDLE_FLOW, kind: 'sign-in' });
+    this.requestEmitter.fire();
     const epoch = this.loginEpoch;
     this.deps.logUsage('auth/sign-in-started');
     try {
@@ -93,9 +96,9 @@ export class AuthService implements vscode.Disposable {
 
   openAuth(screen?: 'account' | 'project'): void {
     if (!this.enabled) return;
-    if (this.flow.kind === 'sign-in') return this.publish({ ...this.snapshot, surface: 'auth' });
-    const kind = screen ? MANUAL_FLOW_KINDS[screen] : 'idle';
-    this.startFlow({ ...IDLE_FLOW, kind });
+    if (this.flow.kind === 'sign-in') this.publish({ ...this.snapshot, surface: 'auth' });
+    else this.startFlow({ ...IDLE_FLOW, kind: screen ? MANUAL_FLOW_KINDS[screen] : 'idle' });
+    this.requestEmitter.fire();
   }
 
   async closeAuth(): Promise<void> {
@@ -175,6 +178,7 @@ export class AuthService implements vscode.Disposable {
   dispose(): void {
     this.disposables.forEach((disposable) => disposable.dispose());
     this.emitter.dispose();
+    this.requestEmitter.dispose();
   }
 
   private async lookUpRepo(repo: AuthRepo | null): Promise<void> {

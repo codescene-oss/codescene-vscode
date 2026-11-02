@@ -380,8 +380,7 @@ suite('HomeView auth surface', () => {
 
   async function initialize() {
     await resolve();
-    await getWebviewMessageHandler()!({ messageType: 'init', payload: 'home' });
-    await render();
+    await sendInit();
   }
 
   async function showSurface(surface: AuthSurface) {
@@ -440,6 +439,42 @@ suite('HomeView auth surface', () => {
       for (const surface of surfaces) await showSurface(surface);
       view.setVisible(false);
       for (const fragment of expected) assert.ok(view.webview.html.includes(fragment), fragment);
+    });
+  }
+
+  async function sendInit() {
+    await getWebviewMessageHandler()!({ messageType: 'init', payload: 'home' });
+    await render();
+  }
+
+  const initCases: Array<{ name: string; arrange: () => Promise<void> }> = [
+    {
+      name: 'a file added while hidden after returning from auth',
+      arrange: async () => {
+        await initialize();
+        await showSurface('auth');
+        view.setVisible(false);
+        await showSurface('monitor');
+        await addMonitoredFile();
+        view.setVisible(true);
+      },
+    },
+    {
+      name: 'a file added between resolve and init',
+      arrange: async () => {
+        await resolve();
+        await addMonitoredFile();
+      },
+    },
+  ];
+
+  for (const { name, arrange } of initCases) {
+    test(`init posts the current monitor data including ${name}`, async () => {
+      await arrange();
+      getWebviewPostMessageCalls().length = 0;
+      await sendInit();
+      assert.strictEqual(lastRendered().payload.view, 'home');
+      assert.deepStrictEqual(monitoredFiles(lastRendered()), [filePath]);
     });
   }
 
