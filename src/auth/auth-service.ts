@@ -362,7 +362,7 @@ export class AuthService implements vscode.Disposable {
   }
 
   private present(next: AuthSnapshot): AuthSnapshot {
-    const step = nextStep(this.flow, next);
+    const step = nextStep(this.stepFlow(), next);
     if (step === 'done') this.resetFlow();
     return {
       ...next,
@@ -371,6 +371,11 @@ export class AuthService implements vscode.Disposable {
       context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
       syncing: this.isSyncing(),
     };
+  }
+
+  private stepFlow(): FlowState {
+    const lookingUpRepo = this.repoSyncing && this.flow.kind === 'sign-in';
+    return lookingUpRepo ? { ...this.flow, resolved: false } : this.flow;
   }
 
   private isSyncing(): boolean {

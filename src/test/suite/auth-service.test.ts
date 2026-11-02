@@ -999,6 +999,31 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  test('a repo switch while resolving does not offer the project picker before its link is found', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    await prepare({
+      link: (params) =>
+        params['repo-path'] === otherRepo.path ? new Promise((resolve) => (release = resolve)) : { project: null },
+    });
+    await harness.service.signIn();
+    harness.transport.notify(signedIn);
+    const switching = harness.service.setRepo(otherRepo);
+    await flushPromises();
+    const during = view();
+    release({ project: otherProject, source: 'remote' });
+    await switching;
+    await flushPromises();
+    assert.deepStrictEqual(
+      { during, after: view(), trail: trail(), linked: harness.service.current.linkedProject },
+      {
+        during: { surface: 'auth', step: 'resolving', context: 'sign-in', syncing: true },
+        after: monitor,
+        trail: ['summary', 'resolving', 'summary'],
+        linked: otherProject,
+      }
+    );
+  });
+
   test('reports syncing while the account data loads at startup', async () => {
     let release: (value: unknown) => void = () => undefined;
     await prepare({ configure: signedIn, projects: () => new Promise((resolve) => (release = resolve)) });
