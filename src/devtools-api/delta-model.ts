@@ -18,7 +18,10 @@ export interface Delta {
    * If the file was not recently created, the old file score
    */
   'old-score'?: number;
-  'old-git-blob-sha'?: string;
+  /**
+   * Git blob SHA1 of the file at the merge base; null for a file that did not exist there. Only in deltaReview results.
+   */
+  'old-git-blob-sha'?: string | null;
   'new-git-blob-sha'?: string;
   /**
    * Represents the change in score for this Delta. An empty old- or new score is assumed to

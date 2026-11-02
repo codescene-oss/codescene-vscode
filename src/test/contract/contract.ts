@@ -77,6 +77,15 @@ export function fixture(root: string, variant: string, form: FixtureForm): any {
   return readJson(path.join('fixtures', form, root, `${variant}.json`));
 }
 
+/** The variants of the fixture root `root` (a key of fixtures/index.json), in the bundle's order. */
+export function fixtureVariants(root: string): string[] {
+  const index: FixtureIndex = readJson(path.join('fixtures', 'index.json'));
+  if (!index[root]) {
+    throw new Error(`Unknown fixture root "${root}"; the bundle has: ${Object.keys(index).join(', ')}`);
+  }
+  return index[root].variants;
+}
+
 let ajv: Ajv | undefined;
 const validators = new Map<string, ValidateFunction>();
 
@@ -236,4 +245,70 @@ export function assertDeclaredFieldsMatch(fixtureValue: unknown, entity: unknown
     compareAt(fixtureValue, actual, field.split('.'), '$', problems);
   }
   assert.deepStrictEqual(problems, [], `Declared fields differ from the fixture:\n  ${problems.join('\n  ')}`);
+}
+
+type SchemaNode = Record<string, any>;
+
+function ancestorsAndSelf(field: string): string[] {
+  const segments = field.split('.');
+  return segments.map((_, index) => segments.slice(0, index + 1).join('.'));
+}
+
+/**
+ * The model-completeness rule of D10: the model must declare every field the schema requires, because the
+ * re-serialized entity is validated against `required`. Starting at `definition` of `schemaFile`, every
+ * required property, and below each declared property every required property, must be among `declaredFields`
+ * (dotted kebab-case paths as for `assertDeclaredFieldsMatch`; an ancestor of a declared path counts as
+ * declared). Optional properties the model leaves undeclared, and everything below them, are not checked.
+ */
+export function assertRequiredFieldsDeclared(schemaFile: string, definition: string, declaredFields: string[]): void {
+  const document = readJson(path.join('schemas', schemaFile));
+  if (!document.definitions?.[definition]) {
+    throw new Error(`Schema ${schemaFile} has no definition "${definition}"`);
+  }
+  const declared = new Set(declaredFields.flatMap(ancestorsAndSelf));
+  const missing: string[] = [];
+
+  const resolve = (node: SchemaNode): SchemaNode[] => {
+    if (typeof node.$ref === 'string') {
+      const target = document.definitions[node.$ref.replace('#/definitions/', '')];
+      if (!target) {
+        throw new Error(`Schema ${schemaFile} has no definition for ${node.$ref}`);
+      }
+      return resolve(target);
+    }
+    if (Array.isArray(node.oneOf) || Array.isArray(node.anyOf)) {
+      return [...(node.oneOf ?? []), ...(node.anyOf ?? [])].flatMap(resolve);
+    }
+    if (node.type === 'array' && node.items) {
+      return resolve(node.items);
+    }
+    return [node];
+  };
+
+  const visit = (node: SchemaNode, location: string): void => {
+    for (const objectNode of resolve(node)) {
+      const required: string[] = objectNode.required ?? [];
+      for (const [name, property] of Object.entries<SchemaNode>(objectNode.properties ?? {})) {
+        const propertyPath = location ? `${location}.${name}` : name;
+        if (required.includes(name) && !declared.has(propertyPath)) {
+          missing.push(propertyPath);
+        } else if (declared.has(propertyPath)) {
+          visit(property, propertyPath);
+        }
+      }
+    }
+  };
+
+  visit(document.definitions[definition], '');
+  assert.deepStrictEqual(missing, [], `The model does not declare fields ${schemaFile}#${definition} requires: ${missing.join(', ')}`);
+}
+
+/** The raw JSON Schema of `definition` in `schemaFile`, for tests that compare the extension's types with it (an enum, say). */
+export function schemaDefinition(schemaFile: string, definition: string): any {
+  const document = readJson(path.join('schemas', schemaFile));
+  if (!document.definitions?.[definition]) {
+    throw new Error(`Schema ${schemaFile} has no definition "${definition}"`);
+  }
+  return document.definitions[definition];
 }

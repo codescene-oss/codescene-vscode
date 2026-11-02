@@ -5,10 +5,13 @@ import * as path from 'path';
 import {
   assertCasing,
   assertDeclaredFieldsMatch,
+  assertRequiredFieldsDeclared,
   contractRoot,
   fixture,
+  fixtureVariants,
   loadManifest,
   manifestEntry,
+  schemaDefinition,
   toKebabKeys,
   useContractDir,
   validate,
@@ -35,6 +38,13 @@ suite('Contract harness Test Suite', () => {
     test('loads fixtures in entity and wire form', () => {
       assert.ok('raw-score' in fixture('review', 'minimal', 'entity'));
       assert.ok('rawScore' in fixture('review', 'minimal', 'wire'));
+    });
+
+    test('lists the variants of a fixture root and reads a definition of a schema', () => {
+      assert.deepStrictEqual(fixtureVariants('delta-review-notification'), ['full', 'minimal', 'null-result']);
+      assert.throws(() => fixtureVariants('no-such-root'), /Unknown fixture root "no-such-root"/);
+      assert.ok(schemaDefinition('wire.json', 'AuthErrorCode').enum.includes('auth/cancelled'));
+      assert.throws(() => schemaDefinition('wire.json', 'NoSuchDefinition'), /no definition "NoSuchDefinition"/);
     });
 
     test('rejects an unknown fixture root and an unknown variant', () => {
@@ -203,6 +213,59 @@ suite('Contract harness Test Suite', () => {
       const minimal = fixture('review', 'minimal', 'entity');
       const entity = { ...minimal, score: 0, 'raw-score': 'other' };
       assert.throws(() => assertDeclaredFieldsMatch(minimal, entity, declared), /score[\s\S]*raw-score/);
+    });
+  });
+
+  suite('assertRequiredFieldsDeclared', () => {
+    const range = ['start-line', 'start-column', 'end-line', 'end-column'];
+    const codeSmell = ['category', 'details', ...range.map((field) => `highlight-range.${field}`)];
+    const fileReview = [
+      ...codeSmell.map((field) => `file-level-code-smells.${field}`),
+      'function-level-code-smells.function',
+      ...range.map((field) => `function-level-code-smells.range.${field}`),
+      ...codeSmell.map((field) => `function-level-code-smells.code-smells.${field}`),
+      'raw-score',
+      'git-blob-sha',
+    ];
+
+    test('accepts a model that declares every required field and none of the optional ones', () => {
+      assertRequiredFieldsDeclared('wire.json', 'FileReviewResult', fileReview);
+    });
+
+    test('a required field the model leaves out fails, also below a declared field', () => {
+      assert.throws(
+        () => assertRequiredFieldsDeclared('wire.json', 'FileReviewResult', fileReview.filter((field) => field !== 'raw-score')),
+        /requires: raw-score/
+      );
+      assert.throws(
+        () =>
+          assertRequiredFieldsDeclared(
+            'wire.json',
+            'FileReviewResult',
+            fileReview.filter((field) => field !== 'file-level-code-smells.highlight-range.end-column')
+          ),
+        /requires: file-level-code-smells.highlight-range.end-column/
+      );
+    });
+
+    test('an optional field is checked below only once the model declares it', () => {
+      const withRulesError = [...fileReview, 'code-health-rules-error.description'];
+      assert.throws(
+        () => assertRequiredFieldsDeclared('wire.json', 'FileReviewResult', withRulesError),
+        /requires: code-health-rules-error.remedy/
+      );
+    });
+
+    test('looks into a nullable property, so a nullable required field must be declared', () => {
+      const declared = ['path', 'repo-root', 'result.score-change', 'result.file-level-findings.change-type'];
+      assert.throws(
+        () => assertRequiredFieldsDeclared('wire.json', 'DeltaReviewNotification', declared),
+        /result.old-git-blob-sha, result.new-git-blob-sha/
+      );
+    });
+
+    test('rejects an unknown definition', () => {
+      assert.throws(() => assertRequiredFieldsDeclared('wire.json', 'NoSuchDefinition', []), /no definition "NoSuchDefinition"/);
     });
   });
 });
