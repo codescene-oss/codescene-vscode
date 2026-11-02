@@ -65,9 +65,11 @@ export class AuthService implements vscode.Disposable {
     if (!this.enabled) return;
     this.syncOnSignIn = true;
     this.startFlow({ ...IDLE_FLOW, kind: 'sign-in' });
+    const gen = this.flowGen;
     this.deps.logUsage('auth/sign-in-started');
     try {
       const login = await this.rpc.login();
+      if (gen !== this.flowGen) return await this.abandonLogin(login['login-id']);
       await this.deps.openExternal(login['authorize-url']);
     } catch (error) {
       this.logEvent(signInFailed(authErrorCode(error)));
@@ -113,10 +115,15 @@ export class AuthService implements vscode.Disposable {
     const status = await this.rpc.selectAccount(accountId);
     if (gen === this.flowGen) this.chooseAccount();
     this.applyStatus(status);
-    const url = status.login?.['authorize-url'];
-    if (!url) return;
+    const login = status.login;
+    if (!login) return;
+    if (gen !== this.flowGen) return this.abandonLogin(login['login-id']);
     this.deps.logUsage('auth/sign-in-started');
-    await this.deps.openExternal(url);
+    await this.deps.openExternal(login['authorize-url']);
+  }
+
+  private async abandonLogin(loginId: string): Promise<void> {
+    this.applyStatus(await this.rpc.cancelLogin(loginId));
   }
 
   async linkProject(projectId: string | null): Promise<void> {

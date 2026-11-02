@@ -894,6 +894,44 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  test('closing while the login request is pending cancels that login instead of opening the browser', async () => {
+    let release: (login: unknown) => void = () => undefined;
+    await prepare();
+    harness.transport
+      .respond('cs-ide/auth-login', () => new Promise((resolve) => (release = resolve)))
+      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    const signingIn = harness.service.signIn();
+    await harness.service.closeAuth();
+    release({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' });
+    await signingIn;
+    assert.deepStrictEqual(
+      { opened: harness.opened, last: harness.transport.requests.at(-1), view: view() },
+      { opened: [], last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': 'abc' } }, view: monitor }
+    );
+  });
+
+  test('closing while an account choice is pending cancels its login instead of opening the browser', async () => {
+    let release: (status: AuthStatus) => void = () => undefined;
+    await signInWith(twoAccountsUnlinked);
+    harness.transport
+      .respond('cs-ide/auth-select-account', () => new Promise((resolve) => (release = resolve)))
+      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
+    const openedBefore = [...harness.opened];
+    const selecting = harness.service.selectAccount('7');
+    await harness.service.closeAuth();
+    release(authStatusFixture('signing-in'));
+    await selecting;
+    await flushPromises();
+    assert.deepStrictEqual(
+      { opened: harness.opened, last: harness.transport.requests.at(-1), view: view() },
+      {
+        opened: openedBefore,
+        last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': '3f1c9a2e' } },
+        view: monitor,
+      }
+    );
+  });
+
   test('a session already signed in at startup does not start the flow', async () => {
     await prepare({ ...twoAccountsUnlinked, configure: signedIn });
     assert.deepStrictEqual({ view: view(), trail: trail() }, { view: monitor, trail: ['summary'] });
