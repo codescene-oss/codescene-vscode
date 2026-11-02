@@ -36,6 +36,8 @@ export class AuthService implements vscode.Disposable {
   private configureSeq = 0;
   private loadedKey: string | undefined;
   private accountLoad: Promise<void> = Promise.resolve();
+  private accountLoadSeq = 0;
+  private accountLoading = false;
   private flow: FlowState = IDLE_FLOW;
   private flowGen = 0;
   private loginEpoch = 0;
@@ -210,7 +212,7 @@ export class AuthService implements vscode.Disposable {
       await this.configure();
       return;
     }
-    this.loadedKey = undefined;
+    this.forgetAccountData();
     this.repoSyncing = false;
     this.loginEpoch++;
     this.resetFlow();
@@ -244,8 +246,9 @@ export class AuthService implements vscode.Disposable {
   private applyStatus(status: AuthStatus, reloadAccountData = false): void {
     if (!this.enabled) return;
     this.logEvent(signInOutcome(this.snapshot.status, status));
+    const startAccountLoad = this.prepareAccountLoad(status, reloadAccountData);
     this.publish({ ...this.snapshot, active: true, status });
-    void this.loadAccountData(status, reloadAccountData);
+    startAccountLoad();
     const signedIn = accountDataKey(status) !== undefined;
     const sync = this.takeSignInSync(signedIn);
     if (sync || this.awaitsResolution(signedIn)) void this.settle(sync);
@@ -324,18 +327,29 @@ export class AuthService implements vscode.Disposable {
     }
   }
 
-  private loadAccountData(status: AuthStatus, reload: boolean): Promise<void> {
+  private prepareAccountLoad(status: AuthStatus, reload: boolean): () => void {
     const key = accountDataKey(status);
-    if (!reload && key === this.loadedKey) return this.accountLoad;
+    if (!reload && key === this.loadedKey) return () => undefined;
     this.loadedKey = key;
-    this.accountLoad = this.fetchAccountDataFor(key);
-    return this.accountLoad;
+    this.accountLoading = key !== undefined;
+    const seq = ++this.accountLoadSeq;
+    return () => {
+      this.accountLoad = this.fetchAccountDataFor(key, seq);
+    };
   }
 
-  private async fetchAccountDataFor(key: string | undefined): Promise<void> {
+  private async fetchAccountDataFor(key: string | undefined, seq: number): Promise<void> {
     const repo = this.snapshot.repo;
     const data = key ? await fetchAccountData(this.rpc, repo) : EMPTY_ACCOUNT_DATA;
-    if (key === this.loadedKey) this.publish({ ...this.snapshot, ...this.forCurrentRepo(data, repo) });
+    if (seq !== this.accountLoadSeq) return;
+    this.accountLoading = false;
+    this.publish({ ...this.snapshot, ...this.forCurrentRepo(data, repo) });
+  }
+
+  private forgetAccountData(): void {
+    this.loadedKey = undefined;
+    this.accountLoadSeq++;
+    this.accountLoading = false;
   }
 
   private forCurrentRepo(data: AccountData, repo: AuthRepo | null): Partial<AccountData> {
@@ -355,8 +369,13 @@ export class AuthService implements vscode.Disposable {
       surface: step === 'done' ? 'monitor' : next.surface,
       step: step === 'done' ? 'summary' : step,
       context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
-      syncing: this.repoSyncing || (this.flow.kind === 'sign-in' && !this.flow.resolved),
+      syncing: this.isSyncing(),
     };
+  }
+
+  private isSyncing(): boolean {
+    const resolvingSignIn = this.flow.kind === 'sign-in' && !this.flow.resolved;
+    return this.repoSyncing || this.accountLoading || resolvingSignIn;
   }
 
   private publish(next: AuthSnapshot): void {

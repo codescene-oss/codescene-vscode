@@ -999,6 +999,32 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  test('reports syncing while the account data loads at startup', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    await prepare({ configure: signedIn, projects: () => new Promise((resolve) => (release = resolve)) });
+    const during = harness.service.current.syncing;
+    release(projects);
+    await flushPromises();
+    assert.deepStrictEqual({ during, after: harness.service.current.syncing }, { during: true, after: false });
+  });
+
+  test('reports syncing while the account data reloads after an account switch', async () => {
+    let release: (value: unknown) => void = () => undefined;
+    await prepare({ configure: signedIn });
+    harness.transport
+      .respond('cs-ide/auth-select-account', () => switched)
+      .respond('cs-ide/projects-list', () => new Promise((resolve) => (release = resolve)));
+    const before = harness.service.current.syncing;
+    await harness.service.selectAccount('7');
+    const during = harness.service.current.syncing;
+    release(projects);
+    await flushPromises();
+    assert.deepStrictEqual(
+      { before, during, after: harness.service.current.syncing },
+      { before: false, during: true, after: false }
+    );
+  });
+
   const accountBLocal: Account = { ...accountB, 'signed-in-locally': true };
   const manualOptions: FlowOptions = { configure: signedIn, accounts: [accountA, accountBLocal] };
   const manualView = (surface: string, step: string) => ({ surface, step, context: 'manual', syncing: false });
