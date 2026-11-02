@@ -46,8 +46,11 @@ suite('auth commands', () => {
       signOut: async () => {
         calls.push('signOut');
       },
+      openAuth: (screen?: 'account' | 'project') => {
+        calls.push(screen ? `openAuth:${screen}` : 'openAuth');
+      },
     };
-    registerAuthCommands(service, () => calls.push('showAuthView'));
+    registerAuthCommands(service);
     return calls;
   }
 
@@ -68,16 +71,16 @@ suite('auth commands', () => {
     );
   });
 
-  test('sign-in shows the account view and starts a browser sign-in', async () => {
+  test('sign-in opens the auth view and starts a browser sign-in', async () => {
     const calls = register(active(authStatusFixture('signed-out')));
     await run(SIGN_IN_COMMAND);
-    assert.deepStrictEqual(calls, ['showAuthView', 'signIn']);
+    assert.deepStrictEqual(calls, ['openAuth', 'signIn']);
   });
 
-  test('sign-in only shows the account view when already signed in', async () => {
+  test('sign-in only opens the auth view when already signed in', async () => {
     const calls = register(active(authStatusFixture('signed-in-oauth')));
     await run(SIGN_IN_COMMAND);
-    assert.deepStrictEqual(calls, ['showAuthView']);
+    assert.deepStrictEqual(calls, ['openAuth']);
   });
 
   test('sign-out signs out an OAuth session', async () => {
@@ -98,9 +101,9 @@ suite('auth commands', () => {
     assert.deepStrictEqual(infos, [NOT_SIGNED_IN_MESSAGE]);
   });
 
-  test('open account shows the account view', async () => {
+  test('open account opens the auth view', async () => {
     const calls = register(active(authStatusFixture('signed-out')));
     await run('codescene.openAccount');
-    assert.deepStrictEqual(calls, ['showAuthView']);
+    assert.deepStrictEqual(calls, ['openAuth']);
   });
 });

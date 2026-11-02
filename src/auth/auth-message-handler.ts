@@ -5,9 +5,10 @@ import type { AuthService } from './auth-service';
 
 export const AUTH_MESSAGE_TYPES = [
   'open-auth',
+  'auth-close',
+  'auth-skip-project',
   'auth-sign-in',
   'auth-open-browser-again',
-  'auth-cancel-sign-in',
   'auth-sign-out',
   'auth-retry',
   'auth-select-account',
@@ -28,7 +29,9 @@ export type AuthActions = Pick<
   | 'current'
   | 'signIn'
   | 'openBrowserAgain'
-  | 'cancelSignIn'
+  | 'openAuth'
+  | 'closeAuth'
+  | 'skipProject'
   | 'signOut'
   | 'retry'
   | 'selectAccount'
@@ -38,7 +41,6 @@ export type AuthActions = Pick<
 >;
 
 export interface AuthMessageTarget {
-  showAuthView(): void;
   openServerSetting(): Thenable<unknown>;
   openExternal(url: string): Thenable<unknown>;
 }
@@ -54,10 +56,11 @@ function openPatPage(actions: AuthActions, target: AuthMessageTarget): Thenable<
 
 function handlers(actions: AuthActions, target: AuthMessageTarget): Handlers {
   return {
-    'open-auth': () => target.showAuthView(),
+    'open-auth': (message) => actions.openAuth(message.payload?.screen),
+    'auth-close': () => actions.closeAuth(),
+    'auth-skip-project': () => actions.skipProject(),
     'auth-sign-in': () => actions.signIn(),
     'auth-open-browser-again': () => actions.openBrowserAgain(),
-    'auth-cancel-sign-in': () => actions.cancelSignIn(),
     'auth-sign-out': () => actions.signOut(),
     'auth-retry': () => actions.retry(),
     'auth-select-account': (message) => actions.selectAccount(message.payload.accountId),

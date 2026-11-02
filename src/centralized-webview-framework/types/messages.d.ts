@@ -82,7 +82,6 @@ export type MessageToIDEType =
   | { messageType: 'auth-skip-project' }
   | { messageType: 'auth-sign-in' }
   | { messageType: 'auth-open-browser-again' }
-  | { messageType: 'auth-cancel-sign-in' }
   | { messageType: 'auth-sign-out' }
   | { messageType: 'auth-retry' }
   | { messageType: 'auth-select-account'; payload: { accountId: string } }

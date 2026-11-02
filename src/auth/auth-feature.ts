@@ -4,9 +4,8 @@ import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
-import { registerAuthMessages, routeAuthMessage } from './auth-message-handler';
+import { registerAuthMessages } from './auth-message-handler';
 import { AuthNotices } from './auth-notices';
-import { AuthPanel } from './auth-panel';
 import { toAuthPayload, type AuthSnapshot } from './auth-payload';
 import { pickRepo } from './auth-repo';
 import { AuthService } from './auth-service';
@@ -20,10 +19,6 @@ function openInBrowser(url: string): Thenable<boolean> {
 
 function openSetting(id: string): Thenable<unknown> {
   return vscode.commands.executeCommand('workbench.action.openSettings', id);
-}
-
-function showAuthView(): void {
-  AuthPanel.show(routeAuthMessage);
 }
 
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
@@ -63,11 +58,10 @@ export function activateAuth(context: vscode.ExtensionContext, transport: AuthTr
     service,
     service.onDidChange((snapshot) => publish(snapshot, notices)),
     registerAuthMessages(service, {
-      showAuthView,
       openServerSetting: () => openSetting('codescene.serverUrl'),
       openExternal: openInBrowser,
     }),
-    ...registerAuthCommands(service, showAuthView),
+    ...registerAuthCommands(service),
     ...watchRepository(service),
   ];
   void service.start().catch((error: unknown) => logOutputChannel.warn(`[auth] start failed: ${String(error)}`));
