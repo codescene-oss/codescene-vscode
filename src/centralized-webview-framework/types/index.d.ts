@@ -6,6 +6,7 @@ import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
 export interface AuthField {
   auth?: AuthPayload;
   authFlow?: AuthFlow;
+  signInBannerHidden?: boolean;
 }
 
 export type IdeTypes = 'VSCode';

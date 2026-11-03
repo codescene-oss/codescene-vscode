@@ -25,7 +25,7 @@ function openSetting(id: string): Thenable<unknown> {
 
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
-  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface);
+  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, snapshot.signInBannerHidden);
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
 }

@@ -48,6 +48,7 @@ export class AuthService implements vscode.Disposable {
   private settlingGen: number | undefined;
   private repoSeq = 0;
   private repoSyncing = false;
+  private signInBannerHidden = false;
   readonly onDidChange = this.emitter.event;
   private readonly requestEmitter = new vscode.EventEmitter<void>();
   readonly onDidRequestAuth = this.requestEmitter.event;
@@ -119,6 +120,12 @@ export class AuthService implements vscode.Disposable {
     this.publish(this.snapshot);
   }
 
+  hideSignInBanner(): void {
+    if (!this.enabled) return;
+    this.signInBannerHidden = true;
+    this.publish(this.snapshot);
+  }
+
   async signOut(): Promise<void> {
     if (!this.enabled) return;
     this.deps.logUsage('auth/sign-out');
@@ -159,6 +166,10 @@ export class AuthService implements vscode.Disposable {
   }
 
   async setAccessToken(token: string): Promise<void> {
+    if (this.enabled && token.trim()) {
+      this.syncOnSignIn = true;
+      this.startFlow({ ...IDLE_FLOW, kind: 'sign-in' });
+    }
     await this.deps.settings.setAccessToken(token);
     this.deps.logUsage('auth/pat-set');
   }
@@ -374,6 +385,7 @@ export class AuthService implements vscode.Disposable {
       step: step === 'done' ? 'summary' : step,
       context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
       syncing: this.isSyncing(),
+      signInBannerHidden: this.signInBannerHidden,
     };
   }
 

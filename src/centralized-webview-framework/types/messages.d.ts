@@ -80,6 +80,7 @@ export type MessageToIDEType =
   | { messageType: 'open-auth'; payload?: { screen?: 'account' | 'project' } }
   | { messageType: 'auth-close' }
   | { messageType: 'auth-skip-project' }
+  | { messageType: 'hide-sign-in-banner' }
   | { messageType: 'auth-sign-in' }
   | { messageType: 'auth-open-browser-again' }
   | { messageType: 'auth-sign-out' }
