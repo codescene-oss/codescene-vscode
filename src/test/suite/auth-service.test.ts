@@ -1,54 +1,12 @@
 import * as assert from 'assert';
-import { INACTIVE_SNAPSHOT, toAuthPayload } from '../../auth/auth-payload';
-import { AuthService } from '../../auth/auth-service';
-import { FakeAuthSettings } from '../fakes/fake-auth-settings';
+import { INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload, type AuthSnapshot } from '../../auth/auth-payload';
+import { createHarness, type Harness } from '../fakes/auth-service-harness';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
-import { authRpcError, FakeAuthTransport, flushPromises } from '../fakes/fake-auth-transport';
+import { authRpcError, flushPromises } from '../fakes/fake-auth-transport';
 import { authPayloadFixture, authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { assertLogOmits } from '../setup';
 
-interface Harness {
-  service: AuthService;
-  transport: FakeAuthTransport;
-  settings: FakeAuthSettings;
-  events: Array<{ name: string; data?: Record<string, unknown> }>;
-  opened: string[];
-}
-
-interface HarnessOptions {
-  capabilities?: string[];
-  signInEnabled?: boolean;
-  accessToken?: string;
-}
-
 const NULL_CONFIGURATION = { 'server-url': null, 'access-token': null };
-
-function createHarness(options: HarnessOptions = {}): Harness {
-  const transport = new FakeAuthTransport({ sha: 'sha', version: 'version', capabilities: options.capabilities ?? ['auth-v1'] })
-    .respond('cs-ide/auth-configure', () => authStatusFixture('signed-out'))
-    .respond('cs-ide/auth-list-accounts', () => [])
-    .respond('cs-ide/projects-list', () => [])
-    .respond('cs-ide/project-link-get', () => ({ project: null }))
-    .respond('cs-ide/auth-sync-account', () => {
-      throw Object.assign(new Error('Method not found'), { code: -32601 });
-    });
-  const settings = new FakeAuthSettings({
-    signInEnabled: options.signInEnabled ?? true,
-    serverUrl: '',
-    accessToken: options.accessToken ?? '',
-  });
-  const events: Harness['events'] = [];
-  const opened: string[] = [];
-  const service = new AuthService({
-    transport,
-    settings,
-    openExternal: async (url) => {
-      opened.push(url);
-    },
-    logUsage: (name, data) => events.push(data ? { name, data } : { name }),
-  });
-  return { service, transport, settings, events, opened };
-}
 
 suite('AuthService', () => {
   let harness: Harness;
@@ -319,6 +277,58 @@ suite('AuthService account data', () => {
     );
   });
 
+  test('publishes how the link was found when account data loads', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    const cases = [
+      { name: 'git remote', response: { project, source: 'remote' }, expected: { linkedProject: project, projectSource: 'remote' } },
+      { name: 'manual link', response: { project, source: 'link' }, expected: { linkedProject: project, projectSource: 'link' } },
+      { name: 'no link', response: { project: null }, expected: { linkedProject: null, projectSource: null } },
+    ];
+    for (const { name, response, expected } of cases) {
+      harness = createHarness();
+      harness.transport.respond('cs-ide/project-link-get', () => response);
+      await harness.service.setRepo(repo);
+      await harness.service.start();
+      harness.transport.notify(authStatusFixture('signed-in-oauth'));
+      await flushPromises();
+      const { linkedProject, projectSource } = harness.service.current;
+      assert.deepStrictEqual({ linkedProject, projectSource }, expected, name);
+      harness.service.dispose();
+    }
+  });
+
+  test('publishes the source of the link for a newly selected repo', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-get', (params) =>
+      params['repo-path'] === repo.path ? { project, source: 'remote' } : { project: null }
+    );
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.setRepo(repo);
+    assert.deepStrictEqual(
+      { linkedProject: harness.service.current.linkedProject, projectSource: harness.service.current.projectSource },
+      { linkedProject: project, projectSource: 'remote' }
+    );
+  });
+
+  test('clears the link and source when the next repo has no link', async () => {
+    const project = { id: '101', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-get', () => ({ project, source: 'remote' }));
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+    await harness.service.setRepo(repo);
+    harness.transport.respond('cs-ide/project-link-get', () => ({ project: null }));
+    await harness.service.setRepo({ path: 'C:\git\other-web', name: 'other-web' });
+    assert.deepStrictEqual(
+      { linkedProject: harness.service.current.linkedProject, projectSource: harness.service.current.projectSource },
+      { linkedProject: null, projectSource: null }
+    );
+  });
+
   test('keeps working when account requests fail', async () => {
     harness = createHarness();
     harness.transport.respond('cs-ide/auth-list-accounts', () => {
@@ -579,6 +589,46 @@ suite('AuthService actions', () => {
     );
   });
 
+  test('link-project marks a chosen project as manually linked', async () => {
+    const repo = { path: 'C:\git\acme-backend', name: 'acme-backend' };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/project-link-set', () => ({ project: { id: '102', name: 'acme-frontend' } }));
+    await harness.service.start();
+    await harness.service.setRepo(repo);
+    await harness.service.linkProject('102');
+    assert.deepStrictEqual(
+      { project: harness.service.current.linkedProject, source: harness.service.current.projectSource },
+      { project: { id: '102', name: 'acme-frontend' }, source: 'link' }
+    );
+  });
+
+  test('link-project with null resets the link and publishes the re-read result', async () => {
+    const repo = { path: 'C:\git\acme-backend', name: 'acme-backend' };
+    const project = { id: '101', name: 'acme-backend' };
+    const cases = [
+      { name: 'git remote match', get: { project, source: 'remote' }, expected: { project, source: 'remote' } },
+      { name: 'nothing found', get: { project: null }, expected: { project: null, source: null } },
+    ];
+    for (const { name, get, expected } of cases) {
+      harness = createHarness();
+      harness.transport.respond('cs-ide/project-link-set', () => ({ project: null }));
+      await harness.service.start();
+      await harness.service.setRepo(repo);
+      harness.transport.respond('cs-ide/project-link-get', () => get);
+      await harness.service.linkProject(null);
+      assert.deepStrictEqual(
+        {
+          methods: harness.transport.methods().slice(-2),
+          project: harness.service.current.linkedProject,
+          source: harness.service.current.projectSource,
+        },
+        { methods: ['cs-ide/project-link-set', 'cs-ide/project-link-get'], ...expected },
+        name
+      );
+      harness.service.dispose();
+    }
+  });
+
   test('setting and removing the access token writes the setting and configures cs-ide again', async () => {
     harness = createHarness();
     await harness.service.start();
@@ -600,5 +650,55 @@ suite('AuthService actions', () => {
         events: [{ name: 'auth/pat-set' }, { name: 'auth/pat-removed' }],
       }
     );
+  });
+});
+
+suite('AuthService flow payload', () => {
+  const active: AuthSnapshot = {
+    ...INACTIVE_SNAPSHOT,
+    active: true,
+    status: authStatusFixture('signed-in-oauth'),
+    projectSource: 'remote',
+    step: 'pick-project',
+    context: 'sign-in',
+    syncing: true,
+  };
+  const cases: Array<{ name: string; snapshot: AuthSnapshot; expected: unknown }> = [
+    { name: 'inactive', snapshot: INACTIVE_SNAPSHOT, expected: undefined },
+    {
+      name: 'active',
+      snapshot: active,
+      expected: {
+        step: 'pick-project',
+        context: 'sign-in',
+        'project-source': 'remote',
+        syncing: true,
+        'project-reason': null,
+        'project-candidates': [],
+      },
+    },
+    {
+      name: 'unlinked',
+      snapshot: {
+        ...active,
+        projectSource: null,
+        projectReason: 'multiple-projects',
+        projectCandidates: [{ id: '1', name: 'a', 'account-id': '3834' }],
+      },
+      expected: {
+        step: 'pick-project',
+        context: 'sign-in',
+        'project-source': null,
+        syncing: true,
+        'project-reason': 'multiple-projects',
+        'project-candidates': [{ id: '1', name: 'a', 'account-id': '3834' }],
+      },
+    },
+  ];
+
+  cases.forEach(({ name, snapshot, expected }) => {
+    test(`maps the ${name} snapshot to the auth flow`, () => {
+      assert.deepStrictEqual(toAuthFlow(snapshot), expected);
+    });
   });
 });

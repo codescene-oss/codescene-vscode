@@ -1,11 +1,14 @@
-import type { Project } from '../centralized-webview-framework/types/auth';
 import { logOutputChannel } from '../log';
 import type { AuthRepo, AuthSnapshot } from './auth-payload';
-import { authErrorCode, type AuthRpc } from './auth-rpc';
+import { authErrorCode, type AuthRpc, type ProjectLink } from './auth-rpc';
 
-export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects' | 'linkedProject'>;
+type LinkFields = Pick<AuthSnapshot, 'linkedProject' | 'projectSource' | 'projectReason' | 'projectCandidates'>;
 
-export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, linkedProject: null };
+export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects'> & LinkFields;
+
+export const NO_LINK: LinkFields = { linkedProject: null, projectSource: null, projectReason: null, projectCandidates: [] };
+
+export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, ...NO_LINK };
 
 async function optional<T>(request: Promise<T>): Promise<T | null> {
   try {
@@ -16,17 +19,22 @@ async function optional<T>(request: Promise<T>): Promise<T | null> {
   }
 }
 
-export async function fetchLinkedProject(rpc: AuthRpc, repo: AuthRepo | null): Promise<Project | null> {
+export async function fetchProjectLink(rpc: AuthRpc, repo: AuthRepo | null): Promise<ProjectLink | null> {
   if (!repo) return null;
-  const link = await optional(rpc.getProjectLink(repo.path));
-  return link?.project ?? null;
+  return optional(rpc.getProjectLink(repo.path));
+}
+
+export function linkFields(link: ProjectLink | null): LinkFields {
+  const linkedProject = link?.project ?? null;
+  if (linkedProject) return { ...NO_LINK, linkedProject, projectSource: link?.source ?? null };
+  return { ...NO_LINK, projectReason: link?.reason ?? null, projectCandidates: link?.candidates ?? [] };
 }
 
 export async function fetchAccountData(rpc: AuthRpc, repo: AuthRepo | null): Promise<AccountData> {
-  const [accounts, projects, linkedProject] = await Promise.all([
+  const [accounts, projects, link] = await Promise.all([
     optional(rpc.listAccounts()),
     optional(rpc.listProjects()),
-    fetchLinkedProject(rpc, repo),
+    fetchProjectLink(rpc, repo),
   ]);
-  return { accounts, projects, linkedProject };
+  return { accounts, projects, ...linkFields(link) };
 }

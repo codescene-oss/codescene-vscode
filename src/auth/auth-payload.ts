@@ -1,4 +1,15 @@
-import type { Account, AuthPayload, AuthStatus, Project } from '../centralized-webview-framework/types/auth';
+import type {
+  Account,
+  AuthFlow,
+  AuthPayload,
+  AuthStatus,
+  AuthStep,
+  Project,
+  ProjectCandidate,
+  ProjectReason,
+  ProjectSource,
+} from '../centralized-webview-framework/types/auth';
+import type { AuthSurface } from './auth-flow';
 
 export interface AuthRepo {
   path: string;
@@ -12,6 +23,14 @@ export interface AuthSnapshot {
   projects: Project[] | null;
   repo: AuthRepo | null;
   linkedProject: Project | null;
+  projectSource: ProjectSource | null;
+  projectReason: ProjectReason | null;
+  projectCandidates: ProjectCandidate[];
+  surface: AuthSurface;
+  step: AuthStep;
+  context: AuthFlow['context'];
+  syncing: boolean;
+  signInBannerHidden: boolean;
 }
 
 export const INACTIVE_SNAPSHOT: AuthSnapshot = {
@@ -21,6 +40,14 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   projects: null,
   repo: null,
   linkedProject: null,
+  projectSource: null,
+  projectReason: null,
+  projectCandidates: [],
+  surface: 'monitor',
+  step: 'summary',
+  context: 'manual',
+  syncing: false,
+  signInBannerHidden: false,
 };
 
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {
@@ -31,6 +58,18 @@ export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {
     projects: snapshot.projects,
     repo: snapshot.repo,
     'linked-project': snapshot.linkedProject,
+  };
+}
+
+export function toAuthFlow(snapshot: AuthSnapshot): AuthFlow | undefined {
+  if (!snapshot.active) return undefined;
+  return {
+    step: snapshot.step,
+    context: snapshot.context,
+    'project-source': snapshot.projectSource,
+    syncing: snapshot.syncing,
+    'project-reason': snapshot.projectReason,
+    'project-candidates': snapshot.projectCandidates,
   };
 }
 
