@@ -3,7 +3,14 @@ import { isDeepStrictEqual } from 'util';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ServerMetadata } from '../devtools-api/ide-server-client';
 import { logOutputChannel } from '../log';
-import { EMPTY_ACCOUNT_DATA, fetchAccountData, fetchProjectLink, linkFields, type AccountData } from './account-data';
+import {
+  EMPTY_ACCOUNT_DATA,
+  fetchAccountData,
+  fetchProjectLink,
+  linkFields,
+  NO_LINK,
+  type AccountData,
+} from './account-data';
 import { IDLE_FLOW, nextStep, type FlowState } from './auth-flow';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
 import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
@@ -183,7 +190,7 @@ export class AuthService implements vscode.Disposable {
     if (isDeepStrictEqual(repo, this.snapshot.repo)) return;
     const seq = ++this.repoSeq;
     this.repoSyncing = this.loadedKey !== undefined;
-    this.publish({ ...this.snapshot, repo, linkedProject: null, projectSource: null });
+    this.publish({ ...this.snapshot, repo, ...NO_LINK });
     if (!this.loadedKey) return;
     try {
       await this.lookUpRepo(repo);

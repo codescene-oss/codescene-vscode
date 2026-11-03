@@ -4,7 +4,7 @@ import { cwfAuthSurface, onDidChangeCwfAuth, setCwfAuth, withCwfAuth } from '../
 import type { HomeContextViewProps } from '../../centralized-webview-framework/types';
 import { authPayloadFixture } from '../fixtures/auth/auth-fixtures';
 
-const flow: AuthFlow = { step: 'pick-project', context: 'sign-in', 'project-source': 'remote', syncing: false };
+const flow: AuthFlow = { step: 'pick-project', context: 'sign-in', 'project-source': 'remote', syncing: false, 'project-reason': null, 'project-candidates': [] };
 
 suite('withCwfAuth', () => {
   const homeProps = (): HomeContextViewProps => ({

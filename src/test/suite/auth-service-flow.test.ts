@@ -335,6 +335,50 @@ suite('AuthService sign-in flow', () => {
     );
   });
 
+  const candidates = [
+    { id: '101', name: 'acme-backend', 'account-id': '42' },
+    { id: '102', name: 'acme-frontend', 'account-id': '42' },
+  ];
+  const unresolved = { project: null, reason: 'multiple-projects', candidates };
+  const reasonOf = () => {
+    const { linkedProject, projectReason, projectCandidates } = harness.service.current;
+    return { linkedProject, projectReason, projectCandidates };
+  };
+
+  test('keeps why the repo has no project and which projects it could be', async () => {
+    await prepare({ configure: signedIn, link: () => unresolved });
+    assert.deepStrictEqual(reasonOf(), {
+      linkedProject: null,
+      projectReason: 'multiple-projects',
+      projectCandidates: candidates,
+    });
+  });
+
+  test('forgets the reason when the repo changes', async () => {
+    let release: (link: unknown) => void = () => undefined;
+    await prepare({ configure: signedIn, link: () => unresolved });
+    harness.transport.respond('cs-ide/project-link-get', () => new Promise((resolve) => (release = resolve)));
+    const selecting = harness.service.setRepo({ path: 'C:\\git\\other-web', name: 'other-web' });
+    await flushPromises();
+    const during = reasonOf();
+    release({ project: null, reason: 'repository-unknown' });
+    await selecting;
+    assert.deepStrictEqual(
+      { during, after: reasonOf() },
+      {
+        during: { linkedProject: null, projectReason: null, projectCandidates: [] },
+        after: { linkedProject: null, projectReason: 'repository-unknown', projectCandidates: [] },
+      }
+    );
+  });
+
+  test('forgets the reason once a project is linked', async () => {
+    await prepare({ configure: signedIn, link: () => unresolved });
+    harness.transport.respond('cs-ide/project-link-set', () => ({ project }));
+    await harness.service.linkProject(project.id);
+    assert.deepStrictEqual(reasonOf(), { linkedProject: project, projectReason: null, projectCandidates: [] });
+  });
+
   const otherRepo = { path: 'C:\\git\\other-web', name: 'other-web' };
   const otherProject = { id: '201', name: 'other-web' };
   const linkByRepo = (params: Record<string, unknown>) =>

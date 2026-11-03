@@ -5,6 +5,8 @@ import type {
   AuthStatus,
   AuthStep,
   Project,
+  ProjectCandidate,
+  ProjectReason,
   ProjectSource,
 } from '../centralized-webview-framework/types/auth';
 import type { AuthSurface } from './auth-flow';
@@ -22,6 +24,8 @@ export interface AuthSnapshot {
   repo: AuthRepo | null;
   linkedProject: Project | null;
   projectSource: ProjectSource | null;
+  projectReason: ProjectReason | null;
+  projectCandidates: ProjectCandidate[];
   surface: AuthSurface;
   step: AuthStep;
   context: AuthFlow['context'];
@@ -37,6 +41,8 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   repo: null,
   linkedProject: null,
   projectSource: null,
+  projectReason: null,
+  projectCandidates: [],
   surface: 'monitor',
   step: 'summary',
   context: 'manual',
@@ -62,6 +68,8 @@ export function toAuthFlow(snapshot: AuthSnapshot): AuthFlow | undefined {
     context: snapshot.context,
     'project-source': snapshot.projectSource,
     syncing: snapshot.syncing,
+    'project-reason': snapshot.projectReason,
+    'project-candidates': snapshot.projectCandidates,
   };
 }
 
