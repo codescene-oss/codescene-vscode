@@ -2,9 +2,13 @@ import { logOutputChannel } from '../log';
 import type { AuthRepo, AuthSnapshot } from './auth-payload';
 import { authErrorCode, type AuthRpc, type ProjectLink } from './auth-rpc';
 
-export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects' | 'linkedProject' | 'projectSource'>;
+type LinkFields = Pick<AuthSnapshot, 'linkedProject' | 'projectSource' | 'projectReason' | 'projectCandidates'>;
 
-export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, linkedProject: null, projectSource: null };
+export type AccountData = Pick<AuthSnapshot, 'accounts' | 'projects'> & LinkFields;
+
+export const NO_LINK: LinkFields = { linkedProject: null, projectSource: null, projectReason: null, projectCandidates: [] };
+
+export const EMPTY_ACCOUNT_DATA: AccountData = { accounts: null, projects: null, ...NO_LINK };
 
 async function optional<T>(request: Promise<T>): Promise<T | null> {
   try {
@@ -20,9 +24,10 @@ export async function fetchProjectLink(rpc: AuthRpc, repo: AuthRepo | null): Pro
   return optional(rpc.getProjectLink(repo.path));
 }
 
-export function linkFields(link: ProjectLink | null): Pick<AuthSnapshot, 'linkedProject' | 'projectSource'> {
+export function linkFields(link: ProjectLink | null): LinkFields {
   const linkedProject = link?.project ?? null;
-  return { linkedProject, projectSource: linkedProject ? (link?.source ?? null) : null };
+  if (linkedProject) return { ...NO_LINK, linkedProject, projectSource: link?.source ?? null };
+  return { ...NO_LINK, projectReason: link?.reason ?? null, projectCandidates: link?.candidates ?? [] };
 }
 
 export async function fetchAccountData(rpc: AuthRpc, repo: AuthRepo | null): Promise<AccountData> {

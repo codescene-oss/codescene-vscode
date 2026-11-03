@@ -341,7 +341,7 @@ suite('HomeView', () => {
 
 suite('HomeView auth surface', () => {
   const payload = authPayloadFixture('auth-payload-linked-project');
-  const flow: AuthFlow = { step: 'summary', context: 'sign-in', 'project-source': null, syncing: false };
+  const flow: AuthFlow = { step: 'summary', context: 'sign-in', 'project-source': null, syncing: false, 'project-reason': null, 'project-candidates': [] };
   const filePath = '/workspace/monitored.ts';
   let homeView: HomeView;
   let view: MockWebviewView;

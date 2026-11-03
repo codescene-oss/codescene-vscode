@@ -668,7 +668,31 @@ suite('AuthService flow payload', () => {
     {
       name: 'active',
       snapshot: active,
-      expected: { step: 'pick-project', context: 'sign-in', 'project-source': 'remote', syncing: true },
+      expected: {
+        step: 'pick-project',
+        context: 'sign-in',
+        'project-source': 'remote',
+        syncing: true,
+        'project-reason': null,
+        'project-candidates': [],
+      },
+    },
+    {
+      name: 'unlinked',
+      snapshot: {
+        ...active,
+        projectSource: null,
+        projectReason: 'multiple-projects',
+        projectCandidates: [{ id: '1', name: 'a', 'account-id': '3834' }],
+      },
+      expected: {
+        step: 'pick-project',
+        context: 'sign-in',
+        'project-source': null,
+        syncing: true,
+        'project-reason': 'multiple-projects',
+        'project-candidates': [{ id: '1', name: 'a', 'account-id': '3834' }],
+      },
     },
   ];
 
