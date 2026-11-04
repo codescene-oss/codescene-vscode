@@ -1,6 +1,53 @@
 import { Position } from 'vscode';
 import { FileWithIssues } from '../code-health-monitor/file-with-issues';
+import { Delta, FunctionFinding } from '../devtools-api/delta-model';
+import { FnToRefactor } from '../devtools-api/refactor-models';
 import { FileDeltaData, FileMetaType } from './types';
+import type { DeltaForFile, FunctionFinding as CwfFunctionFinding, FunctionToRefactor } from './types/delta';
+
+/* eslint-disable @typescript-eslint/naming-convention */
+
+/**
+ * The webview type requires `function-type`, which the daemon leaves optional. The webview never reads it
+ * (the refactoring itself runs from the extension's own FnToRefactor), so an absent one is sent as empty.
+ */
+function toCwfFunctionToRefactor(fn: FnToRefactor): FunctionToRefactor {
+  return {
+    name: fn.name,
+    body: fn.body,
+    'function-type': fn['function-type'] ?? '',
+    'file-type': fn['file-type'],
+    range: fn.range,
+    'refactoring-targets': fn['refactoring-targets'],
+  };
+}
+
+/**
+ * The webview schemas are closed, so a finding carries exactly the fields the webview declares.
+ * The extension keeps the refactorable function as `refactorableFn` (with internal fields such as `vscodeRange`);
+ * the webview calls it `refactorable-fn`.
+ */
+function toCwfFunctionFinding(finding: FunctionFinding): CwfFunctionFinding {
+  return {
+    function: finding.function,
+    'change-details': finding['change-details'],
+    ...(finding.refactorableFn && { 'refactorable-fn': toCwfFunctionToRefactor(finding.refactorableFn) }),
+  };
+}
+
+/**
+ * Convert a delta result to the webview's DeltaForFile: only the fields the webview declares
+ * (so not the blob SHAs of deltaReview results), with each function finding in the webview's shape.
+ */
+export function convertDeltaToCWFDelta(delta: Delta): DeltaForFile {
+  return {
+    ...(delta['old-score'] !== undefined && { 'old-score': delta['old-score'] }),
+    ...(delta['new-score'] !== undefined && { 'new-score': delta['new-score'] }),
+    'score-change': delta['score-change'],
+    'file-level-findings': delta['file-level-findings'],
+    'function-level-findings': delta['function-level-findings'].map(toCwfFunctionFinding),
+  };
+}
 
 /**
  * Convert VSCode FileWithIssues to CWF delta object
@@ -12,7 +59,7 @@ export function convertFileIssueToCWFDeltaItem(event: FileWithIssues): FileDelta
     file: {
       fileName: event.document.fileName,
     },
-    delta: event.deltaForFile,
+    delta: convertDeltaToCWFDelta(event.deltaForFile),
   };
 }
 

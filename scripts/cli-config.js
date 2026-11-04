@@ -6,7 +6,7 @@
  * - TypeScript source files (via artifact-info.ts) that import from this file
  */
 
-const requiredDevtoolsVersion = '36415d5ef5b5746ff434debbde055d74e80d6ff5';
+const requiredDevtoolsVersion = 'd3071decd6dc19bf48020e7455bf183e7ed20774';
 
 const nativeOsNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
 const nativeArchNames = { x64: 'amd64', arm64: 'aarch64' };
@@ -34,6 +34,11 @@ function nativeArtifactName(platform, arch) {
   return `cs-ide-${osName}-${archName}-${requiredDevtoolsVersion}.zip`;
 }
 
+/** The contract bundle (schemas, wire manifest, fixtures) the CLI publishes next to its zips at the same SHA. */
+function contractArtifactName() {
+  return `cs-ide-contract-${requiredDevtoolsVersion}.zip`;
+}
+
 const artifacts = {
   darwin: {
     x64: nativeArtifactName('darwin', 'x64'),
@@ -51,6 +56,7 @@ const artifacts = {
 module.exports = {
   requiredDevtoolsVersion,
   artifacts,
+  contractArtifactName,
   nativeBinaryFileName,
   requiredSidecarFileNames,
 };

@@ -8,7 +8,8 @@ export const ideType = 'VSCode';
 
 // Enable Webview devmode with alot of logging
 export const devmode = process.env.DEVMODE === 'true';
-export const featureFlags: FeatureFlags[] = ['jobs', 'open-settings']; // CS-5597: removed 'commit-baseline'
+// The webview declares no flag the extension turns on (CS-5597: removed 'commit-baseline'; 'jobs' and 'open-settings' are no longer flags)
+export const featureFlags: FeatureFlags[] = [];
 const opacityHexLookup = {
   '1': {
     hex: '03',

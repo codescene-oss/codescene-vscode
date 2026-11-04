@@ -284,6 +284,8 @@ class TabInputTextStub {
 }
 
 const vscodeStub = {
+  // The editor version is always a string in VS Code; telemetry sends it as editor-version.
+  version: '1.112.0',
   TabInputText: TabInputTextStub,
   extensions: {
     getExtension: (id: string) => {
@@ -533,6 +535,7 @@ const vscodeStub = {
   Range: RangeStub,
   Position: PositionStub,
   Selection: SelectionStub,
+  TextEditorRevealType: { Default: 0, InCenter: 1, InCenterIfOutsideViewport: 2, AtTop: 3 },
   WorkspaceEdit: WorkspaceEditStub,
   CodeAction: CodeActionStub,
   CodeLens: CodeLensStub,

@@ -90,7 +90,8 @@ export interface DeltaResult {
 }
 
 export interface ReviewFailed {
-  id?: string;
+  /** The id the IDE gave the file in reviewFiles; null when it gave none (absent from servers that omit it). */
+  id?: string | null;
   path: string;
   repoRoot: string;
   message: string;
@@ -521,6 +522,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     );
     this.reviewFailedEmitter.fire({
       ...identity,
+      ...(notification.id === undefined ? {} : { id: notification.id }),
       message: notification.message,
     });
   }
@@ -539,7 +541,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   }
 
   private notificationIdentity(
-    notification: { id?: string; path?: string; repoRoot?: string; 'repo-root'?: string },
+    notification: { id?: string | null; path?: string; repoRoot?: string; 'repo-root'?: string },
     kind: string
   ): NotificationIdentity | undefined {
     const repoRoot = notificationRepoRoot(notification);

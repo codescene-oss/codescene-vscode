@@ -197,4 +197,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform, locateNativeBinary, locateRequiredSidecars };
+module.exports = { bundleBinaryForPlatform, downloadBinary, locateNativeBinary, locateRequiredSidecars };
