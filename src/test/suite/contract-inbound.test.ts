@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { Event } from 'vscode';
-import type { Account, AuthErrorCode, AuthStatus, Project } from '../../centralized-webview-framework/types/auth';
+import type { Account, AuthErrorCode, AuthStatus, Project, ProjectCandidate } from '../../centralized-webview-framework/types/auth';
 import { AuthRpc, authErrorCode, isMethodNotFound, LoginStart, ProjectLink } from '../../auth/auth-rpc';
 import { ChangeDetail, Delta, FunctionFinding, Function as DeltaFunction } from '../../devtools-api/delta-model';
 import { CsIdeServerClient, DeltaResult, ReviewFailed, ReviewResult, ServerMetadata } from '../../devtools-api/ide-server-client';
@@ -97,7 +97,13 @@ const authStatusFields = declared<AuthStatus>({
 const accountFields = declared<Account>({ id: true, name: true, 'signed-in-locally': true });
 const projectFields = declared<Project>({ id: true, name: true });
 const loginStartFields = declared<LoginStart>({ 'login-id': true, 'authorize-url': true });
-const projectLinkFields = declared<ProjectLink>({ project: projectFields, source: true });
+const projectCandidateFields = declared<ProjectCandidate>({ id: true, name: true, 'account-id': true });
+const projectLinkFields = declared<ProjectLink>({
+  project: projectFields,
+  source: true,
+  reason: true,
+  candidates: projectCandidateFields,
+});
 // The error object of a JSON-RPC response as the client surfaces it; `data` is compared as a whole.
 const jsonRpcErrorFields = ['code', 'message', 'data'];
 

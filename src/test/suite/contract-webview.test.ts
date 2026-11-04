@@ -16,8 +16,8 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { registerAuthMessages, routeAuthMessage, type AuthActions, type AuthMessageTarget } from '../../auth/auth-message-handler';
-import { AuthPanel, authViewProps } from '../../auth/auth-panel';
-import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthPayload } from '../../auth/auth-payload';
+import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload } from '../../auth/auth-payload';
+import { authViewProps } from '../../auth/auth-view-props';
 import { setCwfAuth, withCwfAuth } from '../../auth/cwf-auth';
 import { BackgroundServiceView } from '../../code-health-monitor/background-view';
 import { handleCWFMessage } from '../../code-health-monitor/home/cwf-message-handlers';
@@ -45,7 +45,6 @@ import { authMessageSamples, docsMessageSamples, homeMessageSamples } from '../f
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import {
-  getLastWebviewPanelMock,
   getWebviewMessageHandler,
   getWebviewPostMessageCalls,
   resetWebviewPanelMocks,
@@ -89,13 +88,6 @@ const assertPayloadClosed = (payload: unknown, locate: (copy: any) => Json) =>
 
 /** The payload of a message, when it is an object that can carry an undeclared field. */
 const messagePayload = (copy: any): Json | undefined => (typeof copy.payload === 'object' && copy.payload !== null ? copy.payload : undefined);
-
-/** The initial IDE context the base HTML hands to the webview (`window.ideContext = ...`). */
-function initialContext(html: string): unknown {
-  const match = /window\.ideContext = (.*)\n/.exec(html);
-  assert.ok(match, 'the base HTML carries no window.ideContext');
-  return JSON.parse(match[1]);
-}
 
 // ---- Harness ----------------------------------------------------------------------------------------------------
 
@@ -448,12 +440,16 @@ suite('Contract webview payloads Test Suite', () => {
     const projects: Project[] = fixture('project-list', 'full', 'entity');
     const link = fixture('project-link', 'full', 'entity');
     return {
+      ...INACTIVE_SNAPSHOT,
       active: true,
       status,
       accounts,
       projects,
       repo: { path: REPO, name: 'repo' },
       linkedProject: link.project,
+      projectSource: link.source ?? null,
+      projectReason: link.reason ?? null,
+      projectCandidates: link.candidates ?? [],
     };
   }
 
@@ -463,18 +459,20 @@ suite('Contract webview payloads Test Suite', () => {
     for (const statusVariant of fixtureVariants('auth-status')) {
       for (const inputs of ['minimal', 'full'] as const) {
         test(`the ${statusVariant} auth-status fixture with ${inputs} accounts and projects validates and is closed`, () => {
-          const payload = toAuthPayload(authSnapshot(fixture('auth-status', statusVariant, 'entity'), inputs));
-          setCwfAuth(payload);
+          const snapshot = authSnapshot(fixture('auth-status', statusVariant, 'entity'), inputs);
+          setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot));
 
           // The auth view, and the home view (whose props the auth payload rides along with)
           const authView = updateRendererMessage(authViewProps()).payload as any;
           assert.deepStrictEqual(authView.featureFlags, ['ide-auth']);
           assertPayloadClosed(authView, (copy) => copy.auth.status.server);
           assertPayloadClosed(authView, (copy) => copy.auth);
+          assertPayloadClosed(authView, (copy) => copy.authFlow);
 
           const props: HomeContextViewProps = { ideType: 'VSCode', view: 'home', data: { fileDeltaData: [] } };
           const homeProps = withCwfAuth(props);
           assertPayloadClosed(homeProps, (copy) => copy.auth.status);
+          assertPayloadClosed(homeProps, (copy) => copy.authFlow);
         });
       }
     }
@@ -486,26 +484,18 @@ suite('Contract webview payloads Test Suite', () => {
       validateWebviewPayload(view);
     });
 
-    test('the auth panel hands the webview a valid initial context and valid updates', async () => {
-      (CsExtensionState as any)._instance = { extensionUri: vscode.Uri.file('/ext') };
-      setCwfAuth(toAuthPayload(signedInSnapshot()));
-      AuthPanel.show(async () => {});
-      try {
-        const initial = initialContext(getLastWebviewPanelMock()!.webview.html);
-        assertPayloadClosed(initial, (copy) => copy.auth);
+    test('the auth surface hands the webview a valid payload with the auth flow, before and after a state change', () => {
+      const signedIn = signedInSnapshot();
+      setCwfAuth(toAuthPayload(signedIn), toAuthFlow(signedIn), 'auth');
+      const first = updateRendererMessage(authViewProps()).payload as any;
+      assertPayloadClosed(first, (copy) => copy.auth);
+      assertPayloadClosed(first, (copy) => copy.authFlow);
 
-        await getWebviewMessageHandler()!({ messageType: 'init', payload: 'auth' });
-        setCwfAuth(toAuthPayload(authSnapshot(fixture('auth-status', 'signing-in', 'entity'), 'minimal')));
-        await flushPromises();
-        const posted = getWebviewPostMessageCalls() as Array<{ messageType: string; payload: unknown }>;
-        assert.strictEqual(posted.length, 2);
-        for (const message of posted) {
-          assert.strictEqual(message.messageType, 'update-renderer');
-          assertPayloadClosed(message.payload, (copy) => copy.auth);
-        }
-      } finally {
-        getLastWebviewPanelMock()?.dispose();
-      }
+      const signingIn = authSnapshot(fixture('auth-status', 'signing-in', 'entity'), 'minimal');
+      setCwfAuth(toAuthPayload(signingIn), toAuthFlow(signingIn), 'auth');
+      const second = updateRendererMessage(authViewProps()).payload as any;
+      assertPayloadClosed(second, (copy) => copy.auth);
+      assertPayloadClosed(second, (copy) => copy.authFlow);
     });
   });
 });
@@ -595,7 +585,9 @@ suite('Contract webview messages Test Suite', () => {
       'open-auth',
       'auth-sign-in',
       'auth-open-browser-again',
-      'auth-cancel-sign-in',
+      'auth-close',
+      'auth-skip-project',
+      'hide-sign-in-banner',
       'auth-sign-out',
       'auth-retry',
       'auth-select-account',
@@ -619,7 +611,10 @@ suite('Contract webview messages Test Suite', () => {
         current: { ...INACTIVE_SNAPSHOT, active: true, status },
         signIn: record('signIn'),
         openBrowserAgain: record('openBrowserAgain'),
-        cancelSignIn: record('cancelSignIn'),
+        openAuth: record('openAuth'),
+        closeAuth: record('closeAuth'),
+        skipProject: record('skipProject'),
+        hideSignInBanner: record('hideSignInBanner'),
         signOut: record('signOut'),
         retry: record('retry'),
         selectAccount: record('selectAccount'),
@@ -628,9 +623,6 @@ suite('Contract webview messages Test Suite', () => {
         removeAccessToken: record('removeAccessToken'),
       } as AuthActions;
       const target: AuthMessageTarget = {
-        showAuthView: () => {
-          calls.push(['showAuthView']);
-        },
         openServerSetting: record('openServerSetting'),
         openExternal: record('openExternal'),
       };

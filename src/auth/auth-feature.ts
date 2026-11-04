@@ -4,15 +4,16 @@ import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import Telemetry from '../telemetry';
 import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
-import { registerAuthMessages, routeAuthMessage } from './auth-message-handler';
+import { registerAuthMessages } from './auth-message-handler';
 import { AuthNotices } from './auth-notices';
-import { AuthPanel } from './auth-panel';
-import { toAuthPayload, type AuthSnapshot } from './auth-payload';
+import { toAuthFlow, toAuthPayload, type AuthSnapshot } from './auth-payload';
 import { pickRepo } from './auth-repo';
 import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
 import type { AuthTransport } from './auth-transport';
 import { setCwfAuth } from './cwf-auth';
+
+const HOME_VIEW_FOCUS_COMMAND = 'codescene.homeView.focus';
 
 function openInBrowser(url: string): Thenable<boolean> {
   return vscode.env.openExternal(vscode.Uri.parse(url, true));
@@ -22,15 +23,15 @@ function openSetting(id: string): Thenable<unknown> {
   return vscode.commands.executeCommand('workbench.action.openSettings', id);
 }
 
-function showAuthView(): void {
-  AuthPanel.show(routeAuthMessage);
-}
-
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
-  setCwfAuth(toAuthPayload(snapshot));
+  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, snapshot.signInBannerHidden);
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
+}
+
+export function revealOnAuthRequest(service: Pick<AuthService, 'onDidRequestAuth'>): vscode.Disposable {
+  return service.onDidRequestAuth(() => void vscode.commands.executeCommand(HOME_VIEW_FOCUS_COMMAND));
 }
 
 function watchRepository(service: AuthService): vscode.Disposable[] {
@@ -62,12 +63,12 @@ export function activateAuth(context: vscode.ExtensionContext, transport: AuthTr
     settings,
     service,
     service.onDidChange((snapshot) => publish(snapshot, notices)),
+    revealOnAuthRequest(service),
     registerAuthMessages(service, {
-      showAuthView,
       openServerSetting: () => openSetting('codescene.serverUrl'),
       openExternal: openInBrowser,
     }),
-    ...registerAuthCommands(service, showAuthView),
+    ...registerAuthCommands(service),
     ...watchRepository(service),
   ];
   void service.start().catch((error: unknown) => logOutputChannel.warn(`[auth] start failed: ${String(error)}`));

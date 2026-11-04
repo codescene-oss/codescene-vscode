@@ -1,4 +1,12 @@
-import type { Account, AuthErrorCode, AuthStatus, Project } from '../centralized-webview-framework/types/auth';
+import type {
+  Account,
+  AuthErrorCode,
+  AuthStatus,
+  Project,
+  ProjectCandidate,
+  ProjectReason,
+  ProjectSource,
+} from '../centralized-webview-framework/types/auth';
 import type { AuthTransport } from './auth-transport';
 
 const AUTH_ERROR = -32803;
@@ -16,7 +24,9 @@ export interface LoginStart {
 
 export interface ProjectLink {
   project: Project | null;
-  source?: 'link' | 'remote';
+  source?: ProjectSource;
+  reason?: ProjectReason;
+  candidates?: ProjectCandidate[];
 }
 
 export class AuthRpc {
