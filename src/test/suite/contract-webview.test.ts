@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { aceTest } from '../ace-test-suite';
 import { registerAuthMessages, routeAuthMessage, type AuthActions, type AuthMessageTarget } from '../../auth/auth-message-handler';
 import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload } from '../../auth/auth-payload';
 import { authViewProps } from '../../auth/auth-view-props';
@@ -298,7 +299,7 @@ suite('Contract webview payloads Test Suite', () => {
       assertPayloadClosed(homePayload(), (copy) => copy.data);
     });
 
-    test('a running and queued analysis with the ACE feature on validates', () => {
+    aceTest('a running and queued analysis with the ACE feature on validates', () => {
       enableAce();
       assert.strictEqual(homePayload().data.autoRefactor.visible, true);
       addDelta(fixture('delta', 'full', 'entity'));
@@ -355,7 +356,7 @@ suite('Contract webview payloads Test Suite', () => {
     const fileData = (copy: any) => copy.data.fileData;
 
     for (const variant of fixtureVariants('review')) {
-      test(`the ${variant} review fixture, function-level smell, not refactorable, validates and is closed`, async () => {
+      aceTest(`the ${variant} review fixture, function-level smell, not refactorable, validates and is closed`, async () => {
         enableAce();
         daemonFinds([]);
         const payload = await getDocsData(docsParams(variant, 'function', newDocument()));
@@ -369,7 +370,7 @@ suite('Contract webview payloads Test Suite', () => {
         assertPayloadClosed(updateRendererMessage(payload).payload, (copy) => copy.data);
       });
 
-      test(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
+      aceTest(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
         enableAce();
         daemonFinds([refactorableFunction()]);
         const payload = await getDocsData(docsParams(variant, 'function', newDocument()));
