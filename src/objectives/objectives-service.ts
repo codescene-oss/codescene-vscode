@@ -32,9 +32,8 @@ export class ObjectivesService implements vscode.Disposable {
   }
 
   get current(): ObjectivesSnapshot | undefined {
-    const { active, repoPath } = this.context;
-    if (!active || !this.hasSettled || !this.capable || !repoPath) return undefined;
-    return this.snapshots.get(normalizeFsPath(repoPath));
+    const repoPath = this.servableRepo(this.hasSettled);
+    return repoPath ? this.snapshots.get(normalizeFsPath(repoPath)) : undefined;
   }
 
   async start(): Promise<void> {
@@ -57,6 +56,11 @@ export class ObjectivesService implements vscode.Disposable {
   dispose(): void {
     this.disposables.forEach((disposable) => disposable.dispose());
     this.emitter.dispose();
+  }
+
+  private servableRepo(settled: boolean): string | undefined {
+    const { active, repoPath } = this.context;
+    return active && this.capable && settled ? repoPath : undefined;
   }
 
   private needsLoad(next: ObjectivesContext): boolean {
@@ -86,8 +90,8 @@ export class ObjectivesService implements vscode.Disposable {
   }
 
   private async load(): Promise<void> {
-    const { active, settled, repoPath } = this.context;
-    if (!active || !settled || !this.capable || !repoPath) return;
+    const repoPath = this.servableRepo(this.context.settled);
+    if (!repoPath) return;
     const epoch = this.serverEpoch;
     try {
       const snapshot = await this.rpc.snapshot(repoPath);
