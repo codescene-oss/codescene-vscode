@@ -19,6 +19,7 @@ import {
 } from '../../centralized-webview-framework/types';
 import { initBaseContent, updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
 import { cwfAuthSurface, onDidChangeCwfAuth } from '../../auth/cwf-auth';
+import { onDidChangeCwfObjectives } from '../../objectives/cwf-objectives';
 import { authViewProps } from '../../auth/auth-view-props';
 import type { AuthSurface } from '../../auth/auth-flow';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
@@ -79,6 +80,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       CsExtensionState.onAuthChanged(() => this.refreshAceState()),
       onDidChangeCwfAuth(() => this.update()),
+      onDidChangeCwfObjectives(() => this.update()),
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );

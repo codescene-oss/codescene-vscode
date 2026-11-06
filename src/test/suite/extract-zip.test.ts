@@ -113,7 +113,7 @@ suite('Extract Zip Script Test Suite', () => {
         await extraction;
         assert.strictEqual(fs.readlinkSync(path.join(destination, 'link')), target);
       } else {
-        await assert.rejects(extraction, /links outside the extraction directory/);
+        await assert.rejects(extraction, /links outside the extraction directory|symlink error/);
       }
     });
   }

@@ -2,6 +2,7 @@ import vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
+import type { ObjectivesFeature } from '../objectives/objectives-feature';
 import Telemetry from '../telemetry';
 import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
 import { registerAuthMessages } from './auth-message-handler';
@@ -47,7 +48,11 @@ function watchRepository(service: AuthService): vscode.Disposable[] {
   ];
 }
 
-export function activateAuth(context: vscode.ExtensionContext, transport: AuthTransport): vscode.Disposable[] {
+export function activateAuth(
+  context: vscode.ExtensionContext,
+  transport: AuthTransport,
+  objectives?: ObjectivesFeature
+): vscode.Disposable[] {
   const settings = new VsCodeAuthSettings();
   const service = new AuthService({
     transport,
@@ -62,7 +67,10 @@ export function activateAuth(context: vscode.ExtensionContext, transport: AuthTr
   const disposables: vscode.Disposable[] = [
     settings,
     service,
-    service.onDidChange((snapshot) => publish(snapshot, notices)),
+    service.onDidChange((snapshot) => {
+      publish(snapshot, notices);
+      objectives?.update(snapshot);
+    }),
     revealOnAuthRequest(service),
     registerAuthMessages(service, {
       openServerSetting: () => openSetting('codescene.serverUrl'),

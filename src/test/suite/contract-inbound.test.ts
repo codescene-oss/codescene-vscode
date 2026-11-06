@@ -16,6 +16,19 @@ import { AuthRpc, authErrorCode, isMethodNotFound, LoginStart, ProjectLink } fro
 import { ChangeDetail, Delta, FunctionFinding, Function as DeltaFunction } from '../../devtools-api/delta-model';
 import { CsIdeServerClient, DeltaResult, ReviewFailed, ReviewResult, ServerMetadata } from '../../devtools-api/ide-server-client';
 import { CodeHealthRulesError, CodeSmell, Function as ReviewFunction, Range, Review } from '../../devtools-api/review-model';
+import type {
+  LocalFileResult,
+  LocalResult,
+  Objective,
+  ObjectiveParent,
+  ObjectiveProject,
+  ObjectivesSnapshot,
+  ObjectiveSubject,
+  ObjectiveSubjectFile,
+  ObjectiveThreshold,
+  SharedResult,
+} from '../../centralized-webview-framework/types/objectives';
+import { ObjectivesRpc } from '../../objectives/objectives-rpc';
 import {
   assertCasing,
   assertDeclaredFieldsMatch,
@@ -103,6 +116,28 @@ const projectLinkFields = declared<ProjectLink>({
   source: true,
   reason: true,
   candidates: projectCandidateFields,
+});
+const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
+  'repo-root': true,
+  state: true,
+  project: declared<ObjectiveProject>({ id: true, name: true }),
+  'refreshed-at': true,
+  objectives: declared<Objective>({
+    kind: true,
+    id: true,
+    revision: true,
+    'area-id': true,
+    'metric-id': true,
+    threshold: declared<ObjectiveThreshold>({ operator: true, mode: true, value: true, 'comparison-value': true }),
+    parent: declared<ObjectiveParent>({ kind: true, id: true }),
+    subject: declared<ObjectiveSubject>({ type: true, files: declared<ObjectiveSubjectFile>({ path: true }) }),
+    shared: declared<SharedResult>({ applicability: true, result: true, value: true, 'evaluated-at': true, 'as-of': true }),
+    local: declared<LocalResult>({
+      result: true,
+      reason: true,
+      files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true }),
+    }),
+  }),
 });
 // The error object of a JSON-RPC response as the client surfaces it; `data` is compared as a whole.
 const jsonRpcErrorFields = ['code', 'message', 'data'];
@@ -220,6 +255,20 @@ const cases: InboundCase[] = [
     root: 'review-failed-notification',
     replay: entityOfNotification('cs-ide/reviewFailed', (client) => client.onDidReviewFailed, notificationEntity),
     declared: reviewFailedFields,
+  },
+  {
+    method: 'cs-ide/objectives',
+    side: 'result',
+    root: 'objectives-snapshot',
+    replay: entityOfRequest('cs-ide/objectives', ({ client }) => new ObjectivesRpc(client).snapshot(REPO)),
+    declared: objectivesSnapshotFields,
+  },
+  {
+    method: 'cs-ide/objectivesChanged',
+    side: 'params',
+    root: 'objectives-snapshot',
+    replay: entityOfNotification('cs-ide/objectivesChanged', (client) => client.onDidObjectivesChange, (snapshot) => snapshot),
+    declared: objectivesSnapshotFields,
   },
   authStatusResult('cs-ide/auth-status', (rpc) => rpc.status()),
   authStatusResult('cs-ide/auth-configure', (rpc) => rpc.configure({ 'server-url': null, 'access-token': null })),
