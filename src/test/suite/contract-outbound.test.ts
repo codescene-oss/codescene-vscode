@@ -13,6 +13,7 @@ import * as os from 'os';
 import * as path from 'path';
 import vscode from 'vscode';
 import { AuthRpc } from '../../auth/auth-rpc';
+import { ObjectivesRpc } from '../../objectives/objectives-rpc';
 import { authConfiguration } from '../../auth/auth-settings';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
@@ -42,6 +43,7 @@ type Variants = Record<string, () => unknown>;
 const notSentByVsCode: Record<string, string> = {
   'cs-ide/auth': 'license check: VS Code resolves its license through auth-status',
   'cs-ide/auth-token': 'the access token stays inside cs-ide; VS Code never asks for it',
+  'cs-ide/features': 'VS Code does not probe feature availability; the objectives snapshot carries its own off state',
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -232,6 +234,13 @@ suite('Contract outbound params Test Suite', () => {
     { method: 'cs-ide/auth-sync-account', variants: { 'all inputs': () => auth.syncAccount(REPO) } },
     { method: 'cs-ide/projects-list', variants: { 'no inputs': () => auth.listProjects() } },
     { method: 'cs-ide/project-link-get', variants: { 'all inputs': () => auth.getProjectLink(REPO) } },
+    {
+      method: 'cs-ide/objectives',
+      variants: {
+        'all inputs': () => new ObjectivesRpc(client).snapshot(REPO, true),
+        'optional inputs missing': () => new ObjectivesRpc(client).snapshot(REPO),
+      },
+    },
     {
       method: 'cs-ide/project-link-set',
       variants: {

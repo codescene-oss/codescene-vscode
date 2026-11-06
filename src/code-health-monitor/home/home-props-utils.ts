@@ -3,6 +3,7 @@ import vscode from 'vscode';
 import { HomeContextViewProps, IdeContextType, Job } from '../../centralized-webview-framework/types';
 import { devmode, featureFlags, ideType } from '../../centralized-webview-framework/cwf-html-utils';
 import { isPathUnderRoot, normalizeFsPath, relativePosix, toPosixRelPath } from '../../utils/fs-paths';
+import { withCwfObjectives } from '../../objectives/cwf-objectives';
 
 function repoRelative(fileName: string, repoRoots: readonly string[]): string | undefined {
   const normalizedFile = normalizeFsPath(fileName);
@@ -110,7 +111,7 @@ export const getHomeData = ({
   totalCount,
   remainingCount,
 }: HomeContextViewProps['data']): IdeContextType => {
-  return {
+  return withCwfObjectives<IdeContextType>({
     ideType: ideType,
     view: 'home',
     devmode: devmode,
@@ -125,5 +126,5 @@ export const getHomeData = ({
       totalCount,
       remainingCount,
     },
-  };
+  });
 };

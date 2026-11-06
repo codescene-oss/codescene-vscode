@@ -4,4 +4,5 @@ export type FeatureFlags =
   | 'onboarding-guide'
   | 'ace-status-indicator'
   | 'commit-baseline'
-  | 'ide-auth';
+  | 'ide-auth'
+  | 'ide-objectives';

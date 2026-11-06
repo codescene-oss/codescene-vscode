@@ -3,6 +3,7 @@ import * as path from 'path';
 import vscode from 'vscode';
 import { CancellationToken, CancellationTokenSource, createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
+import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
 import { formatLogFields, logOutputChannel } from '../log';
 import { redactSecrets } from '../log-redaction';
 import { authRequestSummaries, authResponseSummaries, authStatusSummary } from './auth-log-summaries';
@@ -165,6 +166,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private readonly serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
   private readonly queueEmitter = new vscode.EventEmitter<ReviewQueue>();
   private readonly authStatusEmitter = new vscode.EventEmitter<AuthStatus>();
+  private readonly objectivesEmitter = new vscode.EventEmitter<ObjectivesSnapshot>();
 
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
@@ -174,6 +176,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   readonly onDidServerStart = this.serverStartEmitter.event;
   readonly onDidQueue = this.queueEmitter.event;
   readonly onDidAuthStatusChange = this.authStatusEmitter.event;
+  readonly onDidObjectivesChange = this.objectivesEmitter.event;
 
   constructor(
     readonly binaryPath: string,
@@ -240,6 +243,7 @@ export class CsIdeServerClient implements vscode.Disposable {
       connection.onNotification('cs-ide/watchInventoryChanged', (notification: Record<string, any>) =>
         this.handleWatchInventory(notification));
       connection.onNotification('cs-ide/authStatusChanged', (status: AuthStatus) => this.handleAuthStatus(status));
+      connection.onNotification('cs-ide/objectivesChanged', (snapshot: ObjectivesSnapshot) => this.handleObjectives(snapshot));
       connection.onError(([error]) => this.handleError(error));
       connection.listen();
     } catch (error) {
@@ -360,6 +364,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.serverStartEmitter.dispose();
     this.queueEmitter.dispose();
     this.authStatusEmitter.dispose();
+    this.objectivesEmitter.dispose();
   }
 
   private bindRefactorCancellation(signal?: AbortSignal): { token: CancellationToken; dispose: () => void } {
@@ -457,6 +462,17 @@ export class CsIdeServerClient implements vscode.Disposable {
   private handleAuthStatus(status: AuthStatus): void {
     logOutputChannel.info(`[cs-ide] received authStatusChanged ${authStatusSummary(status)}`);
     this.authStatusEmitter.fire(status);
+  }
+
+  private handleObjectives(snapshot: ObjectivesSnapshot): void {
+    logOutputChannel.info(
+      `[cs-ide] received objectivesChanged ${formatLogFields({
+        repo: snapshot['repo-root'],
+        state: snapshot.state,
+        count: snapshot.objectives.length,
+      })}`
+    );
+    this.objectivesEmitter.fire(snapshot);
   }
 
   private handleWatchInventory(notification: Record<string, any>): void {
