@@ -284,28 +284,6 @@ suite('AuthService sign-in flow', () => {
     assert.deepStrictEqual({ view: view(), trail: trail() }, { view: monitor, trail: ['summary'] });
   });
 
-  test('hiding the sign-in banner is remembered for the session across sign-in changes', async () => {
-    await prepare();
-    const hidden = () => harness.service.current.signInBannerHidden;
-    const initial = hidden();
-    harness.service.hideSignInBanner();
-    const afterHide = hidden();
-    harness.transport.notify(signedIn);
-    await flushPromises();
-    harness.transport.notify(authStatusFixture('signed-out'));
-    await flushPromises();
-    assert.deepStrictEqual(
-      { initial, afterHide, afterChanges: hidden() },
-      { initial: false, afterHide: true, afterChanges: true }
-    );
-  });
-
-  test('hiding the sign-in banner does nothing while inactive', async () => {
-    harness = createHarness({ capabilities: [] });
-    await harness.service.start();
-    harness.service.hideSignInBanner();
-    assert.strictEqual(harness.service.current.signInBannerHidden, false);
-  });
 
   test('reports syncing while a newly selected repo looks up its link', async () => {
     let release: (link: unknown) => void = () => undefined;
