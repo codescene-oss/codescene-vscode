@@ -154,4 +154,31 @@ suite('ObjectivesService', () => {
     await flushPromises();
     assert.strictEqual(service.workSessionsCapable, false);
   });
+
+  test('findSnapshotWithGoal prefers current when the same goal id is in multiple cached snapshots', async () => {
+    await startService();
+    // Load REPO_A first
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    // Push updated REPO_A snapshot with goal 123
+    const snapshotA = snapshotFor(REPO_A);
+    snapshotA.objectives = [{ ...snapshotA.objectives[0], kind: 'goal', id: 123 }];
+    transport.notify(snapshotA);
+    // Switch to REPO_B and load it
+    service.setContext({ active: true, settled: true, repoPath: REPO_B });
+    await flushPromises();
+    // Push updated REPO_B snapshot with the same goal id 123
+    const snapshotB = snapshotFor(REPO_B);
+    snapshotB.objectives = [{ ...snapshotB.objectives[0], kind: 'goal', id: 123 }];
+    transport.notify(snapshotB);
+    // Verify REPO_B is current
+    assert.strictEqual(service.current?.['repo-root'], REPO_B, 'REPO_B should be current');
+    // Verify current has goal 123
+    const currentHasGoal = service.current?.objectives.some(obj => obj.kind === 'goal' && obj.id === 123);
+    assert.strictEqual(currentHasGoal, true, 'Current snapshot should have goal 123');
+    // Now REPO_B is current and both snapshots have goal 123
+    // findSnapshotWithGoal should return REPO_B (current), not REPO_A (cached first in insertion order)
+    const found = service.findSnapshotWithGoal(123);
+    assert.strictEqual(found?.['repo-root'], REPO_B, 'Should prefer current snapshot over cached ones');
+  });
 });

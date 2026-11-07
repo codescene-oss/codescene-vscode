@@ -43,6 +43,12 @@ export class ObjectivesService implements vscode.Disposable {
   }
 
   findSnapshotWithGoal(goalId: number): ObjectivesSnapshot | undefined {
+    // Prefer the current snapshot when it contains the goal
+    const current = this.current;
+    if (current && current.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+      return current;
+    }
+    // Fall back to other cached snapshots
     for (const snapshot of this.snapshots.values()) {
       if (snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
         return snapshot;

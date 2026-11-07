@@ -14,6 +14,7 @@ import * as path from 'path';
 import vscode from 'vscode';
 import { AuthRpc } from '../../auth/auth-rpc';
 import { ObjectivesRpc } from '../../objectives/objectives-rpc';
+import { GoalWorkSessionRpc } from '../../objectives/goal-work-session-rpc';
 import { authConfiguration } from '../../auth/auth-settings';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
@@ -245,10 +246,7 @@ suite('Contract outbound params Test Suite', () => {
     {
       method: 'cs-ide/goalWorkSessionStart',
       variants: {
-        'all inputs': () => {
-          const { GoalWorkSessionRpc } = require('../../objectives/goal-work-session-rpc');
-          return new GoalWorkSessionRpc(client).start(REPO, 123);
-        },
+        'all inputs': () => new GoalWorkSessionRpc(client).start(REPO, 123),
       },
     },
     {

@@ -1,10 +1,11 @@
 import * as assert from 'assert';
 import type { ObjectivesSnapshot } from '../../centralized-webview-framework/types/objectives';
-import { GOAL_WORK_SESSIONS_CAPABILITY } from '../../objectives/objectives-service';
+import { GOAL_WORK_SESSIONS_CAPABILITY, OBJECTIVES_CAPABILITY, ObjectivesService } from '../../objectives/objectives-service';
 import { handleGoalWorkSessionStart } from '../../objectives/goal-work-session-messages';
 import { fixture } from '../contract/contract';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
 import { GoalWorkSessionRpc } from '../../objectives/goal-work-session-rpc';
+import { flushPromises } from '../fakes/fake-auth-transport';
 
 const REPO_A = '/work/repo-a';
 const REPO_B = '/work/repo-b';
@@ -34,39 +35,33 @@ interface RecordedInfo {
 
 suite('Goal work session messages', () => {
   let transport: FakeObjectivesTransport;
+  let service: ObjectivesService;
   let rpc: GoalWorkSessionRpc;
   let warnings: RecordedWarning[];
   let infos: RecordedInfo[];
   let executedCommands: string[];
   let logMessages: string[];
   let capable: boolean;
-  let snapshots: Map<string, ObjectivesSnapshot>;
 
-  function setupDeps() {
-    transport = new FakeObjectivesTransport({ sha: 'sha', version: 'version', capabilities: [GOAL_WORK_SESSIONS_CAPABILITY] }, () =>
-      snapshotFor(REPO_A, 1)
+  async function setupDeps() {
+    transport = new FakeObjectivesTransport(
+      { sha: 'sha', version: 'version', capabilities: [OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY] },
+      (repoPath) => snapshotFor(repoPath, 1)
     );
+    service = new ObjectivesService(transport);
+    await service.start();
     rpc = new GoalWorkSessionRpc(transport);
     warnings = [];
     infos = [];
     executedCommands = [];
     logMessages = [];
     capable = true;
-    snapshots = new Map();
   }
 
   function deps(goalId: number) {
     return {
       rpc,
-      snapshot: () => {
-        // Find the snapshot containing this goal
-        for (const snapshot of snapshots.values()) {
-          if (snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
-            return snapshot;
-          }
-        }
-        return undefined;
-      },
+      snapshot: () => service.findSnapshotWithGoal(goalId),
       capable: () => capable,
       notify: {
         warn: async (message: string, ...actions: string[]) => {
@@ -89,36 +84,48 @@ suite('Goal work session messages', () => {
     };
   }
 
-  setup(() => {
-    setupDeps();
+  setup(async () => {
+    await setupDeps();
+  });
+
+  teardown(() => {
+    service?.dispose();
   });
 
   test('start-sends-rpc-with-snapshot-repo-root-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 123));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 123));
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(123, deps(123));
 
-    assert.strictEqual(transport.requests.length, 1);
-    assert.deepStrictEqual(transport.requests[0], {
+    assert.strictEqual(transport.requests.length, 2); // objectives request + goalWorkSessionStart
+    const startRequest = transport.requests.find((r) => r.method === 'cs-ide/goalWorkSessionStart');
+    assert.deepStrictEqual(startRequest, {
       method: 'cs-ide/goalWorkSessionStart',
       params: { 'repo-path': REPO_A, 'goal-id': 123 },
     });
   });
 
   test('start-uses-snapshot-repo-root-test', async () => {
-    snapshots.set(REPO_B, snapshotFor(REPO_B, 456));
+    service.setContext({ active: true, settled: true, repoPath: REPO_B });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_B, 456));
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(456, deps(456));
 
-    assert.strictEqual(transport.requests.length, 1);
-    const params = transport.requests[0].params as Record<string, unknown>;
+    const startRequest = transport.requests.find((r) => r.method === 'cs-ide/goalWorkSessionStart');
+    assert.ok(startRequest, 'Should have sent goalWorkSessionStart');
+    const params = startRequest.params as Record<string, unknown>;
     assert.strictEqual(params['repo-path'], REPO_B, 'Should use repo-root from snapshot containing the goal');
   });
 
   test('started-shows-no-notification-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -128,7 +135,9 @@ suite('Goal work session messages', () => {
   });
 
   test('unavailable-shows-no-notification-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'unavailable' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -138,7 +147,9 @@ suite('Goal work session messages', () => {
   });
 
   test('goal-inactive-shows-exact-copy-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'goal-inactive' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -149,7 +160,9 @@ suite('Goal work session messages', () => {
   });
 
   test('parent-inactive-shows-exact-copy-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'parent-inactive' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -160,7 +173,9 @@ suite('Goal work session messages', () => {
   });
 
   test('network-shows-exact-copy-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'network' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -171,7 +186,9 @@ suite('Goal work session messages', () => {
   });
 
   test('scope-missing-shows-exact-copy-and-action-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'scope-missing' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -182,7 +199,9 @@ suite('Goal work session messages', () => {
   });
 
   test('scope-missing-action-runs-reauthorize-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'scope-missing' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -192,7 +211,9 @@ suite('Goal work session messages', () => {
   });
 
   test('signed-out-shows-exact-copy-and-action-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'signed-out' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -203,7 +224,9 @@ suite('Goal work session messages', () => {
   });
 
   test('signed-out-action-runs-sign-in-command-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.setWorkSessionStartResult({ result: 'signed-out' });
 
     await handleGoalWorkSessionStart(1, deps(1));
@@ -213,47 +236,60 @@ suite('Goal work session messages', () => {
   });
 
   test('start-rejected-by-restart-shows-network-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     transport.failRequests(new Error('Connection refused'));
 
     await handleGoalWorkSessionStart(1, deps(1));
 
     assert.strictEqual(warnings.length, 1);
     assert.strictEqual(warnings[0].message, "Couldn't reach CodeScene to start the work session. Try again.");
+    assert.strictEqual(logMessages.length, 1);
+    assert.ok(logMessages[0].includes('Start failed'), 'Should log the error');
   });
 
   test('start-without-capability-is-ignored-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 1));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
     capable = false;
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(1, deps(1));
 
-    assert.strictEqual(transport.requests.length, 0, 'Should not send RPC when capability is missing');
+    const startRequest = transport.requests.find((r) => r.method === 'cs-ide/goalWorkSessionStart');
+    assert.strictEqual(startRequest, undefined, 'Should not send goalWorkSessionStart when capability is missing');
     assert.strictEqual(logMessages.length, 1);
     assert.ok(logMessages[0].includes('work session'), 'Should log about work session');
   });
 
   test('goal-not-in-any-snapshot-is-ignored-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 999)); // Different goal ID
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 999)); // Different goal ID
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(1, deps(1));
 
-    assert.strictEqual(transport.requests.length, 0, 'Should not send RPC when goal is not found');
+    const startRequest = transport.requests.find((r) => r.method === 'cs-ide/goalWorkSessionStart');
+    assert.strictEqual(startRequest, undefined, 'Should not send goalWorkSessionStart when goal is not found');
     assert.strictEqual(logMessages.length, 1);
     assert.ok(logMessages[0].includes('not found'), 'Should log that goal was not found');
   });
 
   test('multi-repo-finds-correct-snapshot-test', async () => {
-    snapshots.set(REPO_A, snapshotFor(REPO_A, 100));
-    snapshots.set(REPO_B, snapshotFor(REPO_B, 200));
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 100));
+    transport.notify(snapshotFor(REPO_B, 200));
     transport.setWorkSessionStartResult({ result: 'started' });
 
     await handleGoalWorkSessionStart(200, deps(200));
 
-    assert.strictEqual(transport.requests.length, 1);
-    const params = transport.requests[0].params as Record<string, unknown>;
+    const startRequest = transport.requests.find((r) => r.method === 'cs-ide/goalWorkSessionStart');
+    assert.ok(startRequest, 'Should have sent goalWorkSessionStart');
+    const params = startRequest.params as Record<string, unknown>;
     assert.strictEqual(params['repo-path'], REPO_B, 'Should use repo-root from correct snapshot');
     assert.strictEqual(params['goal-id'], 200);
   });
