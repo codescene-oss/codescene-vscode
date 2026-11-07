@@ -63,9 +63,11 @@ export function activateAuth(
     openExternal: openInBrowser,
     logUsage: (name, data) => Telemetry.logUsage(name, data),
   });
-  const notices = new AuthNotices(context.globalState, {
+  const notices = new AuthNotices({
     show: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
     signIn: () => vscode.commands.executeCommand(SIGN_IN_COMMAND),
+    focusHomeView: () => vscode.commands.executeCommand(HOME_VIEW_FOCUS_COMMAND),
+    logUsage: (name, data) => Telemetry.logUsage(name, data),
   });
   const licenseGate = new LicenseGate(license);
   DevtoolsAPI.useLicenseGate(licenseGate);

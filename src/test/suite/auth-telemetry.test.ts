@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { signInOutcome } from '../../auth/auth-telemetry';
+import { signInOutcome, GATE_SHOWN } from '../../auth/auth-telemetry';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 
@@ -54,4 +54,10 @@ suite('signInOutcome', () => {
       assert.deepStrictEqual(signInOutcome(previous, next), expected);
     });
   }
+});
+
+suite('GATE_SHOWN constant', () => {
+  test('has the correct value', () => {
+    assert.strictEqual(GATE_SHOWN, 'auth/gate-shown');
+  });
 });

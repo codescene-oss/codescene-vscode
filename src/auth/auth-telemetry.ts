@@ -1,5 +1,7 @@
 import type { AuthErrorCode, AuthStatus } from '../centralized-webview-framework/types/auth';
 
+export const GATE_SHOWN = 'auth/gate-shown';
+
 export interface AuthTelemetryEvent {
   name: string;
   data?: Record<string, unknown>;

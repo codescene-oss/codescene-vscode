@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { CsStatusBar } from '../../cs-statusbar';
 import { AnalysisFeature, CsExtensionState } from '../../cs-extension-state';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
+import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 
 type FakeItem = { text: string; tooltip: string; command: string; backgroundColor?: unknown };
 
@@ -104,5 +105,65 @@ suite('CsStatusBar automatic analysis', () => {
         assert.strictEqual(analysis[key as keyof FakeItem], value, key);
       }
     });
+  });
+});
+
+suite('CsStatusBar auth states', () => {
+  let originalCreate: typeof vscode.window.createStatusBarItem;
+  let originalStateProperties: PropertyDescriptor | undefined;
+  let items: FakeItem[];
+
+  setup(() => {
+    originalCreate = vscode.window.createStatusBarItem;
+    originalStateProperties = Object.getOwnPropertyDescriptor(CsExtensionState, 'stateProperties');
+    items = [];
+    vscode.window.createStatusBarItem = (() => {
+      const item = {
+        text: '',
+        tooltip: '',
+        command: '',
+        backgroundColor: undefined,
+        show: () => undefined,
+        hide: () => undefined,
+        dispose: () => undefined,
+      };
+      items.push(item);
+      return item as any;
+    }) as typeof vscode.window.createStatusBarItem;
+  });
+
+  teardown(() => {
+    vscode.window.createStatusBarItem = originalCreate;
+    restoreDefaultConfiguration();
+    if (originalStateProperties) {
+      Object.defineProperty(CsExtensionState, 'stateProperties', originalStateProperties);
+    }
+  });
+
+  function renderWithAuth(active: boolean, status: any): FakeItem {
+    Object.defineProperty(CsExtensionState, 'stateProperties', {
+      configurable: true,
+      get: () => ({
+        auth: { active, status },
+        features: {
+          analysis: { state: 'enabled' },
+          ace: { state: 'enabled' },
+        },
+      }),
+    });
+    const bar = new CsStatusBar();
+    bar.update();
+    bar.dispose();
+    return items[items.length - 1];
+  }
+
+  test('statusbar-sign-in-required', () => {
+    const unlicensed = renderWithAuth(true, authStatusFixture('signed-out'));
+    assert.strictEqual(unlicensed.text, 'CodeScene: Sign in required');
+    assert.strictEqual(unlicensed.command, 'codescene.homeView.focus');
+
+    const licensed = renderWithAuth(true, authStatusFixture('signed-in-oauth'));
+    assert.strictEqual(licensed.text, '$(cs-logo) Analysis');
+    assert.strictEqual(licensed.command, 'codescene.homeView.focus');
   });
 });
