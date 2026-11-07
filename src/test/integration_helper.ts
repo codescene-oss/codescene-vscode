@@ -44,3 +44,40 @@ export async function ensureBinary(): Promise<string> {
 
   return binaryPath;
 }
+
+/**
+ * A test skipped right after setup can leave a short-lived child process (such as the git
+ * availability check) inside the directory, which Windows refuses to remove until it exits.
+ */
+export async function removeTestDir(dir: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EBUSY' || attempt >= 50) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
+export const CREDENTIAL_SKIP_REASON =
+  'needs a CodeScene credential: set CS_ACCESS_TOKEN (CLI access) to run real cs-ide analysis tests';
+
+export function hasCodeSceneCredential(): boolean {
+  return Boolean(process.env.CS_ACCESS_TOKEN?.trim());
+}
+
+/**
+ * cs-ide answers its Code Health methods only with a valid CLI license, which these tests get from
+ * the CS_ACCESS_TOKEN the spawned binary inherits. Without one the calling test is reported as
+ * pending with the reason in its title.
+ */
+export function skipWithoutCodeSceneCredential(context: Mocha.Context): void {
+  if (hasCodeSceneCredential()) return;
+  const test = context.currentTest ?? context.test;
+  if (test && !test.title.endsWith(`(${CREDENTIAL_SKIP_REASON})`)) {
+    test.title = `${test.title} (${CREDENTIAL_SKIP_REASON})`;
+  }
+  context.skip();
+}
