@@ -4,7 +4,7 @@ import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import type { ObjectivesFeature } from '../objectives/objectives-feature';
 import Telemetry from '../telemetry';
-import { registerAuthCommands, SIGN_IN_COMMAND, SIGN_IN_CONTEXT_KEY } from './auth-commands';
+import { registerAuthCommands, SIGN_IN_COMMAND, updateAuthContextKeys } from './auth-commands';
 import { registerAuthMessages } from './auth-message-handler';
 import { AuthNotices } from './auth-notices';
 import { toAuthFlow, toAuthPayload, type AuthSnapshot } from './auth-payload';
@@ -27,7 +27,7 @@ function openSetting(id: string): Thenable<unknown> {
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
   setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, snapshot.signInBannerHidden);
-  void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
+  updateAuthContextKeys(snapshot);
   void notices.update(snapshot);
 }
 
