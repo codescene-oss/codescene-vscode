@@ -44,6 +44,7 @@ const notSentByVsCode: Record<string, string> = {
   'cs-ide/auth': 'license check: VS Code resolves its license through auth-status',
   'cs-ide/auth-token': 'the access token stays inside cs-ide; VS Code never asks for it',
   'cs-ide/features': 'VS Code does not probe feature availability; the objectives snapshot carries its own off state',
+  'cs-ide/auth-reauthorize': 'tested in Task 3 (CS-12138)',
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -239,6 +240,15 @@ suite('Contract outbound params Test Suite', () => {
       variants: {
         'all inputs': () => new ObjectivesRpc(client).snapshot(REPO, true),
         'optional inputs missing': () => new ObjectivesRpc(client).snapshot(REPO),
+      },
+    },
+    {
+      method: 'cs-ide/goalWorkSessionStart',
+      variants: {
+        'all inputs': () => {
+          const { GoalWorkSessionRpc } = require('../../objectives/goal-work-session-rpc');
+          return new GoalWorkSessionRpc(client).start(REPO, 123);
+        },
       },
     },
     {

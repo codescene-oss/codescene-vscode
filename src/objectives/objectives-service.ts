@@ -42,6 +42,15 @@ export class ObjectivesService implements vscode.Disposable {
     return this._workSessionsCapable;
   }
 
+  findSnapshotWithGoal(goalId: number): ObjectivesSnapshot | undefined {
+    for (const snapshot of this.snapshots.values()) {
+      if (snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+        return snapshot;
+      }
+    }
+    return undefined;
+  }
+
   async start(): Promise<void> {
     this.disposables.push(
       this.transport.onDidServerStart((event) => this.handleServerStart(event.metadata)),

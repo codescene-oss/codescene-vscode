@@ -153,6 +153,30 @@ function handleAnalysisMessage(message: MessageToIDEType) {
   }
 }
 
+type ObjectivesActions = {
+  startWorkSession(goalId: number): Promise<void>;
+};
+
+let objectivesActions: ObjectivesActions | undefined;
+
+export function registerObjectivesMessages(actions: ObjectivesActions): { dispose(): void } {
+  objectivesActions = actions;
+  return {
+    dispose: () => {
+      objectivesActions = undefined;
+    },
+  };
+}
+
+async function handleObjectivesMessage(message: MessageToIDEType) {
+  if (!objectivesActions) return;
+  switch (message.messageType) {
+    case 'goal-work-session-start':
+      await objectivesActions.startWorkSession(message.payload.goalId);
+      return;
+  }
+}
+
 /**
  * Handles all messages from the home view panel
  * @param homeView
@@ -173,6 +197,9 @@ export async function handleCWFMessage(homeView: HomeView, message: MessageToIDE
       return;
     case 'analysis':
       handleAnalysisMessage(message);
+      return;
+    case 'objectives':
+      await handleObjectivesMessage(message);
       return;
     default:
       console.warn(message.messageType, 'not supported yet');
