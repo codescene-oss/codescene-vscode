@@ -39,6 +39,4 @@ export class AuthNotices {
     if (choice === SIGN_IN_ACTION) await this.deps.signIn();
     else if (choice === USE_ACCESS_TOKEN_ACTION) await this.deps.focusHomeView();
   }
-
-  simulateCsIdeRestart(): void {}
 }
