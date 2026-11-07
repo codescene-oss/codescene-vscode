@@ -2,20 +2,12 @@ import { EventEmitter } from 'vscode';
 import type { ObjectivesSnapshot } from '../../centralized-webview-framework/types/objectives';
 import type { ServerMetadata, ServerStartEvent } from '../../devtools-api/ide-server-client';
 import type { ObjectivesTransport } from '../../objectives/objectives-transport';
+import type { GoalWorkSessionStartResult } from '../../objectives/goal-work-session-rpc';
 
 export interface RecordedObjectivesRequest {
   method: string;
   params: unknown;
 }
-
-export type GoalWorkSessionStartResult =
-  | { result: 'started' }
-  | { result: 'unavailable' }
-  | { result: 'goal-inactive' }
-  | { result: 'parent-inactive' }
-  | { result: 'network' }
-  | { result: 'scope-missing' }
-  | { result: 'signed-out' };
 
 export class FakeObjectivesTransport implements ObjectivesTransport {
   readonly requests: RecordedObjectivesRequest[] = [];

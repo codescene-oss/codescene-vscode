@@ -169,7 +169,10 @@ export function registerObjectivesMessages(actions: ObjectivesActions): { dispos
 }
 
 async function handleObjectivesMessage(message: MessageToIDEType) {
-  if (!objectivesActions) return;
+  if (!objectivesActions) {
+    console.warn(`[objectives] Message ${message.messageType} received but objectives actions not registered`);
+    return;
+  }
   switch (message.messageType) {
     case 'goal-work-session-start':
       await objectivesActions.startWorkSession(message.payload.goalId);

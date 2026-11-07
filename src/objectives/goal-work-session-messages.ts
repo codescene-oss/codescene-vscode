@@ -28,40 +28,52 @@ export async function handleGoalWorkSessionStart(goalId: number, deps: GoalWorkS
 
   const repoPath = snapshot['repo-root'];
 
+  let result;
   try {
-    const result = await deps.rpc.start(repoPath, goalId);
-
-    switch (result.result) {
-      case 'started':
-      case 'unavailable':
-        // No notification
-        break;
-      case 'goal-inactive':
-        await deps.notify.warn("This Goal is no longer active, so a work session can't be started.");
-        break;
-      case 'parent-inactive':
-        await deps.notify.warn("This Goal's Policy is inactive, so a work session can't be started.");
-        break;
-      case 'network':
-        await deps.notify.warn("Couldn't reach CodeScene to start the work session. Try again.");
-        break;
-      case 'scope-missing': {
-        const action = await deps.notify.warn('Re-authorize CodeScene to use work sessions.', 'Re-authorize');
-        if (action === 'Re-authorize') {
-          await deps.executeCommand('codescene.reauthorize');
-        }
-        break;
-      }
-      case 'signed-out': {
-        const action = await deps.notify.warn('Sign in to CodeScene to use work sessions.', 'Sign in');
-        if (action === 'Sign in') {
-          await deps.executeCommand(SIGN_IN_COMMAND);
-        }
-        break;
-      }
-    }
+    result = await deps.rpc.start(repoPath, goalId);
   } catch (error) {
     deps.log?.(`[goal-work-sessions] Start failed: ${String(error)}`);
-    await deps.notify.warn("Couldn't reach CodeScene to start the work session. Try again.");
+    void deps.notify.warn("Couldn't reach CodeScene to start the work session. Try again.");
+    return;
+  }
+
+  switch (result.result) {
+    case 'started':
+    case 'unavailable':
+      // No notification
+      break;
+    case 'goal-inactive':
+      void deps.notify.warn("This Goal is no longer active, so a work session can't be started.");
+      break;
+    case 'parent-inactive':
+      void deps.notify.warn("This Goal's Policy is inactive, so a work session can't be started.");
+      break;
+    case 'network':
+      void deps.notify.warn("Couldn't reach CodeScene to start the work session. Try again.");
+      break;
+    case 'scope-missing':
+      void deps.notify
+        .warn('Re-authorize CodeScene to use work sessions.', 'Re-authorize')
+        .then(
+          (action) => {
+            if (action === 'Re-authorize') {
+              void deps.executeCommand('codescene.reauthorize');
+            }
+          },
+          (error) => deps.log?.(`[goal-work-sessions] Notification failed: ${String(error)}`)
+        );
+      break;
+    case 'signed-out':
+      void deps.notify
+        .warn('Sign in to CodeScene to use work sessions.', 'Sign in')
+        .then(
+          (action) => {
+            if (action === 'Sign in') {
+              void deps.executeCommand(SIGN_IN_COMMAND);
+            }
+          },
+          (error) => deps.log?.(`[goal-work-sessions] Notification failed: ${String(error)}`)
+        );
+      break;
   }
 }
