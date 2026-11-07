@@ -220,9 +220,9 @@ suite('Contract outbound params Test Suite', () => {
       method: 'cs-ide/auth-configure',
       variants: {
         'all inputs': () =>
-          auth.configure(authConfiguration({ signInEnabled: true, serverUrl: 'https://codescene.example.com', accessToken: 'pat-123' })),
+          auth.configure(authConfiguration({ serverUrl: 'https://codescene.example.com', accessToken: 'pat-123' })),
         'optional inputs missing: blank settings': () =>
-          auth.configure(authConfiguration({ signInEnabled: true, serverUrl: '  ', accessToken: '' })),
+          auth.configure(authConfiguration({ serverUrl: '  ', accessToken: '' })),
       },
     },
     { method: 'cs-ide/auth-status', variants: { 'no inputs': () => auth.status() } },

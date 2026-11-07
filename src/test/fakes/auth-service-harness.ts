@@ -13,7 +13,6 @@ export interface Harness {
 
 export interface HarnessOptions {
   capabilities?: string[];
-  signInEnabled?: boolean;
   accessToken?: string;
 }
 
@@ -28,7 +27,6 @@ export function createHarness(options: HarnessOptions = {}): Harness {
       throw Object.assign(new Error('Method not found'), { code: -32601 });
     });
   const settings = new FakeAuthSettings({
-    signInEnabled: options.signInEnabled ?? true,
     serverUrl: '',
     accessToken: options.accessToken ?? '',
   });

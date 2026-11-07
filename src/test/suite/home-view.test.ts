@@ -502,14 +502,6 @@ suite('HomeView auth surface', () => {
     await showSurface('auth');
     assert.ok(view.webview.html.includes('"view":"auth"'), view.webview.html);
   });
-
-  test('stays on the monitor when the surface is auth but browser sign-in is inactive', async () => {
-    setCwfAuth(undefined, undefined, 'auth');
-    await initialize();
-    assert.ok(view.webview.html.includes('"view":"home"'), view.webview.html);
-    assert.strictEqual(lastRendered().payload.view, 'home');
-    assert.ok(!view.webview.html.includes('ide-auth'));
-  });
 });
 
 suite('Home view legacy login messages', () => {

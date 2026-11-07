@@ -22,23 +22,12 @@ suite('AuthService', () => {
     );
   });
 
-  test('stays inactive while the toggle is off', async () => {
-    harness = createHarness({ signInEnabled: false });
+  test('starts active with auth-v1 and no setting', async () => {
+    harness = createHarness();
     await harness.service.start();
     assert.deepStrictEqual(
-      { requests: harness.transport.requests, restarts: harness.transport.restarts, snapshot: harness.service.current },
-      { requests: [], restarts: 0, snapshot: INACTIVE_SNAPSHOT }
-    );
-  });
-
-  test('does not restart cs-ide for setting changes while the toggle is off', async () => {
-    harness = createHarness({ signInEnabled: false });
-    await harness.service.start();
-    harness.settings.update({ serverUrl: 'https://cs.example' });
-    await flushPromises();
-    assert.deepStrictEqual(
-      { requests: harness.transport.requests, restarts: harness.transport.restarts },
-      { requests: [], restarts: 0 }
+      { requests: harness.transport.requests, active: harness.service.current.active },
+      { requests: [{ method: 'cs-ide/auth-configure', params: NULL_CONFIGURATION }], active: true }
     );
   });
 
@@ -141,38 +130,10 @@ suite('AuthService', () => {
   });
 
   test('ignores status notifications while inactive', async () => {
-    harness = createHarness({ signInEnabled: false });
+    harness = createHarness({ capabilities: [] });
     await harness.service.start();
     harness.transport.notify(authStatusFixture('signed-in-oauth'));
     assert.deepStrictEqual(harness.service.current, INACTIVE_SNAPSHOT);
-  });
-
-  test('turns inactive and restarts cs-ide once when the toggle is switched off', async () => {
-    harness = createHarness();
-    await harness.service.start();
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
-    assert.deepStrictEqual(
-      {
-        payload: toAuthPayload(harness.service.current),
-        restarts: harness.transport.restarts,
-        methods: harness.transport.methods(),
-      },
-      { payload: undefined, restarts: 1, methods: ['cs-ide/auth-configure'] }
-    );
-  });
-
-  test('configures the fresh cs-ide again when the toggle is switched back on', async () => {
-    harness = createHarness();
-    await harness.service.start();
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
-    harness.settings.update({ signInEnabled: true });
-    await flushPromises();
-    assert.deepStrictEqual(
-      { restarts: harness.transport.restarts, methods: harness.transport.methods(), state: harness.service.current.status?.state },
-      { restarts: 1, methods: ['cs-ide/auth-configure', 'cs-ide/auth-configure'], state: 'signed-out' }
-    );
   });
 
   test('reports sign-in completion and failure from status transitions', async () => {
@@ -197,8 +158,8 @@ suite('AuthService', () => {
     assert.deepStrictEqual(states, ['signed-out']);
   });
 
-  test('does not call cs-ide on retry while the toggle is off', async () => {
-    harness = createHarness({ signInEnabled: false });
+  test('does not call cs-ide on retry while inactive', async () => {
+    harness = createHarness({ capabilities: [] });
     await harness.service.start();
     await harness.service.retry();
     assert.deepStrictEqual(

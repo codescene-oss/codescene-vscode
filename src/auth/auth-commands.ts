@@ -5,8 +5,7 @@ import type { AuthService } from './auth-service';
 export const SIGN_IN_COMMAND = 'codescene.browserSignIn';
 export const SIGN_OUT_COMMAND = 'codescene.browserSignOut';
 export const SIGN_IN_CONTEXT_KEY = 'codescene.signInActive';
-export const SIGN_IN_INACTIVE_MESSAGE =
-  'Browser sign-in is experimental. Turn on the codescene.experimental.signIn setting to use it.';
+export const SIGN_IN_INACTIVE_MESSAGE = 'Sign-in needs a newer CodeScene CLI. Reload the window to update.';
 export const TOKEN_SIGN_OUT_MESSAGE =
   'You are signed in with a personal access token. Remove it from the codescene.authToken setting to sign out.';
 export const ENV_TOKEN_SIGN_OUT_MESSAGE =
