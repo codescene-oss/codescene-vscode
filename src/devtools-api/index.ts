@@ -230,6 +230,7 @@ export class DevtoolsAPI {
   private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
     try {
       await addRefactorableFunctionsToDeltaResult(document, result);
+      if (!DevtoolsAPI.licensed) return;
       DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor, enrichment: true });
     } catch (error) {
       logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);

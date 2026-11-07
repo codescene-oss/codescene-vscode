@@ -6,8 +6,9 @@ import vscode from 'vscode';
 import { analysisLicenseHooks } from '../../auth/analysis-license-hooks';
 import { INACTIVE_SNAPSHOT } from '../../auth/auth-payload';
 import { isLicensed, LicenseGate } from '../../auth/license-gate';
-import { CsExtensionState } from '../../cs-extension-state';
-import { DevtoolsAPI } from '../../devtools-api';
+import { ACE_ENABLED } from '../../build-flags';
+import { CsExtensionState, type CsFeature } from '../../cs-extension-state';
+import { DevtoolsAPI, type DeltaAnalysisEvent } from '../../devtools-api';
 import { DeltaResult, ReviewFailed, ReviewQueue, ReviewResult } from '../../devtools-api/ide-server-client';
 import { Review } from '../../devtools-api/review-model';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
@@ -48,6 +49,10 @@ class FakeIdeServer {
 
   reviewFiles(repoRoot: string, files: Files): void {
     this.batches.push({ repoRoot, files });
+  }
+
+  preflight(): Promise<unknown> {
+    return Promise.resolve({});
   }
 
   get files(): Files {
@@ -286,6 +291,47 @@ suite('License gate analysis Test Suite', () => {
     gate.update({ ...licensedSnapshot(), serverStart: 2 });
 
     assert.deepStrictEqual({ enabled: watch.enabled, resyncs: watch.resyncs }, { enabled: [true], resyncs: 1 });
+  });
+
+  test('a delta enriched after the license lapsed is not presented', async () => {
+    gate.update(licensedSnapshot());
+    const doc = document('enriched.ts');
+    const deltas: DeltaAnalysisEvent[] = [];
+    const listener = DevtoolsAPI.onDidDeltaAnalysisComplete((event) => {
+      deltas.push(event);
+      if (!event.enrichment) gate.update(statusSnapshot('signed-in-refused'));
+    });
+    const review = DevtoolsAPI.reviewWithServer(doc, { skipMonitorUpdate: false, updateDiagnosticsPane: true });
+    const [{ files }] = server.batches;
+    server.reviewEmitter.fire({ id: files[0].id, repoRoot, path: 'enriched.ts', result: emptyReview() });
+    server.deltaEmitter.fire({
+      id: files[0].id,
+      repoRoot,
+      path: 'enriched.ts',
+      result: { 'old-score': 9, 'new-score': 8, 'score-change': -1, 'file-level-findings': [], 'function-level-findings': [] },
+    });
+    await review;
+    await settle();
+
+    assert.deepStrictEqual(
+      deltas.map(({ enrichment }) => enrichment === true),
+      [false]
+    );
+    listener.dispose();
+  });
+
+  test('unlicensed-transition-disables-ace', async function () {
+    if (!ACE_ENABLED) this.skip();
+    await DevtoolsAPI.preflight();
+    assert.strictEqual(DevtoolsAPI.aceEnabled(), true);
+    gate.update(licensedSnapshot());
+    const states: CsFeature['state'][] = [];
+    const listener = DevtoolsAPI.onDidChangePreflightState((event) => states.push(event.state));
+
+    gate.update(statusSnapshot('signed-in-offline-expired'));
+
+    assert.deepStrictEqual({ aceEnabled: DevtoolsAPI.aceEnabled(), states }, { aceEnabled: false, states: ['disabled'] });
+    listener.dispose();
   });
 
   test('licensed-respects-automatic-analysis-off', () => {
