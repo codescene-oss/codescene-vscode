@@ -14,7 +14,7 @@ export function activateObjectives(transport: ObjectivesTransport): ObjectivesFe
   const service = new ObjectivesService(transport);
   const disposables: vscode.Disposable[] = [
     service,
-    service.onDidChange(() => setCwfObjectives(service.current)),
+    service.onDidChange(() => setCwfObjectives(service.current, { workSessions: service.workSessionsCapable })),
   ];
   void service.start().catch((error: unknown) => logOutputChannel.warn(`[objectives] start failed: ${String(error)}`));
   return {

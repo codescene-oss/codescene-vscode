@@ -5,4 +5,5 @@ export type FeatureFlags =
   | 'ace-status-indicator'
   | 'commit-baseline'
   | 'ide-auth'
-  | 'ide-objectives';
+  | 'ide-objectives'
+  | 'goal-work-sessions';
