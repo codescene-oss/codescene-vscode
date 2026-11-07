@@ -1,5 +1,5 @@
 import type { AuthSnapshot } from './auth-payload';
-import { isLicensed } from './license-gate';
+import { isLicensed, isLicenseResolving } from './license-gate';
 import { GATE_SHOWN } from './auth-telemetry';
 
 const ACTIVATION_MESSAGE = 'CodeScene requires a CodeScene account. Sign in to get Code Health analysis in your editor.';
@@ -17,7 +17,7 @@ function shouldShowGate(snapshot: AuthSnapshot): boolean {
   if (!snapshot.active) return false;
   if (isLicensed(snapshot)) return false;
   if (snapshot.status?.state === 'signing-in') return false;
-  if (snapshot.status?.state === 'signed-in' && snapshot.status.license === null) return false;
+  if (isLicenseResolving(snapshot.status)) return false;
   return true;
 }
 

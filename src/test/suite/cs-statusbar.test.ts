@@ -166,4 +166,10 @@ suite('CsStatusBar auth states', () => {
     assert.strictEqual(licensed.text, '$(cs-logo) Analysis');
     assert.strictEqual(licensed.command, 'codescene.homeView.focus');
   });
+
+  test('statusbar-no-sign-in-required-while-the-license-resolves', () => {
+    const resolving = renderWithAuth(true, { ...authStatusFixture('signed-in-oauth'), license: null });
+    assert.notStrictEqual(resolving.text, 'CodeScene: Sign in required');
+    assert.strictEqual(resolving.text, '$(cs-logo) Analysis');
+  });
 });
