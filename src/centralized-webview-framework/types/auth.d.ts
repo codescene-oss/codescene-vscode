@@ -34,6 +34,7 @@ export type AuthStatus = {
   'expires-at': number | null;
   login: { 'login-id': string; 'authorize-url': string } | null;
   error: AuthError | null;
+  'reauthorize-needed': boolean;
 };
 
 export type Account = {

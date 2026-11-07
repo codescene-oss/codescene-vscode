@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import type { ObjectivesSnapshot } from '../../centralized-webview-framework/types/objectives';
-import { OBJECTIVES_CAPABILITY, ObjectivesService } from '../../objectives/objectives-service';
+import { GOAL_WORK_SESSIONS_CAPABILITY, OBJECTIVES_CAPABILITY, ObjectivesService } from '../../objectives/objectives-service';
 import { fixture } from '../contract/contract';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
@@ -135,5 +135,23 @@ suite('ObjectivesService', () => {
     service.setContext({ active: true, settled: true, repoPath: REPO_A });
     await flushPromises();
     assert.deepStrictEqual({ current: service.current, changes }, { current: undefined, changes: 0 });
+  });
+
+  test('sets workSessionsCapable to true when server advertises goal-work-sessions-v1', async () => {
+    await startService([OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, true);
+  });
+
+  test('sets workSessionsCapable to false when server lacks goal-work-sessions-v1', async () => {
+    await startService([OBJECTIVES_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, false);
+  });
+
+  test('resets workSessionsCapable to false when server restarts without the capability', async () => {
+    await startService([OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, true);
+    transport.emitRestart({ sha: 'sha', version: 'version', capabilities: [OBJECTIVES_CAPABILITY] });
+    await flushPromises();
+    assert.strictEqual(service.workSessionsCapable, false);
   });
 });
