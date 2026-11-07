@@ -73,9 +73,8 @@ Location: `Code Health Monitor` > `Extension Settings`
 | **Agent Model** | String | `anthropic/claude-sonnet-5-5` | Model the Refactoring Agent uses. Left at the default, it follows the credentials you set: Anthropic, then OpenAI, then Google, then Amazon Bedrock. |
 | **Agent Model Override** | String | - | Any `provider/model` identifier. Overrides **Agent Model** when set. |
 | **Provider Options** | Object | - | Amazon Bedrock `amazon-bedrock:profile` and `amazon-bedrock:region` for the Refactoring Agent. |
-| **Server URL** | String | - | CodeScene server for browser sign-in. Empty uses `CS_ONPREM_URL`, then CodeScene Cloud. Used when Experimental: Sign In is on. |
+| **Server URL** | String | - | CodeScene server for browser sign-in. Empty uses `CS_ONPREM_URL`, then CodeScene Cloud. |
 | **Auth Token** | String | - | Personal access token — an alternative to signing in, for WSL, remote and headless environments. Also used for refactoring. Browser sign-in is recommended. |
-| **Experimental: Sign In** | Boolean | false | Sign in to CodeScene in the browser (experimental). Requires a CodeScene IDE server with sign-in support. |
 | **Enable Telemetry** | Boolean | true | Enable/Disable collecting anonymized telemetry for tracking usage and feature engagement. |
 
 ### Refactoring Agent ###

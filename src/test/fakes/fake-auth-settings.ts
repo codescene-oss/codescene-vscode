@@ -6,7 +6,7 @@ export class FakeAuthSettings implements AuthSettings {
   private readonly emitter = new EventEmitter<void>();
   readonly onDidChange = this.emitter.event;
 
-  constructor(private values: AuthSettingsSnapshot = { signInEnabled: true, serverUrl: '', accessToken: '' }) {}
+  constructor(private values: AuthSettingsSnapshot = { serverUrl: '', accessToken: '' }) {}
 
   read(): AuthSettingsSnapshot {
     return { ...this.values };

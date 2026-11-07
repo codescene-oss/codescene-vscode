@@ -284,7 +284,7 @@ suite('AuthService sign-in flow', () => {
     assert.deepStrictEqual({ view: view(), trail: trail() }, { view: monitor, trail: ['summary'] });
   });
 
-  test('hiding the sign-in banner is remembered for the session across sign-in changes and the toggle', async () => {
+  test('hiding the sign-in banner is remembered for the session across sign-in changes', async () => {
     await prepare();
     const hidden = () => harness.service.current.signInBannerHidden;
     const initial = hidden();
@@ -294,30 +294,17 @@ suite('AuthService sign-in flow', () => {
     await flushPromises();
     harness.transport.notify(authStatusFixture('signed-out'));
     await flushPromises();
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
-    harness.settings.update({ signInEnabled: true });
-    await flushPromises();
     assert.deepStrictEqual(
       { initial, afterHide, afterChanges: hidden() },
       { initial: false, afterHide: true, afterChanges: true }
     );
   });
 
-  test('hiding the sign-in banner does nothing while sign-in is off', async () => {
-    await prepare();
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
+  test('hiding the sign-in banner does nothing while inactive', async () => {
+    harness = createHarness({ capabilities: [] });
+    await harness.service.start();
     harness.service.hideSignInBanner();
     assert.strictEqual(harness.service.current.signInBannerHidden, false);
-  });
-
-  test('turning the toggle off while the auth view is open returns to the monitor', async () => {
-    await signInWith(twoAccountsUnlinked);
-    const before = view().surface;
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
-    assert.deepStrictEqual({ before, after: view() }, { before: 'auth', after: monitor });
   });
 
   test('reports syncing while a newly selected repo looks up its link', async () => {
@@ -496,7 +483,7 @@ suite('AuthService sign-in flow', () => {
   });
 
   test('opening the auth view while the feature is inactive does nothing', async () => {
-    harness = createHarness({ signInEnabled: false });
+    harness = createHarness({ capabilities: [] });
     published = [];
     harness.service.onDidChange((snapshot) => published.push(snapshot));
     await harness.service.start();
@@ -531,7 +518,7 @@ suite('AuthService sign-in flow', () => {
   });
 
   test('does not request the auth view while the feature is inactive', async () => {
-    harness = createHarness({ signInEnabled: false });
+    harness = createHarness({ capabilities: [] });
     await harness.service.start();
     let requested = 0;
     harness.service.onDidRequestAuth(() => requested++);
@@ -617,23 +604,6 @@ suite('AuthService sign-in flow', () => {
         }
       );
     });
-  });
-
-  test('turning the feature off while the login request is pending cancels that login', async () => {
-    let release: (login: unknown) => void = () => undefined;
-    await prepare();
-    harness.transport
-      .respond('cs-ide/auth-login', () => new Promise((resolve) => (release = resolve)))
-      .respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-out'));
-    const signingIn = harness.service.signIn();
-    harness.settings.update({ signInEnabled: false });
-    await flushPromises();
-    release({ 'login-id': 'abc', 'authorize-url': 'https://codescene.io/oauth2/auth' });
-    await signingIn;
-    assert.deepStrictEqual(
-      { opened: harness.opened, last: harness.transport.requests.at(-1) },
-      { opened: [], last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': 'abc' } } }
-    );
   });
 
   test('a second sign-in cancels the first pending login by its id', async () => {

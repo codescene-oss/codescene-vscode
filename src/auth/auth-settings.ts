@@ -4,7 +4,6 @@ import { getConfiguration } from '../configuration';
 import type { AuthConfiguration } from './auth-rpc';
 
 export interface AuthSettingsSnapshot {
-  signInEnabled: boolean;
   serverUrl: string;
   accessToken: string;
 }
@@ -15,7 +14,7 @@ export interface AuthSettings {
   readonly onDidChange: vscode.Event<void>;
 }
 
-export const AUTH_SETTING_KEYS = ['experimental.signIn', 'serverUrl', 'authToken'] as const;
+export const AUTH_SETTING_KEYS = ['serverUrl', 'authToken'] as const;
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();
@@ -31,7 +30,6 @@ export function authConfiguration(settings: AuthSettingsSnapshot): AuthConfigura
 
 export function readAuthSettings(): AuthSettingsSnapshot {
   return {
-    signInEnabled: getConfiguration<boolean>('experimental.signIn') === true,
     serverUrl: getConfiguration<string>('serverUrl', '') ?? '',
     accessToken: getConfiguration<string>('authToken', '') ?? '',
   };
