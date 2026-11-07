@@ -19,6 +19,7 @@ export function analysisLicenseHooks(analysis: LicensedAnalysis): LicenseHooks {
       DevtoolsAPI.clearQueue();
       analysis.watch()?.setEnabled(false);
       DevtoolsAPI.clearAllResults();
+      DevtoolsAPI.disableAce();
     },
     onServerRelicensed() {
       void analysis.watch()?.resync();
