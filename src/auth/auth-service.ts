@@ -52,6 +52,7 @@ export class AuthService implements vscode.Disposable {
   private flow: FlowState = IDLE_FLOW;
   private flowGen = 0;
   private loginEpoch = 0;
+  private reauthorizeLoginId: string | undefined;
   private settlingGen: number | undefined;
   private repoSeq = 0;
   private repoSyncing = false;
@@ -97,6 +98,19 @@ export class AuthService implements vscode.Disposable {
     }
   }
 
+  async reauthorize(): Promise<void> {
+    if (!this.enabled) return;
+    if (!this.snapshot.status?.['reauthorize-needed']) return;
+    this.deps.logUsage('auth/reauthorize-started');
+    try {
+      const login = await this.rpc.reauthorize();
+      this.reauthorizeLoginId = login['login-id'];
+      await this.deps.openExternal(login['authorize-url']);
+    } catch (error) {
+      this.logEvent(signInFailed(authErrorCode(error)));
+    }
+  }
+
   async openBrowserAgain(): Promise<void> {
     const url = this.snapshot.status?.login?.['authorize-url'];
     if (url) await this.deps.openExternal(url);
@@ -104,8 +118,11 @@ export class AuthService implements vscode.Disposable {
 
   async cancelSignIn(): Promise<void> {
     if (!this.enabled) return;
-    const loginId = this.snapshot.status?.login?.['login-id'];
-    if (loginId) this.applyStatus(await this.rpc.cancelLogin(loginId));
+    const loginId = this.snapshot.status?.login?.['login-id'] ?? this.reauthorizeLoginId;
+    if (loginId) {
+      this.applyStatus(await this.rpc.cancelLogin(loginId));
+      this.reauthorizeLoginId = undefined;
+    }
   }
 
   openAuth(screen?: 'account' | 'project'): void {
@@ -269,6 +286,9 @@ export class AuthService implements vscode.Disposable {
     if (!this.enabled) return;
     this.logEvent(signInOutcome(this.snapshot.status, status));
     const startAccountLoad = this.prepareAccountLoad(status, reloadAccountData);
+    if (this.reauthorizeLoginId && !status['reauthorize-needed']) {
+      this.reauthorizeLoginId = undefined;
+    }
     this.publish({ ...this.snapshot, active: true, status });
     startAccountLoad();
     const signedIn = accountDataKey(status) !== undefined;

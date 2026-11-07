@@ -49,6 +49,9 @@ suite('auth commands', () => {
       openAuth: (screen?: 'account' | 'project') => {
         calls.push(screen ? `openAuth:${screen}` : 'openAuth');
       },
+      reauthorize: async () => {
+        calls.push('reauthorize');
+      },
     };
     registerAuthCommands(service);
     return calls;
@@ -105,5 +108,22 @@ suite('auth commands', () => {
     const calls = register(active(authStatusFixture('signed-out')));
     await run('codescene.openAccount');
     assert.deepStrictEqual(calls, ['openAuth']);
+  });
+
+  test('reauthorize-command-registered-test', async () => {
+    const calls: string[] = [];
+    const snapshot = active({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    const service = {
+      current: snapshot,
+      signIn: async () => {},
+      signOut: async () => {},
+      openAuth: () => {},
+      reauthorize: async () => {
+        calls.push('reauthorize');
+      },
+    };
+    registerAuthCommands(service);
+    await run('codescene.reauthorize');
+    assert.deepStrictEqual(calls, ['reauthorize']);
   });
 });

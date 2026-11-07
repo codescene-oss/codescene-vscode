@@ -651,6 +651,63 @@ suite('AuthService actions', () => {
       }
     );
   });
+
+  test('reauthorize-opens-authorize-url-test', async () => {
+    const reauthorizeUrl = 'https://codescene.acme.internal/oauth/authorize?state=reauth-xyz';
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-reauthorize', () => ({ 'login-id': 'reauth-1', 'authorize-url': reauthorizeUrl }));
+    await harness.service.start();
+    harness.transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    await harness.service.reauthorize();
+    assert.deepStrictEqual(
+      { opened: harness.opened, events: harness.events },
+      { opened: [reauthorizeUrl], events: [{ name: 'auth/reauthorize-started' }] }
+    );
+  });
+
+  test('reauthorize-not-needed-does-nothing-test', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await harness.service.reauthorize();
+    assert.deepStrictEqual(
+      { methods: harness.transport.methods(), opened: harness.opened },
+      { methods: ['cs-ide/auth-configure'], opened: [] }
+    );
+  });
+
+  test('reauthorize-twice-opens-same-url-test', async () => {
+    const reauthorizeUrl = 'https://codescene.acme.internal/oauth/authorize?state=reauth-xyz';
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-reauthorize', () => ({ 'login-id': 'reauth-1', 'authorize-url': reauthorizeUrl }));
+    await harness.service.start();
+    harness.transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    await harness.service.reauthorize();
+    await harness.service.reauthorize();
+    assert.deepStrictEqual(
+      { methods: harness.transport.methods().slice(-2), opened: harness.opened },
+      { methods: ['cs-ide/auth-reauthorize', 'cs-ide/auth-reauthorize'], opened: [reauthorizeUrl, reauthorizeUrl] }
+    );
+  });
+
+  test('cancel-reauthorize-test', async () => {
+    const reauthorizeUrl = 'https://codescene.acme.internal/oauth/authorize?state=reauth-xyz';
+    const cancelled = { ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': false, login: null };
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-reauthorize', () => ({ 'login-id': 'reauth-1', 'authorize-url': reauthorizeUrl }));
+    harness.transport.respond('cs-ide/auth-cancel-login', () => cancelled);
+    await harness.service.start();
+    harness.transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    await harness.service.reauthorize();
+    await harness.service.closeAuth();
+    assert.deepStrictEqual(
+      { last: harness.transport.requests.at(-1), status: harness.service.current.status },
+      {
+        last: { method: 'cs-ide/auth-cancel-login', params: { 'login-id': 'reauth-1' } },
+        status: cancelled,
+      }
+    );
+  });
 });
 
 suite('AuthService flow payload', () => {

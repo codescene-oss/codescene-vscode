@@ -12,8 +12,9 @@ export const TOKEN_SIGN_OUT_MESSAGE =
 export const ENV_TOKEN_SIGN_OUT_MESSAGE =
   'You are signed in with the CS_ACCESS_TOKEN environment variable. Unset it and restart the editor to sign out.';
 export const NOT_SIGNED_IN_MESSAGE = 'Not signed in to CodeScene.';
+export const REAUTHORIZE_COMMAND = 'codescene.reauthorize';
 
-type CommandService = Pick<AuthService, 'current' | 'signIn' | 'signOut' | 'openAuth'>;
+type CommandService = Pick<AuthService, 'current' | 'signIn' | 'signOut' | 'openAuth' | 'reauthorize'>;
 
 const TOKEN_SIGN_OUT_HINTS: Record<Exclude<CredentialSource, 'oauth'>, string> = {
   'setting-token': TOKEN_SIGN_OUT_MESSAGE,
@@ -34,9 +35,15 @@ function signOut(service: CommandService): unknown {
 export function registerAuthCommands(service: CommandService): vscode.Disposable[] {
   const whenActive = (action: () => unknown) => () =>
     service.current.active ? action() : vscode.window.showInformationMessage(SIGN_IN_INACTIVE_MESSAGE);
+  const reauthorize = () => {
+    if (service.current.active && service.current.status?.['reauthorize-needed']) {
+      return service.reauthorize();
+    }
+  };
   return [
     vscode.commands.registerCommand(SIGN_IN_COMMAND, whenActive(() => signIn(service))),
     vscode.commands.registerCommand(SIGN_OUT_COMMAND, whenActive(() => signOut(service))),
     vscode.commands.registerCommand('codescene.openAccount', whenActive(() => service.openAuth())),
+    vscode.commands.registerCommand(REAUTHORIZE_COMMAND, reauthorize),
   ];
 }
