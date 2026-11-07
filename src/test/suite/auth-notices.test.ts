@@ -3,6 +3,8 @@ import { AuthNotices } from '../../auth/auth-notices';
 import { INACTIVE_SNAPSHOT, type AuthSnapshot } from '../../auth/auth-payload';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import { createHarness } from '../fakes/auth-service-harness';
+import { flushPromises } from '../fakes/fake-auth-transport';
 
 const ACTIVATION_MESSAGE = 'CodeScene requires a CodeScene account. Sign in to get Code Health analysis in your editor.';
 
@@ -70,12 +72,38 @@ suite('AuthNotices', () => {
   });
 
   test('gate-shown-once-per-session', async () => {
-    const { notices, telemetry } = noticeHarness(undefined);
-    await notices.update(active(unlicensedStatus()));
-    await notices.update(active(unlicensedStatus()));
-    (notices as any).simulateCsIdeRestart();
-    await notices.update(active(unlicensedStatus()));
-    assert.strictEqual(telemetry.length, 1);
+    const harness = createHarness();
+    const shown: Array<{ message: string; items: string[] }> = [];
+    const telemetry: Array<{ name: string; data?: Record<string, unknown> }> = [];
+    const notices = new AuthNotices({
+      show: async (message: string, ...items: string[]) => {
+        shown.push({ message, items });
+        return undefined;
+      },
+      signIn: async () => undefined,
+      focusHomeView: async () => undefined,
+      logUsage: (name: string, data?: Record<string, unknown>) => telemetry.push({ name, data }),
+    });
+
+    harness.service.onDidChange((snapshot) => void notices.update(snapshot));
+    await harness.service.start();
+    await flushPromises();
+
+    harness.transport.notify(unlicensedStatus());
+    await flushPromises();
+
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+
+    harness.transport.emitRestart();
+    await flushPromises();
+
+    harness.transport.notify(unlicensedStatus());
+    await flushPromises();
+
+    assert.strictEqual(shown.length, 1, 'should show notification only once');
+    assert.strictEqual(shown[0].message, ACTIVATION_MESSAGE);
+    assert.strictEqual(telemetry.length, 1, 'should log telemetry only once');
     assert.strictEqual(telemetry[0].name, 'auth/gate-shown');
   });
 });
