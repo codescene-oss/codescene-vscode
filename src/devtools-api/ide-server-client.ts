@@ -78,6 +78,7 @@ export interface ReviewFailed {
   path: string;
   repoRoot: string;
   message: string;
+  code?: 'auth/license-required';
 }
 
 export interface ReviewQueue {
@@ -470,6 +471,7 @@ export class CsIdeServerClient implements vscode.Disposable {
       ...identity,
       ...(notification.id === undefined ? {} : { id: notification.id }),
       message: notification.message,
+      ...(notification.code === undefined ? {} : { code: notification.code }),
     });
   }
 

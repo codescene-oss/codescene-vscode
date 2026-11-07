@@ -6,7 +6,7 @@
   "oauth-supported": true,
   "user": { "id": "17", "name": "Ada Lovelace" },
   "account": null,
-  "license": { "pro": true },
+  "license": { "pro": true, "state": "valid" },
   "ace-credential": false,
   "expires-at": 1792000000,
   "login": null,

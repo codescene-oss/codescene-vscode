@@ -7,6 +7,8 @@ export type AuthStatusFixture =
   | 'signed-in-network-error'
   | 'signed-in-oauth'
   | 'signed-in-oauth-setting-token-rejected'
+  | 'signed-in-offline-expired'
+  | 'signed-in-refused'
   | 'signed-in-setting-token-onprem'
   | 'signed-out'
   | 'signed-out-env-token-invalid'
@@ -22,6 +24,8 @@ export const AUTH_STATUS_FIXTURES: readonly AuthStatusFixture[] = [
   'signed-in-network-error',
   'signed-in-oauth',
   'signed-in-oauth-setting-token-rejected',
+  'signed-in-offline-expired',
+  'signed-in-refused',
   'signed-in-setting-token-onprem',
   'signed-out',
   'signed-out-env-token-invalid',
