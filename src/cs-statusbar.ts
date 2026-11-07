@@ -5,6 +5,8 @@ import { aceAvailable } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
+import { isLicensed } from './auth/license-gate';
+import { INACTIVE_SNAPSHOT } from './auth/auth-payload';
 
 interface StatusBarOptions {
   text: string;
@@ -61,6 +63,16 @@ export class CsStatusBar implements Disposable {
     const item = this.analysisStatus;
 
     if (this.handleErrorStates(analysis)) return;
+
+    const auth = CsExtensionState.stateProperties.auth;
+    if (auth.active && !isLicensed({ ...INACTIVE_SNAPSHOT, active: auth.active, status: auth.status })) {
+      this.setStatus(item, {
+        text: 'CodeScene: Sign in required',
+        tooltip: 'Sign in to get Code Health analysis',
+        command: 'codescene.homeView.focus',
+      });
+      return;
+    }
 
     if (!automaticAnalysisEnabled()) {
       this.setStatus(item, {
