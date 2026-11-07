@@ -21,7 +21,7 @@ The **Code Health Monitor** flags for drops in code health in real time and offe
 
 <img style="margin: 10px 10px 10px 10px;" src="screenshots/monitor.gif" width="500">
 
-> **_NOTE:_** _The Code Health Monitor is currently available to all users for a limited time period. However, this capability will become accessible only to CodeScene customers in future_.
+> **_NOTE:_** _CodeScene requires a CodeScene account. Sign in to get Code Health analysis in your editor._
 
 ## Overview of Available Features ##
 | Feature | Description | What it looks like |
