@@ -89,7 +89,7 @@ const deltaFields = declared<Delta>({
 
 const fileReviewFields = declared<ReviewResult>({ id: true, path: true, repoRoot: true, result: reviewFields });
 const deltaReviewFields = declared<DeltaResult>({ id: true, path: true, repoRoot: true, result: deltaFields });
-const reviewFailedFields = declared<ReviewFailed>({ id: true, path: true, repoRoot: true, message: true });
+const reviewFailedFields = declared<ReviewFailed>({ id: true, path: true, repoRoot: true, message: true, code: true });
 const startFields = declared<ServerMetadata>({ sha: true, version: true, capabilities: true });
 
 type Declared<T> = NonNullable<T>;
@@ -101,7 +101,7 @@ const authStatusFields = declared<AuthStatus>({
   'oauth-supported': true,
   user: declared<Declared<AuthStatus['user']>>({ id: true, name: true }),
   account: declared<Declared<AuthStatus['account']>>({ id: true, name: true }),
-  license: declared<Declared<AuthStatus['license']>>({ pro: true }),
+  license: declared<Declared<AuthStatus['license']>>({ pro: true, state: true }),
   'ace-credential': true,
   'expires-at': true,
   login: declared<Declared<AuthStatus['login']>>({ 'login-id': true, 'authorize-url': true }),
@@ -463,6 +463,7 @@ suite('Contract inbound replay Test Suite', () => {
           'auth/network': true,
           'auth/session-revoked': true,
           'auth/invalid-token': true,
+          'auth/license-required': true,
         };
         const schemaCodes: string[] = schemaDefinition('wire.json', 'AuthErrorCode').enum;
         const fixtureCodes = authVariants.map((variant) => fixture('json-rpc-error', variant, 'wire').data.code);

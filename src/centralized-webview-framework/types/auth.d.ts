@@ -10,7 +10,8 @@ export type AuthErrorCode =
   | 'auth/port-unavailable'
   | 'auth/network'
   | 'auth/session-revoked'
-  | 'auth/invalid-token';
+  | 'auth/invalid-token'
+  | 'auth/license-required';
 
 export type AuthError = { code: AuthErrorCode; message: string };
 
@@ -29,7 +30,7 @@ export type AuthStatus = {
   'oauth-supported': boolean | null;
   user: { id: string; name: string } | null;
   account: { id: string; name: string } | null;
-  license: { pro: boolean } | null;
+  license: { pro: boolean; state: 'valid' | 'refused' | 'offline-expired' } | null;
   'ace-credential': boolean;
   'expires-at': number | null;
   login: { 'login-id': string; 'authorize-url': string } | null;

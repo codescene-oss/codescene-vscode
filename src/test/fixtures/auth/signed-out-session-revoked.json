@@ -10,5 +10,5 @@
   "ace-credential": false,
   "expires-at": null,
   "login": null,
-  "error": { "code": "auth/session-revoked", "message": "Your CodeScene session has ended. Sign in again." }
+  "error": { "code": "auth/session-revoked", "message": "Sign in again to resume Code Health analysis." }
 }
