@@ -2,6 +2,8 @@ All commands for building, testing, linting etc are maintained at the Makefile. 
 
 Use `make test1 TEST='<test name>'` to run a single test. Do not run the entire test suite unless asked to.
 
+Integration tests against the real cs-ide need `CS_ACCESS_TOKEN` (CLI access) in the environment; without it they are reported as pending. See [TESTING.md](.claude/TESTING.md).
+
 If a linting issue is found, you must prioritize fixing it before resuming your previous intent.
 
 Don't add comments to any code you add, however keep any existing comments you find.

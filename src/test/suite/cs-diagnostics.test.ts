@@ -9,7 +9,8 @@ import { MockDiagnosticCollection } from '../mocks/mock-diagnostic-collection';
 import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, removeTestDir, skipWithoutCodeSceneCredential } from '../integration_helper';
+import { licensedGate } from '../fixtures/auth/auth-fixtures';
 
 suite('CsDiagnostics Integration Test Suite', () => {
   const testDir = createTestDir('test-cs-diagnostics');
@@ -29,6 +30,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
     const mockContext = createMockExtensionContext(testDir);
 
     DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.useLicenseGate(licensedGate());
     mockCollection = new MockDiagnosticCollection();
     originalCollection = (CsDiagnostics as any).collection;
     (CsDiagnostics as any).collection = mockCollection;
@@ -36,19 +38,18 @@ suite('CsDiagnostics Integration Test Suite', () => {
     Reviewer.init(mockContext, () => new Map());
   });
 
-  teardown(() => {
+  teardown(async () => {
     if (originalCollection) {
       (CsDiagnostics as any).collection = originalCollection;
     }
 
-    if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    }
+    await removeTestDir(testDir);
 
     restoreDefaultWorkspaceFolders();
   });
 
   test('review C++ code with code smells', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
     const fixtureSourcePath = path.join(__dirname, '../../../src/test/fixtures/gc.cpp');
     const expectedResultsPath = path.join(__dirname, '../../../src/test/fixtures/gc.cpp.expected.json');
@@ -110,6 +111,7 @@ suite('CsDiagnostics Integration Test Suite', () => {
   });
 
   test('review clean code', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(30000);
     const cleanFile = path.join(testDir, 'clean.cpp');
     const cleanCode = `#include <iostream>
@@ -148,6 +150,7 @@ return 0;
   });
 
   test('review respects document selector for C++ files', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(30000);
     const cppFile = path.join(testDir, 'example.cpp');
     const code = `int foo() { return 42; }\n`;

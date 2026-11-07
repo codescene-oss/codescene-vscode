@@ -7,7 +7,8 @@ import { fnToRefactorForCodeSmell } from '../../refactoring/fn-to-refactor';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
+import { licensedGate } from '../fixtures/auth/auth-fixtures';
 
 
 suite('Delta Integration Test Suite', () => {
@@ -28,6 +29,7 @@ suite('Delta Integration Test Suite', () => {
   }
 
   setup(async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -40,6 +42,7 @@ suite('Delta Integration Test Suite', () => {
     const mockContext = createMockExtensionContext(testDir);
 
     DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.useLicenseGate(licensedGate());
 
     analysisError = undefined;
 
