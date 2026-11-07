@@ -16,7 +16,7 @@ import { AbortError } from './abort-error';
 import { isFindingGoal } from '../refactoring/agent-types';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
+import { CsIdeServerClient, ReviewQueue, WatchInventory } from './ide-server-client';
 import { v4 as uuid } from 'uuid';
 import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
 import { CsReview } from '../review/cs-review';
@@ -69,9 +69,6 @@ export class DevtoolsAPI {
 
   static readonly onDidWatchInventory: vscode.Event<WatchInventory> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidWatchInventory(listener, thisArgs, disposables);
-
-  static readonly onDidServerStart: vscode.Event<ServerStartEvent> = (listener, thisArgs?, disposables?) =>
-    DevtoolsAPI.ideServer.onDidServerStart(listener, thisArgs, disposables);
 
   static readonly onDidQueue: vscode.Event<ReviewQueue> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidQueue(listener, thisArgs, disposables);

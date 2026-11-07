@@ -72,6 +72,23 @@ suite('AuthService', () => {
     assert.deepStrictEqual(harness.transport.methods(), ['cs-ide/auth-configure', 'cs-ide/auth-configure']);
   });
 
+  test('publishes the status a restarted cs-ide answers even when it is unchanged', async () => {
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-configure', () => authStatusFixture('signed-in-oauth'));
+    const published: number[] = [];
+    harness.service.onDidChange((snapshot) => published.push(snapshot.serverStart));
+    await harness.service.start();
+    await flushPromises();
+    const beforeRestart = harness.service.current.serverStart;
+
+    harness.transport.emitRestart();
+    await flushPromises();
+
+    assert.strictEqual(harness.service.current.serverStart, beforeRestart + 1);
+    assert.deepStrictEqual(harness.service.current.status, authStatusFixture('signed-in-oauth'));
+    assert.strictEqual(published[published.length - 1], beforeRestart + 1);
+  });
+
   test('turns inactive when a restarted cs-ide no longer reports auth-v1', async () => {
     harness = createHarness();
     await harness.service.start();

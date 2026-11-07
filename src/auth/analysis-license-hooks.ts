@@ -4,7 +4,7 @@ import { DevtoolsAPI } from '../devtools-api';
 import type { LicenseHooks } from './license-gate';
 
 export interface LicensedAnalysis {
-  watch(): { setEnabled(enabled: boolean): void } | undefined;
+  watch(): { setEnabled(enabled: boolean): void; resync(): Promise<void> } | undefined;
   observer(): { reviewOpenDocuments(reason: string): void } | undefined;
 }
 
@@ -19,6 +19,9 @@ export function analysisLicenseHooks(analysis: LicensedAnalysis): LicenseHooks {
       DevtoolsAPI.clearQueue();
       analysis.watch()?.setEnabled(false);
       DevtoolsAPI.clearAllResults();
+    },
+    onServerRelicensed() {
+      void analysis.watch()?.resync();
     },
   };
 }
