@@ -31,4 +31,30 @@ suite('Home payload objectives', () => {
       { objectives: snapshot, flagged: true, later: false }
     );
   });
+
+  test('adds goal-work-sessions flag when work sessions capability is enabled', () => {
+    const snapshot = fixture('objectives-snapshot', 'full', 'entity');
+    setCwfObjectives(snapshot, { workSessions: true });
+    const payload = homePayload();
+    assert.deepStrictEqual(
+      {
+        objectivesFlag: payload.featureFlags?.includes('ide-objectives'),
+        workSessionsFlag: payload.featureFlags?.includes('goal-work-sessions'),
+      },
+      { objectivesFlag: true, workSessionsFlag: true }
+    );
+  });
+
+  test('omits goal-work-sessions flag when work sessions capability is not enabled', () => {
+    const snapshot = fixture('objectives-snapshot', 'full', 'entity');
+    setCwfObjectives(snapshot, { workSessions: false });
+    const payload = homePayload();
+    assert.deepStrictEqual(
+      {
+        objectivesFlag: payload.featureFlags?.includes('ide-objectives'),
+        workSessionsFlag: payload.featureFlags?.includes('goal-work-sessions'),
+      },
+      { objectivesFlag: true, workSessionsFlag: false }
+    );
+  });
 });

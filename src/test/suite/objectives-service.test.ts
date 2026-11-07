@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import type { ObjectivesSnapshot } from '../../centralized-webview-framework/types/objectives';
-import { OBJECTIVES_CAPABILITY, ObjectivesService } from '../../objectives/objectives-service';
+import { GOAL_WORK_SESSIONS_CAPABILITY, OBJECTIVES_CAPABILITY, ObjectivesService } from '../../objectives/objectives-service';
 import { fixture } from '../contract/contract';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
@@ -135,5 +135,50 @@ suite('ObjectivesService', () => {
     service.setContext({ active: true, settled: true, repoPath: REPO_A });
     await flushPromises();
     assert.deepStrictEqual({ current: service.current, changes }, { current: undefined, changes: 0 });
+  });
+
+  test('sets workSessionsCapable to true when server advertises goal-work-sessions-v1', async () => {
+    await startService([OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, true);
+  });
+
+  test('sets workSessionsCapable to false when server lacks goal-work-sessions-v1', async () => {
+    await startService([OBJECTIVES_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, false);
+  });
+
+  test('resets workSessionsCapable to false when server restarts without the capability', async () => {
+    await startService([OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY]);
+    assert.strictEqual(service.workSessionsCapable, true);
+    transport.emitRestart({ sha: 'sha', version: 'version', capabilities: [OBJECTIVES_CAPABILITY] });
+    await flushPromises();
+    assert.strictEqual(service.workSessionsCapable, false);
+  });
+
+  test('findSnapshotWithGoal prefers current when the same goal id is in multiple cached snapshots', async () => {
+    await startService();
+    // Load REPO_A first
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    // Push updated REPO_A snapshot with goal 123
+    const snapshotA = snapshotFor(REPO_A);
+    snapshotA.objectives = [{ ...snapshotA.objectives[0], kind: 'goal', id: 123 }];
+    transport.notify(snapshotA);
+    // Switch to REPO_B and load it
+    service.setContext({ active: true, settled: true, repoPath: REPO_B });
+    await flushPromises();
+    // Push updated REPO_B snapshot with the same goal id 123
+    const snapshotB = snapshotFor(REPO_B);
+    snapshotB.objectives = [{ ...snapshotB.objectives[0], kind: 'goal', id: 123 }];
+    transport.notify(snapshotB);
+    // Verify REPO_B is current
+    assert.strictEqual(service.current?.['repo-root'], REPO_B, 'REPO_B should be current');
+    // Verify current has goal 123
+    const currentHasGoal = service.current?.objectives.some(obj => obj.kind === 'goal' && obj.id === 123);
+    assert.strictEqual(currentHasGoal, true, 'Current snapshot should have goal 123');
+    // Now REPO_B is current and both snapshots have goal 123
+    // findSnapshotWithGoal should return REPO_B (current), not REPO_A (cached first in insertion order)
+    const found = service.findSnapshotWithGoal(123);
+    assert.strictEqual(found?.['repo-root'], REPO_B, 'Should prefer current snapshot over cached ones');
   });
 });

@@ -32,6 +32,7 @@ function recorder(status: AuthStatus | null = authStatusFixture('signed-in-setti
     linkProject: record('linkProject'),
     setAccessToken: record('setAccessToken'),
     removeAccessToken: record('removeAccessToken'),
+    reauthorize: record('reauthorize'),
   };
   const target: AuthMessageTarget = {
     openServerSetting: record('openServerSetting'),
@@ -62,6 +63,7 @@ suite('handleAuthMessage', () => {
       message: { messageType: 'auth-open-pat-page' },
       expected: ['openExternal', 'https://codescene.acme.internal/configuration/user/token'],
     },
+    { message: { messageType: 'auth-reauthorize' }, expected: ['reauthorize'] },
   ];
 
   for (const { message, expected } of cases) {

@@ -8,6 +8,7 @@ import { ObjectivesRpc } from './objectives-rpc';
 import type { ObjectivesTransport } from './objectives-transport';
 
 export const OBJECTIVES_CAPABILITY = 'objectives-v1';
+export const GOAL_WORK_SESSIONS_CAPABILITY = 'goal-work-sessions-v1';
 
 export interface ObjectivesContext {
   active: boolean;
@@ -20,6 +21,7 @@ export class ObjectivesService implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly snapshots = new Map<string, ObjectivesSnapshot>();
   private capable = false;
+  private _workSessionsCapable = false;
   private serverEpoch = 0;
   private hasSettled = false;
   private context: ObjectivesContext = { active: false, settled: false, repoPath: undefined };
@@ -34,6 +36,25 @@ export class ObjectivesService implements vscode.Disposable {
   get current(): ObjectivesSnapshot | undefined {
     const repoPath = this.servableRepo(this.hasSettled);
     return repoPath ? this.snapshots.get(normalizeFsPath(repoPath)) : undefined;
+  }
+
+  get workSessionsCapable(): boolean {
+    return this._workSessionsCapable;
+  }
+
+  findSnapshotWithGoal(goalId: number): ObjectivesSnapshot | undefined {
+    // Prefer the current snapshot when it contains the goal
+    const current = this.current;
+    if (current && current.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+      return current;
+    }
+    // Fall back to other cached snapshots
+    for (const snapshot of this.snapshots.values()) {
+      if (snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+        return snapshot;
+      }
+    }
+    return undefined;
   }
 
   async start(): Promise<void> {
@@ -72,6 +93,7 @@ export class ObjectivesService implements vscode.Disposable {
   private handleServerStart(metadata: ServerMetadata): void {
     const before = this.current;
     this.capable = metadata.capabilities?.includes(OBJECTIVES_CAPABILITY) === true;
+    this._workSessionsCapable = metadata.capabilities?.includes(GOAL_WORK_SESSIONS_CAPABILITY) === true;
     this.serverEpoch++;
     this.hasSettled = this.context.settled;
     this.snapshots.clear();

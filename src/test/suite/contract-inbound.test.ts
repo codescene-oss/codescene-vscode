@@ -17,6 +17,7 @@ import { ChangeDetail, Delta, FunctionFinding, Function as DeltaFunction } from 
 import { CsIdeServerClient, DeltaResult, ReviewFailed, ReviewResult, ServerMetadata } from '../../devtools-api/ide-server-client';
 import { CodeHealthRulesError, CodeSmell, Function as ReviewFunction, Range, Review } from '../../devtools-api/review-model';
 import type {
+  GoalWorkSessions,
   LocalFileResult,
   LocalResult,
   Objective,
@@ -27,6 +28,7 @@ import type {
   ObjectiveSubjectFile,
   ObjectiveThreshold,
   SharedResult,
+  WorkSessionParticipant,
 } from '../../centralized-webview-framework/types/objectives';
 import { ObjectivesRpc } from '../../objectives/objectives-rpc';
 import {
@@ -106,6 +108,7 @@ const authStatusFields = declared<AuthStatus>({
   'expires-at': true,
   login: declared<Declared<AuthStatus['login']>>({ 'login-id': true, 'authorize-url': true }),
   error: declared<Declared<AuthStatus['error']>>({ code: true, message: true }),
+  'reauthorize-needed': true,
 });
 const accountFields = declared<Account>({ id: true, name: true, 'signed-in-locally': true });
 const projectFields = declared<Project>({ id: true, name: true });
@@ -136,6 +139,12 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
       result: true,
       reason: true,
       files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true }),
+    }),
+    'work-sessions': declared<GoalWorkSessions>({
+      state: true,
+      reauthorize: true,
+      participants: declared<WorkSessionParticipant>({ actor: true, you: true, 'started-at': true }),
+      mine: ['session-id', 'started-at'],
     }),
   }),
 });

@@ -90,4 +90,6 @@ export type MessageToIDEType =
   | { messageType: 'auth-set-access-token'; payload: { token: string } }
   | { messageType: 'auth-remove-access-token' }
   | { messageType: 'auth-open-server-setting' }
-  | { messageType: 'auth-open-pat-page' };
+  | { messageType: 'auth-open-pat-page' }
+  | { messageType: 'goal-work-session-start'; payload: { goalId: number } }
+  | { messageType: 'auth-reauthorize' };

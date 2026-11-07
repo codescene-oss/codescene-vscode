@@ -622,6 +622,7 @@ suite('Contract webview messages Test Suite', () => {
         linkProject: record('linkProject'),
         setAccessToken: record('setAccessToken'),
         removeAccessToken: record('removeAccessToken'),
+        reauthorize: record('reauthorize'),
       } as AuthActions;
       const target: AuthMessageTarget = {
         openServerSetting: record('openServerSetting'),

@@ -18,6 +18,7 @@ export const AUTH_MESSAGE_TYPES = [
   'auth-remove-access-token',
   'auth-open-server-setting',
   'auth-open-pat-page',
+  'auth-reauthorize',
 ] as const;
 
 type AuthMessageType = (typeof AUTH_MESSAGE_TYPES)[number];
@@ -40,6 +41,7 @@ export type AuthActions = Pick<
   | 'linkProject'
   | 'setAccessToken'
   | 'removeAccessToken'
+  | 'reauthorize'
 >;
 
 export interface AuthMessageTarget {
@@ -72,6 +74,7 @@ function handlers(actions: AuthActions, target: AuthMessageTarget): Handlers {
     'auth-remove-access-token': () => actions.removeAccessToken(),
     'auth-open-server-setting': () => target.openServerSetting(),
     'auth-open-pat-page': () => openPatPage(actions, target),
+    'auth-reauthorize': () => actions.reauthorize(),
   };
 }
 
