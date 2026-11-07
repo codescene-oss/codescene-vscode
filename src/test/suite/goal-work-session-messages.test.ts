@@ -42,6 +42,7 @@ suite('Goal work session messages', () => {
   let executedCommands: string[];
   let logMessages: string[];
   let capable: boolean;
+  let reauthorizable: boolean;
 
   async function setupDeps() {
     transport = new FakeObjectivesTransport(
@@ -56,6 +57,7 @@ suite('Goal work session messages', () => {
     executedCommands = [];
     logMessages = [];
     capable = true;
+    reauthorizable = true;
   }
 
   function deps(goalId: number) {
@@ -63,6 +65,7 @@ suite('Goal work session messages', () => {
       rpc,
       snapshot: () => service.findSnapshotWithGoal(goalId),
       capable: () => capable,
+      canReauthorize: () => reauthorizable,
       notify: {
         warn: async (message: string, ...actions: string[]) => {
           const warning: RecordedWarning = { message, actions };
@@ -208,6 +211,24 @@ suite('Goal work session messages', () => {
 
     assert.strictEqual(executedCommands.length, 1);
     assert.strictEqual(executedCommands[0], 'codescene.reauthorize');
+  });
+
+  test('scope-missing-without-reauthorize-shows-token-copy-test', async () => {
+    reauthorizable = false;
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    transport.notify(snapshotFor(REPO_A, 1));
+    transport.setWorkSessionStartResult({ result: 'scope-missing' });
+
+    await handleGoalWorkSessionStart(1, deps(1));
+
+    assert.deepStrictEqual(
+      { warnings, executedCommands },
+      {
+        warnings: [{ message: "Your access token doesn't allow work sessions.", actions: [], picked: undefined }],
+        executedCommands: [],
+      }
+    );
   });
 
   test('signed-out-shows-exact-copy-and-action-test', async () => {

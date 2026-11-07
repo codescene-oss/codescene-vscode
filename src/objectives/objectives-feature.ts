@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { canReauthorize } from '../auth/auth-commands';
 import type { AuthSnapshot } from '../auth/auth-payload';
 import { logOutputChannel } from '../log';
 import { setCwfObjectives } from './cwf-objectives';
@@ -17,12 +18,14 @@ export interface ObjectivesFeature {
 export function activateObjectives(transport: ObjectivesTransport): ObjectivesFeature {
   const service = new ObjectivesService(transport);
   const rpc = new GoalWorkSessionRpc(transport);
+  let reauthorizable = false;
 
   const startWorkSession = async (goalId: number) => {
     await handleGoalWorkSessionStart(goalId, {
       rpc,
       snapshot: () => service.findSnapshotWithGoal(goalId),
       capable: () => service.workSessionsCapable,
+      canReauthorize: () => reauthorizable,
       notify: {
         warn: (message, ...actions) => vscode.window.showWarningMessage(message, ...actions),
         info: (message) => vscode.window.showInformationMessage(message).then(() => {}),
@@ -40,8 +43,10 @@ export function activateObjectives(transport: ObjectivesTransport): ObjectivesFe
   void service.start().catch((error: unknown) => logOutputChannel.warn(`[objectives] start failed: ${String(error)}`));
   return {
     disposables,
-    update: ({ active, status, syncing, repo }) =>
-      service.setContext({ active, settled: status?.state === 'signed-in' && !syncing, repoPath: repo?.path }),
+    update: ({ active, status, syncing, repo }) => {
+      reauthorizable = canReauthorize({ active, status });
+      service.setContext({ active, settled: status?.state === 'signed-in' && !syncing, repoPath: repo?.path });
+    },
     startWorkSession,
   };
 }

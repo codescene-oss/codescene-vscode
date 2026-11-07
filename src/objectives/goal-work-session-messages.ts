@@ -1,4 +1,4 @@
-import { SIGN_IN_COMMAND } from '../auth/auth-commands';
+import { REAUTHORIZE_COMMAND, SIGN_IN_COMMAND } from '../auth/auth-commands';
 import type { GoalWorkSessionRpc } from './goal-work-session-rpc';
 import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
 
@@ -6,6 +6,7 @@ interface GoalWorkSessionDeps {
   rpc: GoalWorkSessionRpc;
   snapshot: () => ObjectivesSnapshot | undefined;
   capable: () => boolean;
+  canReauthorize: () => boolean;
   notify: {
     warn: (message: string, ...actions: string[]) => Thenable<string | undefined>;
     info: (message: string) => Thenable<void>;
@@ -52,12 +53,16 @@ export async function handleGoalWorkSessionStart(goalId: number, deps: GoalWorkS
       void deps.notify.warn("Couldn't reach CodeScene to start the work session. Try again.");
       break;
     case 'scope-missing':
+      if (!deps.canReauthorize()) {
+        void deps.notify.warn("Your access token doesn't allow work sessions.");
+        break;
+      }
       void deps.notify
         .warn('Re-authorize CodeScene to use work sessions.', 'Re-authorize')
         .then(
           (action) => {
             if (action === 'Re-authorize') {
-              void deps.executeCommand('codescene.reauthorize');
+              void deps.executeCommand(REAUTHORIZE_COMMAND);
             }
           },
           (error) => deps.log?.(`[goal-work-sessions] Notification failed: ${String(error)}`)
