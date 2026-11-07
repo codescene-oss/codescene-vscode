@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import type { ObjectivesFeature } from '../objectives/objectives-feature';
@@ -13,6 +14,7 @@ import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
 import type { AuthTransport } from './auth-transport';
 import { setCwfAuth } from './cwf-auth';
+import { LicenseGate, type LicenseHooks } from './license-gate';
 
 const HOME_VIEW_FOCUS_COMMAND = 'codescene.homeView.focus';
 
@@ -51,6 +53,7 @@ function watchRepository(service: AuthService): vscode.Disposable[] {
 export function activateAuth(
   context: vscode.ExtensionContext,
   transport: AuthTransport,
+  license: LicenseHooks,
   objectives?: ObjectivesFeature
 ): vscode.Disposable[] {
   const settings = new VsCodeAuthSettings();
@@ -64,11 +67,14 @@ export function activateAuth(
     show: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
     signIn: () => vscode.commands.executeCommand(SIGN_IN_COMMAND),
   });
+  const licenseGate = new LicenseGate(license);
+  DevtoolsAPI.useLicenseGate(licenseGate);
   const disposables: vscode.Disposable[] = [
     settings,
     service,
     service.onDidChange((snapshot) => {
       publish(snapshot, notices);
+      licenseGate.update(snapshot);
       objectives?.update(snapshot);
     }),
     revealOnAuthRequest(service),

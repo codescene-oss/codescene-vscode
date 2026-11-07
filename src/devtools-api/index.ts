@@ -28,6 +28,7 @@ export class DevtoolsAPI {
   private static pipeline: ReviewPipeline;
   private static queueSubscription?: vscode.Disposable;
   private static lastNetworkError = false;
+  private static licenseGate: { readonly licensed: boolean } = { licensed: false };
 
   static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
     DevtoolsAPI.pipeline?.dispose();
@@ -38,7 +39,16 @@ export class DevtoolsAPI {
     DevtoolsAPI.queueCount = 0;
     DevtoolsAPI.queueDone = 0;
     DevtoolsAPI.queued = [];
+    DevtoolsAPI.licenseGate = { licensed: false };
     DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.applyQueue(queue));
+  }
+
+  static useLicenseGate(gate: { readonly licensed: boolean }): void {
+    DevtoolsAPI.licenseGate = gate;
+  }
+
+  static get licensed(): boolean {
+    return DevtoolsAPI.licenseGate.licensed;
   }
 
   static get reviewPipeline(): ReviewPipeline {
@@ -147,6 +157,10 @@ export class DevtoolsAPI {
   public static readonly onDidReviewComplete = DevtoolsAPI.reviewEmitter.event;
 
   static reviewWithServer(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<Review | void> {
+    if (!DevtoolsAPI.licensed) {
+      logOutputChannel.debug(`[review] skipped path=${document.fileName} reason=unlicensed`);
+      return Promise.resolve(undefined);
+    }
     const repoRoot = DevtoolsAPI.repoRootFor(document);
     return DevtoolsAPI.pipeline.submit(repoRoot, {
       document,
@@ -179,8 +193,12 @@ export class DevtoolsAPI {
       reviewFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName),
       deltaStarted: (document) => DevtoolsAPI.startAnalysisEvent(document.fileName, true),
       deltaFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName, true),
-      presentReview: (review) => DevtoolsAPI.presentServerReview(review),
-      presentDelta: (delta) => DevtoolsAPI.presentServerDelta(delta),
+      presentReview: (review) => {
+        if (DevtoolsAPI.licensed) DevtoolsAPI.presentServerReview(review);
+      },
+      presentDelta: (delta) => {
+        if (DevtoolsAPI.licensed) DevtoolsAPI.presentServerDelta(delta);
+      },
       remove: (document) => DevtoolsAPI.removeServerReview(document),
       failed: (error) => DevtoolsAPI.analysisErrorEmitter.fire(error),
     };
@@ -221,6 +239,15 @@ export class DevtoolsAPI {
     fireFileDeletedFromGit(document.uri.fsPath);
   }
 
+  static clearAllResults(): void {
+    DevtoolsAPI.pipeline?.clear();
+    CsDiagnostics.clear();
+    Reviewer.instance?.reviewCache.clear();
+    DevtoolsAPI.resultsClearedEmitter.fire();
+  }
+
+  private static readonly resultsClearedEmitter = new vscode.EventEmitter<void>();
+  public static readonly onDidClearResults = DevtoolsAPI.resultsClearedEmitter.event;
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
   public static readonly onDidDeltaAnalysisComplete = DevtoolsAPI.deltaAnalysisEmitter.event;
   private static readonly aceStateEmitter = new vscode.EventEmitter<CsFeature>();
@@ -354,6 +381,7 @@ export class DevtoolsAPI {
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
     try { DevtoolsAPI.deltaAnalysisEmitter.dispose(); } catch {}
     try { DevtoolsAPI.aceStateEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.resultsClearedEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringRequestEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringErrorEmitter.dispose(); } catch {}
   }

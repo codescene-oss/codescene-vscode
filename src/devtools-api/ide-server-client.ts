@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
-import { createMessageConnection, MessageConnection } from 'vscode-jsonrpc/node';
+import { createMessageConnection, MessageConnection, ResponseError } from 'vscode-jsonrpc/node';
 import type { AuthTokenResponse } from '../auth/auth-token';
 import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
@@ -24,6 +24,13 @@ import {
 } from './rpc-response-normalizers';
 
 const STARTUP_TIMEOUT_MS = 30000;
+const REQUEST_FAILED = -32803;
+
+export function isLicenseRequired(error: unknown): boolean {
+  return error instanceof ResponseError
+    && error.code === REQUEST_FAILED
+    && (error.data as { code?: unknown } | undefined)?.code === 'auth/license-required';
+}
 export function distributionServerCommand(
   distributionPath: string,
   serverArgs: string[] = ['server']
@@ -337,9 +344,9 @@ export class CsIdeServerClient implements vscode.Disposable {
       return result;
     } catch (error) {
       const message = redactSecrets(error instanceof Error ? error.message : String(error));
-      logOutputChannel.error(
-        `[cs-ide] request failed id=${id} method=${method} durationMs=${Date.now() - started}: ${message}`
-      );
+      const line = `[cs-ide] request failed id=${id} method=${method} durationMs=${Date.now() - started}: ${message}`;
+      if (isLicenseRequired(error)) logOutputChannel.debug(line);
+      else logOutputChannel.error(line);
       throw error;
     }
   }
