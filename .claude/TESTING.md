@@ -37,6 +37,7 @@ The prefered course of action for failing tests is:
 
 cs-ide answers its Code Health methods (review, delta, check-rules, the rules template, preflight, fns-to-refactor, refactor, watches) only with a valid CLI license. The integration tests that spawn the real bundled binary get that license from a `CS_ACCESS_TOKEN` in the environment, which the spawned server inherits.
 
+- Only `CS_ACCESS_TOKEN` in the environment enables these tests; signing in with OAuth (in VS Code or with `cs-ide`) does not.
 - Without `CS_ACCESS_TOKEN`, those tests are reported as pending with the reason "needs a CodeScene credential: set CS_ACCESS_TOKEN (CLI access) to run real cs-ide analysis tests". Set the variable in the shell that runs `make test` to run them.
 - Guard any new real-binary test of a license-gated method with `skipWithoutCodeSceneCredential(this)` from `integration_helper.ts`, either in its `setup` hook or as the first line of the test. Never let such a test pass silently without the credential.
 - Tests that only use ungated methods (device-id, telemetry) run without it.
