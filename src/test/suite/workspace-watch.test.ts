@@ -548,6 +548,36 @@ suite('WorkspaceWatch Test Suite', () => {
     assertLogContains('info', 'automatic analysis started');
   });
 
+  test('re-sends a watch whose start was overtaken by setEnabled(false) once enabled again', async () => {
+    let fireStateChange = () => undefined as unknown;
+    const [opened] = dependencies.repositories();
+    const onDidChange = (listener: () => unknown) => {
+      fireStateChange = listener;
+      return { dispose: () => undefined };
+    };
+    const repo = { ...opened, state: { ...opened.state, onDidChange } } as any;
+    let resolveRoot!: () => void;
+    const rootLookup = new Promise<void>((resolve) => (resolveRoot = resolve));
+    const lookup = dependencies.gitRootFor;
+    dependencies.gitRootFor = async (directory) => {
+      await rootLookup;
+      return lookup(directory);
+    };
+    watch.bindRepository(repo);
+
+    fireStateChange();
+    watch.setEnabled(false);
+    resolveRoot();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.deepStrictEqual(watches, [], 'no watch is started once the watch is disabled');
+
+    watch.setEnabled(true);
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
+  });
+
   test('isExcludedByConfiguration matches nested exclude patterns', () => {
     const workspace = vscode.workspace as any;
     const originalGetConfiguration = workspace.getConfiguration;

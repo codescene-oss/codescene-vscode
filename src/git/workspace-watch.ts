@@ -161,6 +161,7 @@ export class WorkspaceWatch implements vscode.Disposable {
   private async syncTarget(target: WatchTarget): Promise<void> {
     if (!this.isActive()) return;
     const scope = await this.scopeFor(target.repoRoot);
+    if (!this.isActive()) return;
     if (!scope) {
       logOutputChannel.debug(`[watch] not watching ${formatLogFields({ repo: target.repoRoot, reason: 'no-scope' })}`);
       this.stopWatching(target.repoRoot, 'no-scope');
