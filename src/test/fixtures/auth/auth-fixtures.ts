@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { INACTIVE_SNAPSHOT, type AuthSnapshot } from '../../../auth/auth-payload';
+import { LicenseGate } from '../../../auth/license-gate';
 import type { AuthPayload, AuthStatus } from '../../../centralized-webview-framework/types/auth';
 
 export type AuthStatusFixture =
@@ -47,4 +49,18 @@ export function authStatusFixture(name: AuthStatusFixture): AuthStatus {
 
 export function authPayloadFixture(name: AuthPayloadFixture): AuthPayload {
   return readFixture<AuthPayload>(name);
+}
+
+export function snapshotWith(status: AuthStatus | null): AuthSnapshot {
+  return { ...INACTIVE_SNAPSHOT, active: true, status };
+}
+
+export function licensedSnapshot(): AuthSnapshot {
+  return snapshotWith(authStatusFixture('signed-in-oauth'));
+}
+
+export function licensedGate(): LicenseGate {
+  const gate = new LicenseGate({ onLicensed: () => undefined, onUnlicensed: () => undefined });
+  gate.update(licensedSnapshot());
+  return gate;
 }
