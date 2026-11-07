@@ -9,6 +9,10 @@ export function signInFailed(code: AuthErrorCode | undefined): AuthTelemetryEven
   return { name: 'auth/sign-in-failed', data: { 'error-code': code ?? 'unknown' } };
 }
 
+export function reauthorizeFailed(code: AuthErrorCode | undefined): AuthTelemetryEvent {
+  return { name: 'auth/reauthorize-failed', data: { 'error-code': code ?? 'unknown' } };
+}
+
 export function signInOutcome(previous: AuthStatus | null, next: AuthStatus): AuthTelemetryEvent | undefined {
   if (previous?.state !== 'signing-in' || next.state === 'signing-in') return undefined;
   const code = next.error?.code;

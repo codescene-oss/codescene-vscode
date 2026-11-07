@@ -155,6 +155,10 @@
         {
           "command": "codescene.openAccount",
           "when": "codescene.signInActive"
+        },
+        {
+          "command": "codescene.reauthorize",
+          "when": "codescene.reauthorizeNeeded"
         }
       ]
     },

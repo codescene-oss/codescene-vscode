@@ -15,7 +15,7 @@ import { IDLE_FLOW, nextStep, type FlowState } from './auth-flow';
 import { accountDataKey, INACTIVE_SNAPSHOT, type AuthRepo, type AuthSnapshot } from './auth-payload';
 import { authErrorCode, AuthRpc, isMethodNotFound } from './auth-rpc';
 import { authConfiguration, type AuthSettings } from './auth-settings';
-import { signInFailed, signInOutcome, type AuthTelemetryEvent } from './auth-telemetry';
+import { reauthorizeFailed, signInFailed, signInOutcome, type AuthTelemetryEvent } from './auth-telemetry';
 import type { AuthTransport } from './auth-transport';
 
 export const AUTH_CAPABILITY = 'auth-v1';
@@ -107,7 +107,7 @@ export class AuthService implements vscode.Disposable {
       this.reauthorizeLoginId = login['login-id'];
       await this.deps.openExternal(login['authorize-url']);
     } catch (error) {
-      this.logEvent(signInFailed(authErrorCode(error)));
+      this.logEvent(reauthorizeFailed(authErrorCode(error)));
     }
   }
 
