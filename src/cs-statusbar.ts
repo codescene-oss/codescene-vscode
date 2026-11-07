@@ -1,12 +1,15 @@
 import vscode, { Disposable } from 'vscode';
 import { ACE_ENABLED } from './build-flags';
-import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
+import { AnalysisFeature, CsExtensionState, CsFeature, ExtensionAuthState } from './cs-extension-state';
 import { aceAvailable } from './devtools-api';
 import { CreditsInfoError } from './devtools-api/credits-info-error';
 import { isDefined, toUppercase } from './utils';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
-import { isLicensed } from './auth/license-gate';
-import { INACTIVE_SNAPSHOT } from './auth/auth-payload';
+import { isLicensed, isLicenseResolving } from './auth/license-gate';
+
+function signInRequired(auth: ExtensionAuthState): boolean {
+  return auth.active && !isLicensed(auth) && !isLicenseResolving(auth.status);
+}
 
 interface StatusBarOptions {
   text: string;
@@ -64,8 +67,7 @@ export class CsStatusBar implements Disposable {
 
     if (this.handleErrorStates(analysis)) return;
 
-    const auth = CsExtensionState.stateProperties.auth;
-    if (auth.active && !isLicensed({ ...INACTIVE_SNAPSHOT, active: auth.active, status: auth.status })) {
+    if (signInRequired(CsExtensionState.stateProperties.auth)) {
       this.setStatus(item, {
         text: 'CodeScene: Sign in required',
         tooltip: 'Sign in to get Code Health analysis',

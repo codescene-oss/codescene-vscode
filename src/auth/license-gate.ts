@@ -1,3 +1,4 @@
+import type { AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { AuthSnapshot } from './auth-payload';
 
 export interface LicenseHooks {
@@ -8,6 +9,10 @@ export interface LicenseHooks {
 
 export function isLicensed(snapshot: Pick<AuthSnapshot, 'active' | 'status'>): boolean {
   return snapshot.active && snapshot.status?.state === 'signed-in' && snapshot.status.license?.state === 'valid';
+}
+
+export function isLicenseResolving(status: AuthStatus | null): boolean {
+  return status?.state === 'signed-in' && status.license === null;
 }
 
 export class LicenseGate {
