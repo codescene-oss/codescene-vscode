@@ -114,6 +114,7 @@ async function settle(): Promise<void> {
 suite('License gate Test Suite', () => {
   const cases: Array<{ name: string; snapshot: ReturnType<typeof snapshotWith>; licensed: boolean }> = [
     { name: 'signed in with a valid license', snapshot: statusSnapshot('signed-in-oauth'), licensed: true },
+    { name: 'signed in with a valid license and a network error', snapshot: statusSnapshot('signed-in-network-error'), licensed: true },
     { name: 'signed in with a valid license on-prem', snapshot: statusSnapshot('signed-in-setting-token-onprem'), licensed: true },
     { name: 'signed in with a refused license', snapshot: statusSnapshot('signed-in-refused'), licensed: false },
     { name: 'signed in with an expired offline license', snapshot: statusSnapshot('signed-in-offline-expired'), licensed: false },
