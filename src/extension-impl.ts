@@ -299,7 +299,6 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
       stopWatchFiles: DevtoolsAPI.stopWatchFiles,
       getWatchInventory: DevtoolsAPI.getWatchInventory,
       onDidWatchInventory: DevtoolsAPI.onDidWatchInventory,
-      onDidServerStart: DevtoolsAPI.onDidServerStart,
       onDidQueue: DevtoolsAPI.onDidQueue,
     },
     DevtoolsAPI.reviewPipeline,

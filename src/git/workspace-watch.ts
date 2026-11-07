@@ -1,7 +1,7 @@
 import * as path from 'path';
 import vscode from 'vscode';
 import type { Repository } from '../../types/git';
-import type { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from '../devtools-api/ide-server-client';
+import type { CsIdeServerClient, ReviewQueue, WatchInventory } from '../devtools-api/ide-server-client';
 import { supportedExtensions } from '../language-support';
 import { formatLogFields, logOutputChannel } from '../log';
 import { ReviewPipeline, ReviewSubmission } from '../review/review-pipeline';
@@ -23,7 +23,6 @@ export type WatchClient = Pick<
   | 'stopWatchFiles'
   | 'getWatchInventory'
   | 'onDidWatchInventory'
-  | 'onDidServerStart'
   | 'onDidQueue'
 >;
 
@@ -88,7 +87,6 @@ export class WorkspaceWatch implements vscode.Disposable {
   ) {
     this.disposables.push(
       client.onDidWatchInventory((inventory) => this.applyInventory(inventory)),
-      client.onDidServerStart((event) => this.handleServerStart(event)),
       client.onDidQueue((queue) => this.handleQueue(queue))
     );
   }
@@ -135,6 +133,17 @@ export class WorkspaceWatch implements vscode.Disposable {
         logOutputChannel.warn(`Workspace watch sync failed for ${target.repoRoot}: ${error}`);
       }
     }
+  }
+
+  /**
+   * A restarted server has no watches, and the extension missed every inventory change during the
+   * outage. Existing inventories are kept until fresh ones arrive so the monitor does not blank out.
+   */
+  async resync(): Promise<void> {
+    if (!this.isActive()) return;
+    logOutputChannel.info('[watch] cs-ide restarted and licensed, re-establishing repository watches');
+    this.watched.clear();
+    await this.syncAll();
   }
 
   dispose(): void {
@@ -462,17 +471,6 @@ export class WorkspaceWatch implements vscode.Disposable {
    */
   private resolveRepoRoot(reported: string): string {
     return this.knownRoots.get(normalizeFsPath(reported)) ?? path.normalize(toLocalRepoRoot(reported));
-  }
-
-  /**
-   * A restarted server has no watches, and the extension missed every inventory change during the
-   * outage. Existing inventories are kept until fresh ones arrive so the monitor does not blank out.
-   */
-  private handleServerStart(event: ServerStartEvent): void {
-    if (!event.restart || !this.isActive()) return;
-    logOutputChannel.info('[watch] cs-ide restarted, re-establishing repository watches');
-    this.watched.clear();
-    void this.syncAll();
   }
 
   private isActive(): boolean {

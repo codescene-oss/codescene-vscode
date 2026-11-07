@@ -60,7 +60,7 @@ export function licensedSnapshot(): AuthSnapshot {
 }
 
 export function licensedGate(): LicenseGate {
-  const gate = new LicenseGate({ onLicensed: () => undefined, onUnlicensed: () => undefined });
+  const gate = new LicenseGate({ onLicensed: () => undefined, onUnlicensed: () => undefined, onServerRelicensed: () => undefined });
   gate.update(licensedSnapshot());
   return gate;
 }

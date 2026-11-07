@@ -41,6 +41,7 @@ export class AuthService implements vscode.Disposable {
   private capable = false;
   private enabled = false;
   private startHandled = false;
+  private serverStarts = 0;
   private syncOnSignIn = false;
   private syncSupported = true;
   private configureSeq = 0;
@@ -214,6 +215,7 @@ export class AuthService implements vscode.Disposable {
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {
     this.startHandled = true;
+    this.serverStarts++;
     this.syncSupported = true;
     this.capable = metadata.capabilities?.includes(AUTH_CAPABILITY) === true;
     this.enabled = this.capable;
@@ -247,7 +249,7 @@ export class AuthService implements vscode.Disposable {
     if (!this.enabled) return;
     this.logEvent(signInOutcome(this.snapshot.status, status));
     const startAccountLoad = this.prepareAccountLoad(status, reloadAccountData);
-    this.publish({ ...this.snapshot, active: true, status });
+    this.publish({ ...this.snapshot, active: true, status, serverStart: this.serverStarts });
     startAccountLoad();
     const signedIn = accountDataKey(status) !== undefined;
     const sync = this.takeSignInSync(signedIn);

@@ -3,6 +3,7 @@ import type { AuthSnapshot } from './auth-payload';
 export interface LicenseHooks {
   onUnlicensed(): void;
   onLicensed(): void;
+  onServerRelicensed(): void;
 }
 
 export function isLicensed(snapshot: AuthSnapshot): boolean {
@@ -11,6 +12,7 @@ export function isLicensed(snapshot: AuthSnapshot): boolean {
 
 export class LicenseGate {
   private current = false;
+  private serverStart = 0;
 
   constructor(private readonly deps: LicenseHooks) {}
 
@@ -19,8 +21,13 @@ export class LicenseGate {
   }
 
   update(snapshot: AuthSnapshot): void {
+    const answeredNewServer = snapshot.serverStart !== this.serverStart;
+    this.serverStart = snapshot.serverStart;
     const next = isLicensed(snapshot);
-    if (next === this.current) return;
+    if (next === this.current) {
+      if (next && answeredNewServer) this.deps.onServerRelicensed();
+      return;
+    }
     this.current = next;
     if (next) this.deps.onLicensed();
     else this.deps.onUnlicensed();

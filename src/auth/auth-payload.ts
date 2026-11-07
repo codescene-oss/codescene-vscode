@@ -30,6 +30,7 @@ export interface AuthSnapshot {
   step: AuthStep;
   context: AuthFlow['context'];
   syncing: boolean;
+  serverStart: number;
 }
 
 export const INACTIVE_SNAPSHOT: AuthSnapshot = {
@@ -46,6 +47,7 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   step: 'summary',
   context: 'manual',
   syncing: false,
+  serverStart: 0,
 };
 
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {

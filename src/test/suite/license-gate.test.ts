@@ -65,12 +65,21 @@ class FakeIdeServer {
 
 interface FakeWatch {
   enabled: boolean[];
+  resyncs: number;
   setEnabled(enabled: boolean): void;
+  resync(): Promise<void>;
 }
 
 function fakeWatch(): FakeWatch {
-  const enabled: boolean[] = [];
-  return { enabled, setEnabled: (value) => enabled.push(value) };
+  const watch: FakeWatch = {
+    enabled: [],
+    resyncs: 0,
+    setEnabled: (value) => watch.enabled.push(value),
+    resync: async () => {
+      watch.resyncs++;
+    },
+  };
+  return watch;
 }
 
 function emptyReview(): Review {
@@ -120,6 +129,7 @@ suite('License gate Test Suite', () => {
     const gate = new LicenseGate({
       onLicensed: () => calls.push('licensed'),
       onUnlicensed: () => calls.push('unlicensed'),
+      onServerRelicensed: () => calls.push('relicensed'),
     });
 
     assert.strictEqual(gate.licensed, false);
@@ -133,6 +143,34 @@ suite('License gate Test Suite', () => {
 
     assert.deepStrictEqual(calls, ['licensed', 'unlicensed', 'licensed']);
     assert.strictEqual(gate.licensed, true);
+  });
+
+  const restartCases: Array<{ name: string; after: AuthStatusFixture[]; calls: string[] }> = [
+    { name: 'a fresh licensed status', after: ['signed-in-oauth', 'signed-in-oauth'], calls: ['licensed', 'relicensed'] },
+    {
+      name: 'an unlicensed status first',
+      after: ['signed-in-refused', 'signed-in-oauth'],
+      calls: ['licensed', 'unlicensed', 'licensed'],
+    },
+  ];
+
+  restartCases.forEach(({ name, after, calls: expected }) => {
+    test(`after a cs-ide restart, waits for ${name} before relicensing`, () => {
+      const calls: string[] = [];
+      const gate = new LicenseGate({
+        onLicensed: () => calls.push('licensed'),
+        onUnlicensed: () => calls.push('unlicensed'),
+        onServerRelicensed: () => calls.push('relicensed'),
+      });
+      const before = { ...licensedSnapshot(), serverStart: 1 };
+      gate.update(before);
+
+      gate.update({ ...before, syncing: true });
+      gate.update({ ...before, repo: { path: '/repo', name: 'repo' } });
+      after.forEach((status) => gate.update({ ...statusSnapshot(status), serverStart: 2 }));
+
+      assert.deepStrictEqual(calls, expected);
+    });
   });
 });
 
@@ -241,6 +279,13 @@ suite('License gate analysis Test Suite', () => {
     assert.deepStrictEqual(reviews, []);
     assert.strictEqual(Reviewer.instance.reviewCache.get(doc, 'any'), undefined);
     listener.dispose();
+  });
+
+  test('a restarted cs-ide that answers licensed resyncs the watch', () => {
+    gate.update({ ...licensedSnapshot(), serverStart: 1 });
+    gate.update({ ...licensedSnapshot(), serverStart: 2 });
+
+    assert.deepStrictEqual({ enabled: watch.enabled, resyncs: watch.resyncs }, { enabled: [true], resyncs: 1 });
   });
 
   test('licensed-respects-automatic-analysis-off', () => {

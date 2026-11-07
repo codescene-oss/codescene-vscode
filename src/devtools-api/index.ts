@@ -24,7 +24,6 @@ import {
   isLicenseRequired,
   RefactorParams,
   ReviewQueue,
-  ServerStartEvent,
   WatchInventory,
 } from './ide-server-client';
 import { v4 as uuid } from 'uuid';
@@ -81,9 +80,6 @@ export class DevtoolsAPI {
 
   static readonly onDidWatchInventory: vscode.Event<WatchInventory> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidWatchInventory(listener, thisArgs, disposables);
-
-  static readonly onDidServerStart: vscode.Event<ServerStartEvent> = (listener, thisArgs?, disposables?) =>
-    DevtoolsAPI.ideServer.onDidServerStart(listener, thisArgs, disposables);
 
   static readonly onDidQueue: vscode.Event<ReviewQueue> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidQueue(listener, thisArgs, disposables);

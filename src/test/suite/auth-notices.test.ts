@@ -106,4 +106,24 @@ suite('AuthNotices', () => {
     assert.strictEqual(telemetry.length, 1, 'should log telemetry only once');
     assert.strictEqual(telemetry[0].name, 'auth/gate-shown');
   });
+
+  test('no-notice-across-a-licensed-restart', async () => {
+    const harness = createHarness();
+    harness.transport.respond('cs-ide/auth-configure', () => authStatusFixture('signed-in-oauth'));
+    const { notices, shown, telemetry } = noticeHarness(undefined);
+    const snapshots: number[] = [];
+    harness.service.onDidChange((snapshot) => {
+      snapshots.push(snapshot.serverStart);
+      void notices.update(snapshot);
+    });
+    await harness.service.start();
+    await flushPromises();
+
+    harness.transport.emitRestart();
+    await flushPromises();
+
+    assert.ok(snapshots.includes(2), `the restarted cs-ide answered: ${JSON.stringify(snapshots)}`);
+    assert.deepStrictEqual(shown, []);
+    assert.deepStrictEqual(telemetry, []);
+  });
 });
