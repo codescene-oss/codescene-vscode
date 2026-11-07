@@ -4,6 +4,7 @@ import { HomeContextViewProps, IdeContextType, Job } from '../../centralized-web
 import { devmode, featureFlags, ideType } from '../../centralized-webview-framework/cwf-html-utils';
 import { isPathUnderRoot, normalizeFsPath, relativePosix, toPosixRelPath } from '../../utils/fs-paths';
 import { withCwfObjectives } from '../../objectives/cwf-objectives';
+import { cwfAuthPro } from '../../auth/cwf-auth';
 
 function repoRelative(fileName: string, repoRoots: readonly string[]): string | undefined {
   const normalizedFile = normalizeFsPath(fileName);
@@ -115,7 +116,7 @@ export const getHomeData = ({
     ideType: ideType,
     view: 'home',
     devmode: devmode,
-    pro: true,
+    pro: cwfAuthPro(),
     featureFlags: featureFlags,
     data: {
       fileDeltaData,

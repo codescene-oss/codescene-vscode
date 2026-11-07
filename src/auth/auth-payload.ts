@@ -30,7 +30,6 @@ export interface AuthSnapshot {
   step: AuthStep;
   context: AuthFlow['context'];
   syncing: boolean;
-  signInBannerHidden: boolean;
 }
 
 export const INACTIVE_SNAPSHOT: AuthSnapshot = {
@@ -47,7 +46,6 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   step: 'summary',
   context: 'manual',
   syncing: false,
-  signInBannerHidden: false,
 };
 
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {

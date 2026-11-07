@@ -7,7 +7,6 @@ export const AUTH_MESSAGE_TYPES = [
   'open-auth',
   'auth-close',
   'auth-skip-project',
-  'hide-sign-in-banner',
   'auth-sign-in',
   'auth-open-browser-again',
   'auth-sign-out',
@@ -33,7 +32,6 @@ export type AuthActions = Pick<
   | 'openAuth'
   | 'closeAuth'
   | 'skipProject'
-  | 'hideSignInBanner'
   | 'signOut'
   | 'retry'
   | 'selectAccount'
@@ -61,7 +59,6 @@ function handlers(actions: AuthActions, target: AuthMessageTarget): Handlers {
     'open-auth': (message) => actions.openAuth(message.payload?.screen),
     'auth-close': () => actions.closeAuth(),
     'auth-skip-project': () => actions.skipProject(),
-    'hide-sign-in-banner': () => actions.hideSignInBanner(),
     'auth-sign-in': () => actions.signIn(),
     'auth-open-browser-again': () => actions.openBrowserAgain(),
     'auth-sign-out': () => actions.signOut(),

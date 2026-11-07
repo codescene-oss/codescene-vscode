@@ -62,16 +62,9 @@ suite('withCwfAuth', () => {
     assert.strictEqual('authFlow' in result, false);
   });
 
-  test('adds signInBannerHidden only once the banner was hidden', () => {
+  test('adds no signInBannerHidden field', () => {
     const payload = authPayloadFixture('auth-payload-linked-project');
-    setCwfAuth(payload, flow, 'monitor', false);
-    assert.strictEqual('signInBannerHidden' in withCwfAuth(homeProps()), false);
-    setCwfAuth(payload, flow, 'monitor', true);
-    assert.strictEqual(withCwfAuth(homeProps()).signInBannerHidden, true);
-  });
-
-  test('adds no signInBannerHidden while inactive', () => {
-    setCwfAuth(undefined, flow, 'monitor', true);
+    setCwfAuth(payload, flow, 'monitor');
     assert.strictEqual('signInBannerHidden' in withCwfAuth(homeProps()), false);
   });
 

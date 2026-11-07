@@ -3,6 +3,7 @@ import * as path from 'path';
 import vscode from 'vscode';
 import { analysisJobsToCwf, getHomeData } from '../../code-health-monitor/home/home-props-utils';
 import { analysisProgressTooltip } from '../../cs-statusbar';
+import { setCwfAuth } from '../../auth/cwf-auth';
 
 suite('analysisJobsToCwf', () => {
   const root = path.join('/repo');
@@ -105,7 +106,39 @@ suite('analysisProgressTooltip', () => {
 });
 
 suite('getHomeData', () => {
-  test('renders the home view as pro without a user or login flags', () => {
+  teardown(() => setCwfAuth(undefined));
+
+  test('renders the home view with pro false when unlicensed', () => {
+    setCwfAuth(undefined, undefined, 'monitor', false);
+    const payload = getHomeData({
+      fileDeltaData: [],
+      jobs: [],
+      autoRefactor: undefined,
+      showOnboarding: false,
+      analysisState: 'running',
+      totalCount: 11,
+      remainingCount: 4,
+    });
+    assert.deepStrictEqual(payload, {
+      ideType: 'VSCode',
+      view: 'home',
+      devmode: false,
+      pro: false,
+      featureFlags: [],
+      data: {
+        fileDeltaData: [],
+        jobs: [],
+        autoRefactor: undefined,
+        showOnboarding: false,
+        analysisState: 'running',
+        totalCount: 11,
+        remainingCount: 4,
+      },
+    });
+  });
+
+  test('renders the home view with pro true when licensed', () => {
+    setCwfAuth(undefined, undefined, 'monitor', true);
     const payload = getHomeData({
       fileDeltaData: [],
       jobs: [],

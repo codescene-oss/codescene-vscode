@@ -54,7 +54,6 @@ export class AuthService implements vscode.Disposable {
   private settlingGen: number | undefined;
   private repoSeq = 0;
   private repoSyncing = false;
-  private signInBannerHidden = false;
   readonly onDidChange = this.emitter.event;
   private readonly requestEmitter = new vscode.EventEmitter<void>();
   readonly onDidRequestAuth = this.requestEmitter.event;
@@ -123,12 +122,6 @@ export class AuthService implements vscode.Disposable {
   skipProject(): void {
     if (this.flow.kind !== 'sign-in') return;
     this.flow = { ...this.flow, projectSkipped: true };
-    this.publish(this.snapshot);
-  }
-
-  hideSignInBanner(): void {
-    if (!this.enabled) return;
-    this.signInBannerHidden = true;
     this.publish(this.snapshot);
   }
 
@@ -377,7 +370,6 @@ export class AuthService implements vscode.Disposable {
       step: step === 'done' ? 'summary' : step,
       context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
       syncing: this.isSyncing(),
-      signInBannerHidden: this.signInBannerHidden,
     };
   }
 

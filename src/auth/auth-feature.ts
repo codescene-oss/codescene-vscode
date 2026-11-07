@@ -14,7 +14,7 @@ import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
 import type { AuthTransport } from './auth-transport';
 import { setCwfAuth } from './cwf-auth';
-import { LicenseGate, type LicenseHooks } from './license-gate';
+import { isLicensed, LicenseGate, type LicenseHooks } from './license-gate';
 
 const HOME_VIEW_FOCUS_COMMAND = 'codescene.homeView.focus';
 
@@ -28,7 +28,7 @@ function openSetting(id: string): Thenable<unknown> {
 
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
-  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, snapshot.signInBannerHidden);
+  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, isLicensed(snapshot));
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
 }
