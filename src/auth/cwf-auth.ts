@@ -9,7 +9,7 @@ export const IDE_AUTH_FLAG: FeatureFlags = 'ide-auth';
 let currentPayload: AuthPayload | undefined;
 let currentFlow: AuthFlow | undefined;
 let currentSurface: AuthSurface = 'monitor';
-let currentBannerHidden = false;
+let currentPro = false;
 const changeEmitter = new vscode.EventEmitter<void>();
 
 export const onDidChangeCwfAuth = changeEmitter.event;
@@ -18,12 +18,12 @@ export function setCwfAuth(
   payload: AuthPayload | undefined,
   flow?: AuthFlow,
   surface: AuthSurface = 'monitor',
-  bannerHidden = false
+  pro = false
 ): void {
   currentPayload = payload;
   currentFlow = flow;
   currentSurface = surface;
-  currentBannerHidden = bannerHidden;
+  currentPro = pro;
   changeEmitter.fire();
 }
 
@@ -35,6 +35,10 @@ export function cwfAuthActive(): boolean {
   return currentPayload !== undefined;
 }
 
+export function cwfAuthPro(): boolean {
+  return currentPro;
+}
+
 export function withCwfAuth<T extends AuthField & { featureFlags?: FeatureFlags[] }>(props: T): T {
   if (!currentPayload) return props;
   return {
@@ -42,6 +46,5 @@ export function withCwfAuth<T extends AuthField & { featureFlags?: FeatureFlags[
     featureFlags: [...(props.featureFlags ?? []), IDE_AUTH_FLAG],
     auth: currentPayload,
     ...(currentFlow ? { authFlow: currentFlow } : {}),
-    ...(currentBannerHidden ? { signInBannerHidden: true } : {}),
   };
 }

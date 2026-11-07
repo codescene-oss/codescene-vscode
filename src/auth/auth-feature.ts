@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { DevtoolsAPI } from '../devtools-api';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { logOutputChannel } from '../log';
 import type { ObjectivesFeature } from '../objectives/objectives-feature';
@@ -13,6 +14,7 @@ import { AuthService } from './auth-service';
 import { VsCodeAuthSettings } from './auth-settings';
 import type { AuthTransport } from './auth-transport';
 import { setCwfAuth } from './cwf-auth';
+import { isLicensed, LicenseGate, type LicenseHooks } from './license-gate';
 
 const HOME_VIEW_FOCUS_COMMAND = 'codescene.homeView.focus';
 
@@ -26,7 +28,7 @@ function openSetting(id: string): Thenable<unknown> {
 
 function publish(snapshot: AuthSnapshot, notices: AuthNotices): void {
   CsExtensionState.setAuth({ active: snapshot.active, status: snapshot.status });
-  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, snapshot.signInBannerHidden);
+  setCwfAuth(toAuthPayload(snapshot), toAuthFlow(snapshot), snapshot.surface, isLicensed(snapshot));
   void vscode.commands.executeCommand('setContext', SIGN_IN_CONTEXT_KEY, snapshot.active);
   void notices.update(snapshot);
 }
@@ -51,6 +53,7 @@ function watchRepository(service: AuthService): vscode.Disposable[] {
 export function activateAuth(
   context: vscode.ExtensionContext,
   transport: AuthTransport,
+  license: LicenseHooks,
   objectives?: ObjectivesFeature
 ): vscode.Disposable[] {
   const settings = new VsCodeAuthSettings();
@@ -60,15 +63,20 @@ export function activateAuth(
     openExternal: openInBrowser,
     logUsage: (name, data) => Telemetry.logUsage(name, data),
   });
-  const notices = new AuthNotices(context.globalState, {
+  const notices = new AuthNotices({
     show: (message, ...items) => vscode.window.showInformationMessage(message, ...items),
     signIn: () => vscode.commands.executeCommand(SIGN_IN_COMMAND),
+    focusHomeView: () => vscode.commands.executeCommand(HOME_VIEW_FOCUS_COMMAND),
+    logUsage: (name, data) => Telemetry.logUsage(name, data),
   });
+  const licenseGate = new LicenseGate(license);
+  DevtoolsAPI.useLicenseGate(licenseGate);
   const disposables: vscode.Disposable[] = [
     settings,
     service,
     service.onDidChange((snapshot) => {
       publish(snapshot, notices);
+      licenseGate.update(snapshot);
       objectives?.update(snapshot);
     }),
     revealOnAuthRequest(service),

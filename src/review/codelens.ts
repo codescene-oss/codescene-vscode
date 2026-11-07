@@ -52,6 +52,7 @@ implements vscode.CodeLensProvider<vscode.CodeLens | CsCodeLens>, vscode.Disposa
       onDidChangeConfiguration('enableReviewCodeLenses', () => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidReviewComplete(() => this.changeCodeLensesEmitter.fire()),
       DevtoolsAPI.onDidDeltaAnalysisComplete(() => this.changeCodeLensesEmitter.fire()),
+      DevtoolsAPI.onDidClearResults(() => this.changeCodeLensesEmitter.fire()),
       vscode.workspace.onDidChangeTextDocument((event) => {
         fnsToRefactorCache.invalidateForDocument(event.document);
       }),

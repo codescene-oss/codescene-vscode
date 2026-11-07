@@ -6,7 +6,7 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
 
 import { aceSuite } from '../ace-test-suite';
 
@@ -81,6 +81,7 @@ aceSuite('FnsToRefactor Integration Test Suite', () => {
   });
 
   test('fnsToRefactorFromDelta handles delta with no function findings', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const cleanContent = 'int add(int a, int b) { return a + b; }\n';

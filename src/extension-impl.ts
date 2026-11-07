@@ -1,4 +1,5 @@
 import vscode from 'vscode';
+import { analysisLicenseHooks } from './auth/analysis-license-hooks';
 import { activateAuth } from './auth/auth-feature';
 import { readLegacySession } from './auth/legacy-session';
 import { activateObjectives } from './objectives/objectives-feature';
@@ -152,7 +153,11 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
 
 function registerAuth(context: vscode.ExtensionContext, ideServer: CsIdeServerClient) {
   const objectives = activateObjectives(ideServer);
-  const disposables = [...activateAuth(context, ideServer, objectives), ...objectives.disposables];
+  const license = analysisLicenseHooks({
+    watch: () => workspaceWatchInstance,
+    observer: () => openFilesObserverInstance,
+  });
+  const disposables = [...activateAuth(context, ideServer, license, objectives), ...objectives.disposables];
   DISPOSABLES.push(...disposables);
   context.subscriptions.push(...disposables);
 }
@@ -257,7 +262,7 @@ function addReviewListeners(context: vscode.ExtensionContext) {
 
   const automaticAnalysisListener = onDidChangeConfiguration('enableAutomaticAnalysis', ({ value }) => {
     const enabled = value !== false;
-    workspaceWatchInstance?.setEnabled(enabled);
+    workspaceWatchInstance?.setEnabled(enabled && DevtoolsAPI.licensed);
     if (!enabled) DevtoolsAPI.clearQueue();
   });
   DISPOSABLES.push(automaticAnalysisListener);
@@ -294,12 +299,11 @@ function setupWorkspaceWatch(context: vscode.ExtensionContext): void {
       stopWatchFiles: DevtoolsAPI.stopWatchFiles,
       getWatchInventory: DevtoolsAPI.getWatchInventory,
       onDidWatchInventory: DevtoolsAPI.onDidWatchInventory,
-      onDidServerStart: DevtoolsAPI.onDidServerStart,
       onDidQueue: DevtoolsAPI.onDidQueue,
     },
     DevtoolsAPI.reviewPipeline,
     createWorkspaceWatchDependencies(() => gitApi.repositories),
-    automaticAnalysisEnabled()
+    automaticAnalysisEnabled() && DevtoolsAPI.licensed
   );
   const watch = workspaceWatchInstance;
   DevtoolsAPI.reviewPipeline.setWatchDeltaFilter((repoRoot, relPath) => watch.admitsDelta(repoRoot, relPath));

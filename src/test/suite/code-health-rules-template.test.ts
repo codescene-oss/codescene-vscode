@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
 
 suite('Code Health Rules Template Test Suite', () => {
   const testDir = createTestDir('test-code-health-rules-template');
@@ -18,6 +18,7 @@ suite('Code Health Rules Template Test Suite', () => {
   }
 
   setup(async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });

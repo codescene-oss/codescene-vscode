@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { ReviewQueue, ServerStartEvent, WatchInventory } from '../../devtools-api/ide-server-client';
+import type { ReviewQueue, WatchInventory } from '../../devtools-api/ide-server-client';
 import {
   INVENTORY_REFRESH_DELAY_MS,
   isExcludedByConfiguration,
@@ -10,7 +10,13 @@ import {
   WorkspaceWatchDependencies,
 } from '../../git/workspace-watch';
 import { ReviewPipeline, ReviewSubmission } from '../../review/review-pipeline';
-import { assertLogContains } from '../setup';
+import { analysisLicenseHooks } from '../../auth/analysis-license-hooks';
+import { LicenseGate } from '../../auth/license-gate';
+import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
+import { createHarness, type Harness } from '../fakes/auth-service-harness';
+import { flushPromises } from '../fakes/fake-auth-transport';
+import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import { assertLogContains, mockConfiguration, restoreDefaultConfiguration } from '../setup';
 
 suite('WorkspaceWatch Test Suite', () => {
   const queueIdleDelayMs = 20;
@@ -28,11 +34,11 @@ suite('WorkspaceWatch Test Suite', () => {
   let inventoryFiles: string[];
   let inventoryError: Error | undefined;
   let inventoryEmitter: vscode.EventEmitter<WatchInventory>;
-  let serverStartEmitter: vscode.EventEmitter<ServerStartEvent>;
   let queueEmitter: vscode.EventEmitter<ReviewQueue>;
   let pipeline: Pick<ReviewPipeline, 'submitBatch'>;
   let dirtyDoc: vscode.TextDocument;
   let dependencies: WorkspaceWatchDependencies;
+  let client: WatchClient;
   let watch: WorkspaceWatch;
   let headName: string;
   let headCommit: string;
@@ -54,7 +60,6 @@ suite('WorkspaceWatch Test Suite', () => {
     gitRoots = [repoRoot];
     rootLookups = [];
     inventoryEmitter = new vscode.EventEmitter<WatchInventory>();
-    serverStartEmitter = new vscode.EventEmitter<ServerStartEvent>();
     queueEmitter = new vscode.EventEmitter<ReviewQueue>();
     dirtyDoc = fakeDocument(path.join(repoRoot, 'dirty.ts'), 'const dirty = 1;', true);
     pipeline = {
@@ -94,7 +99,7 @@ suite('WorkspaceWatch Test Suite', () => {
       isExcluded: () => false,
       pruneMonitor: (repoRoots, keepPaths) => pruned.push({ repoRoots, keepPaths }),
     };
-    const client: WatchClient = {
+    client = {
       watchFiles: (repoRoot, relativePaths) => void watches.push({ repoRoot, relativePaths }),
       stopWatchFiles: (root) => void stops.push(root),
       getWatchInventory: async (root) => {
@@ -103,7 +108,6 @@ suite('WorkspaceWatch Test Suite', () => {
         return { repoRoot: root, files: inventoryFiles };
       },
       onDidWatchInventory: inventoryEmitter.event,
-      onDidServerStart: serverStartEmitter.event,
       onDidQueue: queueEmitter.event,
     };
     watch = new WorkspaceWatch(client, pipeline as ReviewPipeline, dependencies);
@@ -112,7 +116,6 @@ suite('WorkspaceWatch Test Suite', () => {
   teardown(() => {
     watch.dispose();
     inventoryEmitter.dispose();
-    serverStartEmitter.dispose();
     queueEmitter.dispose();
   });
 
@@ -350,23 +353,93 @@ suite('WorkspaceWatch Test Suite', () => {
     assertLogContains('debug', 'inventory refresh skipped');
   });
 
-  test('re-establishes watches after the CLI server restarts', async () => {
+  test('resync re-establishes every watch and re-seeds dirty buffers', async () => {
     await watch.syncAll();
 
-    serverStartEmitter.fire({ metadata: { sha: 'sha', version: '1' }, restart: true });
-    await watch.syncAll();
+    await watch.resync();
 
     assert.strictEqual(watches.length, 2);
     assert.strictEqual(submitted.length, 2, 'Dirty buffers are re-seeded against the fresh watch');
   });
 
-  test('ignores the first server start, which the initial sync already covers', async () => {
-    await watch.syncAll();
+  suite('across a cs-ide restart', () => {
+    const repoB = path.normalize('/repo-b');
+    let harness: Harness;
+    let gate: LicenseGate;
+    let holdConfigure: boolean;
+    let releaseConfigure: ((status: AuthStatus) => void) | undefined;
+    let subscriptions: vscode.Disposable[];
 
-    serverStartEmitter.fire({ metadata: { sha: 'sha', version: '1' }, restart: false });
-    await watch.syncAll();
+    async function until(predicate: () => boolean, what: string): Promise<void> {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (predicate()) return;
+        await flushPromises();
+      }
+      assert.fail(`timed out waiting for ${what}, watches: ${JSON.stringify(watches)}`);
+    }
 
-    assert.strictEqual(watches.length, 1);
+    async function startLicensed(automaticAnalysis: boolean): Promise<void> {
+      mockConfiguration('codescene', { enableAutomaticAnalysis: automaticAnalysis });
+      workspaceFolders = [repoRoot, repoB];
+      openedRepositories = [repoRoot, repoB];
+      gitRoots = [repoRoot, repoB];
+      watch.dispose();
+      watch = new WorkspaceWatch(client, pipeline as ReviewPipeline, dependencies, false);
+      holdConfigure = false;
+      releaseConfigure = undefined;
+      harness = createHarness();
+      harness.transport.respond('cs-ide/auth-configure', () =>
+        holdConfigure
+          ? new Promise<AuthStatus>((resolve) => (releaseConfigure = resolve))
+          : authStatusFixture('signed-in-oauth')
+      );
+      gate = new LicenseGate(analysisLicenseHooks({ watch: () => watch, observer: () => undefined }));
+      subscriptions = [harness.service.onDidChange((snapshot) => gate.update(snapshot))];
+      await harness.service.start();
+      await flushPromises();
+    }
+
+    teardown(() => {
+      subscriptions.forEach((subscription) => subscription.dispose());
+      harness.service.dispose();
+      restoreDefaultConfiguration();
+    });
+
+    test('re-sends every watch only once the restarted cs-ide reports a licensed status', async () => {
+      await startLicensed(true);
+      await until(() => watches.length === 2, 'the initial watches');
+      assert.strictEqual(gate.licensed, true);
+
+      holdConfigure = true;
+      harness.transport.emitRestart();
+      await flushPromises();
+      await harness.service.setRepo({ path: repoRoot, name: 'repo' });
+      await watch.syncAll();
+      await flushPromises();
+
+      assert.strictEqual(watches.length, 2, 'no watch is sent to a cs-ide that has not reported a license yet');
+      assert.ok(releaseConfigure, 'the restarted cs-ide is configured');
+
+      releaseConfigure(authStatusFixture('signed-in-oauth'));
+      await until(() => watches.length === 4, 'the re-sent watches');
+
+      assert.deepStrictEqual(
+        watches.slice(2).map((entry) => entry.repoRoot).sort(),
+        [repoRoot, repoB].sort()
+      );
+      await flushPromises();
+      assert.strictEqual(watches.length, 4);
+    });
+
+    test('sends no watch across a restart while automatic analysis is off', async () => {
+      await startLicensed(false);
+      assert.strictEqual(gate.licensed, true);
+
+      harness.transport.emitRestart();
+      for (let i = 0; i < 5; i++) await flushPromises();
+
+      assert.deepStrictEqual(watches, []);
+    });
   });
 
   suite('deltas outside the known change set', () => {
@@ -529,8 +602,7 @@ suite('WorkspaceWatch Test Suite', () => {
 
     headCommit = 'head-sha-2';
     await watch.syncAll();
-    serverStartEmitter.fire({ metadata: { sha: 'sha', version: '1' }, restart: true });
-    await watch.syncAll();
+    await watch.resync();
 
     assert.strictEqual(watches.length, watchCount);
     assert.strictEqual(submitted.length, seedCount);
@@ -546,6 +618,36 @@ suite('WorkspaceWatch Test Suite', () => {
     assert.strictEqual(watches.length, 2);
     assert.strictEqual(submitted.length, 2);
     assertLogContains('info', 'automatic analysis started');
+  });
+
+  test('re-sends a watch whose start was overtaken by setEnabled(false) once enabled again', async () => {
+    let fireStateChange = () => undefined as unknown;
+    const [opened] = dependencies.repositories();
+    const onDidChange = (listener: () => unknown) => {
+      fireStateChange = listener;
+      return { dispose: () => undefined };
+    };
+    const repo = { ...opened, state: { ...opened.state, onDidChange } } as any;
+    let resolveRoot!: () => void;
+    const rootLookup = new Promise<void>((resolve) => (resolveRoot = resolve));
+    const lookup = dependencies.gitRootFor;
+    dependencies.gitRootFor = async (directory) => {
+      await rootLookup;
+      return lookup(directory);
+    };
+    watch.bindRepository(repo);
+
+    fireStateChange();
+    watch.setEnabled(false);
+    resolveRoot();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.deepStrictEqual(watches, [], 'no watch is started once the watch is disabled');
+
+    watch.setEnabled(true);
+    await watch.syncAll();
+
+    assert.deepStrictEqual(watches, [{ repoRoot, relativePaths: undefined }]);
   });
 
   test('isExcludedByConfiguration matches nested exclude patterns', () => {

@@ -38,7 +38,6 @@ export const authMessageSamples: AuthMessage[] = [
   { messageType: 'auth-open-browser-again' },
   { messageType: 'auth-close' },
   { messageType: 'auth-skip-project' },
-  { messageType: 'hide-sign-in-banner' },
   { messageType: 'auth-sign-out' },
   { messageType: 'auth-retry' },
   { messageType: 'auth-select-account', payload: { accountId: '42' } },

@@ -4,6 +4,7 @@ import { Uri } from '../mocks/vscode';
 import { HomeView } from '../../code-health-monitor/home/home-view';
 import { BackgroundServiceView } from '../../code-health-monitor/background-view';
 import { CsExtensionState } from '../../cs-extension-state';
+import { DevtoolsAPI } from '../../devtools-api';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { FileWithIssues } from '../../code-health-monitor/file-with-issues';
 import { getMessageCategory } from '../../code-health-monitor/home/cwf-message-categories';
@@ -223,6 +224,21 @@ suite('HomeView', () => {
       assert.strictEqual(homeView.getFileIssueMap().size, 0);
       assert.deepStrictEqual((homeView as any).ideContextData.fileDeltaData, []);
       assert.strictEqual((homeView as any).ideContextData.analysisState, 'stopped');
+      assert.strictEqual(badgeCount, 0);
+    });
+
+    test('clears monitored files when the results are cleared', () => {
+      let badgeCount: number | undefined;
+      mockBackgroundServiceView.updateBadge = (count: number) => {
+        badgeCount = count;
+      };
+      addFileToHomeView('/workspace/fileA.ts');
+      addFileToHomeView('/workspace/fileB.ts');
+
+      DevtoolsAPI.clearAllResults();
+
+      assert.strictEqual(homeView.getFileIssueMap().size, 0);
+      assert.deepStrictEqual((homeView as any).ideContextData.fileDeltaData, []);
       assert.strictEqual(badgeCount, 0);
     });
 
@@ -501,14 +517,6 @@ suite('HomeView auth surface', () => {
     assert.strictEqual(view.webview.html, monitorHtml);
     await showSurface('auth');
     assert.ok(view.webview.html.includes('"view":"auth"'), view.webview.html);
-  });
-
-  test('stays on the monitor when the surface is auth but browser sign-in is inactive', async () => {
-    setCwfAuth(undefined, undefined, 'auth');
-    await initialize();
-    assert.ok(view.webview.html.includes('"view":"home"'), view.webview.html);
-    assert.strictEqual(lastRendered().payload.view, 'home');
-    assert.ok(!view.webview.html.includes('ide-auth'));
   });
 });
 

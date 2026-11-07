@@ -77,6 +77,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
+      DevtoolsAPI.onDidClearResults(() => this.handleResultsCleared()),
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       CsExtensionState.onAuthChanged(() => this.refreshAceState()),
       onDidChangeCwfAuth(() => this.update()),
@@ -255,6 +256,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   private handleFileDelete(filePath: string) {
     this.removeTreeEntry(filePath);
+    this.updateActivityBadge();
+    this.rebuildFileDeltaData();
+    this.update();
+  }
+
+  private handleResultsCleared() {
+    this.fileIssueMap.clear();
     this.updateActivityBadge();
     this.rebuildFileDeltaData();
     this.update();

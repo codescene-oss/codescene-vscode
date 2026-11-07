@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
 
 import { aceSuite } from '../ace-test-suite';
 
@@ -66,6 +66,7 @@ aceSuite('Preflight Integration Test Suite', () => {
   });
 
   test('preflight returns expected response structure', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const response = await DevtoolsAPI.preflight();
@@ -95,6 +96,7 @@ aceSuite('Preflight Integration Test Suite', () => {
   });
 
   test('preflight fires state change event with enabled state on success', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const initialStateChangeFired = preflightStateChangeFired;
@@ -112,6 +114,7 @@ aceSuite('Preflight Integration Test Suite', () => {
   });
 
   test('preflight enables ACE when successful', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const initialAceState = DevtoolsAPI.aceEnabled();
@@ -127,6 +130,7 @@ aceSuite('Preflight Integration Test Suite', () => {
   });
 
   test('preflight contains expected code smells', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const response = await DevtoolsAPI.preflight();
@@ -139,6 +143,7 @@ aceSuite('Preflight Integration Test Suite', () => {
   });
 
   test('preflight contains expected file types', async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
 
     const response = await DevtoolsAPI.preflight();

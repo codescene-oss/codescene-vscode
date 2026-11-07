@@ -19,7 +19,13 @@ import { ReviewCache } from './review-cache';
 import { AbortError } from './abort-error';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
-import { CsIdeServerClient, RefactorParams, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
+import {
+  CsIdeServerClient,
+  isLicenseRequired,
+  RefactorParams,
+  ReviewQueue,
+  WatchInventory,
+} from './ide-server-client';
 import { v4 as uuid } from 'uuid';
 import { PresentedDelta, PresentedReview, ReviewPipeline, ReviewPipelinePresentation } from '../review/review-pipeline';
 import { CsReview } from '../review/cs-review';
@@ -32,6 +38,7 @@ export class DevtoolsAPI {
   private static pipeline: ReviewPipeline;
   private static queueSubscription?: vscode.Disposable;
   private static lastNetworkError = false;
+  private static licenseGate: { readonly licensed: boolean } = { licensed: false };
 
   static init(binaryPath: string, context: ExtensionContext, ideServer?: CsIdeServerClient) {
     DevtoolsAPI.pipeline?.dispose();
@@ -43,7 +50,16 @@ export class DevtoolsAPI {
     DevtoolsAPI.queueCount = 0;
     DevtoolsAPI.queueDone = 0;
     DevtoolsAPI.queued = [];
+    DevtoolsAPI.licenseGate = { licensed: false };
     DevtoolsAPI.queueSubscription = DevtoolsAPI.ideServer.onDidQueue((queue) => DevtoolsAPI.applyQueue(queue));
+  }
+
+  static useLicenseGate(gate: { readonly licensed: boolean }): void {
+    DevtoolsAPI.licenseGate = gate;
+  }
+
+  static get licensed(): boolean {
+    return DevtoolsAPI.licenseGate.licensed;
   }
 
   static get reviewPipeline(): ReviewPipeline {
@@ -64,9 +80,6 @@ export class DevtoolsAPI {
 
   static readonly onDidWatchInventory: vscode.Event<WatchInventory> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidWatchInventory(listener, thisArgs, disposables);
-
-  static readonly onDidServerStart: vscode.Event<ServerStartEvent> = (listener, thisArgs?, disposables?) =>
-    DevtoolsAPI.ideServer.onDidServerStart(listener, thisArgs, disposables);
 
   static readonly onDidQueue: vscode.Event<ReviewQueue> = (listener, thisArgs?, disposables?) =>
     DevtoolsAPI.ideServer.onDidQueue(listener, thisArgs, disposables);
@@ -144,6 +157,10 @@ export class DevtoolsAPI {
   public static readonly onDidReviewComplete = DevtoolsAPI.reviewEmitter.event;
 
   static reviewWithServer(document: vscode.TextDocument, reviewOpts?: ReviewOpts): Promise<Review | void> {
+    if (!DevtoolsAPI.licensed) {
+      logOutputChannel.debug(`[review] skipped path=${document.fileName} reason=unlicensed`);
+      return Promise.resolve(undefined);
+    }
     const repoRoot = DevtoolsAPI.repoRootFor(document);
     return DevtoolsAPI.pipeline.submit(repoRoot, {
       document,
@@ -176,8 +193,12 @@ export class DevtoolsAPI {
       reviewFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName),
       deltaStarted: (document) => DevtoolsAPI.startAnalysisEvent(document.fileName, true),
       deltaFinished: (document) => DevtoolsAPI.endAnalysisEvent(document.fileName, true),
-      presentReview: (review) => DevtoolsAPI.presentServerReview(review),
-      presentDelta: (delta) => DevtoolsAPI.presentServerDelta(delta),
+      presentReview: (review) => {
+        if (DevtoolsAPI.licensed) DevtoolsAPI.presentServerReview(review);
+      },
+      presentDelta: (delta) => {
+        if (DevtoolsAPI.licensed) DevtoolsAPI.presentServerDelta(delta);
+      },
       remove: (document) => DevtoolsAPI.removeServerReview(document),
       failed: (error) => DevtoolsAPI.analysisErrorEmitter.fire(error),
     };
@@ -209,6 +230,7 @@ export class DevtoolsAPI {
   private static async enrichServerDelta(document: TextDocument, result: Delta, updateMonitor: boolean): Promise<void> {
     try {
       await addRefactorableFunctionsToDeltaResult(document, result);
+      if (!DevtoolsAPI.licensed) return;
       DevtoolsAPI.deltaAnalysisEmitter.fire({ document, result, updateMonitor, enrichment: true });
     } catch (error) {
       logOutputChannel.warn(`[cs-ide] could not enrich delta for ${document.fileName}: ${assertError(error).message}`);
@@ -221,6 +243,15 @@ export class DevtoolsAPI {
     fireFileDeletedFromGit(document.uri.fsPath);
   }
 
+  static clearAllResults(): void {
+    DevtoolsAPI.pipeline?.clear();
+    CsDiagnostics.clear();
+    Reviewer.instance?.reviewCache.clear();
+    DevtoolsAPI.resultsClearedEmitter.fire();
+  }
+
+  private static readonly resultsClearedEmitter = new vscode.EventEmitter<void>();
+  public static readonly onDidClearResults = DevtoolsAPI.resultsClearedEmitter.event;
   private static readonly deltaAnalysisEmitter = new vscode.EventEmitter<DeltaAnalysisEvent>();
   public static readonly onDidDeltaAnalysisComplete = DevtoolsAPI.deltaAnalysisEmitter.event;
   private static readonly preflightRequestEmitter = new vscode.EventEmitter<CsFeature>();
@@ -236,6 +267,10 @@ export class DevtoolsAPI {
       DevtoolsAPI.preflightRequestEmitter.fire({ state: 'enabled' });
       return response;
     } catch (e) {
+      if (isLicenseRequired(e)) {
+        DevtoolsAPI.preflightRequestEmitter.fire({ state: 'disabled' });
+        return;
+      }
       if (DevtoolsAPI.shouldHandleOfflineBehavior(e)) {
         DevtoolsAPI.handleOfflineBehavior();
         return;
@@ -271,7 +306,11 @@ export class DevtoolsAPI {
       preflight: JSON.parse(DevtoolsAPI.preflightJson!),
       ...(cachePath ? { 'cache-path': cachePath } : {}),
       ...args,
+    }).catch((e: unknown) => {
+      if (isLicenseRequired(e)) return undefined;
+      throw e;
     });
+    if (!ret) return;
     ret.forEach((fn) => (fn.vscodeRange = vscodeRange(fn.range)!));
     logOutputChannel.debug(`Completed fns-to-refactor for ${basename(document.fileName)}, found ${ret.length} function(s)`);
     return ret;
@@ -380,6 +419,7 @@ export class DevtoolsAPI {
     try { DevtoolsAPI.analysisErrorEmitter.dispose(); } catch {}
     try { DevtoolsAPI.reviewEmitter.dispose(); } catch {}
     try { DevtoolsAPI.deltaAnalysisEmitter.dispose(); } catch {}
+    try { DevtoolsAPI.resultsClearedEmitter.dispose(); } catch {}
     try { DevtoolsAPI.preflightRequestEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringRequestEmitter.dispose(); } catch {}
     try { DevtoolsAPI.refactoringErrorEmitter.dispose(); } catch {}

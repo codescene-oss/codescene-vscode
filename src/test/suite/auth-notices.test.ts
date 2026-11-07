@@ -1,89 +1,129 @@
 import * as assert from 'assert';
-import { AuthNotices, DONT_SHOW_AGAIN, shouldNudge } from '../../auth/auth-notices';
+import { AuthNotices } from '../../auth/auth-notices';
 import { INACTIVE_SNAPSHOT, type AuthSnapshot } from '../../auth/auth-payload';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import { createHarness } from '../fakes/auth-service-harness';
+import { flushPromises } from '../fakes/fake-auth-transport';
 
-const SIGN_IN_TEXT = 'Sign in to CodeScene in your browser to connect the extension to your account.';
-const settingTokenRejected: AuthStatus = {
-  ...authStatusFixture('signed-out'),
-  'oauth-supported': true,
-  error: { code: 'auth/invalid-token', message: 'The access token was rejected by CodeScene.' },
-};
+const ACTIVATION_MESSAGE = 'CodeScene requires a CodeScene account. Sign in to get Code Health analysis in your editor.';
 
-function active(status: AuthStatus): AuthSnapshot {
+function active(status: AuthStatus | null): AuthSnapshot {
   return { ...INACTIVE_SNAPSHOT, active: true, status };
 }
 
-function memento() {
-  const values = new Map<string, unknown>();
-  return {
-    values,
-    get: (key: string): any => values.get(key),
-    update: async (key: string, value: unknown) => {
-      values.set(key, value);
-    },
-  };
+function unlicensedStatus(): AuthStatus {
+  return authStatusFixture('signed-out');
 }
 
-function noticeHarness(choice: string | undefined, state = memento()) {
-  const shown: string[] = [];
+function resolvingStatus(): AuthStatus {
+  return { ...authStatusFixture('signed-in-oauth'), license: null };
+}
+
+interface NoticeHarnessResult {
+  notices: AuthNotices;
+  shown: Array<{ message: string; items: string[] }>;
+  calls: string[];
+  telemetry: Array<{ name: string; data?: Record<string, unknown> }>;
+}
+
+function noticeHarness(choice: string | undefined): NoticeHarnessResult {
+  const shown: Array<{ message: string; items: string[] }> = [];
   const calls: string[] = [];
-  const notices = new AuthNotices(state, {
-    show: async (message: string) => {
-      shown.push(message);
+  const telemetry: Array<{ name: string; data?: Record<string, unknown> }> = [];
+  const notices = new AuthNotices({
+    show: async (message: string, ...items: string[]) => {
+      shown.push({ message, items });
       return choice;
     },
     signIn: async () => calls.push('signIn'),
+    focusHomeView: async () => calls.push('focusHomeView'),
+    logUsage: (name: string, data?: Record<string, unknown>) => telemetry.push({ name, data }),
   });
-  return { notices, shown, calls, state };
+  return { notices, shown, calls, telemetry };
 }
 
-suite('shouldNudge', () => {
-  const cases: Array<{ name: string; snapshot: AuthSnapshot; expected: boolean }> = [
-    { name: 'inactive sign-in', snapshot: INACTIVE_SNAPSHOT, expected: false },
-    { name: 'signed out', snapshot: active(authStatusFixture('signed-out')), expected: true },
-    { name: 'signed out after cs-ide skipped a rejected setting token', snapshot: active(settingTokenRejected), expected: true },
-    { name: 'an env token', snapshot: active(authStatusFixture('signed-out-env-token-invalid')), expected: false },
-    { name: 'a server without OAuth', snapshot: active(authStatusFixture('signed-out-oauth-unsupported')), expected: false },
-    { name: 'a previous sign-in error', snapshot: active(authStatusFixture('signed-out-timeout')), expected: false },
-    { name: 'signed in', snapshot: active(authStatusFixture('signed-in-oauth')), expected: false },
-    {
-      name: 'signed in with a rejected setting token',
-      snapshot: active(authStatusFixture('signed-in-oauth-setting-token-rejected')),
-      expected: false,
-    },
-  ];
-
-  for (const { name, snapshot, expected } of cases) {
-    test(`nudges for ${name}: ${expected}`, () => {
-      assert.strictEqual(shouldNudge(snapshot), expected);
-    });
-  }
-});
-
 suite('AuthNotices', () => {
-  test('shows the sign-in nudge once per session', async () => {
+  test('shows-activation-notice-once', async () => {
     const { notices, shown } = noticeHarness(undefined);
-    await notices.update(active(authStatusFixture('signed-out')));
-    await notices.update(active(authStatusFixture('signed-out')));
-    assert.deepStrictEqual(shown, [SIGN_IN_TEXT]);
+    await notices.update(active(unlicensedStatus()));
+    await notices.update(active(unlicensedStatus()));
+    assert.strictEqual(shown.length, 1);
+    assert.strictEqual(shown[0].message, ACTIVATION_MESSAGE);
+    assert.deepStrictEqual(shown[0].items, ['Sign in', 'Use access token']);
   });
 
-  test("persists Don't show again across sessions", async () => {
-    const first = noticeHarness(DONT_SHOW_AGAIN);
-    await first.notices.update(active(authStatusFixture('signed-out')));
-    const second = noticeHarness(undefined, first.state);
-    await second.notices.update(active(authStatusFixture('signed-out')));
-    assert.deepStrictEqual(
-      { stored: first.state.values.get('codescene.auth.signInNudgeDismissed'), shownAgain: second.shown },
-      { stored: true, shownAgain: [] }
-    );
+  test('no-notice-while-resolving', async () => {
+    const { notices, shown } = noticeHarness(undefined);
+    await notices.update(active(resolvingStatus()));
+    assert.deepStrictEqual(shown, []);
   });
 
-  test('Sign in starts the sign-in command', async () => {
+  test('sign-in-action-starts-sign-in', async () => {
     const { notices, calls } = noticeHarness('Sign in');
-    await notices.update(active(authStatusFixture('signed-out')));
+    await notices.update(active(unlicensedStatus()));
     assert.deepStrictEqual(calls, ['signIn']);
+  });
+
+  test('use-access-token-action-focuses-home-view', async () => {
+    const { notices, calls } = noticeHarness('Use access token');
+    await notices.update(active(unlicensedStatus()));
+    assert.deepStrictEqual(calls, ['focusHomeView']);
+  });
+
+  test('gate-shown-once-per-session', async () => {
+    const harness = createHarness();
+    const shown: Array<{ message: string; items: string[] }> = [];
+    const telemetry: Array<{ name: string; data?: Record<string, unknown> }> = [];
+    const notices = new AuthNotices({
+      show: async (message: string, ...items: string[]) => {
+        shown.push({ message, items });
+        return undefined;
+      },
+      signIn: async () => undefined,
+      focusHomeView: async () => undefined,
+      logUsage: (name: string, data?: Record<string, unknown>) => telemetry.push({ name, data }),
+    });
+
+    harness.service.onDidChange((snapshot) => void notices.update(snapshot));
+    await harness.service.start();
+    await flushPromises();
+
+    harness.transport.notify(unlicensedStatus());
+    await flushPromises();
+
+    harness.transport.notify(authStatusFixture('signed-in-oauth'));
+    await flushPromises();
+
+    harness.transport.emitRestart();
+    await flushPromises();
+
+    harness.transport.notify(unlicensedStatus());
+    await flushPromises();
+
+    assert.strictEqual(shown.length, 1, 'should show notification only once');
+    assert.strictEqual(shown[0].message, ACTIVATION_MESSAGE);
+    assert.strictEqual(telemetry.length, 1, 'should log telemetry only once');
+    assert.strictEqual(telemetry[0].name, 'auth/gate-shown');
+  });
+
+  test('no-notice-across-a-licensed-restart', async () => {
+    const harness = createHarness();
+    harness.transport.respond('cs-ide/auth-configure', () => authStatusFixture('signed-in-oauth'));
+    const { notices, shown, telemetry } = noticeHarness(undefined);
+    const snapshots: number[] = [];
+    harness.service.onDidChange((snapshot) => {
+      snapshots.push(snapshot.serverStart);
+      void notices.update(snapshot);
+    });
+    await harness.service.start();
+    await flushPromises();
+
+    harness.transport.emitRestart();
+    await flushPromises();
+
+    assert.ok(snapshots.includes(2), `the restarted cs-ide answered: ${JSON.stringify(snapshots)}`);
+    assert.deepStrictEqual(shown, []);
+    assert.deepStrictEqual(telemetry, []);
   });
 });

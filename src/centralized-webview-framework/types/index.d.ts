@@ -7,7 +7,6 @@ import { ObjectivesSnapshot } from './objectives';
 export interface AuthField {
   auth?: AuthPayload;
   authFlow?: AuthFlow;
-  signInBannerHidden?: boolean;
 }
 
 export interface ObjectivesField {

@@ -40,8 +40,8 @@ export class AuthService implements vscode.Disposable {
   private snapshot: AuthSnapshot = INACTIVE_SNAPSHOT;
   private capable = false;
   private enabled = false;
-  private optedIn = false;
   private startHandled = false;
+  private serverStarts = 0;
   private syncOnSignIn = false;
   private syncSupported = true;
   private configureSeq = 0;
@@ -55,7 +55,6 @@ export class AuthService implements vscode.Disposable {
   private settlingGen: number | undefined;
   private repoSeq = 0;
   private repoSyncing = false;
-  private signInBannerHidden = false;
   readonly onDidChange = this.emitter.event;
   private readonly requestEmitter = new vscode.EventEmitter<void>();
   readonly onDidRequestAuth = this.requestEmitter.event;
@@ -124,12 +123,6 @@ export class AuthService implements vscode.Disposable {
   skipProject(): void {
     if (this.flow.kind !== 'sign-in') return;
     this.flow = { ...this.flow, projectSkipped: true };
-    this.publish(this.snapshot);
-  }
-
-  hideSignInBanner(): void {
-    if (!this.enabled) return;
-    this.signInBannerHidden = true;
     this.publish(this.snapshot);
   }
 
@@ -222,14 +215,14 @@ export class AuthService implements vscode.Disposable {
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {
     this.startHandled = true;
+    this.serverStarts++;
     this.syncSupported = true;
     this.capable = metadata.capabilities?.includes(AUTH_CAPABILITY) === true;
-    this.optedIn = false;
+    this.enabled = this.capable;
     await this.refresh();
   }
 
   private async refresh(): Promise<void> {
-    this.enabled = this.capable && this.deps.settings.read().signInEnabled;
     if (this.enabled) {
       await this.configure();
       return;
@@ -239,23 +232,10 @@ export class AuthService implements vscode.Disposable {
     this.loginEpoch++;
     this.resetFlow();
     this.publish({ ...INACTIVE_SNAPSHOT, repo: this.snapshot.repo });
-    await this.optOut();
-  }
-
-  private async optOut(): Promise<void> {
-    if (!this.optedIn) return;
-    this.optedIn = false;
-    logOutputChannel.info('[auth] browser sign-in turned off; restarting cs-ide');
-    try {
-      await this.deps.transport.restart();
-    } catch {
-      logOutputChannel.warn('[auth] cs-ide restart after turning off sign-in failed');
-    }
   }
 
   private async configure(): Promise<void> {
     const seq = ++this.configureSeq;
-    this.optedIn = true;
     this.syncOnSignIn = true;
     try {
       const status = await this.rpc.configure(authConfiguration(this.deps.settings.read()));
@@ -269,7 +249,7 @@ export class AuthService implements vscode.Disposable {
     if (!this.enabled) return;
     this.logEvent(signInOutcome(this.snapshot.status, status));
     const startAccountLoad = this.prepareAccountLoad(status, reloadAccountData);
-    this.publish({ ...this.snapshot, active: true, status });
+    this.publish({ ...this.snapshot, active: true, status, serverStart: this.serverStarts });
     startAccountLoad();
     const signedIn = accountDataKey(status) !== undefined;
     const sync = this.takeSignInSync(signedIn);
@@ -392,7 +372,6 @@ export class AuthService implements vscode.Disposable {
       step: step === 'done' ? 'summary' : step,
       context: this.flow.kind === 'sign-in' ? 'sign-in' : 'manual',
       syncing: this.isSyncing(),
-      signInBannerHidden: this.signInBannerHidden,
     };
   }
 

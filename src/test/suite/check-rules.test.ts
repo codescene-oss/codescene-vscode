@@ -5,7 +5,7 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { CodeHealthRulesResult } from '../../devtools-api/model';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
 
 suite('Check Rules Test Suite', () => {
   const testDir = createTestDir('test-check-rules');
@@ -30,6 +30,7 @@ suite('Check Rules Test Suite', () => {
   }
 
   setup(async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });

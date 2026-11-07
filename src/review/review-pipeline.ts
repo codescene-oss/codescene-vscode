@@ -246,6 +246,14 @@ export class ReviewPipeline implements vscode.Disposable {
     logOutputChannel.debug(`[pipeline] epochInvalidated dedupEpoch=${this.dedupEpoch}`);
   }
 
+  clear(): void {
+    Array.from(this.pendingById.values()).forEach((pending) => this.ignorePending(pending));
+    this.latestByPath.clear();
+    this.watchReviews.clear();
+    this.bufferOwnedPaths.clear();
+    this.invalidate();
+  }
+
   dispose(): void {
     this.failAll(new Error('Review pipeline stopped'));
     this.disposables.forEach((disposable) => disposable.dispose());
@@ -475,14 +483,25 @@ export class ReviewPipeline implements vscode.Disposable {
   }
 
   private handleFailure(failure: ReviewFailed): void {
+    const licenseRequired = failure.code === 'auth/license-required';
     if (!failure.id) {
-      logOutputChannel.warn(`[pipeline] watch reviewFailed path=${failure.path} repo=${failure.repoRoot}: ${failure.message}`);
+      const message = `[pipeline] watch reviewFailed path=${failure.path} repo=${failure.repoRoot}: ${failure.message}`;
+      if (licenseRequired) logOutputChannel.debug(message);
+      else logOutputChannel.warn(message);
       return;
     }
     const pending = this.pendingById.get(failure.id);
     if (!pending) return;
     if (!this.isCurrent(pending, failure.repoRoot, failure.path)) {
       this.ignorePending(pending);
+      return;
+    }
+    if (licenseRequired) {
+      logOutputChannel.debug(
+        `[pipeline] review refused ${formatLogFields({ id: pending.id, path: pending.relPath, reason: failure.code })}`
+      );
+      this.completePending(pending);
+      this.latestByPath.delete(pending.pathKey);
       return;
     }
     const error = new Error(failure.message);

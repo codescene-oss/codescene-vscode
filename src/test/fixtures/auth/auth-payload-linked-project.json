@@ -7,7 +7,7 @@
     "oauth-supported": true,
     "user": { "id": "1234", "name": "Ada Lovelace" },
     "account": { "id": "42", "name": "Acme Corp" },
-    "license": { "pro": true },
+    "license": { "pro": true, "state": "valid" },
     "ace-credential": true,
     "expires-at": 1792000000,
     "login": null,
