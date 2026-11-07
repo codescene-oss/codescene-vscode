@@ -6,7 +6,7 @@ export interface LicenseHooks {
   onServerRelicensed(): void;
 }
 
-export function isLicensed(snapshot: AuthSnapshot): boolean {
+export function isLicensed(snapshot: Pick<AuthSnapshot, 'active' | 'status'>): boolean {
   return snapshot.active && snapshot.status?.state === 'signed-in' && snapshot.status.license?.state === 'valid';
 }
 

@@ -1,5 +1,6 @@
 import vscode from 'vscode';
 import type { AuthSnapshot } from '../auth/auth-payload';
+import { isLicensed } from '../auth/license-gate';
 import { logOutputChannel } from '../log';
 import { setCwfObjectives } from './cwf-objectives';
 import { ObjectivesService } from './objectives-service';
@@ -20,6 +21,6 @@ export function activateObjectives(transport: ObjectivesTransport): ObjectivesFe
   return {
     disposables,
     update: ({ active, status, syncing, repo }) =>
-      service.setContext({ active, settled: status?.state === 'signed-in' && !syncing, repoPath: repo?.path }),
+      service.setContext({ active, settled: isLicensed({ active, status }) && !syncing, repoPath: repo?.path }),
   };
 }
