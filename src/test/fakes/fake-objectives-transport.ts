@@ -8,11 +8,21 @@ export interface RecordedObjectivesRequest {
   params: unknown;
 }
 
+export type GoalWorkSessionStartResult =
+  | { result: 'started' }
+  | { result: 'unavailable' }
+  | { result: 'goal-inactive' }
+  | { result: 'parent-inactive' }
+  | { result: 'network' }
+  | { result: 'scope-missing' }
+  | { result: 'signed-out' };
+
 export class FakeObjectivesTransport implements ObjectivesTransport {
   readonly requests: RecordedObjectivesRequest[] = [];
   private readonly startEmitter = new EventEmitter<ServerStartEvent>();
   private readonly objectivesEmitter = new EventEmitter<ObjectivesSnapshot>();
   private failure: Error | undefined;
+  private workSessionStartResult: GoalWorkSessionStartResult | undefined;
   readonly onDidServerStart = this.startEmitter.event;
   readonly onDidObjectivesChange = this.objectivesEmitter.event;
 
@@ -29,9 +39,21 @@ export class FakeObjectivesTransport implements ObjectivesTransport {
     this.failure = error;
   }
 
+  setWorkSessionStartResult(result: GoalWorkSessionStartResult): void {
+    this.workSessionStartResult = result;
+  }
+
   async request<T>(method: string, params: unknown): Promise<T> {
     this.requests.push({ method, params });
     if (this.failure) throw this.failure;
+
+    if (method === 'cs-ide/goalWorkSessionStart') {
+      if (!this.workSessionStartResult) {
+        throw new Error('Work session start result not configured');
+      }
+      return this.workSessionStartResult as T;
+    }
+
     return this.answer((params as { 'repo-path': string })['repo-path']) as T;
   }
 
