@@ -2,11 +2,13 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
   NOT_SIGNED_IN_MESSAGE,
+  REAUTHORIZE_CONTEXT_KEY,
   registerAuthCommands,
   SIGN_IN_COMMAND,
   SIGN_IN_INACTIVE_MESSAGE,
   SIGN_OUT_COMMAND,
   TOKEN_SIGN_OUT_MESSAGE,
+  updateAuthContextKeys,
 } from '../../auth/auth-commands';
 import { INACTIVE_SNAPSHOT, type AuthSnapshot } from '../../auth/auth-payload';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
@@ -48,6 +50,9 @@ suite('auth commands', () => {
       },
       openAuth: (screen?: 'account' | 'project') => {
         calls.push(screen ? `openAuth:${screen}` : 'openAuth');
+      },
+      reauthorize: async () => {
+        calls.push('reauthorize');
       },
     };
     registerAuthCommands(service);
@@ -105,5 +110,56 @@ suite('auth commands', () => {
     const calls = register(active(authStatusFixture('signed-out')));
     await run('codescene.openAccount');
     assert.deepStrictEqual(calls, ['openAuth']);
+  });
+
+  test('reauthorize-command-registered-test', async () => {
+    const calls: string[] = [];
+    const snapshot = active({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    const service = {
+      current: snapshot,
+      signIn: async () => {},
+      signOut: async () => {},
+      openAuth: () => {},
+      reauthorize: async () => {
+        calls.push('reauthorize');
+      },
+    };
+    registerAuthCommands(service);
+    await run('codescene.reauthorize');
+    assert.deepStrictEqual(calls, ['reauthorize']);
+  });
+
+  test('reauthorize-command-noop-when-not-needed-test', async () => {
+    const notNeeded = register(active({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': false }));
+    await run('codescene.reauthorize');
+    const inactive = register({
+      ...INACTIVE_SNAPSHOT,
+      status: { ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true },
+    });
+    await run('codescene.reauthorize');
+    assert.deepStrictEqual({ notNeeded, inactive, infos }, { notNeeded: [], inactive: [], infos: [] });
+  });
+
+  test('reauthorize-context-key-follows-status-test', () => {
+    const originalExecute = vscode.commands.executeCommand;
+    const contexts: Array<[string, unknown]> = [];
+    (vscode.commands as any).executeCommand = async (id: string, key: string, value: unknown) => {
+      if (id === 'setContext' && key === REAUTHORIZE_CONTEXT_KEY) contexts.push([key, value]);
+    };
+    try {
+      updateAuthContextKeys(active({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true }));
+      updateAuthContextKeys(active({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': false }));
+      updateAuthContextKeys({
+        ...INACTIVE_SNAPSHOT,
+        status: { ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true },
+      });
+    } finally {
+      (vscode.commands as any).executeCommand = originalExecute;
+    }
+    assert.deepStrictEqual(contexts, [
+      [REAUTHORIZE_CONTEXT_KEY, true],
+      [REAUTHORIZE_CONTEXT_KEY, false],
+      [REAUTHORIZE_CONTEXT_KEY, false],
+    ]);
   });
 });

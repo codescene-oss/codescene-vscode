@@ -14,6 +14,7 @@ import * as path from 'path';
 import vscode from 'vscode';
 import { AuthRpc } from '../../auth/auth-rpc';
 import { ObjectivesRpc } from '../../objectives/objectives-rpc';
+import { GoalWorkSessionRpc } from '../../objectives/goal-work-session-rpc';
 import { authConfiguration } from '../../auth/auth-settings';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
@@ -227,6 +228,7 @@ suite('Contract outbound params Test Suite', () => {
     },
     { method: 'cs-ide/auth-status', variants: { 'no inputs': () => auth.status() } },
     { method: 'cs-ide/auth-login', variants: { 'no inputs': () => auth.login() } },
+    { method: 'cs-ide/auth-reauthorize', variants: { 'no inputs': () => auth.reauthorize() } },
     { method: 'cs-ide/auth-cancel-login', variants: { 'all inputs': () => auth.cancelLogin('login-1') } },
     { method: 'cs-ide/auth-logout', variants: { 'no inputs': () => auth.logout() } },
     { method: 'cs-ide/auth-list-accounts', variants: { 'no inputs': () => auth.listAccounts() } },
@@ -239,6 +241,12 @@ suite('Contract outbound params Test Suite', () => {
       variants: {
         'all inputs': () => new ObjectivesRpc(client).snapshot(REPO, true),
         'optional inputs missing': () => new ObjectivesRpc(client).snapshot(REPO),
+      },
+    },
+    {
+      method: 'cs-ide/goalWorkSessionStart',
+      variants: {
+        'all inputs': () => new GoalWorkSessionRpc(client).start(REPO, 123),
       },
     },
     {

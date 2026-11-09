@@ -78,6 +78,24 @@ export interface LocalResult {
   files?: LocalFileResult[];
 }
 
+/** A participant in a Goal work session. */
+export interface WorkSessionParticipant {
+  actor: string;
+  you: boolean;
+  "started-at": string;
+}
+
+/** Goal work session presence and state. */
+export interface GoalWorkSessions {
+  state: "ok" | "scope-missing" | "unavailable";
+  reauthorize: boolean;
+  participants: WorkSessionParticipant[];
+  mine?: {
+    "session-id": number;
+    "started-at": string;
+  };
+}
+
 /** A Policy, Target or Goal that covers the repository. */
 export interface Objective {
   kind: ObjectiveKind;
@@ -93,6 +111,8 @@ export interface Objective {
   subject: ObjectiveSubject;
   shared?: SharedResult;
   local: LocalResult;
+  /** Goal work sessions (Goals only). */
+  "work-sessions"?: GoalWorkSessions;
 }
 
 /** The CodeScene project the repository is linked to. */

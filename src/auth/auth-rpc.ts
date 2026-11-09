@@ -44,6 +44,10 @@ export class AuthRpc {
     return this.transport.request('cs-ide/auth-login', {});
   }
 
+  reauthorize(): Promise<LoginStart> {
+    return this.transport.request('cs-ide/auth-reauthorize', {});
+  }
+
   cancelLogin(loginId: string): Promise<AuthStatus> {
     return this.transport.request('cs-ide/auth-cancel-login', { 'login-id': loginId });
   }
