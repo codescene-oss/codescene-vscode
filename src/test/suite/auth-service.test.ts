@@ -730,6 +730,19 @@ suite('AuthService actions', () => {
       }
     );
   });
+
+  test('reauthorize-completed-forgets-login-test', async () => {
+    const reauthorizeUrl = 'https://codescene.acme.internal/oauth/authorize?state=reauth-xyz';
+    harness = createHarness();
+    harness.transport.respond('cs-ide/auth-reauthorize', () => ({ 'login-id': 'reauth-1', 'authorize-url': reauthorizeUrl }));
+    harness.transport.respond('cs-ide/auth-cancel-login', () => authStatusFixture('signed-in-oauth'));
+    await harness.service.start();
+    harness.transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
+    await harness.service.reauthorize();
+    harness.transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': false });
+    await harness.service.closeAuth();
+    assert.ok(!harness.transport.methods().includes('cs-ide/auth-cancel-login'));
+  });
 });
 
 suite('AuthService flow payload', () => {
