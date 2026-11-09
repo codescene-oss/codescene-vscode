@@ -16,6 +16,10 @@ export interface ObjectivesContext {
   repoPath: string | undefined;
 }
 
+function containsGoal(snapshot: ObjectivesSnapshot, goalId: number): boolean {
+  return snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId);
+}
+
 export class ObjectivesService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -45,12 +49,12 @@ export class ObjectivesService implements vscode.Disposable {
   findSnapshotWithGoal(goalId: number): ObjectivesSnapshot | undefined {
     // Prefer the current snapshot when it contains the goal
     const current = this.current;
-    if (current && current.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+    if (current && containsGoal(current, goalId)) {
       return current;
     }
     // Fall back to other cached snapshots
     for (const snapshot of this.snapshots.values()) {
-      if (snapshot.objectives.some((obj) => obj.kind === 'goal' && obj.id === goalId)) {
+      if (containsGoal(snapshot, goalId)) {
         return snapshot;
       }
     }
