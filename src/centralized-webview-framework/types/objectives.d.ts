@@ -27,6 +27,8 @@ export interface ObjectiveThreshold {
 export interface ObjectiveParent {
   kind: ObjectiveKind;
   id: number;
+  /** Who created the parent objective. Absent when it could not be resolved. */
+  "created-by-display-name"?: string;
 }
 
 /** A file a Goal is about. */
@@ -81,6 +83,8 @@ export interface LocalResult {
 /** A participant in a Goal work session. */
 export interface WorkSessionParticipant {
   actor: string;
+  /** The participant's name. Absent when it could not be resolved. */
+  "display-name"?: string;
   you: boolean;
   "started-at": string;
 }
@@ -107,6 +111,8 @@ export interface Objective {
   /** The metric, for example average-code-health. */
   "metric-id": string;
   threshold: ObjectiveThreshold;
+  /** Who created the objective. Absent when it could not be resolved. */
+  "created-by-display-name"?: string;
   parent?: ObjectiveParent;
   subject: ObjectiveSubject;
   shared?: SharedResult;
