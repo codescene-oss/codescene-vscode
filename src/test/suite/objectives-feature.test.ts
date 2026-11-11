@@ -12,6 +12,7 @@ import { fixture } from '../contract/contract';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import { DevtoolsAPI } from '../../devtools-api';
 
 const REPO = '/work/repo-a';
 const GOAL_ID = 42;
@@ -146,5 +147,82 @@ suite('Objectives feature work sessions', () => {
         consoleWarnings: ['[objectives] Message goal-work-session-start received but objectives actions not registered'],
       }
     );
+  });
+});
+
+import { aceTest } from '../ace-test-suite';
+
+suite('Objectives feature fix goal', () => {
+  let transport: FakeObjectivesTransport;
+  let feature: ObjectivesFeature;
+  let executed: Array<{ command: string; args: unknown[] }>;
+  let originalExecute: typeof vscode.commands.executeCommand;
+  let originalOpenTextDocument: typeof vscode.workspace.openTextDocument;
+
+  const path = 'src/orders.js';
+
+  function snapshotWithGoalAndFile(repoRoot: string): ObjectivesSnapshot {
+    const snapshot = { ...fixture('objectives-snapshot', 'full', 'entity'), 'repo-root': repoRoot };
+    snapshot.objectives = [
+      {
+        ...snapshot.objectives[0],
+        kind: 'goal' as const,
+        id: GOAL_ID,
+        local: {
+          result: 'violated' as const,
+          reason: 'threshold-not-met',
+          files: [
+            {
+              path,
+              result: 'violated' as const,
+              reason: 'threshold-not-met',
+              value: 6,
+              'comparison-value': 9,
+            },
+          ],
+        },
+      },
+    ];
+    return snapshot;
+  }
+
+  setup(() => {
+    executed = [];
+    originalExecute = vscode.commands.executeCommand;
+    originalOpenTextDocument = vscode.workspace.openTextDocument;
+    (vscode.commands as any).executeCommand = (command: string, ...args: unknown[]) => {
+      executed.push({ command, args });
+      return Promise.resolve(undefined);
+    };
+    (vscode.workspace as any).openTextDocument = () => Promise.resolve({});
+  });
+
+  teardown(() => {
+    feature?.disposables.forEach((disposable) => disposable.dispose());
+    setCwfObjectives(undefined);
+    (vscode.commands as any).executeCommand = originalExecute;
+    (vscode.workspace as any).openTextDocument = originalOpenTextDocument;
+  });
+
+  async function activate(): Promise<void> {
+    transport = new FakeObjectivesTransport(
+      { sha: 'sha', version: 'version', capabilities: [OBJECTIVES_CAPABILITY] },
+      snapshotWithGoalAndFile
+    );
+    feature = activateObjectives(transport);
+    feature.update(signedIn(false));
+    await flushPromises();
+  }
+
+  aceTest('routes a fix-goal webview message to the requestAndPresentRefactoring command', async () => {
+    DevtoolsAPI.enableAce();
+    await activate();
+    await handleCWFMessage({} as any, { messageType: 'fix-goal', payload: { goalId: GOAL_ID, path } });
+    assert.strictEqual(executed.length, 1);
+    assert.strictEqual(executed[0].command, 'codescene.requestAndPresentRefactoring');
+    assert.strictEqual(executed[0].args[1], 'objectives');
+    const target = executed[0].args[5] as any;
+    assert.strictEqual(target.repoRoot, REPO);
+    DevtoolsAPI.disableAce();
   });
 });

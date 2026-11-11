@@ -3,7 +3,7 @@ const lifecycleMessages = ['init'] as const;
 const panelMessages = ['request-and-present-refactoring', 'open-docs-for-function'] as const;
 const editorMessages = ['goto-function-location', 'open-settings'] as const;
 const analysisMessages = ['stop-analysis', 'start-analysis'] as const;
-const objectivesMessages = ['goal-work-session-start'] as const;
+const objectivesMessages = ['goal-work-session-start', 'fix-goal'] as const;
 
 const categorySets = {
   lifecycle: new Set<string>(lifecycleMessages),
