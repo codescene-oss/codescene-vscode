@@ -5,10 +5,17 @@ import { FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-mode
 import { TestTextDocument } from '../mocks/test-text-document';
 import { Range, Position } from '../mocks/vscode';
 import { aceSuite } from '../ace-test-suite';
+import { CsExtensionState } from '../../cs-extension-state';
+import { createMockExtensionContext } from '../mocks/mock-extension-context';
+import { CsRefactoringCommands } from '../../refactoring/commands';
+import * as unsavedChanges from '../../refactoring/unsaved-changes';
+import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 
 aceSuite('RefactoringRequest Test Suite', () => {
   let postRefactoringCallCount: number;
   let originalPostRefactoring: any;
+  let originalEnsureSaved: any;
+  let originalPanelShow: any;
   const mockResponse: RefactorResponse = {
     code: 'refactored code',
     confidence: {
@@ -45,10 +52,16 @@ aceSuite('RefactoringRequest Test Suite', () => {
       postRefactoringCallCount++;
       return Promise.resolve(mockResponse);
     };
+    originalEnsureSaved = unsavedChanges.ensureSavedForRefactoring;
+    (unsavedChanges as any).ensureSavedForRefactoring = async () => true;
+    originalPanelShow = CodeSceneCWFAceAcknowledgementTabPanel.show;
+    CodeSceneCWFAceAcknowledgementTabPanel.show = () => {};
   });
 
   teardown(() => {
     DevtoolsAPI.postRefactoring = originalPostRefactoring;
+    (unsavedChanges as any).ensureSavedForRefactoring = originalEnsureSaved;
+    CodeSceneCWFAceAcknowledgementTabPanel.show = originalPanelShow;
   });
 
   test('constructing a request does not start the agent', () => {
@@ -75,12 +88,19 @@ aceSuite('RefactoringRequest Test Suite', () => {
     await promise1;
   });
 
-  test('the acknowledgement panel does not start the agent', () => {
+  test('the acknowledgement panel does not start the agent', async () => {
+    const context = createMockExtensionContext('/tmp/test');
+    CsExtensionState.init(context);
+    await CsExtensionState.setAcknowledgedAceUsage(false);
+
+    const commands = new CsRefactoringCommands();
     const doc = new TestTextDocument('test content', 'test.ts', 'typescript');
     const fnToRefactor = createMockFnToRefactor();
 
-    new RefactoringRequest(fnToRefactor, doc);
+    await (commands as any).requestAndPresentRefactoringCmd(doc, 'test-source', fnToRefactor);
 
     assert.strictEqual(postRefactoringCallCount, 0);
+
+    commands.dispose();
   });
 });
