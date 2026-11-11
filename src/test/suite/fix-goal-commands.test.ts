@@ -6,11 +6,14 @@ import { fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { FixGoalTarget } from '../../refactoring/agent-types';
 import { aceSuite } from '../ace-test-suite';
-import { resetExecutedCommands } from '../mocks/vscode';
-import { resetWebviewPanelMocks } from '../setup';
+import { getAppliedEdits, getWebviewMessageHandler, resetAppliedEdits, resetWebviewPanelMocks } from '../setup';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
-import * as csExtensionState from '../../cs-extension-state';
-import { DevtoolsAPI } from '../../devtools-api';
+import { CsExtensionState } from '../../cs-extension-state';
+import { createMockExtensionContext } from '../mocks/mock-extension-context';
+import { CodeSceneCWFAceTabPanel } from '../../codescene-tab/webview/ace/cwf-webview-ace-panel';
+import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
+import { SAVE_AND_REFACTOR } from '../../refactoring/unsaved-changes';
+import { flushPromises } from '../fakes/fake-auth-transport';
 
 const goal: FixGoalTarget = {
   goalId: 2,
@@ -23,14 +26,13 @@ const goal: FixGoalTarget = {
 };
 
 let document: TestTextDocument;
-const edits: Array<{ uri: vscode.Uri; range: vscode.Range; newText: string }> = [];
 const warnings: string[] = [];
-const executed: string[] = [];
+const executed: Array<{ command: string; args: unknown[] }> = [];
+let warningAnswer: string | undefined;
 
-function goalRequest(original: string, responseCode: string): RefactoringRequest {
-  const request = new RefactoringRequest(fnToRefactorForWholeFile(document), document, false, goal);
-  const response: RefactorResponse = {
-    code: responseCode,
+function responseWith(code: string): RefactorResponse {
+  return {
+    code,
     confidence: { level: 2, title: '', 'recommended-action': { description: '', details: '' } },
     reasons: [],
     'refactoring-properties': { 'removed-code-smells': [], 'added-code-smells': [] },
@@ -38,88 +40,84 @@ function goalRequest(original: string, responseCode: string): RefactoringRequest
     'trace-id': 'trace-1',
     'goal-outcome': 'improved',
   };
-  (request as any)._promise = Promise.resolve(response);
+}
+
+function requestWith(responseCode: string, requestGoal?: FixGoalTarget): RefactoringRequest {
+  const request = new RefactoringRequest(fnToRefactorForWholeFile(document), document, false, requestGoal);
+  (request as any)._promise = Promise.resolve(responseWith(responseCode));
   return request;
 }
 
+function goalRequest(original: string, responseCode: string): RefactoringRequest {
+  document.setText(original);
+  return requestWith(responseCode, goal);
+}
+
+function edits() {
+  return getAppliedEdits().flatMap((edit) => edit.replacements);
+}
+
 function editTexts(): string[] {
-  return edits.map((e) => e.newText);
+  return edits().map((e) => e.newText);
+}
+
+function executedCommandNames(): string[] {
+  return executed.map((e) => e.command);
+}
+
+function lastCommand() {
+  return executed[executed.length - 1];
 }
 
 aceSuite('Fix goal commands Test Suite', () => {
   let commands: CsRefactoringCommands;
-  let originalApplyEdit: typeof vscode.workspace.applyEdit;
-  let originalShowWarningMessage: typeof vscode.window.showWarningMessage;
-  let originalExecuteCommand: typeof vscode.commands.executeCommand;
-  let originalShowTextDocument: typeof vscode.window.showTextDocument;
+  const originalShowWarningMessage = vscode.window.showWarningMessage;
+  const originalExecuteCommand = vscode.commands.executeCommand;
+  const originalPanelShow = CodeSceneCWFAceTabPanel.show;
 
-  setup(() => {
+  setup(async () => {
     document = new TestTextDocument('/repo/src/file.ts', 'a\r\nb\r\n', 'typescript');
-    edits.length = 0;
     warnings.length = 0;
     executed.length = 0;
-    resetExecutedCommands();
+    warningAnswer = undefined;
+    resetAppliedEdits();
     resetWebviewPanelMocks();
 
-    DevtoolsAPI.enableAce();
-
-    const mockUri = { fsPath: '/repo', scheme: 'file', authority: '', path: '/repo', query: '', fragment: '' };
-    (csExtensionState.CsExtensionState as any)._instance = {
-      extensionUri: mockUri,
-      stateProperties: {
-        auth: { active: false, status: null },
-        features: {
-          analysis: { state: 'enabled' },
-          ace: { state: 'enabled' }
-        }
-      }
-    };
-
-    Object.defineProperty(csExtensionState.CsExtensionState, 'acknowledgedAceUsage', {
-      get: () => true,
-      configurable: true
-    });
+    CsExtensionState.init(createMockExtensionContext('/test/fix-goal-commands'));
+    await CsExtensionState.setAcknowledgedAceUsage(true);
 
     commands = new CsRefactoringCommands();
 
-    originalApplyEdit = vscode.workspace.applyEdit;
-    originalShowWarningMessage = vscode.window.showWarningMessage;
-    originalExecuteCommand = vscode.commands.executeCommand;
-    originalShowTextDocument = vscode.window.showTextDocument;
-
-    (vscode.workspace as any).applyEdit = async (edit: vscode.WorkspaceEdit) => {
-      for (const entry of (edit as any)._edits) {
-        edits.push({ uri: entry.uri, range: entry.range, newText: entry.newText });
-      }
-      return true;
-    };
-
     (vscode.window as any).showWarningMessage = async (message: string) => {
       warnings.push(message);
-      return undefined;
+      return warningAnswer;
     };
 
-    (vscode.window as any).showTextDocument = async (uri: vscode.Uri | vscode.TextDocument) => {
-      return undefined;
-    };
-
-    (vscode.commands as any).executeCommand = async (command: string, ...args: any[]) => {
-      executed.push(command);
-      return originalExecuteCommand(command, ...args);
-    };
+    vscode.commands.executeCommand = ((command: string, ...args: unknown[]) => {
+      executed.push({ command, args });
+      return Promise.resolve(undefined);
+    }) as typeof vscode.commands.executeCommand;
   });
 
   teardown(() => {
     commands.dispose();
-    (vscode.workspace as any).applyEdit = originalApplyEdit;
     (vscode.window as any).showWarningMessage = originalShowWarningMessage;
-    (vscode.window as any).showTextDocument = originalShowTextDocument;
-    (vscode.commands as any).executeCommand = originalExecuteCommand;
+    vscode.commands.executeCommand = originalExecuteCommand;
+    CodeSceneCWFAceTabPanel.show = originalPanelShow;
+    resetAppliedEdits();
+    resetWebviewPanelMocks();
   });
 
   test('apply replaces the whole document and does not reformat a goal fix', async () => {
     await (commands as any).applyRefactoringCmd(goalRequest('a\r\nb\r\n', 'c\r\n'));
-    assert.deepStrictEqual({ edits: editTexts(), formatted: executed.includes('editor.action.formatSelection') }, { edits: ['c\r\n'], formatted: false });
+    assert.deepStrictEqual(
+      { edits: editTexts(), formatted: executedCommandNames().includes('editor.action.formatSelection') },
+      { edits: ['c\r\n'], formatted: false }
+    );
+    assert.deepStrictEqual(
+      edits()[0].range,
+      new vscode.Range(document.positionAt(0), document.positionAt('a\r\nb\r\n'.length))
+    );
   });
 
   test('apply refuses a goal fix when the document no longer matches', async () => {
@@ -127,5 +125,56 @@ aceSuite('Fix goal commands Test Suite', () => {
     document.setText('a\nmine\n');
     await (commands as any).applyRefactoringCmd(request);
     assert.deepStrictEqual({ edits: editTexts().length, warned: warnings.length }, { edits: 0, warned: 1 });
+  });
+
+  test('apply still formats a smell refactoring', async () => {
+    await (commands as any).applyRefactoringCmd(requestWith('c\r\n'));
+    assert.deepStrictEqual(
+      { edits: editTexts(), formatted: executedCommandNames().includes('editor.action.formatSelection') },
+      { edits: ['c\r\n'], formatted: true }
+    );
+  });
+
+  test('the panel retry reruns the same goal', async () => {
+    const request = goalRequest('a\r\nb\r\n', 'c\r\n');
+    const panel = new CodeSceneCWFAceTabPanel();
+    try {
+      (panel as any).state = { request };
+      await getWebviewMessageHandler()!({ messageType: 'retry' });
+      assert.deepStrictEqual(lastCommand(), {
+        command: 'codescene.requestAndPresentRefactoring',
+        args: [document, 'retry', request.fnToRefactor, false, undefined, goal],
+      });
+    } finally {
+      panel.dispose();
+    }
+  });
+
+  test('acknowledging the agent runs the goal that was clicked', async () => {
+    const request = goalRequest('a\r\nb\r\n', 'c\r\n');
+    const panel = new CodeSceneCWFAceAcknowledgementTabPanel();
+    (panel as any).state = { request };
+    await getWebviewMessageHandler()!({ messageType: 'acknowledged' });
+    await flushPromises();
+    assert.deepStrictEqual(lastCommand(), {
+      command: 'codescene.requestAndPresentRefactoring',
+      args: [document, 'ace-acknowledgement', request.fnToRefactor, false, undefined, goal],
+    });
+  });
+
+  test('a goal request snapshots the document after saving it', async () => {
+    document.setText('unformatted\n');
+    document.setDirty(true);
+    document.setOnSave(() => document.setText('formatted\n'));
+    warningAnswer = SAVE_AND_REFACTOR;
+    const shown: RefactoringRequest[] = [];
+    CodeSceneCWFAceTabPanel.show = (request: RefactoringRequest) => {
+      shown.push(request);
+    };
+    await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, goal);
+    assert.deepStrictEqual(
+      shown.map((request) => ({ body: request.fnToRefactor.body, goal: request.goal })),
+      [{ body: 'formatted\n', goal }]
+    );
   });
 });

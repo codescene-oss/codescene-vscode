@@ -7,6 +7,7 @@ export class TestTextDocument implements vscode.TextDocument {
   private _languageId: string;
   private _version: number;
   private _isDirty = false;
+  private _onSave?: () => void;
 
   constructor(filePath: string, content: string, languageId: string, version: number = 1) {
     this._fileName = filePath;
@@ -59,27 +60,11 @@ export class TestTextDocument implements vscode.TextDocument {
     for (let line = 0; line < lines.length; line++) {
       const lineLength = lines[line].length + 1;
       if (currentOffset + lineLength > offset) {
-        const pos = new vscode.Position(line, offset - currentOffset);
-        (pos as any).translate = function(lineDelta?: number | { lineDelta?: number; characterDelta?: number }, characterDelta?: number) {
-          const ld = typeof lineDelta === 'number' ? lineDelta : (lineDelta?.lineDelta ?? 0);
-          const cd = typeof lineDelta === 'number' ? (characterDelta ?? 0) : (lineDelta?.characterDelta ?? 0);
-          const newPos = new vscode.Position(this.line + ld, this.character + cd);
-          (newPos as any).translate = (pos as any).translate;
-          return newPos;
-        };
-        return pos;
+        return new vscode.Position(line, offset - currentOffset);
       }
       currentOffset += lineLength;
     }
-    const pos = new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
-    (pos as any).translate = function(lineDelta?: number | { lineDelta?: number; characterDelta?: number }, characterDelta?: number) {
-      const ld = typeof lineDelta === 'number' ? lineDelta : (lineDelta?.lineDelta ?? 0);
-      const cd = typeof lineDelta === 'number' ? (characterDelta ?? 0) : (lineDelta?.characterDelta ?? 0);
-      const newPos = new vscode.Position(this.line + ld, this.character + cd);
-      (newPos as any).translate = (pos as any).translate;
-      return newPos;
-    };
-    return pos;
+    return new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
   }
 
   getText(range?: vscode.Range): string {
@@ -92,8 +77,15 @@ export class TestTextDocument implements vscode.TextDocument {
   getWordRangeAtPosition(): vscode.Range | undefined { return undefined; }
   validateRange(range: vscode.Range): vscode.Range { return range; }
   validatePosition(position: vscode.Position): vscode.Position { return position; }
-  save(): Thenable<boolean> { return Promise.resolve(true); }
+  save(): Thenable<boolean> {
+    this._onSave?.();
+    this._isDirty = false;
+    return Promise.resolve(true);
+  }
   setText(newContent: string): void {
     this._content = newContent;
+  }
+  setOnSave(callback: () => void): void {
+    this._onSave = callback;
   }
 }

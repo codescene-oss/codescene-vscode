@@ -52,12 +52,17 @@ export class CsRefactoringCommands implements vscode.Disposable {
     codeSmell?: CodeSmell,
     goal?: FixGoalTarget
   ) {
-    if (!(await ensureSavedForRefactoring(document))) return;
-
-    const toRefactor = goal ? fnToRefactorForWholeFile(document) : (fnToRefactor ?? (await findFnToRefactor(document, codeSmell)));
-    if (!toRefactor) {
-      logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
-      return;
+    let toRefactor: FnToRefactor | undefined;
+    if (goal) {
+      if (!(await ensureSavedForRefactoring(document))) return;
+      toRefactor = fnToRefactorForWholeFile(document);
+    } else {
+      toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
+      if (!toRefactor) {
+        logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
+        return;
+      }
+      if (!(await ensureSavedForRefactoring(document))) return;
     }
 
     if (!CsExtensionState.acknowledgedAceUsage) {
@@ -78,6 +83,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
+      // Close any lingering Show Diff tabs.
       try {
         await this.closeExistingDiffTabs();
       } catch (e) {
@@ -100,6 +106,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
         const workSpaceEdit = new WorkspaceEdit();
         workSpaceEdit.replace(document.uri, vscodeRange, response.code);
         await vscode.workspace.applyEdit(workSpaceEdit);
+        // Select the replaced code in the editor, starting from the original position
         await selectCode(document, response.code, vscodeRange.start);
         await vscode.commands.executeCommand('editor.action.formatSelection');
       }

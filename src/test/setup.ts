@@ -165,6 +165,25 @@ export function resetMockEvents() {
 let mockGitRepositories: any[] = [];
 let mockFindFilesResults: any[] = [];
 
+const appliedEdits: WorkspaceEditStub[] = [];
+
+export function getAppliedEdits(): readonly WorkspaceEditStub[] {
+  return appliedEdits;
+}
+
+export function resetAppliedEdits() {
+  appliedEdits.length = 0;
+}
+
+function createMockTextEditor(documentOrUri: any) {
+  return {
+    document: documentOrUri,
+    selection: undefined as any,
+    viewColumn: 1,
+    revealRange: () => {},
+  };
+}
+
 export function setMockFindFilesResults(results: any[]) {
   mockFindFilesResults = results;
 }
@@ -369,6 +388,7 @@ const vscodeStub = {
       dispose: () => {},
     }),
     createWebviewPanel: () => createMockWebviewPanel(),
+    showTextDocument: async (documentOrUri: any) => createMockTextEditor(documentOrUri),
   },
   ViewColumn: { Beside: 2, Active: 1, One: 1, Two: 2, Three: 3 },
   StatusBarAlignment: { Left: 1, Right: 2 },
@@ -381,6 +401,10 @@ const vscodeStub = {
     workspaceFolders: defaultWorkspaceFolders as any,
     findFiles: async () => {
       return mockFindFilesResults;
+    },
+    applyEdit: async (edit: WorkspaceEditStub) => {
+      appliedEdits.push(edit);
+      return true;
     },
     openTextDocument: async (pathOrUri: string | { fsPath: string }) => {
       const filePath = typeof pathOrUri === 'string' ? pathOrUri : pathOrUri.fsPath;

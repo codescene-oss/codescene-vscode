@@ -95,6 +95,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
     if (document !== e.document || e.contentChanges.length === 0) return;
     const { shouldUpdateRange, isStale } = refactoringStaleness(this.state.request);
 
+    // (cast this.state.isStale to boolean to avoid a first glitch when changing state from undefined to false)
     const stalenessChanged = isStale !== !!this.state.isStale;
 
     if (stalenessChanged) this.state.isStale = isStale;
@@ -138,7 +139,10 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
           request.document,
           'retry',
           request.fnToRefactor,
-          false,
+          // Having true here means skipping cache, meaning retry to get another refactoring
+          // if the first one is not what you want...
+          // But this seem to be used to retry when failed and we definitely don't want to skip cache then
+          false, //true
           undefined,
           request.goal
         );
