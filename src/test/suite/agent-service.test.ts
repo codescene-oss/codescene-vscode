@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AgentRefactoringService, agentArgs } from '../../refactoring/agent-service';
-import { AgentOutput, ConfidenceLevel, FixGoalTarget } from '../../refactoring/agent-types';
+import { AgentOutput, ConfidenceLevel, FixGoalTarget, FixGoalOutput } from '../../refactoring/agent-types';
 import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
@@ -354,5 +354,30 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     assert.strictEqual(response.confidence.title, 'Unable to refactor');
     assert.strictEqual(response.confidence['review-header'], 'Review required');
     assert.strictEqual(response.reasons.length, 1);
+  });
+
+  const goal: FixGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 8, baseline: 6.2, repoRoot: '/repo', path: 'src/a.ts' };
+  const fixGoalOutput = (content: string | undefined): FixGoalOutput => ({ schema_version: '1.0', task_id: 't', fix_result: 'target_reached', confidence: 'high', explanation: 'x', whole_file_content: content, generated_at: '2026-11-11T00:00:00Z' });
+
+  for (const c of [
+    { name: 'scores the CRLF-normalised proposal', body: 'a\r\n', content: 'b\n', scores: [8.1], scored: ['b\r\n'], outcome: 'reached' },
+    { name: 'does not score content that only differs in line endings', body: 'a\r\n', content: 'a\n', scores: [], scored: [], outcome: 'unable' },
+    { name: 'does not score a missing proposal', body: 'a\n', content: undefined, scores: [], scored: [], outcome: 'unable' },
+    { name: 'trusts the cs-ide score over the agent verdict', body: 'a\n', content: 'b\n', scores: [7], scored: ['b\n'], outcome: 'improved' },
+  ]) {
+    test(`resolveFixGoal ${c.name}`, async () => {
+      const scored: string[] = [];
+      const response = await AgentRefactoringService.resolveFixGoal(fixGoalOutput(c.content), createMockFnToRefactor(c.body), goal, async (content) => { scored.push(content); return c.scores[0]; });
+      assert.deepStrictEqual({ scored, outcome: response['goal-outcome'] }, { scored: c.scored, outcome: c.outcome });
+    });
+  }
+
+  test('resolveFixGoal fails rather than guess when cs-ide gives no score', async () => {
+    await assert.rejects(AgentRefactoringService.resolveFixGoal(fixGoalOutput('b\n'), createMockFnToRefactor('a\n'), goal, async () => undefined), /Could not score the proposed change/);
+  });
+
+  test('runFixGoal rejects a document with unsaved changes', async () => {
+    const document = { ...createMockDocument('/repo/src/a.ts', 'a\n'), isDirty: true };
+    await assert.rejects(() => AgentRefactoringService.runFixGoal(document, createMockFnToRefactor('a\n'), goal, async () => 8), /Save .*a\.ts.* before refactoring/);
   });
 });

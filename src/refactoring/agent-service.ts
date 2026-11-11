@@ -6,12 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
-import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL } from './agent-config';
-import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, AGENT_INPUT_CONTEXT } from './agent-types';
+import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
+import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
+import { fixGoalCode, mapFixGoalResponse } from './fix-goal-response';
 
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -23,6 +24,7 @@ function toLf(str: string): string {
 }
 
 export type ProgressCallback = (message: string) => void;
+export type ContentScorer = (content: string) => Promise<number | undefined>;
 
 export function agentArgs(skill: AgentSkill, model: string): string[] {
   return ['run', `skill:${skill.name}`, '--model', model];
@@ -339,6 +341,63 @@ export class AgentRefactoringService {
         details: undefined,
       },
     ];
+  }
+
+  static async resolveFixGoal(
+    output: FixGoalOutput,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer
+  ): Promise<RefactorResponse> {
+    const code = fixGoalCode(output, fnToRefactor.body);
+    let reached: number | undefined;
+
+    if (code === fnToRefactor.body) {
+      reached = undefined;
+    } else {
+      reached = await score(code);
+      if (reached === undefined) {
+        throw new Error('Could not score the proposed change with CodeScene');
+      }
+    }
+
+    const response = mapFixGoalResponse(output, goal, code, reached);
+
+    if (response['goal-outcome'] === 'unable') {
+      logOutputChannel.info(output.explanation);
+    }
+
+    return response;
+  }
+
+  static async runFixGoal(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    if (document.isDirty) {
+      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
+    }
+
+    const taskId = `fix-goal-${uuidv4()}`;
+    const input = AgentRefactoringService.buildFixGoalInput(goal, taskId);
+
+    logOutputChannel.info(`Agent fix-goal started for task ${taskId}`);
+
+    const output = await AgentRefactoringService.runSkill<FixGoalOutput>(
+      FIX_GOAL_SKILL,
+      goal.repoRoot,
+      input,
+      signal,
+      onProgress
+    );
+
+    logOutputChannel.info(`Agent fix-goal completed for task ${taskId}: ${output.fix_result}`);
+
+    return AgentRefactoringService.resolveFixGoal(output, fnToRefactor, goal, score);
   }
 
   private static cleanup(ioDir: string): void {

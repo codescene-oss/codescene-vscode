@@ -90,6 +90,11 @@ export class DevtoolsAPI {
     return { rulesMsg: result } as CodeHealthRulesResult;
   }
 
+  static async scoreContent(repoRoot: string, relPath: string, content: string): Promise<number | undefined> {
+    const result = await DevtoolsAPI.ideServer.review({ path: relPath, 'file-content': content, 'repo-path': repoRoot });
+    return result.score;
+  }
+
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
