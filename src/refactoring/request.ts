@@ -7,7 +7,7 @@ import { ProgressCallback } from './agent-service';
 
 export class RefactoringRequest {
   readonly traceId: string;
-  promise: Promise<RefactorResponse>;
+  private _promise?: Promise<RefactorResponse>;
   private abortController = new AbortController();
   readonly signal = this.abortController.signal;
   onProgress?: ProgressCallback;
@@ -16,7 +16,13 @@ export class RefactoringRequest {
     this.document = document;
     this.fnToRefactor = fnToRefactor;
     this.traceId = uuidv4();
-    this.promise = DevtoolsAPI.postRefactoring(this, (message) => this.onProgress?.(message));
+  }
+
+  get promise(): Promise<RefactorResponse> {
+    if (!this._promise) {
+      this._promise = DevtoolsAPI.postRefactoring(this, (message) => this.onProgress?.(message));
+    }
+    return this._promise;
   }
 
   get eventData() {
