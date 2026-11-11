@@ -1,11 +1,13 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
-import { AgentRefactoringService } from '../../refactoring/agent-service';
+import { AgentRefactoringService, agentArgs } from '../../refactoring/agent-service';
 import { AgentOutput, ConfidenceLevel } from '../../refactoring/agent-types';
 import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
+import { RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from '../../refactoring/agent-config';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'src', 'test', 'fixtures', 'agent-output');
 
@@ -39,6 +41,18 @@ function createMockDocument(fileName: string, content: string) {
 }
 
 aceSuite('AgentRefactoringService Test Suite', () => {
+  for (const { skill, expected } of [
+    { skill: RENDER_CODE_FIX_SKILL, expected: ['run', 'skill:render-code-fix', '--model', 'm'] },
+    { skill: FIX_GOAL_SKILL, expected: ['run', 'skill:fix-goal', '--model', 'm'] },
+  ]) {
+    test(`agentArgs runs skill ${skill.name}`, () => assert.deepStrictEqual(agentArgs(skill, 'm'), expected));
+  }
+
+  test('readOutput reports the end of stderr when the agent wrote no output file', () => {
+    const missing = path.join(os.tmpdir(), `cs-agent-missing-${Date.now()}`, FIX_GOAL_SKILL.outputFile);
+    assert.throws(() => AgentRefactoringService.readOutput(missing, 'line1\nboom'), /Agent did not produce output file: line1\nboom/);
+  });
+
   const testCases = [
     {
       name: 'mapOutputToResponse maps fix_proposed correctly',

@@ -3,6 +3,8 @@ import {
   buildAgentConfigWithToken,
   buildOpencodeConfig,
   buildProviderCredentials,
+  RENDER_CODE_FIX_SKILL,
+  FIX_GOAL_SKILL,
 } from '../../refactoring/agent-config';
 import { getAgentModel } from '../../configuration';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
@@ -13,6 +15,7 @@ const testCases = [
     name: 'buildAgentConfigWithToken includes required fields without providerOptions',
     config: {},
     token: 'test-token-123',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.strictEqual(result.codescene_access_token, 'test-token-123');
@@ -27,6 +30,7 @@ const testCases = [
     name: 'buildAgentConfigWithToken includes io_json_dir when provided',
     config: {},
     token: 'test-token-456',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: '/tmp/cs-agent-io-test',
     assertions: (result: any) => {
       assert.strictEqual(result.codescene_access_token, 'test-token-456');
@@ -43,6 +47,7 @@ const testCases = [
       },
     },
     token: 'test-token-789',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
@@ -60,6 +65,7 @@ const testCases = [
       },
     },
     token: 'test-token-partial',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
@@ -78,6 +84,7 @@ const testCases = [
       },
     },
     token: 'test-token-exact',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.strictEqual(result.provider, undefined, 'provider should not be present when no API keys');
@@ -102,6 +109,7 @@ const testCases = [
       },
     },
     token: 'test-token-anthropic',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.ok(result.provider, 'provider should be present');
@@ -117,6 +125,7 @@ const testCases = [
       },
     },
     token: 'test-token-openai',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.ok(result.provider, 'provider should be present');
@@ -132,6 +141,7 @@ const testCases = [
       },
     },
     token: 'test-token-google',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.ok(result.provider, 'provider should be present');
@@ -150,6 +160,7 @@ const testCases = [
       },
     },
     token: 'test-token-multi',
+    plugin: RENDER_CODE_FIX_SKILL.plugin,
     ioDir: undefined,
     assertions: (result: any) => {
       assert.ok(result.provider, 'provider should be present');
@@ -159,6 +170,22 @@ const testCases = [
       assert.ok(result.opencode_config, 'opencode_config should be present for bedrock');
       assert.strictEqual(result.opencode_config.provider['amazon-bedrock'].options.profile, 'my-profile');
     },
+  },
+  {
+    name: 'buildAgentConfigWithToken uses the plugin of the fix-goal skill',
+    config: {},
+    token: 't',
+    plugin: FIX_GOAL_SKILL.plugin,
+    ioDir: '/tmp/io',
+    assertions: (result: any) => assert.deepStrictEqual(result.plugins, ['fix-goal-reporter']),
+  },
+  {
+    name: 'buildAgentConfigWithToken sends no plugin when none is given',
+    config: {},
+    token: 't',
+    plugin: undefined,
+    ioDir: undefined,
+    assertions: (result: any) => assert.deepStrictEqual(result.plugins, []),
   },
 ];
 
@@ -170,14 +197,14 @@ aceSuite('AgentConfig Test Suite', () => {
   for (const tc of testCases) {
     test(tc.name, () => {
       mockConfiguration('codescene', tc.config);
-      const result = buildAgentConfigWithToken(tc.token, tc.ioDir);
+      const result = buildAgentConfigWithToken(tc.token, tc.plugin, tc.ioDir);
       tc.assertions(result);
     });
   }
 
   test('buildAgentConfigWithToken falls back to an empty token when none is available', () => {
     mockConfiguration('codescene', {});
-    assert.strictEqual(buildAgentConfigWithToken(undefined).codescene_access_token, '');
+    assert.strictEqual(buildAgentConfigWithToken(undefined, RENDER_CODE_FIX_SKILL.plugin).codescene_access_token, '');
   });
 
   test('buildOpencodeConfig produces exact bedrock structure', () => {
