@@ -37,11 +37,42 @@ export interface ObjectiveSubjectFile {
   path: string;
 }
 
+/** Evidence behind a hotspot recommendation. */
+export interface ObjectiveRecommendationEvidence {
+  /**
+   * The Code Health issues the Goal tracks: one for a generated Goal, several for a Goal
+   * created before findings were tracked one by one.
+   */
+  "code-health-issues": string[];
+  revisions?: number;
+  loc?: number;
+  "cyclomatic-complexity"?: number;
+  defects?: number;
+}
+
+/** The hotspot recommendation a recommendation Goal tracks a finding of. */
+export interface ObjectiveRecommendation {
+  /** Whether the finding is of a function or of the file as a whole. */
+  scope: "function" | "file";
+  /** The function, for example processOrder, or processOrder:18 for an issue found at a line. */
+  target: string;
+  "recommendation-type": string;
+  /** Why the recommendation matters. */
+  text: string;
+  evidence: ObjectiveRecommendationEvidence;
+}
+
 /** What the objective is measured on. */
 export interface ObjectiveSubject {
-  type: "area" | "files";
+  /**
+   * An Area, a set of files, or one file with a Code Health finding. A recommendation Goal is
+   * satisfied when its finding is resolved, not by a score threshold.
+   */
+  type: "area" | "files" | "recommendation";
   /** The files of a Goal that live in this repository. */
   files?: ObjectiveSubjectFile[];
+  /** The recommendation of a recommendation Goal. */
+  recommendation?: ObjectiveRecommendation;
 }
 
 /** The latest result stored on the server. Absent when the objective was never evaluated. */
@@ -63,7 +94,10 @@ export interface LocalFileResult {
   /** Path of the file, relative to the repository root. */
   path: string;
   result: ObjectiveResult;
-  /** Why, for example threshold-met, threshold-not-met or subject-removed. */
+  /**
+   * Why, for example threshold-met, threshold-not-met or subject-removed; for a recommendation
+   * Goal finding-present, finding-resolved or findings-unavailable.
+   */
   reason: string;
   /** Current Code Health of the file. */
   value?: number;
