@@ -7,7 +7,7 @@ import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL } from './agent-config';
-import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput } from './agent-types';
+import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, AGENT_INPUT_CONTEXT } from './agent-types';
 import { getExtensionPath } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
@@ -116,7 +116,7 @@ export class AgentRefactoringService {
     }
 
     return {
-      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      '@context': AGENT_INPUT_CONTEXT,
       task_id: taskId,
       file: document.fileName,
       line: target.line,
@@ -126,7 +126,7 @@ export class AgentRefactoringService {
 
   static buildFixGoalInput(goal: FixGoalTarget, taskId: string): FixGoalInput {
     return {
-      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      '@context': AGENT_INPUT_CONTEXT,
       task_id: taskId,
       file: goal.path,
       goal: { id: goal.goalId, 'metric-id': goal.metricId, operator: goal.operator, target: goal.target },

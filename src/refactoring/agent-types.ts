@@ -2,6 +2,10 @@ export interface AgentInputContext {
   '@vocab': string;
 }
 
+export const AGENT_INPUT_CONTEXT: AgentInputContext = {
+  '@vocab': 'https://codescene.io/schemas/code-health-fix#',
+};
+
 export interface AgentInput {
   '@context': AgentInputContext;
   task_id: string;
