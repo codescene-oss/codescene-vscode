@@ -59,11 +59,27 @@ export class TestTextDocument implements vscode.TextDocument {
     for (let line = 0; line < lines.length; line++) {
       const lineLength = lines[line].length + 1;
       if (currentOffset + lineLength > offset) {
-        return new vscode.Position(line, offset - currentOffset);
+        const pos = new vscode.Position(line, offset - currentOffset);
+        (pos as any).translate = function(lineDelta?: number | { lineDelta?: number; characterDelta?: number }, characterDelta?: number) {
+          const ld = typeof lineDelta === 'number' ? lineDelta : (lineDelta?.lineDelta ?? 0);
+          const cd = typeof lineDelta === 'number' ? (characterDelta ?? 0) : (lineDelta?.characterDelta ?? 0);
+          const newPos = new vscode.Position(this.line + ld, this.character + cd);
+          (newPos as any).translate = (pos as any).translate;
+          return newPos;
+        };
+        return pos;
       }
       currentOffset += lineLength;
     }
-    return new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
+    const pos = new vscode.Position(lines.length - 1, lines[lines.length - 1].length);
+    (pos as any).translate = function(lineDelta?: number | { lineDelta?: number; characterDelta?: number }, characterDelta?: number) {
+      const ld = typeof lineDelta === 'number' ? lineDelta : (lineDelta?.lineDelta ?? 0);
+      const cd = typeof lineDelta === 'number' ? (characterDelta ?? 0) : (lineDelta?.characterDelta ?? 0);
+      const newPos = new vscode.Position(this.line + ld, this.character + cd);
+      (newPos as any).translate = (pos as any).translate;
+      return newPos;
+    };
+    return pos;
   }
 
   getText(range?: vscode.Range): string {
@@ -77,4 +93,7 @@ export class TestTextDocument implements vscode.TextDocument {
   validateRange(range: vscode.Range): vscode.Range { return range; }
   validatePosition(position: vscode.Position): vscode.Position { return position; }
   save(): Thenable<boolean> { return Promise.resolve(true); }
+  setText(newContent: string): void {
+    this._content = newContent;
+  }
 }

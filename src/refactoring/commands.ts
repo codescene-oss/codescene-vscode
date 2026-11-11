@@ -1,4 +1,4 @@
-import vscode, { ViewColumn, WorkspaceEdit } from 'vscode';
+import vscode, { ViewColumn, WorkspaceEdit, Range } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
@@ -10,6 +10,8 @@ import { CodeSceneCWFAceTabPanel } from '../codescene-tab/webview/ace/cwf-webvie
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 import { logOutputChannel } from '../log';
 import { CodeSmell } from '../devtools-api/review-model';
+import { FixGoalTarget } from './agent-types';
+import { fnToRefactorForWholeFile } from './fn-to-refactor';
 
 /**
  * Locate the view column of an existing tab for the given document, even when the document
@@ -47,23 +49,24 @@ export class CsRefactoringCommands implements vscode.Disposable {
     source: string,
     fnToRefactor?: FnToRefactor,
     skipCache?: boolean,
-    codeSmell?: CodeSmell
+    codeSmell?: CodeSmell,
+    goal?: FixGoalTarget
   ) {
-    const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
+    if (!(await ensureSavedForRefactoring(document))) return;
+
+    const toRefactor = goal ? fnToRefactorForWholeFile(document) : (fnToRefactor ?? (await findFnToRefactor(document, codeSmell)));
     if (!toRefactor) {
       logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
       return;
     }
 
-    if (!(await ensureSavedForRefactoring(document))) return;
-
     if (!CsExtensionState.acknowledgedAceUsage) {
       Telemetry.logUsage('ace-info/presented', { source });
-      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(toRefactor, document, skipCache));
+      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(toRefactor, document, skipCache, goal));
       return;
     }
 
-    const request = new RefactoringRequest(toRefactor, document, skipCache);
+    const request = new RefactoringRequest(toRefactor, document, skipCache, goal);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneCWFAceTabPanel.show(request);
   }
@@ -75,7 +78,6 @@ export class CsRefactoringCommands implements vscode.Disposable {
     } = refactoring;
 
     return refactoring.promise.then(async (response) => {
-      // Close any lingering Show Diff tabs.
       try {
         await this.closeExistingDiffTabs();
       } catch (e) {
@@ -84,12 +86,23 @@ export class CsRefactoringCommands implements vscode.Disposable {
 
       const viewColumn = targetEditor(document)?.viewColumn ?? findDocumentTabViewColumn(document) ?? ViewColumn.One;
       await vscode.window.showTextDocument(document.uri, { preview: false, viewColumn });
-      const workSpaceEdit = new WorkspaceEdit();
-      workSpaceEdit.replace(document.uri, vscodeRange, response.code);
-      await vscode.workspace.applyEdit(workSpaceEdit);
-      // Select the replaced code in the editor, starting from the original position
-      await selectCode(document, response.code, vscodeRange.start);
-      await vscode.commands.executeCommand('editor.action.formatSelection');
+
+      if (refactoring.goal) {
+        if (document.getText() !== refactoring.fnToRefactor.body) {
+          void vscode.window.showWarningMessage('The file changed after the CodeScene Refactoring Agent read it. Run the goal fix again on the current file.');
+          return;
+        }
+        const fullDocumentRange = new Range(document.positionAt(0), document.positionAt(document.getText().length));
+        const workSpaceEdit = new WorkspaceEdit();
+        workSpaceEdit.replace(document.uri, fullDocumentRange, response.code);
+        await vscode.workspace.applyEdit(workSpaceEdit);
+      } else {
+        const workSpaceEdit = new WorkspaceEdit();
+        workSpaceEdit.replace(document.uri, vscodeRange, response.code);
+        await vscode.workspace.applyEdit(workSpaceEdit);
+        await selectCode(document, response.code, vscodeRange.start);
+        await vscode.commands.executeCommand('editor.action.formatSelection');
+      }
 
       Telemetry.logUsage('refactor/applied', refactoring.eventData);
     });

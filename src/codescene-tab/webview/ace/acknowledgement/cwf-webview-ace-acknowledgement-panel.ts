@@ -87,6 +87,7 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
       acknowledged: async () => {
         const document = this.state?.request.document;
         const fnToRefactor = this.state?.request.fnToRefactor;
+        const goal = this.state?.request.goal;
 
         this.webViewPanel.dispose();
 
@@ -97,7 +98,10 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
           'codescene.requestAndPresentRefactoring',
           document,
           'ace-acknowledgement',
-          fnToRefactor
+          fnToRefactor,
+          false,
+          undefined,
+          goal
         );
         return;
       },
