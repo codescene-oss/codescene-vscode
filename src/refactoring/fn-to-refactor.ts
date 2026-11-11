@@ -55,3 +55,7 @@ export function fnToRefactorForFinding(document: vscode.TextDocument, finding: F
   if (targets.length === 0) return;
   return buildFnToRefactor(document, name, wholeLinesRange(document, range['start-line'], range['end-line']), targets);
 }
+
+export function fnToRefactorForWholeFile(document: vscode.TextDocument): FnToRefactor {
+  return buildFnToRefactor(document, basename(document.fileName), wholeLinesRange(document, 1, document.lineCount), []);
+}
