@@ -168,6 +168,7 @@ suite('Contract webview payloads Test Suite', () => {
   });
 
   teardown(() => {
+    DevtoolsAPI.disableAce();
     setCwfAuth(undefined);
     resetWebviewPanelMocks();
   });
@@ -176,6 +177,7 @@ suite('Contract webview payloads Test Suite', () => {
   function enableAce(): void {
     CsExtensionState.setACEState({ state: 'enabled' });
     CsExtensionState.setAuth({ active: true, status: fixture('auth-status', 'signed-in', 'entity') });
+    DevtoolsAPI.enableAce();
   }
 
   function deltaWithRefactorableFunctions(delta: Delta): Delta {
@@ -240,6 +242,7 @@ suite('Contract webview payloads Test Suite', () => {
         name: 'fakeFunction',
         body: FAKE_FUNCTION_LINES.slice(2, 9).join('\n'),
         'file-type': 'js',
+        'function-type': '',
         range: { 'start-line': 3, 'start-column': 1, 'end-line': 9, 'end-column': 2 },
         'refactoring-targets': [{ category: 'Complex Method', line: 3 }],
       });
