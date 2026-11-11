@@ -59,5 +59,9 @@ export async function handleFixGoal(goalId: number, path: string, deps: FixGoalD
     return;
   }
 
-  await deps.executeCommand('codescene.requestAndPresentRefactoring', document, 'objectives', undefined, false, undefined, target);
+  try {
+    await deps.executeCommand('codescene.requestAndPresentRefactoring', document, 'objectives', undefined, false, undefined, target);
+  } catch (error) {
+    deps.log(`[fix-goal] Failed to execute refactoring command for goal ${goalId} ${path}: ${error}`);
+  }
 }

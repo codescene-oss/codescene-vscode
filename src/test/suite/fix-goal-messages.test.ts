@@ -122,13 +122,23 @@ suite('Fix goal messages Test Suite', () => {
   });
 
   for (const c of [
-    { name: 'agent disabled', over: { enabled: () => false } },
-    { name: 'goal gone', over: { snapshot: () => undefined } },
-    { name: 'file cannot be opened', over: { openDocument: () => Promise.reject(new Error('ENOENT')) } },
+    { name: 'agent disabled', over: { enabled: () => false }, expectCommands: 0 },
+    { name: 'goal gone', over: { snapshot: () => undefined }, expectCommands: 0 },
+    { name: 'file cannot be opened', over: { openDocument: () => Promise.reject(new Error('ENOENT')) }, expectCommands: 0 },
+    {
+      name: 'the refactoring command fails',
+      over: {
+        executeCommand: (command: string, ...args: unknown[]) => {
+          commands.push([command, ...args]);
+          return Promise.reject(new Error('boom'));
+        },
+      },
+      expectCommands: 1,
+    },
   ]) {
     test(`handleFixGoal does nothing but log when ${c.name}`, async () => {
       await handleFixGoal(2, 'src/orders.js', { ...deps, ...c.over });
-      assert.deepStrictEqual({ commands: commands.length, logged: logs.length }, { commands: 0, logged: 1 });
+      assert.deepStrictEqual({ commands: commands.length, logged: logs.length }, { commands: c.expectCommands, logged: 1 });
     });
   }
 });
