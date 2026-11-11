@@ -55,4 +55,12 @@ suite('Fix goal response Test Suite', () => {
   test('mapFixGoalResponse lists no reason for a blank explanation', () => {
     assert.deepStrictEqual(mapFixGoalResponse(output({ explanation: '  ' }), goal, 'b\n', 8.1).reasons, []);
   });
+
+  test('mapFixGoalResponse handles missing explanation without throwing', () => {
+    const noExplanation = { schema_version: '1.0', task_id: 't-2', fix_result: 'unable_to_fix', confidence: 'low', whole_file_content: 'b\n', generated_at: '2026-11-11T00:00:00Z' } as FixGoalOutput;
+    const response = mapFixGoalResponse(noExplanation, goal, 'b\n', undefined);
+    assert.strictEqual(response['goal-outcome'], 'unable');
+    assert.strictEqual(response.confidence['recommended-action'].details, '');
+    assert.deepStrictEqual(response.reasons, []);
+  });
 });

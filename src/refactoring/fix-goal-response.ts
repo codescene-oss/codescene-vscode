@@ -79,11 +79,11 @@ export function mapFixGoalResponse(
     title = 'Unable to improve the file towards the goal';
     reviewHeader = 'Why the target was not reached';
     description = 'The CodeScene Refactoring Agent found no change that improves Code Health.';
-    details = output.explanation;
+    details = output.explanation ?? '';
   }
 
-  const explanationTrimmed = output.explanation.trim();
-  const reasons = explanationTrimmed ? [{ summary: output.explanation }] : [];
+  const explanationTrimmed = (output.explanation ?? '').trim();
+  const reasons = explanationTrimmed ? [{ summary: output.explanation ?? '' }] : [];
 
   return {
     code,

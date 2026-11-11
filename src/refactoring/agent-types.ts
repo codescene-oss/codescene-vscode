@@ -101,11 +101,12 @@ export type FixGoalResult = 'target_reached' | 'improved' | 'unable_to_fix';
 export type FixGoalOutcome = 'reached' | 'improved' | 'unable';
 
 export interface FixGoalOutput {
+  '@context'?: AgentInputContext;
   schema_version: string;
   task_id: string;
   fix_result: FixGoalResult;
   confidence: ConfidenceLevel;
-  explanation: string;
+  explanation?: string;
   estimated_score?: number;
   whole_file_content?: string;
   generated_at: string;

@@ -8,6 +8,7 @@ import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
 import { RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from '../../refactoring/agent-config';
+import { AbortError } from '../../devtools-api/abort-error';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'src', 'test', 'fixtures', 'agent-output');
 
@@ -379,5 +380,12 @@ aceSuite('AgentRefactoringService Test Suite', () => {
   test('runFixGoal rejects a document with unsaved changes', async () => {
     const document = { ...createMockDocument('/repo/src/a.ts', 'a\n'), isDirty: true };
     await assert.rejects(() => AgentRefactoringService.runFixGoal(document, createMockFnToRefactor('a\n'), goal, async () => 8), /Save .*a\.ts.* before refactoring/);
+  });
+
+  test('abort during agent invocation rejects with AbortError not Error', () => {
+    const error = new AbortError('Agent invocation aborted');
+    assert.ok(error instanceof AbortError);
+    assert.ok(error instanceof Error);
+    assert.strictEqual(error.message, 'Agent invocation aborted');
   });
 });

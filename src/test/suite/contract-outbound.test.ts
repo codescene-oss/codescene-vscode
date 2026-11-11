@@ -133,7 +133,7 @@ suite('Contract outbound params Test Suite', () => {
       Telemetry.logUsage('refactor/requested', { source: 'codelens', traceId: 'trace-1', skipCache: true })
     ),
     'call site: goal fix applied': telemetryEnvironment(noTelemetryInput, () =>
-      Telemetry.logUsage('refactor/applied', { source: 'objectives', traceId: 'trace-1', goalId: 2, outcome: 'improved' })
+      Telemetry.logUsage('refactor/applied', { traceId: 'trace-1', goalId: 2, outcome: 'improved' })
     ),
     'call site: sign-in failure': telemetryEnvironment(noTelemetryInput, () =>
       Telemetry.logUsage('auth/sign-in-failed', { 'error-code': 'auth/timeout' })

@@ -13,6 +13,7 @@ import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { DevtoolsAPI } from '../../devtools-api';
+import { aceTest } from '../ace-test-suite';
 
 const REPO = '/work/repo-a';
 const GOAL_ID = 42;
@@ -150,8 +151,6 @@ suite('Objectives feature work sessions', () => {
   });
 });
 
-import { aceTest } from '../ace-test-suite';
-
 suite('Objectives feature fix goal', () => {
   let transport: FakeObjectivesTransport;
   let feature: ObjectivesFeature;
@@ -202,6 +201,7 @@ suite('Objectives feature fix goal', () => {
     setCwfObjectives(undefined);
     (vscode.commands as any).executeCommand = originalExecute;
     (vscode.workspace as any).openTextDocument = originalOpenTextDocument;
+    DevtoolsAPI.disableAce();
   });
 
   async function activate(): Promise<void> {
@@ -223,6 +223,5 @@ suite('Objectives feature fix goal', () => {
     assert.strictEqual(executed[0].args[1], 'objectives');
     const target = executed[0].args[5] as any;
     assert.strictEqual(target.repoRoot, REPO);
-    DevtoolsAPI.disableAce();
   });
 });

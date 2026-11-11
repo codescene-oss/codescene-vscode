@@ -13,6 +13,7 @@ import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { fixGoalCode, mapFixGoalResponse } from './fix-goal-response';
+import { AbortError } from '../devtools-api/abort-error';
 
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -210,7 +211,7 @@ export class AgentRefactoringService {
 
       const abortHandler = () => {
         proc.kill('SIGTERM');
-        reject(new Error('Agent invocation aborted'));
+        reject(new AbortError('Agent invocation aborted'));
       };
 
       signal?.addEventListener('abort', abortHandler);
@@ -367,7 +368,7 @@ export class AgentRefactoringService {
 
     const response = mapFixGoalResponse(output, goal, code, reached);
 
-    if (response['goal-outcome'] === 'unable') {
+    if (response['goal-outcome'] === 'unable' && output.explanation) {
       logOutputChannel.info(output.explanation);
     }
 
