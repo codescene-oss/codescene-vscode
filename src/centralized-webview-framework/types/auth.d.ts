@@ -34,6 +34,7 @@ export type AuthStatus = {
   'expires-at': number | null;
   login: { 'login-id': string; 'authorize-url': string } | null;
   error: AuthError | null;
+  'reauthorize-needed': boolean;
 };
 
 export type Account = {
@@ -50,4 +51,27 @@ export type AuthPayload = {
   projects: Project[] | null;
   repo: { path: string; name: string } | null;
   'linked-project': Project | null;
+};
+
+export type AuthStep = 'summary' | 'resolving' | 'pick-account' | 'pick-project';
+
+export type ProjectSource = 'link' | 'remote';
+
+export type ProjectReason =
+  | 'no-remote'
+  | 'repository-unknown'
+  | 'other-account'
+  | 'multiple-projects'
+  | 'multiple-accounts'
+  | 'lookup-failed';
+
+export type ProjectCandidate = { id: string; name: string | null; 'account-id': string | null };
+
+export type AuthFlow = {
+  step: AuthStep;
+  context: 'sign-in' | 'manual';
+  'project-source': ProjectSource | null;
+  syncing: boolean;
+  'project-reason': ProjectReason | null;
+  'project-candidates': ProjectCandidate[];
 };

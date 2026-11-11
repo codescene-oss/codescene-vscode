@@ -123,7 +123,7 @@ suite('CsIdeServerClient Test Suite', () => {
     const delta = new Promise<{ id?: string; score: number | undefined }>((resolve) => {
       client.onDidDelta((event) => resolve({ id: event.id, score: event.result?.['new-score'] }));
     });
-    const failure = new Promise<{ id?: string; message: string }>((resolve) => {
+    const failure = new Promise<{ id?: string | null; message: string }>((resolve) => {
       client.onDidReviewFailed((event) => resolve({ id: event.id, message: event.message }));
     });
 
@@ -183,7 +183,7 @@ suite('CsIdeServerClient Test Suite', () => {
     const review = new Promise<{ id?: string; path: string }>((resolve) => {
       client.onDidReview((event) => resolve({ id: event.id, path: event.path }));
     });
-    const stopped = new Promise<{ id?: string; path: string }>((resolve) => {
+    const stopped = new Promise<{ id?: string | null; path: string }>((resolve) => {
       client.onDidReviewFailed((event) => resolve({ id: event.id, path: event.path }));
     });
     const rpc = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };

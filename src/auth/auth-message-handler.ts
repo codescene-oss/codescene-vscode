@@ -5,9 +5,11 @@ import type { AuthService } from './auth-service';
 
 export const AUTH_MESSAGE_TYPES = [
   'open-auth',
+  'auth-close',
+  'auth-skip-project',
+  'hide-sign-in-banner',
   'auth-sign-in',
   'auth-open-browser-again',
-  'auth-cancel-sign-in',
   'auth-sign-out',
   'auth-retry',
   'auth-select-account',
@@ -16,6 +18,7 @@ export const AUTH_MESSAGE_TYPES = [
   'auth-remove-access-token',
   'auth-open-server-setting',
   'auth-open-pat-page',
+  'auth-reauthorize',
 ] as const;
 
 type AuthMessageType = (typeof AUTH_MESSAGE_TYPES)[number];
@@ -28,17 +31,20 @@ export type AuthActions = Pick<
   | 'current'
   | 'signIn'
   | 'openBrowserAgain'
-  | 'cancelSignIn'
+  | 'openAuth'
+  | 'closeAuth'
+  | 'skipProject'
+  | 'hideSignInBanner'
   | 'signOut'
   | 'retry'
   | 'selectAccount'
   | 'linkProject'
   | 'setAccessToken'
   | 'removeAccessToken'
+  | 'reauthorize'
 >;
 
 export interface AuthMessageTarget {
-  showAuthView(): void;
   openServerSetting(): Thenable<unknown>;
   openExternal(url: string): Thenable<unknown>;
 }
@@ -54,10 +60,12 @@ function openPatPage(actions: AuthActions, target: AuthMessageTarget): Thenable<
 
 function handlers(actions: AuthActions, target: AuthMessageTarget): Handlers {
   return {
-    'open-auth': () => target.showAuthView(),
+    'open-auth': (message) => actions.openAuth(message.payload?.screen),
+    'auth-close': () => actions.closeAuth(),
+    'auth-skip-project': () => actions.skipProject(),
+    'hide-sign-in-banner': () => actions.hideSignInBanner(),
     'auth-sign-in': () => actions.signIn(),
     'auth-open-browser-again': () => actions.openBrowserAgain(),
-    'auth-cancel-sign-in': () => actions.cancelSignIn(),
     'auth-sign-out': () => actions.signOut(),
     'auth-retry': () => actions.retry(),
     'auth-select-account': (message) => actions.selectAccount(message.payload.accountId),
@@ -66,6 +74,7 @@ function handlers(actions: AuthActions, target: AuthMessageTarget): Handlers {
     'auth-remove-access-token': () => actions.removeAccessToken(),
     'auth-open-server-setting': () => target.openServerSetting(),
     'auth-open-pat-page': () => openPatPage(actions, target),
+    'auth-reauthorize': () => actions.reauthorize(),
   };
 }
 

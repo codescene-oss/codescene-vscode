@@ -8,6 +8,11 @@ function field<T>(value: WireObject, camelCase: string, kebabCase: string): T | 
   return value[camelCase] ?? value[kebabCase];
 }
 
+/** Like `field`, but a null stays null: the wire says "no value" with it, which is not the same as absent. */
+function nullableField<T>(value: WireObject, camelCase: string, kebabCase: string): T | null | undefined {
+  return camelCase in value ? value[camelCase] : value[kebabCase];
+}
+
 function range(value: WireObject | undefined): Range | undefined {
   if (!value) return;
   return {
@@ -75,9 +80,9 @@ export function deltaResponse(value: WireObject): Delta {
     'score-change': field<number>(value, 'scoreChange', 'score-change')!,
     ...(field(value, 'oldScore', 'old-score') === undefined ? {} : { 'old-score': field<number>(value, 'oldScore', 'old-score') }),
     ...(field(value, 'newScore', 'new-score') === undefined ? {} : { 'new-score': field<number>(value, 'newScore', 'new-score') }),
-    ...(field(value, 'oldGitBlobSha', 'old-git-blob-sha') === undefined
+    ...(nullableField(value, 'oldGitBlobSha', 'old-git-blob-sha') === undefined
       ? {}
-      : { 'old-git-blob-sha': field<string>(value, 'oldGitBlobSha', 'old-git-blob-sha') }),
+      : { 'old-git-blob-sha': nullableField<string>(value, 'oldGitBlobSha', 'old-git-blob-sha') }),
     ...(field(value, 'newGitBlobSha', 'new-git-blob-sha') === undefined
       ? {}
       : { 'new-git-blob-sha': field<string>(value, 'newGitBlobSha', 'new-git-blob-sha') }),

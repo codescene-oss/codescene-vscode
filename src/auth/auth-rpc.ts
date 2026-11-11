@@ -1,4 +1,12 @@
-import type { Account, AuthErrorCode, AuthStatus, Project } from '../centralized-webview-framework/types/auth';
+import type {
+  Account,
+  AuthErrorCode,
+  AuthStatus,
+  Project,
+  ProjectCandidate,
+  ProjectReason,
+  ProjectSource,
+} from '../centralized-webview-framework/types/auth';
 import type { AuthTransport } from './auth-transport';
 
 const AUTH_ERROR = -32803;
@@ -16,6 +24,9 @@ export interface LoginStart {
 
 export interface ProjectLink {
   project: Project | null;
+  source?: ProjectSource;
+  reason?: ProjectReason;
+  candidates?: ProjectCandidate[];
 }
 
 export class AuthRpc {
@@ -31,6 +42,10 @@ export class AuthRpc {
 
   login(): Promise<LoginStart> {
     return this.transport.request('cs-ide/auth-login', {});
+  }
+
+  reauthorize(): Promise<LoginStart> {
+    return this.transport.request('cs-ide/auth-reauthorize', {});
   }
 
   cancelLogin(loginId: string): Promise<AuthStatus> {

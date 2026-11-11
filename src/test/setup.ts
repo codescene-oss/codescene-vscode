@@ -190,14 +190,9 @@ export type MockWebviewPanel = {
   reveal: (viewColumn?: unknown, preserveFocus?: boolean) => void;
 };
 
-let lastWebviewPanelMock: MockWebviewPanel | undefined;
 let messageHandler: ((message: unknown) => void) | undefined;
 let disposeHandler: (() => void) | undefined;
 const postMessageCalls: unknown[] = [];
-
-export function getLastWebviewPanelMock(): MockWebviewPanel | undefined {
-  return lastWebviewPanelMock;
-}
 
 export function getWebviewMessageHandler(): ((message: unknown) => void) | undefined {
   return messageHandler;
@@ -208,7 +203,6 @@ export function getWebviewPostMessageCalls(): unknown[] {
 }
 
 export function resetWebviewPanelMocks() {
-  lastWebviewPanelMock = undefined;
   messageHandler = undefined;
   disposeHandler = undefined;
   postMessageCalls.length = 0;
@@ -241,8 +235,28 @@ function createMockWebviewPanel(): MockWebviewPanel {
       panel.visible = true;
     },
   };
-  lastWebviewPanelMock = panel;
   return panel;
+}
+
+export type MockWebviewView = {
+  visible: boolean;
+  webview: MockWebviewPanel['webview'] & { options?: unknown };
+  onDidChangeVisibility: (listener: () => void) => { dispose: () => void };
+  setVisible: (visible: boolean) => void;
+};
+
+export function createMockWebviewView(): MockWebviewView {
+  const visibility = createMockEvent<void>();
+  const view: MockWebviewView = {
+    visible: true,
+    webview: createMockWebviewPanel().webview,
+    onDidChangeVisibility: visibility.event,
+    setVisible: (visible: boolean) => {
+      view.visible = visible;
+      visibility.fire();
+    },
+  };
+  return view;
 }
 
 export function setMockGitRepositories(repos: any[]) {
@@ -270,6 +284,8 @@ class TabInputTextStub {
 }
 
 const vscodeStub = {
+  // The editor version is always a string in VS Code; telemetry sends it as editor-version.
+  version: '1.112.0',
   TabInputText: TabInputTextStub,
   extensions: {
     getExtension: (id: string) => {
@@ -519,6 +535,7 @@ const vscodeStub = {
   Range: RangeStub,
   Position: PositionStub,
   Selection: SelectionStub,
+  TextEditorRevealType: { Default: 0, InCenter: 1, InCenterIfOutsideViewport: 2, AtTop: 3 },
   WorkspaceEdit: WorkspaceEditStub,
   CodeAction: CodeActionStub,
   CodeLens: CodeLensStub,

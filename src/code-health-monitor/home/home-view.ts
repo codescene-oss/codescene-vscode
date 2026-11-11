@@ -10,9 +10,18 @@ import { convertFileIssueToCWFDeltaItem } from '../../centralized-webview-framew
 import { BackgroundServiceView } from '../background-view';
 import { handleCWFMessage } from './cwf-message-handlers';
 import { MessageToIDEType } from '../../centralized-webview-framework/types/messages';
-import { AnalysisState, AutoRefactorConfig, FileDeltaData, Job } from '../../centralized-webview-framework/types';
+import {
+  AnalysisState,
+  AutoRefactorConfig,
+  FileDeltaData,
+  IdeContextType,
+  Job,
+} from '../../centralized-webview-framework/types';
 import { initBaseContent, updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
-import { onDidChangeCwfAuth } from '../../auth/cwf-auth';
+import { cwfAuthSurface, onDidChangeCwfAuth } from '../../auth/cwf-auth';
+import { onDidChangeCwfObjectives } from '../../objectives/cwf-objectives';
+import { authViewProps } from '../../auth/auth-view-props';
+import type { AuthSurface } from '../../auth/auth-flow';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from '../../configuration';
 import { monitorJobCounts } from './analysis-batch';
@@ -48,6 +57,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private disposables: Disposable[] = [];
   private view?: vscode.WebviewView;
   private baseContent: string = '';
+  private baseContentSurface?: AuthSurface;
   private initialized: boolean = false; // keep track of webview init state
   private fileIssueMap: Map<string, FileWithIssues> = new Map(); // Raw VSCode specific delta result, source of truth
   private backgroundServiceView: BackgroundServiceView; //handles badge updates
@@ -64,13 +74,13 @@ export class HomeView implements WebviewViewProvider, Disposable {
     this.backgroundServiceView = backgroundServiceView;
 
     this.disposables.push(
-      this,
       DevtoolsAPI.onDidAnalysisStateChange((e) => this.handleRunningsJobs(e)), // Detect changes to running analysis state
       DevtoolsAPI.onDidDeltaAnalysisComplete((e) => this.handleDeltaUpdate(e)), // Detect delta analysis complete
       onFileDeletedFromGit((filePath) => this.handleFileDelete(filePath)), // Detect file deletions from Git
       CsExtensionState.onAceStateChanged(() => this.refreshAceState()), // Detect change to ACE status
       CsExtensionState.onAuthChanged(() => this.refreshAceState()),
       onDidChangeCwfAuth(() => this.update()),
+      onDidChangeCwfObjectives(() => this.update()),
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );
@@ -96,7 +106,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
     webView.onDidReceiveMessage(this.messageHandler, this, this.disposables);
 
     this.handleVisibilityEvents(webviewView);
-    this.baseContent = initBaseContent(webView, this.homePayload());
+    this.rebuildBaseContent(webView);
     this.update();
   }
 
@@ -213,6 +223,20 @@ export class HomeView implements WebviewViewProvider, Disposable {
     });
   }
 
+  private viewProps(): IdeContextType {
+    return cwfAuthSurface() === 'auth' ? authViewProps() : this.homePayload();
+  }
+
+  private rebuildBaseContent(webView: vscode.Webview) {
+    this.baseContentSurface = cwfAuthSurface();
+    this.baseContent = initBaseContent(webView, this.viewProps());
+  }
+
+  private resetHtml(webView: vscode.Webview) {
+    if (this.baseContentSurface !== cwfAuthSurface()) this.rebuildBaseContent(webView);
+    webView.html = this.baseContent;
+  }
+
   // ### VSCode state handlers ###
 
   private handleRunningsJobs(event: AnalysisEvent) {
@@ -248,6 +272,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
       () => {
         this.initialized = false; // onmounting the webview so will need to reinitiate it when opening codescene panel again.
         this.update.cancel(); // cancel any ongoing render updates that might have been throttled.
+        if (!view.visible) this.rebuildBaseContent(view.webview);
+        this.resetHtml(view.webview);
         Telemetry.logUsage('code-health-details/visibility', { visible: view.visible });
       },
       this,
@@ -285,10 +311,10 @@ export class HomeView implements WebviewViewProvider, Disposable {
     }
   }
 
-  private async updateHomeRenderer() {
+  private async updateRenderer() {
     const webView = this.view?.webview;
     if (!webView) return;
-    await webView.postMessage(updateRendererMessage(this.homePayload()));
+    await webView.postMessage(updateRendererMessage(this.viewProps()));
   }
 
   // Update function for rendering webview. used by lodash throttle to limit number of rerenders
@@ -297,9 +323,9 @@ export class HomeView implements WebviewViewProvider, Disposable {
     if (!webView) return;
 
     if (this.initialized) {
-      await this.updateHomeRenderer();
+      await this.updateRenderer();
     } else {
-      webView.html = this.baseContent;
+      this.resetHtml(webView);
     }
   }
 }

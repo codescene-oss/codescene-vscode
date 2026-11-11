@@ -1,10 +1,17 @@
 import { RefactorResponse } from './ace';
-import { AuthPayload } from './auth';
+import { AuthFlow, AuthPayload } from './auth';
 import { FeatureFlags } from './cwf-feature';
 import { DeltaForFile, FunctionInfo, FunctionInfoExternal } from './delta';
+import { ObjectivesSnapshot } from './objectives';
 
 export interface AuthField {
   auth?: AuthPayload;
+  authFlow?: AuthFlow;
+  signInBannerHidden?: boolean;
+}
+
+export interface ObjectivesField {
+  objectives?: ObjectivesSnapshot;
 }
 
 export type IdeTypes = 'VSCode';
@@ -32,7 +39,7 @@ export type Job = {
 
 export type AnalysisState = 'idle' | 'running' | 'stopped';
 
-export interface HomeContextViewProps extends AuthField {
+export interface HomeContextViewProps extends AuthField, ObjectivesField {
   /**The IDE invoking th webview */
   ideType: IdeTypes;
   /**Enable premium UI elements */

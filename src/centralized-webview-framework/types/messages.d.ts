@@ -77,10 +77,12 @@ export type MessageToIDEType =
   | {
       messageType: 'start-analysis';
     }
-  | { messageType: 'open-auth' }
+  | { messageType: 'open-auth'; payload?: { screen?: 'account' | 'project' } }
+  | { messageType: 'auth-close' }
+  | { messageType: 'auth-skip-project' }
+  | { messageType: 'hide-sign-in-banner' }
   | { messageType: 'auth-sign-in' }
   | { messageType: 'auth-open-browser-again' }
-  | { messageType: 'auth-cancel-sign-in' }
   | { messageType: 'auth-sign-out' }
   | { messageType: 'auth-retry' }
   | { messageType: 'auth-select-account'; payload: { accountId: string } }
@@ -88,4 +90,6 @@ export type MessageToIDEType =
   | { messageType: 'auth-set-access-token'; payload: { token: string } }
   | { messageType: 'auth-remove-access-token' }
   | { messageType: 'auth-open-server-setting' }
-  | { messageType: 'auth-open-pat-page' };
+  | { messageType: 'auth-open-pat-page' }
+  | { messageType: 'goal-work-session-start'; payload: { goalId: number } }
+  | { messageType: 'auth-reauthorize' };

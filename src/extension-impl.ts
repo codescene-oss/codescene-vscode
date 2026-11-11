@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { activateAuth } from './auth/auth-feature';
 import { readLegacySession } from './auth/legacy-session';
+import { activateObjectives } from './objectives/objectives-feature';
 import { activate as activateCHMonitor, deactivate as deactivateAddon } from './code-health-monitor/addon';
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
@@ -151,7 +152,8 @@ function setupAceConfiguration(context: vscode.ExtensionContext) {
 }
 
 function registerAuth(context: vscode.ExtensionContext, ideServer: CsIdeServerClient) {
-  const disposables = activateAuth(context, ideServer);
+  const objectives = activateObjectives(ideServer);
+  const disposables = [...activateAuth(context, ideServer, objectives), ...objectives.disposables];
   DISPOSABLES.push(...disposables);
   context.subscriptions.push(...disposables);
 }

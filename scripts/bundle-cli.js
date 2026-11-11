@@ -7,14 +7,10 @@
  */
 
 const { https } = require('follow-redirects');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
-const extractZip = require('extract-zip');
+const { extractZipArchive } = require('./extract-zip.js');
 const { artifacts, nativeBinaryFileName, requiredSidecarFileNames } = require('./cli-config.js');
-
-const execFileAsync = promisify(execFile);
 
 function getDistributionName(platform, arch) {
   return `cs-${platform}-${arch}`;
@@ -146,19 +142,6 @@ async function removePath(filePath) {
   } catch (e) {}
 }
 
-async function extractZipArchive(zipPath, destinationDir) {
-  // Windows CI publishes zips via Compress-Archive; extract-zip/yauzl can stop early on those.
-  if (process.platform === 'win32') {
-    await execFileAsync(
-      'powershell.exe',
-      ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destinationDir.replace(/'/g, "''")}' -Force`],
-      { windowsHide: true, maxBuffer: 10 * 1024 * 1024 }
-    );
-    return;
-  }
-  await extractZip(zipPath, { dir: destinationDir });
-}
-
 async function extractDistribution(zipPath, platform, arch) {
   const projectRoot = path.join(__dirname, '..');
   const tempExtractDir = path.join(projectRoot, `.temp-extract-${platform}-${arch}`);
@@ -214,4 +197,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { bundleBinaryForPlatform, locateNativeBinary, locateRequiredSidecars };
+module.exports = { bundleBinaryForPlatform, downloadBinary, locateNativeBinary, locateRequiredSidecars };

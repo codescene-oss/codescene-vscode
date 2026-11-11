@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const extractZip = require('extract-zip');
+const { extractZipArchive } = require('./extract-zip.js');
 
 const projectRoot = path.join(__dirname, '..');
 const localCwfDir = path.join(projectRoot, '..', 'cs-webview');
@@ -80,7 +80,7 @@ async function extractCwf(zipPath, dir) {
   fs.rmSync(path.join(dir, stampFileName), { force: true });
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  await extractZip(zipPath, { dir: path.resolve(dir) });
+  await extractZipArchive(zipPath, dir);
   const missing = requiredFiles.filter((file) => !fs.existsSync(path.join(dir, file)));
   if (missing.length > 0) {
     throw new Error(`CWF archive is missing ${missing.map((file) => `cs-cwf/${file}`).join(', ')}`);

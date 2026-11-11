@@ -62,8 +62,8 @@ suite('Update CWF Script Test Suite', () => {
   });
 
   test('the committed cwf.version is a valid pin with a trailing newline', () => {
-    assert.strictEqual(fs.readFileSync(updateCwf.pinPath, 'utf8').replace(/\r\n/g, '\n'), '2.5.8\n');
-    assert.strictEqual(updateCwf.resolveVersion({}, updateCwf.pinPath), '2.5.8');
+    assert.strictEqual(fs.readFileSync(updateCwf.pinPath, 'utf8').replace(/\r\n/g, '\n'), '2.5.13\n');
+    assert.strictEqual(updateCwf.resolveVersion({}, updateCwf.pinPath), '2.5.13');
   });
 
   test('resolveVersion applies the override and file rules', () => {

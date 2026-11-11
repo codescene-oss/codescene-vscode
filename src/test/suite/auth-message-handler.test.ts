@@ -22,18 +22,19 @@ function recorder(status: AuthStatus | null = authStatusFixture('signed-in-setti
     current: { ...INACTIVE_SNAPSHOT, active: status !== null, status },
     signIn: record('signIn'),
     openBrowserAgain: record('openBrowserAgain'),
-    cancelSignIn: record('cancelSignIn'),
+    openAuth: record('openAuth'),
+    closeAuth: record('closeAuth'),
+    skipProject: record('skipProject'),
+    hideSignInBanner: record('hideSignInBanner'),
     signOut: record('signOut'),
     retry: record('retry'),
     selectAccount: record('selectAccount'),
     linkProject: record('linkProject'),
     setAccessToken: record('setAccessToken'),
     removeAccessToken: record('removeAccessToken'),
+    reauthorize: record('reauthorize'),
   };
   const target: AuthMessageTarget = {
-    showAuthView: () => {
-      calls.push(['showAuthView']);
-    },
     openServerSetting: record('openServerSetting'),
     openExternal: record('openExternal'),
   };
@@ -42,10 +43,15 @@ function recorder(status: AuthStatus | null = authStatusFixture('signed-in-setti
 
 suite('handleAuthMessage', () => {
   const cases: Array<{ message: AuthMessage; expected: unknown[] }> = [
-    { message: { messageType: 'open-auth' }, expected: ['showAuthView'] },
+    { message: { messageType: 'open-auth' }, expected: ['openAuth', undefined] },
+    { message: { messageType: 'open-auth', payload: {} }, expected: ['openAuth', undefined] },
+    { message: { messageType: 'open-auth', payload: { screen: 'project' } }, expected: ['openAuth', 'project'] },
+    { message: { messageType: 'open-auth', payload: { screen: 'account' } }, expected: ['openAuth', 'account'] },
+    { message: { messageType: 'auth-close' }, expected: ['closeAuth'] },
+    { message: { messageType: 'auth-skip-project' }, expected: ['skipProject'] },
+    { message: { messageType: 'hide-sign-in-banner' }, expected: ['hideSignInBanner'] },
     { message: { messageType: 'auth-sign-in' }, expected: ['signIn'] },
     { message: { messageType: 'auth-open-browser-again' }, expected: ['openBrowserAgain'] },
-    { message: { messageType: 'auth-cancel-sign-in' }, expected: ['cancelSignIn'] },
     { message: { messageType: 'auth-sign-out' }, expected: ['signOut'] },
     { message: { messageType: 'auth-retry' }, expected: ['retry'] },
     { message: { messageType: 'auth-select-account', payload: { accountId: '7' } }, expected: ['selectAccount', '7'] },
@@ -57,10 +63,11 @@ suite('handleAuthMessage', () => {
       message: { messageType: 'auth-open-pat-page' },
       expected: ['openExternal', 'https://codescene.acme.internal/configuration/user/token'],
     },
+    { message: { messageType: 'auth-reauthorize' }, expected: ['reauthorize'] },
   ];
 
   for (const { message, expected } of cases) {
-    test(`${message.messageType} calls ${String(expected[0])}`, async () => {
+    test(`${message.messageType} ${JSON.stringify((message as any).payload ?? null)} calls ${String(expected[0])}`, async () => {
       const { calls, actions, target } = recorder();
       await handleAuthMessage(actions, target, message);
       assert.deepStrictEqual(calls, [expected]);
