@@ -23,6 +23,8 @@ import type {
   Objective,
   ObjectiveParent,
   ObjectiveProject,
+  ObjectiveRecommendation,
+  ObjectiveRecommendationEvidence,
   ObjectivesSnapshot,
   ObjectiveSubject,
   ObjectiveSubjectFile,
@@ -134,7 +136,23 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     threshold: declared<ObjectiveThreshold>({ operator: true, mode: true, value: true, 'comparison-value': true }),
     'created-by-display-name': true,
     parent: declared<ObjectiveParent>({ kind: true, id: true, 'created-by-display-name': true }),
-    subject: declared<ObjectiveSubject>({ type: true, files: declared<ObjectiveSubjectFile>({ path: true }) }),
+    subject: declared<ObjectiveSubject>({
+      type: true,
+      files: declared<ObjectiveSubjectFile>({ path: true }),
+      recommendation: declared<ObjectiveRecommendation>({
+        scope: true,
+        target: true,
+        'recommendation-type': true,
+        text: true,
+        evidence: declared<ObjectiveRecommendationEvidence>({
+          'code-health-issues': true,
+          revisions: true,
+          loc: true,
+          'cyclomatic-complexity': true,
+          defects: true,
+        }),
+      }),
+    }),
     shared: declared<SharedResult>({ applicability: true, result: true, value: true, 'evaluated-at': true, 'as-of': true }),
     local: declared<LocalResult>({
       result: true,
