@@ -74,6 +74,12 @@ export class AgentRefactoringService {
     }
   }
 
+  private static requireSaved(document: TextDocument): void {
+    if (document.isDirty) {
+      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
+    }
+  }
+
   static async runRefactoring(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
@@ -81,9 +87,7 @@ export class AgentRefactoringService {
     skipCleanup?: boolean,
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
-    if (document.isDirty) {
-      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
-    }
+    AgentRefactoringService.requireSaved(document);
     const taskId = `refactor-${uuidv4()}`;
     const gitApi = acquireGitApi();
     const repo = gitApi?.getRepository(document.uri);
@@ -378,9 +382,7 @@ export class AgentRefactoringService {
     signal?: AbortSignal,
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
-    if (document.isDirty) {
-      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
-    }
+    AgentRefactoringService.requireSaved(document);
 
     const taskId = `fix-goal-${uuidv4()}`;
     const input = AgentRefactoringService.buildFixGoalInput(goal, taskId);
