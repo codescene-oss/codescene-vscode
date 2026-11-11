@@ -132,7 +132,8 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     'area-id': true,
     'metric-id': true,
     threshold: declared<ObjectiveThreshold>({ operator: true, mode: true, value: true, 'comparison-value': true }),
-    parent: declared<ObjectiveParent>({ kind: true, id: true }),
+    'created-by-display-name': true,
+    parent: declared<ObjectiveParent>({ kind: true, id: true, 'created-by-display-name': true }),
     subject: declared<ObjectiveSubject>({ type: true, files: declared<ObjectiveSubjectFile>({ path: true }) }),
     shared: declared<SharedResult>({ applicability: true, result: true, value: true, 'evaluated-at': true, 'as-of': true }),
     local: declared<LocalResult>({
@@ -143,7 +144,12 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     'work-sessions': declared<GoalWorkSessions>({
       state: true,
       reauthorize: true,
-      participants: declared<WorkSessionParticipant>({ actor: true, you: true, 'started-at': true }),
+      participants: declared<WorkSessionParticipant>({
+        actor: true,
+        'display-name': true,
+        you: true,
+        'started-at': true,
+      }),
       mine: ['session-id', 'started-at'],
     }),
   }),
