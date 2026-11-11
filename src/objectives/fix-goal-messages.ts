@@ -3,21 +3,26 @@ import * as nodePath from 'path';
 import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
 import type { FixGoalTarget } from '../refactoring/agent-types';
 
-export function resolveFixGoalTarget(
+type Objective = ObjectivesSnapshot['objectives'][number];
+
+function findGoalObjective(
   snapshot: ObjectivesSnapshot | undefined,
-  goalId: number,
-  path: string
-): FixGoalTarget | string {
+  goalId: number
+): Objective | 'goal-not-found' {
   if (!snapshot) return 'goal-not-found';
-
   const objective = snapshot.objectives.find((obj) => obj.kind === 'goal' && obj.id === goalId);
-  if (!objective) return 'goal-not-found';
+  return objective ?? 'goal-not-found';
+}
 
+function validateFileEntry(
+  objective: Objective,
+  path: string,
+  repoRoot: string,
+  goalId: number
+): FixGoalTarget | string {
   const file = objective.local?.files?.find((f) => f.path === path);
   if (!file) return 'file-not-in-goal';
-
   if (file.result !== 'violated') return 'not-violated';
-
   if (file.value === undefined || file['comparison-value'] === undefined) return 'no-scores';
 
   return {
@@ -26,9 +31,20 @@ export function resolveFixGoalTarget(
     operator: objective.threshold.operator,
     target: file['comparison-value'],
     baseline: file.value,
-    repoRoot: snapshot['repo-root'],
+    repoRoot,
     path,
   };
+}
+
+export function resolveFixGoalTarget(
+  snapshot: ObjectivesSnapshot | undefined,
+  goalId: number,
+  path: string
+): FixGoalTarget | string {
+  const objective = findGoalObjective(snapshot, goalId);
+  if (typeof objective === 'string') return objective;
+
+  return validateFileEntry(objective, path, snapshot!['repo-root'], goalId);
 }
 
 export interface FixGoalDeps {

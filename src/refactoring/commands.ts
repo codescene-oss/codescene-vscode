@@ -52,18 +52,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
     codeSmell?: CodeSmell,
     goal?: FixGoalTarget
   ) {
-    let toRefactor: FnToRefactor | undefined;
-    if (goal) {
-      if (!(await ensureSavedForRefactoring(document))) return;
-      toRefactor = fnToRefactorForWholeFile(document);
-    } else {
-      toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
-      if (!toRefactor) {
-        logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
-        return;
-      }
-      if (!(await ensureSavedForRefactoring(document))) return;
-    }
+    const toRefactor = await this.prepareFnToRefactor(document, fnToRefactor, codeSmell, goal);
+    if (!toRefactor) return;
 
     if (!CsExtensionState.acknowledgedAceUsage) {
       Telemetry.logUsage('ace-info/presented', { source });
@@ -74,6 +64,26 @@ export class CsRefactoringCommands implements vscode.Disposable {
     const request = new RefactoringRequest(toRefactor, document, skipCache, goal);
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneCWFAceTabPanel.show(request);
+  }
+
+  private async prepareFnToRefactor(
+    document: vscode.TextDocument,
+    fnToRefactor: FnToRefactor | undefined,
+    codeSmell: CodeSmell | undefined,
+    goal: FixGoalTarget | undefined
+  ): Promise<FnToRefactor | undefined> {
+    if (goal) {
+      if (!(await ensureSavedForRefactoring(document))) return undefined;
+      return fnToRefactorForWholeFile(document);
+    }
+
+    const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
+    if (!toRefactor) {
+      logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
+      return undefined;
+    }
+    if (!(await ensureSavedForRefactoring(document))) return undefined;
+    return toRefactor;
   }
 
   private async applyRefactoringCmd(refactoring: RefactoringRequest) {
