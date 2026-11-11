@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AgentRefactoringService, agentArgs } from '../../refactoring/agent-service';
-import { AgentOutput, ConfidenceLevel } from '../../refactoring/agent-types';
+import { AgentOutput, ConfidenceLevel, FixGoalTarget } from '../../refactoring/agent-types';
 import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
@@ -47,6 +47,17 @@ aceSuite('AgentRefactoringService Test Suite', () => {
   ]) {
     test(`agentArgs runs skill ${skill.name}`, () => assert.deepStrictEqual(agentArgs(skill, 'm'), expected));
   }
+
+  test('buildFixGoalInput writes the goal of the file, relative to the repository', () => {
+    const goal: FixGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 9, baseline: 6, repoRoot: 'C:\\work\\fake-repo', path: 'src/orders.js' };
+    assert.deepStrictEqual(AgentRefactoringService.buildFixGoalInput(goal, 'fix-goal-1'), {
+      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      task_id: 'fix-goal-1',
+      file: 'src/orders.js',
+      goal: { id: 2, 'metric-id': 'average-code-health', operator: 'greater-than-or-equal', target: 9 },
+      baseline: 6,
+    });
+  });
 
   test('readOutput reports the end of stderr when the agent wrote no output file', () => {
     const missing = path.join(os.tmpdir(), `cs-agent-missing-${Date.now()}`, FIX_GOAL_SKILL.outputFile);

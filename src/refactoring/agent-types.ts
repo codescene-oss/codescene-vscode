@@ -74,3 +74,35 @@ export interface AgentConfig {
   };
   tracking?: TrackingConfig;
 }
+
+export interface FixGoalTarget {
+  goalId: number;
+  metricId: string;
+  operator: string;
+  target: number;
+  baseline: number;
+  repoRoot: string;
+  path: string;
+}
+
+export interface FixGoalInput {
+  '@context': AgentInputContext;
+  task_id: string;
+  file: string;
+  goal: { id: number; 'metric-id': string; operator: string; target: number };
+  baseline: number;
+}
+
+export type FixGoalResult = 'target_reached' | 'improved' | 'unable_to_fix';
+export type FixGoalOutcome = 'reached' | 'improved' | 'unable';
+
+export interface FixGoalOutput {
+  schema_version: string;
+  task_id: string;
+  fix_result: FixGoalResult;
+  confidence: ConfidenceLevel;
+  explanation: string;
+  estimated_score?: number;
+  whole_file_content?: string;
+  generated_at: string;
+}
