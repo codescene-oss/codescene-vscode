@@ -24,4 +24,6 @@ test-cs-diagnostics/
 coverage/
 .cs-prod-build
 bin/cs-agent
+bin/cs-agent.exe
+bin/.cs-agent-version
 bench-results/

@@ -35,9 +35,14 @@ function cleanupOtherBinaries(targetPlatform, targetArch) {
   }
 }
 
-function applyVscodeIgnoreExceptions(content, targetBinary) {
+function excludeAgentBinary(lines) {
+  return lines.map(line => (line.trim() === '!bin/' ? 'bin/' : line));
+}
+
+function applyVscodeIgnoreExceptions(content, targetBinary, includeAgent = true) {
   const eol = content.includes('\r\n') ? '\r\n' : '\n';
-  const lines = content.replace(/!cs-.*\r?\n/g, '').split(/\r?\n/);
+  const kept = content.replace(/!cs-.*\r?\n/g, '').split(/\r?\n/);
+  const lines = includeAgent ? kept : excludeAgentBinary(kept);
   const exceptions = ['!cs-cwf/', '!cs-cwf/**', `!${targetBinary}/`, `!${targetBinary}/**`];
   const zipLineIndex = lines.findIndex(line => line.trim() === '*.zip');
 
@@ -50,13 +55,13 @@ function applyVscodeIgnoreExceptions(content, targetBinary) {
   return lines.join(eol);
 }
 
-function updateVscodeIgnore(targetPlatform, targetArch, originalContent) {
+function updateVscodeIgnore(targetPlatform, targetArch, originalContent, includeAgent = true) {
   const vscodeIgnorePath = path.join(__dirname, '..', '.vscodeignore');
   const targetBinary = `cs-${targetPlatform}-${targetArch}`;
 
   const content = originalContent || fs.readFileSync(vscodeIgnorePath, 'utf8');
 
-  fs.writeFileSync(vscodeIgnorePath, applyVscodeIgnoreExceptions(content, targetBinary));
+  fs.writeFileSync(vscodeIgnorePath, applyVscodeIgnoreExceptions(content, targetBinary, includeAgent));
   console.log(`Updated .vscodeignore to include only: ${targetBinary}`);
 
   return content;
@@ -68,12 +73,18 @@ function restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgno
   restoreVariantFiles(projectRoot, originalPackageJson, originalReadme);
 }
 
-function refreshAssets(tokenEnv) {
+function refreshAssets(tokenEnv, platform, arch, includeAgent) {
   if (process.env.CS_IDE_USE_LOCAL_DISTRIBUTION === 'true') {
     console.log('Skipping remote asset refresh for local distribution packaging.');
     return;
   }
   execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
+  if (includeAgent) {
+    execSync(`node "${path.join(__dirname, 'update-cs-agent.js')}" ${platform} ${arch} --force`, {
+      stdio: 'inherit',
+      env: tokenEnv,
+    });
+  }
 }
 
 function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
@@ -91,11 +102,11 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   cleanupOtherBinaries(platform, arch);
 
   console.log('\nStep 3: Updating .vscodeignore...');
-  updateVscodeIgnore(platform, arch, originalVscodeIgnore);
+  updateVscodeIgnore(platform, arch, originalVscodeIgnore, !buildNoAce);
 
-  console.log('\nStep 4: Updating webview...');
+  console.log('\nStep 4: Updating webview and agent...');
   const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
-  refreshAssets(tokenEnv);
+  refreshAssets(tokenEnv, platform, arch, !buildNoAce);
 
   console.log('\nStep 5: Building extension...');
   execSync('npm run build', {

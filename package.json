@@ -334,6 +334,7 @@
     "test:coverage": "c8 npm run test",
     "test:coverage:dual": "node ./scripts/test-coverage-dual.js",
     "updatecwf": "node scripts/update-cwf.js",
+    "updateagent": "node scripts/update-cs-agent.js",
     "release:test": "node ./scripts/create-test-release.js"
   },
   "extensionDependencies": [
