@@ -8,7 +8,7 @@ import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-
 import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT } from './agent-types';
-import { getExtensionPath } from '../cs-extension-state';
+import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
@@ -158,7 +158,7 @@ export class AgentRefactoringService {
     token: string
   ): { proc: ChildProcess; binaryPath: string } {
     const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir);
+    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir, CsExtensionState.stateProperties.auth.status?.server);
     const configJson = JSON.stringify(config);
 
     const args = agentArgs(skill, getAgentModel());

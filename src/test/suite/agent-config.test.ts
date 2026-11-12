@@ -207,6 +207,20 @@ aceSuite('AgentConfig Test Suite', () => {
     assert.strictEqual(buildAgentConfigWithToken(undefined, RENDER_CODE_FIX_SKILL.plugin).codescene_access_token, '');
   });
 
+  test('buildAgentConfigWithToken sends the on-prem server URL the user is signed in to', () => {
+    mockConfiguration('codescene', {});
+    const server = { url: 'http://localhost:3004', onprem: true, source: 'setting' as const, 'pat-url': '' };
+    const result = buildAgentConfigWithToken('t', RENDER_CODE_FIX_SKILL.plugin, undefined, server);
+    assert.strictEqual(result.codescene_onprem_url, 'http://localhost:3004');
+  });
+
+  test('buildAgentConfigWithToken sends no server URL for the cloud', () => {
+    mockConfiguration('codescene', {});
+    const server = { url: 'https://codescene.io', onprem: false, source: 'default' as const, 'pat-url': '' };
+    const result = buildAgentConfigWithToken('t', RENDER_CODE_FIX_SKILL.plugin, undefined, server);
+    assert.strictEqual('codescene_onprem_url' in result, false);
+  });
+
   test('buildOpencodeConfig produces exact bedrock structure', () => {
     const opts = {
       'amazon-bedrock:profile': 'codescene-dev',

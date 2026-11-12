@@ -70,6 +70,7 @@ export interface TrackingConfig {
 
 export interface AgentConfig {
   codescene_access_token: string;
+  codescene_onprem_url?: string;
   plugins: string[];
   io_json_dir?: string;
   provider?: ProviderCredentials;

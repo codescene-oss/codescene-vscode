@@ -1,3 +1,4 @@
+import type { AuthServer } from '../centralized-webview-framework/types/auth';
 import { getProviderOptions } from '../configuration';
 import { AgentConfig, BedrockOpencodeProvider, ProviderCredentials } from './agent-types';
 
@@ -72,13 +73,19 @@ export function buildOpencodeConfig(opts: Record<string, string>): AgentConfig['
   return { provider };
 }
 
-export function buildAgentConfigWithToken(token: string | undefined, plugin: string | undefined, ioDir?: string): AgentConfig {
+export function buildAgentConfigWithToken(
+  token: string | undefined,
+  plugin: string | undefined,
+  ioDir?: string,
+  server?: AuthServer | null
+): AgentConfig {
   const providerOpts = getProviderOptions();
   const providerCredentials = buildProviderCredentials(providerOpts);
   const opencodeConfig = buildOpencodeConfig(providerOpts);
 
   return {
     codescene_access_token: token ?? '',
+    ...(server?.onprem && { codescene_onprem_url: server.url }),
     plugins: plugin ? [plugin] : [],
     tracking: { environment: 'codescene-vscode' },
     ...(ioDir && { io_json_dir: ioDir }),
