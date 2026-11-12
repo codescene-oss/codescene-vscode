@@ -1,9 +1,9 @@
 import { spawn } from 'child_process';
 import * as path from 'path';
 import vscode from 'vscode';
-import { getExtensionPath } from '../cs-extension-state';
+import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
 import { aceToken } from '../devtools-api';
-import { buildAgentConfigWithToken } from './agent-config';
+import { buildAgentConfigWithToken, RENDER_CODE_FIX_SKILL } from './agent-config';
 import { getAgentModel } from '../configuration';
 import { logOutputChannel } from '../log';
 
@@ -30,7 +30,12 @@ const DEFAULT_TIMEOUT_MS = 60000;
 
 export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
   const binaryPath = getAgentBinaryPath();
-  const config = buildAgentConfigWithToken(aceToken());
+  const config = buildAgentConfigWithToken(
+    aceToken(),
+    RENDER_CODE_FIX_SKILL.plugin,
+    undefined,
+    CsExtensionState.stateProperties.auth.status?.server
+  );
   const configJson = JSON.stringify(config);
   const model = getAgentModel();
 

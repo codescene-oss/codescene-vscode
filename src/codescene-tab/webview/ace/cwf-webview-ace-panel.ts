@@ -8,7 +8,7 @@ import {
   decorateCode,
   deselectRefactoring,
   highlightCode,
-  isFunctionUnchangedInDocument,
+  refactoringStaleness,
 } from '../../../refactoring/utils';
 import { logOutputChannel } from '../../../log';
 import { RefactoringRequest } from '../../../refactoring/request';
@@ -91,9 +91,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
   private handleIsStale(e: vscode.TextDocumentChangeEvent) {
     if (this.isDisposing || !this.state) return;
-    const { document, fnToRefactor } = this.state.request;
+    const { document } = this.state.request;
     if (document !== e.document || e.contentChanges.length === 0) return;
-    const { shouldUpdateRange, isStale } = isFunctionUnchangedInDocument(document, fnToRefactor);
+    const { shouldUpdateRange, isStale } = refactoringStaleness(this.state.request);
 
     // (cast this.state.isStale to boolean to avoid a first glitch when changing state from undefined to false)
     const stalenessChanged = isStale !== !!this.state.isStale;
@@ -142,7 +142,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
           // Having true here means skipping cache, meaning retry to get another refactoring
           // if the first one is not what you want...
           // But this seem to be used to retry when failed and we definitely don't want to skip cache then
-          false //true
+          false, //true
+          undefined,
+          request.goal
         );
       },
       showDiff: () => {

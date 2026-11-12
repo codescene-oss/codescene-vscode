@@ -3,6 +3,7 @@ import type { IdeContextType, ObjectivesField } from '../../centralized-webview-
 import { getHomeData } from '../../code-health-monitor/home/home-props-utils';
 import { setCwfObjectives } from '../../objectives/cwf-objectives';
 import { fixture } from '../contract/contract';
+import { ACE_ENABLED } from '../../build-flags';
 
 const homeData = { fileDeltaData: [], jobs: [], analysisState: 'idle' as const };
 
@@ -56,5 +57,18 @@ suite('Home payload objectives', () => {
       },
       { objectivesFlag: true, workSessionsFlag: false }
     );
+  });
+
+  test('adds ide-goal-fix after ide-objectives exactly when the build has the agent', () => {
+    setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'));
+    const flags = homePayload().featureFlags ?? [];
+    assert.deepStrictEqual(
+      flags.filter((f) => f === 'ide-objectives' || f === 'ide-goal-fix'),
+      ACE_ENABLED ? ['ide-objectives', 'ide-goal-fix'] : ['ide-objectives']
+    );
+  });
+
+  test('has no ide-goal-fix flag while there is no snapshot', () => {
+    assert.strictEqual(homePayload().featureFlags?.includes('ide-goal-fix'), false);
   });
 });

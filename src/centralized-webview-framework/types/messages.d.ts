@@ -92,4 +92,5 @@ export type MessageToIDEType =
   | { messageType: 'auth-open-server-setting' }
   | { messageType: 'auth-open-pat-page' }
   | { messageType: 'goal-work-session-start'; payload: { goalId: number } }
+  | { messageType: 'fix-goal'; payload: { goalId: number; path: string } }
   | { messageType: 'auth-reauthorize' };

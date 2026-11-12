@@ -90,6 +90,11 @@ export class DevtoolsAPI {
     return { rulesMsg: result } as CodeHealthRulesResult;
   }
 
+  static async scoreContent(repoRoot: string, relPath: string, content: string): Promise<number | undefined> {
+    const result = await DevtoolsAPI.ideServer.review({ path: relPath, 'file-content': content, 'repo-path': repoRoot });
+    return result.score;
+  }
+
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
   public static readonly onDidAnalysisStateChange = DevtoolsAPI.analysisStateEmitter.event;
   private static analysesRunning = 0;
@@ -246,12 +251,12 @@ export class DevtoolsAPI {
 
   static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
     this.checkAceEnabled();
-    const { document, fnToRefactor, skipCache, signal } = request;
+    const { document, fnToRefactor, skipCache } = request;
     this.getRefactoringAuthToken();
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
     try {
       this.logRefactorRequested(fnToRefactor, skipCache);
-      const response = await DevtoolsAPI.executeRefactor(document, fnToRefactor, signal, onProgress);
+      const response = await DevtoolsAPI.executeRefactor(request, onProgress);
       this.logRefactorDone(fnToRefactor, skipCache, response);
       DevtoolsAPI.handleBackOnline();
       return response;
@@ -276,11 +281,20 @@ export class DevtoolsAPI {
   }
 
   private static async executeRefactor(
-    document: TextDocument,
-    fnToRefactor: FnToRefactor,
-    signal: AbortSignal,
+    request: RefactoringRequest,
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
+    const { document, fnToRefactor, signal, goal } = request;
+    if (goal) {
+      return AgentRefactoringService.runFixGoal(
+        document,
+        fnToRefactor,
+        goal,
+        (content) => DevtoolsAPI.scoreContent(goal.repoRoot, goal.path, content),
+        signal,
+        onProgress
+      );
+    }
     return AgentRefactoringService.runRefactoring(document, fnToRefactor, signal, undefined, onProgress);
   }
 

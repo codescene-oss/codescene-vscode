@@ -6,12 +6,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
-import { buildAgentConfigWithToken } from './agent-config';
-import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange } from './agent-types';
-import { getExtensionPath } from '../cs-extension-state';
+import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
+import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT } from './agent-types';
+import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
+import { fixGoalCode, mapFixGoalResponse } from './fix-goal-response';
+import { AbortError } from '../devtools-api/abort-error';
 
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -22,10 +24,12 @@ function toLf(str: string): string {
   return str.replace(/\r\n/g, '\n');
 }
 
-const INPUT_FILE = 'render-code-fix-input.json';
-const OUTPUT_FILE = 'render-code-fix-output.json';
-
 export type ProgressCallback = (message: string) => void;
+export type ContentScorer = (content: string) => Promise<number | undefined>;
+
+export function agentArgs(skill: AgentSkill, model: string): string[] {
+  return ['run', `skill:${skill.name}`, '--model', model];
+}
 
 export class AgentRefactoringService {
   private static getAgentBinaryPath(): string {
@@ -37,6 +41,46 @@ export class AgentRefactoringService {
     return path.join(extensionPath, 'bin', binaryName);
   }
 
+  static readOutput<T>(outputPath: string, stderr: string): T {
+    if (!fs.existsSync(outputPath)) {
+      throw AgentRefactoringService.missingOutputError(stderr);
+    }
+    const outputContent = fs.readFileSync(outputPath, 'utf-8');
+    return JSON.parse(outputContent);
+  }
+
+  private static async runSkill<TOutput>(
+    skill: AgentSkill,
+    workDir: string,
+    input: object,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback,
+    skipCleanup?: boolean
+  ): Promise<TOutput> {
+    const ioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agent-io-'));
+
+    try {
+      const inputPath = path.join(ioDir, skill.inputFile);
+      fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
+
+      const token = await AgentRefactoringService.requireToken();
+      const stderr = await AgentRefactoringService.invokeAgent(skill, workDir, ioDir, token, signal, onProgress);
+
+      const outputPath = path.join(ioDir, skill.outputFile);
+      return AgentRefactoringService.readOutput<TOutput>(outputPath, stderr);
+    } finally {
+      if (!skipCleanup) {
+        AgentRefactoringService.cleanup(ioDir);
+      }
+    }
+  }
+
+  private static requireSaved(document: TextDocument): void {
+    if (document.isDirty) {
+      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
+    }
+  }
+
   static async runRefactoring(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
@@ -44,39 +88,26 @@ export class AgentRefactoringService {
     skipCleanup?: boolean,
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
-    if (document.isDirty) {
-      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
-    }
+    AgentRefactoringService.requireSaved(document);
     const taskId = `refactor-${uuidv4()}`;
     const gitApi = acquireGitApi();
     const repo = gitApi?.getRepository(document.uri);
     const workDir = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
-    const ioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agent-io-'));
-    const inputPath = path.join(ioDir, INPUT_FILE);
-    const outputPath = path.join(ioDir, OUTPUT_FILE);
 
-    try {
-      const input = AgentRefactoringService.buildInput(document, fnToRefactor, taskId);
-      fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
+    const input = AgentRefactoringService.buildInput(document, fnToRefactor, taskId);
+    logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
 
-      logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
+    const output = await AgentRefactoringService.runSkill<AgentOutput>(
+      RENDER_CODE_FIX_SKILL,
+      workDir,
+      input,
+      signal,
+      onProgress,
+      skipCleanup
+    );
 
-      const token = await AgentRefactoringService.requireToken();
-      const stderr = await AgentRefactoringService.invokeAgent(workDir, ioDir, token, signal, onProgress);
-
-      if (!fs.existsSync(outputPath)) throw AgentRefactoringService.missingOutputError(stderr);
-
-      const outputContent = fs.readFileSync(outputPath, 'utf-8');
-      const output: AgentOutput = JSON.parse(outputContent);
-
-      logOutputChannel.info(`Agent refactoring completed for task ${taskId}: ${output.fix_result}`);
-
-      return AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
-    } finally {
-      if (!skipCleanup) {
-        AgentRefactoringService.cleanup(ioDir);
-      }
-    }
+    logOutputChannel.info(`Agent refactoring completed for task ${taskId}: ${output.fix_result}`);
+    return AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
   }
 
   private static missingOutputError(stderr: string): Error {
@@ -92,11 +123,21 @@ export class AgentRefactoringService {
     }
 
     return {
-      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      '@context': AGENT_INPUT_CONTEXT,
       task_id: taskId,
       file: document.fileName,
       line: target.line,
       smell: target.category,
+    };
+  }
+
+  static buildFixGoalInput(goal: FixGoalTarget, taskId: string): FixGoalInput {
+    return {
+      '@context': AGENT_INPUT_CONTEXT,
+      task_id: taskId,
+      file: goal.path,
+      goal: { id: goal.goalId, 'metric-id': goal.metricId, operator: goal.operator, target: goal.target },
+      baseline: goal.baseline,
     };
   }
 
@@ -111,15 +152,16 @@ export class AgentRefactoringService {
   }
 
   private static spawnAgentProcess(
+    skill: AgentSkill,
     workDir: string,
     ioDir: string,
     token: string
   ): { proc: ChildProcess; binaryPath: string } {
     const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-    const config = buildAgentConfigWithToken(token, ioDir);
+    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir, CsExtensionState.stateProperties.auth.status?.server);
     const configJson = JSON.stringify(config);
 
-    const args: string[] = ['run', 'skill:render-code-fix', '--model', getAgentModel()];
+    const args = agentArgs(skill, getAgentModel());
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       CS_AGENT_CONFIG: configJson,
@@ -155,6 +197,7 @@ export class AgentRefactoringService {
   }
 
   private static invokeAgent(
+    skill: AgentSkill,
     workDir: string,
     ioDir: string,
     token: string,
@@ -162,13 +205,13 @@ export class AgentRefactoringService {
     onProgress?: ProgressCallback
   ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const { proc } = AgentRefactoringService.spawnAgentProcess(workDir, ioDir, token);
+      const { proc } = AgentRefactoringService.spawnAgentProcess(skill, workDir, ioDir, token);
       const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
       AgentRefactoringService.setupStdoutHandler(proc, onProgress);
 
       const abortHandler = () => {
         proc.kill('SIGTERM');
-        reject(new Error('Agent invocation aborted'));
+        reject(new AbortError('Agent invocation aborted'));
       };
 
       signal?.addEventListener('abort', abortHandler);
@@ -303,6 +346,61 @@ export class AgentRefactoringService {
         details: undefined,
       },
     ];
+  }
+
+  static async resolveFixGoal(
+    output: FixGoalOutput,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer
+  ): Promise<RefactorResponse> {
+    const code = fixGoalCode(output, fnToRefactor.body);
+    let reached: number | undefined;
+
+    if (code === fnToRefactor.body) {
+      reached = undefined;
+    } else {
+      reached = await score(code);
+      if (reached === undefined) {
+        throw new Error('Could not score the proposed change with CodeScene');
+      }
+    }
+
+    const response = mapFixGoalResponse(output, goal, code, reached);
+
+    if (response['goal-outcome'] === 'unable' && output.explanation) {
+      logOutputChannel.info(output.explanation);
+    }
+
+    return response;
+  }
+
+  static async runFixGoal(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    AgentRefactoringService.requireSaved(document);
+
+    const taskId = `fix-goal-${uuidv4()}`;
+    const input = AgentRefactoringService.buildFixGoalInput(goal, taskId);
+
+    logOutputChannel.info(`Agent fix-goal started for task ${taskId}`);
+
+    const output = await AgentRefactoringService.runSkill<FixGoalOutput>(
+      FIX_GOAL_SKILL,
+      goal.repoRoot,
+      input,
+      signal,
+      onProgress
+    );
+
+    logOutputChannel.info(`Agent fix-goal completed for task ${taskId}: ${output.fix_result}`);
+
+    return AgentRefactoringService.resolveFixGoal(output, fnToRefactor, goal, score);
   }
 
   private static cleanup(ioDir: string): void {

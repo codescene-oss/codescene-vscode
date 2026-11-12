@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { ChangeType, FunctionFinding } from '../../devtools-api/delta-model';
 import { CodeSmell, Review } from '../../devtools-api/review-model';
-import { fnToRefactorForCodeSmell, fnToRefactorForFinding } from '../../refactoring/fn-to-refactor';
+import { fnToRefactorForCodeSmell, fnToRefactorForFinding, fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
 import { TestTextDocument } from '../mocks/test-text-document';
 
 const content = 'const a = 1;\nfunction f(x) {\n  return x;\n}\n';
@@ -138,4 +138,14 @@ suite('fnToRefactorForFinding', () => {
       }
     });
   });
+});
+
+suite('fnToRefactorForWholeFile', () => {
+  for (const content of ['a\nb\n', 'a\r\nb', '']) {
+    test(`covers the whole document ${JSON.stringify(content)}`, () => {
+      const document = new TestTextDocument('/repo/src/a.ts', content, 'typescript');
+      const fn = fnToRefactorForWholeFile(document);
+      assert.deepStrictEqual({ body: fn.body, name: fn.name, targets: fn['refactoring-targets'] }, { body: content, name: 'a.ts', targets: [] });
+    });
+  }
 });

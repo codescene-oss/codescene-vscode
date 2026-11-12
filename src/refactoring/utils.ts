@@ -160,6 +160,13 @@ export function isFunctionUnchangedInDocument(
   return { shouldUpdateRange: false, isStale: true };
 }
 
+export function refactoringStaleness(request: RefactoringRequest): { shouldUpdateRange: boolean; isStale: boolean } {
+  if (request.goal) {
+    return { shouldUpdateRange: false, isStale: request.document.getText() !== request.fnToRefactor.body };
+  }
+  return isFunctionUnchangedInDocument(request.document, request.fnToRefactor);
+}
+
 export async function findFnToRefactor(document: vscode.TextDocument | undefined, codeSmell: CodeSmell | undefined) {
   if (!DevtoolsAPI.aceEnabled()) return;
   if (!document || !codeSmell) return;

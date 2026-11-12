@@ -155,6 +155,7 @@ function handleAnalysisMessage(message: MessageToIDEType) {
 
 type ObjectivesActions = {
   startWorkSession(goalId: number): Promise<void>;
+  fixGoal(goalId: number, path: string): Promise<void>;
 };
 
 let objectivesActions: ObjectivesActions | undefined;
@@ -176,6 +177,9 @@ async function handleObjectivesMessage(message: MessageToIDEType) {
   switch (message.messageType) {
     case 'goal-work-session-start':
       await objectivesActions.startWorkSession(message.payload.goalId);
+      return;
+    case 'fix-goal':
+      await objectivesActions.fixGoal(message.payload.goalId, message.payload.path);
       return;
   }
 }

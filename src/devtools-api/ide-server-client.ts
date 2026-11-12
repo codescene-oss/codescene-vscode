@@ -90,6 +90,7 @@ export interface ReviewParams {
   path: string;
   'file-content'?: string;
   'cache-path'?: string;
+  'repo-path'?: string;
 }
 
 export interface DeltaParams {

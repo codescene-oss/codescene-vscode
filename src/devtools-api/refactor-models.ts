@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Range as VscodeRange } from 'vscode';
 import { Range } from '../devtools-api/review-model';
+import { FixGoalOutcome } from '../refactoring/agent-types';
 
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;
@@ -86,6 +87,7 @@ export interface RefactorResponse {
    * Trace id for the request, use for debugging requests
    */
   'trace-id': string;
+  'goal-outcome'?: FixGoalOutcome;
 }
 
 export interface Confidence {

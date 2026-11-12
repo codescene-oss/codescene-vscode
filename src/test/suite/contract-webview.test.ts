@@ -21,8 +21,9 @@ import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload } from '../.
 import { authViewProps } from '../../auth/auth-view-props';
 import { setCwfAuth, withCwfAuth } from '../../auth/cwf-auth';
 import { BackgroundServiceView } from '../../code-health-monitor/background-view';
-import { handleCWFMessage } from '../../code-health-monitor/home/cwf-message-handlers';
+import { handleCWFMessage, registerObjectivesMessages } from '../../code-health-monitor/home/cwf-message-handlers';
 import { HomeView } from '../../code-health-monitor/home/home-view';
+import { setCwfObjectives } from '../../objectives/cwf-objectives';
 import { updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
 import type { HomeContextViewProps } from '../../centralized-webview-framework/types';
 import type { Account, AuthStatus, Project } from '../../centralized-webview-framework/types/auth';
@@ -40,7 +41,7 @@ import { initExtensionId } from '../../extension-id';
 import { fixture, fixtureVariants } from '../contract/contract';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { useCwfDir, validateWebviewMessage, validateWebviewPayload } from '../contract/webview';
-import { authMessageSamples, docsMessageSamples, homeMessageSamples } from '../fixtures/webview-messages';
+import { authMessageSamples, docsMessageSamples, homeMessageSamples, objectivesMessageSamples } from '../fixtures/webview-messages';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import {
@@ -199,6 +200,7 @@ suite('Contract webview payloads Test Suite', () => {
 
     teardown(() => {
       clearMockGitRepositories();
+      setCwfObjectives(undefined);
     });
 
 
@@ -304,6 +306,14 @@ suite('Contract webview payloads Test Suite', () => {
       const message = updateRendererMessage(homePayload());
       assert.deepStrictEqual((message.payload as any).featureFlags, ['ide-auth']);
       assertPayloadClosed(message.payload, (copy) => copy.auth.status);
+    });
+
+    aceTest('the objectives payload with the goal fix flag validates and is closed', () => {
+      enableAce();
+      setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'));
+      const message = updateRendererMessage(homePayload());
+      assert.ok((message.payload as any).featureFlags.includes('ide-goal-fix'));
+      assertPayloadClosed(message.payload, (copy) => copy.objectives);
     });
   });
 
@@ -519,7 +529,7 @@ suite('Contract webview messages Test Suite', () => {
   const homeSamples = () => homeMessageSamples({ fileName: FILE, fn, docType: 'docs_issues_complex_method' });
 
   test('every sample validates against the message schema', () => {
-    for (const message of [...homeSamples(), ...docsMessageSamples, ...authMessageSamples]) {
+    for (const message of [...homeSamples(), ...docsMessageSamples, ...authMessageSamples, ...objectivesMessageSamples]) {
       validateWebviewMessage(message);
     }
   });
@@ -585,6 +595,29 @@ suite('Contract webview messages Test Suite', () => {
       assertValidAndClosed(sample, validateWebviewMessage, messagePayload);
     });
   }
+
+  test('the objectives samples are routed to the objectives actions and closed', async () => {
+    const calls: unknown[][] = [];
+    const record = (name: string) => async (...args: unknown[]) => {
+      calls.push([name, ...args]);
+    };
+    const disposable = registerObjectivesMessages({
+      startWorkSession: record('startWorkSession'),
+      fixGoal: record('fixGoal'),
+    });
+
+    try {
+      for (const sample of objectivesMessageSamples) {
+        await handleCWFMessage(homeView, sample);
+      }
+      assert.deepStrictEqual(calls, [['startWorkSession', 2], ['fixGoal', 2, 'src/orders.js']]);
+      for (const sample of objectivesMessageSamples) {
+        assertValidAndClosed(sample, validateWebviewMessage, messagePayload);
+      }
+    } finally {
+      disposable.dispose();
+    }
+  });
 
   test('the home samples are handled by the home view handler', async () => {
     for (const message of homeSamples()) {

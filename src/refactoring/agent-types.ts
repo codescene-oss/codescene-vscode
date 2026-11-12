@@ -2,6 +2,10 @@ export interface AgentInputContext {
   '@vocab': string;
 }
 
+export const AGENT_INPUT_CONTEXT: AgentInputContext = {
+  '@vocab': 'https://codescene.io/schemas/code-health-fix#',
+};
+
 export interface AgentInput {
   '@context': AgentInputContext;
   task_id: string;
@@ -66,6 +70,7 @@ export interface TrackingConfig {
 
 export interface AgentConfig {
   codescene_access_token: string;
+  codescene_onprem_url?: string;
   plugins: string[];
   io_json_dir?: string;
   provider?: ProviderCredentials;
@@ -73,4 +78,37 @@ export interface AgentConfig {
     provider: BedrockOpencodeProvider;
   };
   tracking?: TrackingConfig;
+}
+
+export interface FixGoalTarget {
+  goalId: number;
+  metricId: string;
+  operator: string;
+  target: number;
+  baseline: number;
+  repoRoot: string;
+  path: string;
+}
+
+export interface FixGoalInput {
+  '@context': AgentInputContext;
+  task_id: string;
+  file: string;
+  goal: { id: number; 'metric-id': string; operator: string; target: number };
+  baseline: number;
+}
+
+export type FixGoalResult = 'target_reached' | 'improved' | 'unable_to_fix';
+export type FixGoalOutcome = 'reached' | 'improved' | 'unable';
+
+export interface FixGoalOutput {
+  '@context'?: AgentInputContext;
+  schema_version: string;
+  task_id: string;
+  fix_result: FixGoalResult;
+  confidence: ConfidenceLevel;
+  explanation?: string;
+  estimated_score?: number;
+  whole_file_content?: string;
+  generated_at: string;
 }
