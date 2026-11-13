@@ -9,6 +9,7 @@ import { aceSuite } from '../ace-test-suite';
 import { getAppliedEdits, getWebviewMessageHandler, resetAppliedEdits, resetWebviewPanelMocks } from '../setup';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
 import { CsExtensionState } from '../../cs-extension-state';
+import { DevtoolsAPI } from '../../devtools-api';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { CodeSceneCWFAceTabPanel } from '../../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
@@ -167,13 +168,19 @@ aceSuite('Fix goal commands Test Suite', () => {
     document.setDirty(true);
     document.setOnSave(() => document.setText('formatted\n'));
     warningAnswer = SAVE_AND_REFACTOR;
-    const shown: RefactoringRequest[] = [];
-    CodeSceneCWFAceTabPanel.show = (request: RefactoringRequest) => {
-      shown.push(request);
+    const sent: RefactoringRequest[] = [];
+    const originalPostRefactoring = DevtoolsAPI.postRefactoring;
+    (DevtoolsAPI as any).postRefactoring = async (request: RefactoringRequest) => {
+      sent.push(request);
+      return responseWith('formatted\n');
     };
-    await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, goal);
+    try {
+      await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, goal);
+    } finally {
+      (DevtoolsAPI as any).postRefactoring = originalPostRefactoring;
+    }
     assert.deepStrictEqual(
-      shown.map((request) => ({ body: request.fnToRefactor.body, goal: request.goal })),
+      sent.map((request) => ({ body: request.fnToRefactor.body, goal: request.goal })),
       [{ body: 'formatted\n', goal }]
     );
   });
