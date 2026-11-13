@@ -1,18 +1,41 @@
-.PHONY: build package tsc clean lint watch test pretest test-release updatecwf benchmark benchmark-isolated
+.PHONY: build package package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64 package-all tsc clean lint watch test pretest test-release updatecwf updateagent benchmark benchmark-isolated
 
 .DEFAULT_GOAL := build
 
-build: updatecwf
+build: updatecwf updateagent
 	npm run build
 
 package: lint pretest
 	npm i
 	$(MAKE) updatecwf
+	$(MAKE) updateagent
 	test -z "$$(git status --porcelain)" || (echo "Error: Working directory must be clean (per git status)" && exit 1); \
 	sed -i '' '/^cs-\*/d' .vscodeignore; \
 	node ./scripts/bundle-cli-for-current-platform.js; \
 	npx @vscode/vsce@4.0.0 package; \
 	git checkout .vscodeignore; \
+
+package-darwin-arm64: lint pretest
+	npm i
+	node ./scripts/package-platform.js darwin arm64
+
+package-darwin-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js darwin x64
+
+package-linux-arm64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux arm64
+
+package-linux-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js linux x64
+
+package-win32-x64: lint pretest
+	npm i
+	node ./scripts/package-platform.js win32 x64
+
+package-all: package-darwin-arm64 package-darwin-x64 package-linux-arm64 package-linux-x64 package-win32-x64
 
 tsc:
 	npx tsc --noEmit
@@ -56,6 +79,9 @@ test-release:
 
 updatecwf:
 	node ./scripts/update-cwf.js
+
+updateagent:
+	node ./scripts/update-cs-agent.js $(if $(FORCE),--force)
 
 clean:
 	npm run clean

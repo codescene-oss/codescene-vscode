@@ -21,9 +21,9 @@ noAceSuite('DevtoolsAPI no-ACE guard Test Suite', () => {
     restoreDefaultWorkspaceFolders();
   });
 
-  test('preflight returns immediately when ACE is disabled', async function () {
-    const response = await DevtoolsAPI.preflight();
-    assert.strictEqual(response, undefined);
+  test('enableAce is a no-op when ACE is disabled', () => {
+    DevtoolsAPI.enableAce();
+    assert.strictEqual(DevtoolsAPI.aceEnabled(), false);
   });
 
   test('aceEnabled returns false when ACE is disabled', () => {

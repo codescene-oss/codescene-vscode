@@ -21,8 +21,9 @@ import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload } from '../.
 import { authViewProps } from '../../auth/auth-view-props';
 import { setCwfAuth, withCwfAuth } from '../../auth/cwf-auth';
 import { BackgroundServiceView } from '../../code-health-monitor/background-view';
-import { handleCWFMessage } from '../../code-health-monitor/home/cwf-message-handlers';
+import { handleCWFMessage, registerObjectivesMessages } from '../../code-health-monitor/home/cwf-message-handlers';
 import { HomeView } from '../../code-health-monitor/home/home-view';
+import { setCwfObjectives } from '../../objectives/cwf-objectives';
 import { updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
 import type { HomeContextViewProps } from '../../centralized-webview-framework/types';
 import type { Account, AuthStatus, Project } from '../../centralized-webview-framework/types/auth';
@@ -32,17 +33,15 @@ import { CodeSceneCWFDocsTabPanel } from '../../codescene-tab/webview/documentat
 import { getDocsData } from '../../codescene-tab/webview/documentation/docs-data-mapper';
 import { CsExtensionState } from '../../cs-extension-state';
 import { DevtoolsAPI } from '../../devtools-api';
-import { addRefactorableFunctionsToDeltaResult } from '../../devtools-api/delta-utils';
 import { Delta } from '../../devtools-api/delta-model';
 import { FnToRefactor } from '../../devtools-api/refactor-models';
 import { Review } from '../../devtools-api/review-model';
 import { InteractiveDocsParams, toDocsParamsRanged } from '../../documentation/commands';
 import { initExtensionId } from '../../extension-id';
-import { vscodeRange } from '../../review/utils';
 import { fixture, fixtureVariants } from '../contract/contract';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { useCwfDir, validateWebviewMessage, validateWebviewPayload } from '../contract/webview';
-import { authMessageSamples, docsMessageSamples, homeMessageSamples } from '../fixtures/webview-messages';
+import { authMessageSamples, docsMessageSamples, homeMessageSamples, objectivesMessageSamples } from '../fixtures/webview-messages';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import {
@@ -56,6 +55,10 @@ import {
 
 const REPO = '/fake/repo';
 const FILE = `${REPO}/src/fake.js`;
+const FAKE_FUNCTION_LINES = ['// fake.js', '', 'function fakeFunction() {', '  if (a) {', '    return 1;', '  }', '  return 2;', '  // end', '}', ''];
+const fakeSource = () => new TestTextDocument(FILE, FAKE_FUNCTION_LINES.join('\n'), 'javascript');
+const addRefactorableFunctions = (document: vscode.TextDocument, delta: Delta) =>
+  (DevtoolsAPI as unknown as { addRefactorableFunctions: (d: vscode.TextDocument, r: Delta) => void }).addRefactorableFunctions(document, delta);
 
 type Json = Record<string, any>;
 
@@ -154,8 +157,6 @@ suite('Contract webview harness Test Suite', () => {
 
 suite('Contract webview payloads Test Suite', () => {
   let mockContext: vscode.ExtensionContext;
-  const originalFnsToRefactorFromDelta = DevtoolsAPI.fnsToRefactorFromDelta;
-  const originalFnsToRefactor = DevtoolsAPI.fnsToRefactor;
 
   suiteSetup(() => {
     initExtensionId({ extension: { id: 'CodeScene.codescene-vscode' } } as vscode.ExtensionContext);
@@ -168,8 +169,7 @@ suite('Contract webview payloads Test Suite', () => {
   });
 
   teardown(() => {
-    DevtoolsAPI.fnsToRefactorFromDelta = originalFnsToRefactorFromDelta;
-    DevtoolsAPI.fnsToRefactor = originalFnsToRefactor;
+    DevtoolsAPI.disableAce();
     setCwfAuth(undefined);
     resetWebviewPanelMocks();
   });
@@ -178,27 +178,11 @@ suite('Contract webview payloads Test Suite', () => {
   function enableAce(): void {
     CsExtensionState.setACEState({ state: 'enabled' });
     CsExtensionState.setAuth({ active: true, status: fixture('auth-status', 'signed-in', 'entity') });
+    DevtoolsAPI.enableAce();
   }
 
-  /** What the daemon returns for the function of the delta fixtures; the webview type requires every field below. */
-  function refactorableFunction(withFunctionType = true): FnToRefactor {
-    const range = { 'start-line': 3, 'start-column': 1, 'end-line': 9, 'end-column': 2 };
-    return {
-      name: 'fakeFunction',
-      body: 'function fakeFunction() {}',
-      'file-type': 'js',
-      ...(withFunctionType ? { 'function-type': 'function' } : {}),
-      'nippy-b64': 'ZmFrZQ==',
-      range,
-      'refactoring-targets': [{ category: 'Complex Method', line: 3 }],
-      vscodeRange: vscodeRange(range)!,
-    };
-  }
-
-  /** The delta as the extension holds it: the daemon's result with the refactorable functions attached. */
-  async function deltaWithRefactorableFunctions(delta: Delta, fns: FnToRefactor[]): Promise<Delta> {
-    DevtoolsAPI.fnsToRefactorFromDelta = async () => fns;
-    await addRefactorableFunctionsToDeltaResult(new TestTextDocument(FILE, '', 'javascript'), delta);
+  function deltaWithRefactorableFunctions(delta: Delta): Delta {
+    addRefactorableFunctions(fakeSource(), delta);
     return delta;
   }
 
@@ -216,6 +200,7 @@ suite('Contract webview payloads Test Suite', () => {
 
     teardown(() => {
       clearMockGitRepositories();
+      setCwfObjectives(undefined);
     });
 
 
@@ -237,9 +222,9 @@ suite('Contract webview payloads Test Suite', () => {
 
     }
 
-    // Only a finding with a function range can be matched with a refactorable function (see delta-utils), so the minimal fixture has none.
+    // Only a finding with a function range can be matched with a refactorable function (see fnToRefactorForFinding), so the minimal fixture has none.
     test('the full delta fixture with a refactorable function validates and is closed', async () => {
-      addDelta(await deltaWithRefactorableFunctions(fixture('delta', 'full', 'entity'), [refactorableFunction()]));
+      addDelta(deltaWithRefactorableFunctions(fixture('delta', 'full', 'entity')));
       const payload = homePayload();
       const finding = firstDelta(payload)['function-level-findings'][0];
       assert.deepStrictEqual(Object.keys(finding).sort(), ['change-details', 'function', 'refactorable-fn']);
@@ -247,27 +232,22 @@ suite('Contract webview payloads Test Suite', () => {
     });
 
     test('the minimal delta fixture has no refactorable function to hand over', async () => {
-      addDelta(await deltaWithRefactorableFunctions(fixture('delta', 'minimal', 'entity'), [refactorableFunction()]));
+      addDelta(deltaWithRefactorableFunctions(fixture('delta', 'minimal', 'entity')));
       const finding = firstDelta(homePayload())['function-level-findings'][0];
       assert.deepStrictEqual(Object.keys(finding).sort(), ['change-details', 'function']);
     });
 
     test('the refactorable function keeps what the webview declares and drops what the extension adds', async () => {
-      addDelta(await deltaWithRefactorableFunctions(fixture('delta', 'full', 'entity'), [refactorableFunction()]));
+      addDelta(deltaWithRefactorableFunctions(fixture('delta', 'full', 'entity')));
       const { 'refactorable-fn': fn } = firstDelta(homePayload())['function-level-findings'][0];
       assert.deepStrictEqual(fn, {
         name: 'fakeFunction',
-        body: 'function fakeFunction() {}',
-        'function-type': 'function',
+        body: FAKE_FUNCTION_LINES.slice(2, 9).join('\n'),
         'file-type': 'js',
+        'function-type': '',
         range: { 'start-line': 3, 'start-column': 1, 'end-line': 9, 'end-column': 2 },
         'refactoring-targets': [{ category: 'Complex Method', line: 3 }],
       });
-    });
-
-    test('a refactorable function without a function-type still validates', async () => {
-      addDelta(await deltaWithRefactorableFunctions(fixture('delta', 'full', 'entity'), [refactorableFunction(false)]));
-      validateWebviewPayload(homePayload());
     });
 
     test('a finding without a refactorable function has none in the payload', () => {
@@ -327,6 +307,14 @@ suite('Contract webview payloads Test Suite', () => {
       assert.deepStrictEqual((message.payload as any).featureFlags, ['ide-auth']);
       assertPayloadClosed(message.payload, (copy) => copy.auth.status);
     });
+
+    aceTest('the objectives payload with the goal fix flag validates and is closed', () => {
+      enableAce();
+      setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'));
+      const message = updateRendererMessage(homePayload());
+      assert.ok((message.payload as any).featureFlags.includes('ide-goal-fix'));
+      assertPayloadClosed(message.payload, (copy) => copy.objectives);
+    });
   });
 
   // ---- Docs data ----
@@ -344,36 +332,19 @@ suite('Contract webview payloads Test Suite', () => {
       return toDocsParamsRanged('Complex Method', document, codeSmell, { reviewResult: review });
     }
 
-    /** Stands in for the daemon's fns-to-refactor, which getDocsData asks when the params carry no function. */
-    const daemonFinds = (fns: FnToRefactor[]) => {
-      DevtoolsAPI.fnsToRefactor = (async () => fns) as typeof DevtoolsAPI.fnsToRefactor;
-    };
-
-    // A document per test: the fns-to-refactor cache is keyed by document.
     let documentCount = 0;
     const newDocument = () => new TestTextDocument(`${REPO}/src/docs-${++documentCount}.js`, '', 'javascript');
 
     const fileData = (copy: any) => copy.data.fileData;
 
     for (const variant of fixtureVariants('review')) {
-      aceTest(`the ${variant} review fixture, function-level smell, not refactorable, validates and is closed`, async () => {
+      aceTest(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
         enableAce();
-        daemonFinds([]);
         const payload = await getDocsData(docsParams(variant, 'function', newDocument()));
         assert.strictEqual(payload.data.fileData?.fn?.name, 'fakeFunction');
-        assert.deepStrictEqual(
-          { visible: payload.data.autoRefactor?.visible, disabled: payload.data.autoRefactor?.disabled },
-          { visible: true, disabled: true }
-        );
         assertPayloadClosed(payload, fileData);
         assertPayloadClosed(payload, (copy) => copy.data.fileData.fn.range);
         assertPayloadClosed(updateRendererMessage(payload).payload, (copy) => copy.data);
-      });
-
-      aceTest(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
-        enableAce();
-        daemonFinds([refactorableFunction()]);
-        const payload = await getDocsData(docsParams(variant, 'function', newDocument()));
         assert.deepStrictEqual(
           { visible: payload.data.autoRefactor?.visible, disabled: payload.data.autoRefactor?.disabled },
           { visible: true, disabled: false }
@@ -382,7 +353,6 @@ suite('Contract webview payloads Test Suite', () => {
       });
 
       test(`the ${variant} review fixture, file-level smell, validates and is closed`, async () => {
-        daemonFinds([]);
         const payload = await getDocsData(docsParams(variant, 'file', newDocument()));
         assertPayloadClosed(payload, fileData);
       });
@@ -407,13 +377,11 @@ suite('Contract webview payloads Test Suite', () => {
 
     test('the signed-in auth payload rides along and validates', async () => {
       setCwfAuth(toAuthPayload(signedInSnapshot()));
-      daemonFinds([]);
       const message = updateRendererMessage(await getDocsData(docsParams('full', 'function', newDocument())));
       assertPayloadClosed(message.payload, (copy) => copy.auth.status);
     });
 
     test('the docs panel posts valid data after the webview reports init', async () => {
-      daemonFinds([]);
       const panelClass = CodeSceneCWFDocsTabPanel as unknown as { _instance?: CodeSceneCWFDocsTabPanel };
       panelClass._instance?.dispose();
       const panel = CodeSceneCWFDocsTabPanel.instance as any;
@@ -546,22 +514,7 @@ suite('Contract webview messages Test Suite', () => {
     homeView = new HomeView(mockContext, { updateBadge: () => {}, dispose: () => {} } as unknown as BackgroundServiceView);
     document = new TestTextDocument(FILE, '', 'javascript');
     const delta: Delta = fixture('delta', 'full', 'entity');
-    const withFunction: FnToRefactor = {
-      name: 'fakeFunction',
-      body: 'function fakeFunction() {}',
-      'file-type': 'js',
-      'function-type': 'function',
-      range: { 'start-line': 3, 'start-column': 1, 'end-line': 9, 'end-column': 2 },
-      'refactoring-targets': [{ category: 'Complex Method', line: 3 }],
-      vscodeRange: vscodeRange({ 'start-line': 3, 'start-column': 1, 'end-line': 9, 'end-column': 2 })!,
-    };
-    const originalFnsToRefactorFromDelta = DevtoolsAPI.fnsToRefactorFromDelta;
-    DevtoolsAPI.fnsToRefactorFromDelta = async () => [withFunction];
-    try {
-      await addRefactorableFunctionsToDeltaResult(document, delta);
-    } finally {
-      DevtoolsAPI.fnsToRefactorFromDelta = originalFnsToRefactorFromDelta;
-    }
+    addRefactorableFunctions(fakeSource(), delta);
     homeView['updateFileDeltaData']({ document, result: delta, updateMonitor: true });
   });
 
@@ -576,7 +529,7 @@ suite('Contract webview messages Test Suite', () => {
   const homeSamples = () => homeMessageSamples({ fileName: FILE, fn, docType: 'docs_issues_complex_method' });
 
   test('every sample validates against the message schema', () => {
-    for (const message of [...homeSamples(), ...docsMessageSamples, ...authMessageSamples]) {
+    for (const message of [...homeSamples(), ...docsMessageSamples, ...authMessageSamples, ...objectivesMessageSamples]) {
       validateWebviewMessage(message);
     }
   });
@@ -642,6 +595,29 @@ suite('Contract webview messages Test Suite', () => {
       assertValidAndClosed(sample, validateWebviewMessage, messagePayload);
     });
   }
+
+  test('the objectives samples are routed to the objectives actions and closed', async () => {
+    const calls: unknown[][] = [];
+    const record = (name: string) => async (...args: unknown[]) => {
+      calls.push([name, ...args]);
+    };
+    const disposable = registerObjectivesMessages({
+      startWorkSession: record('startWorkSession'),
+      fixGoal: record('fixGoal'),
+    });
+
+    try {
+      for (const sample of objectivesMessageSamples) {
+        await handleCWFMessage(homeView, sample);
+      }
+      assert.deepStrictEqual(calls, [['startWorkSession', 2], ['fixGoal', 2, 'src/orders.js']]);
+      for (const sample of objectivesMessageSamples) {
+        assertValidAndClosed(sample, validateWebviewMessage, messagePayload);
+      }
+    } finally {
+      disposable.dispose();
+    }
+  });
 
   test('the home samples are handled by the home view handler', async () => {
     for (const message of homeSamples()) {

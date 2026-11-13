@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Range as VscodeRange } from 'vscode';
 import { Range } from '../devtools-api/review-model';
+import { FixGoalOutcome } from '../refactoring/agent-types';
 
 export interface CreditsInfoError {
   'credits-info': CreditsInfo;
@@ -62,18 +63,6 @@ export interface RefactoringTarget {
   line: number;
 }
 
-export type PreFlightResponse = {
-  version: number;
-  'file-types': string[];
-  'language-common': RefactorSupport;
-  'language-specific'?: Record<string, Partial<RefactorSupport>>;
-};
-
-export type RefactorSupport = {
-  'max-input-loc': number;
-  'code-smells': string[];
-};
-
 export interface RefactorResponse {
   /**
    * Refactored code
@@ -98,6 +87,7 @@ export interface RefactorResponse {
    * Trace id for the request, use for debugging requests
    */
   'trace-id': string;
+  'goal-outcome'?: FixGoalOutcome;
 }
 
 export interface Confidence {

@@ -8,7 +8,7 @@ import {
   decorateCode,
   deselectRefactoring,
   highlightCode,
-  isFunctionUnchangedInDocument,
+  refactoringStaleness,
 } from '../../../refactoring/utils';
 import { logOutputChannel } from '../../../log';
 import { RefactoringRequest } from '../../../refactoring/request';
@@ -27,6 +27,7 @@ export interface CwfAceTabParams {
   request: RefactoringRequest;
   cwfProps?: AceContextViewProps;
   isStale?: boolean;
+  progressMessage?: string;
 }
 
 export class CodeSceneCWFAceTabPanel implements Disposable {
@@ -55,7 +56,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   constructor() {
     this.webViewPanel = vscode.window.createWebviewPanel(
       CodeSceneCWFAceTabPanel.viewType,
-      'CodeScene ACE',
+      'CodeScene Agent',
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
       {
         enableScripts: true,
@@ -90,9 +91,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
 
   private handleIsStale(e: vscode.TextDocumentChangeEvent) {
     if (this.isDisposing || !this.state) return;
-    const { document, fnToRefactor } = this.state.request;
+    const { document } = this.state.request;
     if (document !== e.document || e.contentChanges.length === 0) return;
-    const { shouldUpdateRange, isStale } = isFunctionUnchangedInDocument(document, fnToRefactor);
+    const { shouldUpdateRange, isStale } = refactoringStaleness(this.state.request);
 
     // (cast this.state.isStale to boolean to avoid a first glitch when changing state from undefined to false)
     const stalenessChanged = isStale !== !!this.state.isStale;
@@ -107,7 +108,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       if (!this.state) return;
       await this.handleAceMessage(this.state.request, message);
     } catch (e) {
-      reportError({ context: 'An error occurred in the CodeScene ACE panel', e });
+      reportError({ context: 'An error occurred in the CodeScene Agent panel', e });
     }
   }
 
@@ -141,7 +142,9 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
           // Having true here means skipping cache, meaning retry to get another refactoring
           // if the first one is not what you want...
           // But this seem to be used to retry when failed and we definitely don't want to skip cache then
-          false //true
+          false, //true
+          undefined,
+          request.goal
         );
       },
       showDiff: () => {
@@ -241,6 +244,13 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
   private async updateWebView(request: RefactoringRequest) {
     if (this.isDisposing) return;
     const isStale = this.state?.isStale ?? false;
+
+    request.onProgress = (message: string) => {
+      if (this.state?.request === request) {
+        this.state.progressMessage = message;
+        void this.renderAce(request, getAceData({ request, isStale, loading: true, progressMessage: message }));
+      }
+    };
 
     await this.renderAce(request, getAceData({ request, isStale, loading: true }));
 

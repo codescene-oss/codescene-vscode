@@ -6,4 +6,5 @@ export type FeatureFlags =
   | 'commit-baseline'
   | 'ide-auth'
   | 'ide-objectives'
+  | 'ide-goal-fix'
   | 'goal-work-sessions';

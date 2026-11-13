@@ -65,7 +65,7 @@ export interface FunctionFinding {
   'change-details': ChangeDetail[];
   function: Function;
 
-  /* Present if the function finding is deemed refactorable. See Analyser.addRefactorableFunctionsToDeltaResult() */
+  /* Present if the function finding is deemed refactorable. See DevtoolsAPI.addRefactorableFunctions() */
   refactorableFn?: FnToRefactor;
 }
 

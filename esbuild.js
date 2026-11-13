@@ -6,6 +6,7 @@ const path = require('path');
 
 const buildNoAce = process.env.BUILD_NO_ACE === 'true';
 const isWatch = process.argv.includes('--watch');
+const isProduction = process.argv.includes('--production') || process.env.NODE_ENV === 'production';
 const esbuildDefine = {
   'process.env.BUILD_NO_ACE': JSON.stringify(buildNoAce ? 'true' : 'false'),
   'process.env.DEVMODE': JSON.stringify(isWatch ? 'true' : 'false'),
@@ -13,8 +14,8 @@ const esbuildDefine = {
 
 const baseConfig = {
   bundle: true,
-  minify: process.env.NODE_ENV === 'production',
-  sourcemap: process.env.NODE_ENV !== 'production',
+  minify: isProduction,
+  sourcemap: !isProduction,
   define: esbuildDefine,
 };
 

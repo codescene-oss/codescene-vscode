@@ -1,6 +1,10 @@
 import * as assert from 'assert';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
-import { decorateCode } from '../../refactoring/utils';
+import { decorateCode, refactoringStaleness } from '../../refactoring/utils';
+import { RefactoringRequest } from '../../refactoring/request';
+import { fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
+import { TestTextDocument } from '../mocks/test-text-document';
+import { FixGoalTarget } from '../../refactoring/agent-types';
 
 const originalCode = 'const a = 1;\nconst b = 2;\nconst c = 3;\n';
 
@@ -40,4 +44,28 @@ suite('Refactor utils Test Suite', () => {
     let code = decorateCode(refactorResponse, 'javascript');
     assert.equal(code, 'const a = 1;\n// ⚠️ Issue 1\n// This is weird\nconst b = 2;\n// ⚠️ Issue 2\nconst c = 3;\n');
   });
+
+  const goal: FixGoalTarget = {
+    goalId: 1,
+    metricId: 'code-health',
+    operator: 'greater-than',
+    target: 8.0,
+    baseline: 6.0,
+    repoRoot: '/repo',
+    path: 'file.ts',
+  };
+
+  function requestFor(c: { original: string; now: string; goal: boolean }) {
+    const document = new TestTextDocument('/repo/file.ts', c.now, 'typescript');
+    const fnToRefactor = fnToRefactorForWholeFile(new TestTextDocument('/repo/file.ts', c.original, 'typescript'));
+    return new RefactoringRequest(fnToRefactor, document, false, c.goal ? goal : undefined);
+  }
+
+  for (const c of [
+    { name: 'goal, unchanged', original: 'a\nb\n', now: 'a\nb\n', goal: true, stale: false },
+    { name: 'goal, a line appended', original: 'a\nb\n', now: 'a\nb\nc\n', goal: true, stale: true },
+    { name: 'goal, a line prepended', original: 'a\nb\n', now: 'z\na\nb\n', goal: true, stale: true },
+    { name: 'goal, edited inside', original: 'a\nb\n', now: 'a\nX\n', goal: true, stale: true },
+    { name: 'smell, a line appended', original: 'a\nb\n', now: 'a\nb\nc\n', goal: false, stale: false },
+  ]) test(`refactoringStaleness ${c.name}`, () => assert.strictEqual(refactoringStaleness(requestFor(c)).isStale, c.stale));
 });

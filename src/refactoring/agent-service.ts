@@ -1,0 +1,415 @@
+import { spawn, ChildProcess } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { TextDocument } from 'vscode';
+import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
+import { logOutputChannel } from '../log';
+import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
+import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT } from './agent-types';
+import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
+import { resolveAgentToken } from './agent-token';
+import { getAgentModel } from '../configuration';
+import { acquireGitApi, getRepoRootPath } from '../git-utils';
+import { fixGoalCode, mapFixGoalResponse } from './fix-goal-response';
+import { AbortError } from '../devtools-api/abort-error';
+
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function toLf(str: string): string {
+  return str.replace(/\r\n/g, '\n');
+}
+
+export type ProgressCallback = (message: string) => void;
+export type ContentScorer = (content: string) => Promise<number | undefined>;
+
+export function agentArgs(skill: AgentSkill, model: string): string[] {
+  return ['run', `skill:${skill.name}`, '--model', model];
+}
+
+export class AgentRefactoringService {
+  private static getAgentBinaryPath(): string {
+    const extensionPath = getExtensionPath();
+    if (!extensionPath) {
+      throw new Error('Extension path not available');
+    }
+    const binaryName = process.platform === 'win32' ? 'cs-agent.exe' : 'cs-agent';
+    return path.join(extensionPath, 'bin', binaryName);
+  }
+
+  static readOutput<T>(outputPath: string, stderr: string): T {
+    if (!fs.existsSync(outputPath)) {
+      throw AgentRefactoringService.missingOutputError(stderr);
+    }
+    const outputContent = fs.readFileSync(outputPath, 'utf-8');
+    return JSON.parse(outputContent);
+  }
+
+  private static async runSkill<TOutput>(
+    skill: AgentSkill,
+    workDir: string,
+    input: object,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback,
+    skipCleanup?: boolean
+  ): Promise<TOutput> {
+    const ioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agent-io-'));
+
+    try {
+      const inputPath = path.join(ioDir, skill.inputFile);
+      fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
+
+      const token = await AgentRefactoringService.requireToken();
+      const stderr = await AgentRefactoringService.invokeAgent(skill, workDir, ioDir, token, signal, onProgress);
+
+      const outputPath = path.join(ioDir, skill.outputFile);
+      return AgentRefactoringService.readOutput<TOutput>(outputPath, stderr);
+    } finally {
+      if (!skipCleanup) {
+        AgentRefactoringService.cleanup(ioDir);
+      }
+    }
+  }
+
+  private static requireSaved(document: TextDocument): void {
+    if (document.isDirty) {
+      throw new Error(`Save ${path.basename(document.fileName)} before refactoring: the agent reads the file from disk.`);
+    }
+  }
+
+  static async runRefactoring(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    signal?: AbortSignal,
+    skipCleanup?: boolean,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    AgentRefactoringService.requireSaved(document);
+    const taskId = `refactor-${uuidv4()}`;
+    const gitApi = acquireGitApi();
+    const repo = gitApi?.getRepository(document.uri);
+    const workDir = repo ? getRepoRootPath(repo) : path.dirname(document.fileName);
+
+    const input = AgentRefactoringService.buildInput(document, fnToRefactor, taskId);
+    logOutputChannel.info(`Agent refactoring started for task ${taskId}`);
+
+    const output = await AgentRefactoringService.runSkill<AgentOutput>(
+      RENDER_CODE_FIX_SKILL,
+      workDir,
+      input,
+      signal,
+      onProgress,
+      skipCleanup
+    );
+
+    logOutputChannel.info(`Agent refactoring completed for task ${taskId}: ${output.fix_result}`);
+    return AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
+  }
+
+  private static missingOutputError(stderr: string): Error {
+    const detail = stripAnsi(stderr).trim().split('\n').slice(-5).join('\n');
+    logOutputChannel.error(`Agent exited successfully without producing output. stderr: ${detail}`);
+    return new Error(detail ? `Agent did not produce output file: ${detail}` : 'Agent did not produce output file');
+  }
+
+  private static buildInput(document: TextDocument, fnToRefactor: FnToRefactor, taskId: string): AgentInput {
+    const target = fnToRefactor['refactoring-targets'][0];
+    if (!target) {
+      throw new Error('No refactoring target found');
+    }
+
+    return {
+      '@context': AGENT_INPUT_CONTEXT,
+      task_id: taskId,
+      file: document.fileName,
+      line: target.line,
+      smell: target.category,
+    };
+  }
+
+  static buildFixGoalInput(goal: FixGoalTarget, taskId: string): FixGoalInput {
+    return {
+      '@context': AGENT_INPUT_CONTEXT,
+      task_id: taskId,
+      file: goal.path,
+      goal: { id: goal.goalId, 'metric-id': goal.metricId, operator: goal.operator, target: goal.target },
+      baseline: goal.baseline,
+    };
+  }
+
+  private static async requireToken(): Promise<string> {
+    const token = await resolveAgentToken();
+    if (!token) {
+      throw new Error(
+        'Refactoring requires you to be signed in to CodeScene. Sign in, or set a personal access token in the "Auth token" setting.'
+      );
+    }
+    return token;
+  }
+
+  private static spawnAgentProcess(
+    skill: AgentSkill,
+    workDir: string,
+    ioDir: string,
+    token: string
+  ): { proc: ChildProcess; binaryPath: string } {
+    const binaryPath = AgentRefactoringService.getAgentBinaryPath();
+    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir, CsExtensionState.stateProperties.auth.status?.server);
+    const configJson = JSON.stringify(config);
+
+    const args = agentArgs(skill, getAgentModel());
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      CS_AGENT_CONFIG: configJson,
+    };
+
+    logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
+
+    const proc = spawn(binaryPath, args, { cwd: workDir, env });
+    return { proc, binaryPath };
+  }
+
+  private static setupStderrHandler(proc: ChildProcess): { getStderr: () => string } {
+    let stderr = '';
+    proc.stderr?.on('data', (data: Buffer) => {
+      stderr += data.toString();
+      const lines = data.toString().split('\n').filter((line) => line.trim());
+      for (const line of lines) {
+        logOutputChannel.debug(`[cs-agent:err] ${stripAnsi(line)}`);
+      }
+    });
+    return { getStderr: () => stderr };
+  }
+
+  private static setupStdoutHandler(proc: ChildProcess, onProgress?: ProgressCallback): void {
+    proc.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString();
+      logOutputChannel.debug(`Agent stdout: ${output}`);
+      if (!onProgress) return;
+      const lines = output.split('\n').filter((line) => line.trim());
+      const lastLine = lines[lines.length - 1];
+      if (lastLine) onProgress(lastLine);
+    });
+  }
+
+  private static invokeAgent(
+    skill: AgentSkill,
+    workDir: string,
+    ioDir: string,
+    token: string,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const { proc } = AgentRefactoringService.spawnAgentProcess(skill, workDir, ioDir, token);
+      const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
+      AgentRefactoringService.setupStdoutHandler(proc, onProgress);
+
+      const abortHandler = () => {
+        proc.kill('SIGTERM');
+        reject(new AbortError('Agent invocation aborted'));
+      };
+
+      signal?.addEventListener('abort', abortHandler);
+
+      proc.on('close', (code: number | null) => {
+        signal?.removeEventListener('abort', abortHandler);
+        const stderr = getStderr();
+        if (code === 0) {
+          resolve(stderr);
+        } else {
+          logOutputChannel.error(`Agent exited with code ${code}: ${stderr}`);
+          reject(new Error(`Agent exited with code ${code}: ${stderr}`));
+        }
+      });
+
+      proc.on('error', (err: Error) => {
+        signal?.removeEventListener('abort', abortHandler);
+        reject(err);
+      });
+    });
+  }
+
+  static mapOutputToResponse(
+    output: AgentOutput,
+    document: TextDocument,
+    fnToRefactor: FnToRefactor
+  ): RefactorResponse {
+    const code = AgentRefactoringService.applyChanges(document, fnToRefactor, output.changes);
+
+    const effectiveOutput =
+      code === fnToRefactor.body
+        ? { ...output, fix_result: 'unable_to_fix' as const, confidence: 'low' as const, summary: 'No changes proposed' }
+        : output;
+
+    const confidence = AgentRefactoringService.mapConfidence(effectiveOutput);
+    const reasons = AgentRefactoringService.mapReasons(effectiveOutput);
+
+    return {
+      code,
+      confidence,
+      'credits-info': undefined,
+      declarations: undefined,
+      metadata: { 'cached?': false },
+      reasons,
+      'refactoring-properties': {
+        'added-code-smells': [],
+        'removed-code-smells': fnToRefactor['refactoring-targets'].map((t) => t.category),
+      },
+      'trace-id': output.task_id,
+    };
+  }
+
+  private static applyChange(code: string, change: AgentChange): string {
+    if (change.change_type === 'whole_file' && change.whole_file_content) {
+      return toLf(change.whole_file_content);
+    }
+    if (!change.replacements) return code;
+    return change.replacements.reduce((c, r) => {
+      const exact = { search: toLf(r.search), replace: toLf(r.replace) };
+      const trimmed = { search: exact.search.replace(/\n+$/, ''), replace: exact.replace.replace(/\n+$/, '') };
+      const match = [exact, trimmed].find((candidate) => candidate.search && c.includes(candidate.search));
+      if (!match) {
+        logOutputChannel.warn(
+          `Agent replacement did not match the function body.\nsearch: ${JSON.stringify(r.search)}\nbody: ${JSON.stringify(code)}`
+        );
+        return c;
+      }
+      return c.replace(match.search, () => match.replace);
+    }, code);
+  }
+
+  private static applyChanges(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    changes: AgentChange[]
+  ): string {
+    const relevantChanges = changes.filter(
+      (change) => path.basename(change.file) === path.basename(document.fileName)
+    );
+    const usesCrlf = fnToRefactor.body.includes('\r\n');
+    const patched = relevantChanges.reduce(
+      (code, change) => AgentRefactoringService.applyChange(code, change),
+      toLf(fnToRefactor.body)
+    );
+    return usesCrlf ? patched.replace(/\n/g, '\r\n') : patched;
+  }
+
+  private static mapConfidence(output: AgentOutput): Confidence {
+    const levelMap: Record<ConfidenceLevel, number> = {
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+
+    let title: string;
+    let description: string;
+
+    switch (output.fix_result) {
+      case 'fix_proposed':
+        title = output.summary;
+        description = 'Review the suggested changes and apply if appropriate.';
+        break;
+      case 'unable_to_fix':
+        title = 'Unable to refactor';
+        description = 'The agent could not find a suitable refactoring for this code.';
+        break;
+      case 'needs_human_review':
+        title = 'Needs review';
+        description = 'The suggested changes require careful human review before applying.';
+        break;
+    }
+
+    return {
+      level: levelMap[output.confidence] ?? 2,
+      title,
+      'review-header': output.fix_result === 'fix_proposed' ? undefined : 'Review required',
+      'recommended-action': {
+        description,
+        details: output.reasoning,
+      },
+    };
+  }
+
+  private static mapReasons(output: AgentOutput): Reason[] {
+    if (output.fix_result === 'fix_proposed') {
+      return [];
+    }
+
+    return [
+      {
+        summary: output.summary,
+        details: undefined,
+      },
+    ];
+  }
+
+  static async resolveFixGoal(
+    output: FixGoalOutput,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer
+  ): Promise<RefactorResponse> {
+    const code = fixGoalCode(output, fnToRefactor.body);
+    let reached: number | undefined;
+
+    if (code === fnToRefactor.body) {
+      reached = undefined;
+    } else {
+      reached = await score(code);
+      if (reached === undefined) {
+        throw new Error('Could not score the proposed change with CodeScene');
+      }
+    }
+
+    const response = mapFixGoalResponse(output, goal, code, reached);
+
+    if (response['goal-outcome'] === 'unable' && output.explanation) {
+      logOutputChannel.info(output.explanation);
+    }
+
+    return response;
+  }
+
+  static async runFixGoal(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    goal: FixGoalTarget,
+    score: ContentScorer,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    AgentRefactoringService.requireSaved(document);
+
+    const taskId = `fix-goal-${uuidv4()}`;
+    const input = AgentRefactoringService.buildFixGoalInput(goal, taskId);
+
+    logOutputChannel.info(`Agent fix-goal started for task ${taskId}`);
+
+    const output = await AgentRefactoringService.runSkill<FixGoalOutput>(
+      FIX_GOAL_SKILL,
+      goal.repoRoot,
+      input,
+      signal,
+      onProgress
+    );
+
+    logOutputChannel.info(`Agent fix-goal completed for task ${taskId}: ${output.fix_result}`);
+
+    return AgentRefactoringService.resolveFixGoal(output, fnToRefactor, goal, score);
+  }
+
+  private static cleanup(ioDir: string): void {
+    try {
+      if (fs.existsSync(ioDir)) {
+        fs.rmSync(ioDir, { recursive: true });
+      }
+    } catch (err) {
+      logOutputChannel.warn(`Failed to cleanup directory ${ioDir}: ${err}`);
+    }
+  }
+}

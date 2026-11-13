@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { DevtoolsAPI } from '../../devtools-api';
+import { fnToRefactorForCodeSmell } from '../../refactoring/fn-to-refactor';
 import { mockWorkspaceFolders, createMockWorkspaceFolder, restoreDefaultWorkspaceFolders } from '../setup';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
@@ -59,7 +60,7 @@ suite('Delta Integration Test Suite', () => {
   });
 
 
-  aceTest('fnsToRefactor with code-smells path returns refactorable functions', async function() {
+  aceTest('fnToRefactorForCodeSmell resolves the enclosing function from the review', async function() {
     this.timeout(60000);
 
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';
@@ -69,8 +70,6 @@ suite('Delta Integration Test Suite', () => {
     assertNoAnalysisError();
     assert.ok(review, 'Review should be defined');
 
-    await DevtoolsAPI.preflight();
-
     const functionLevelSmells = review['function-level-code-smells'];
     assert.ok(functionLevelSmells.length > 0, 'Should have function-level code smells');
 
@@ -79,27 +78,26 @@ suite('Delta Integration Test Suite', () => {
 
     const codeSmell = firstFunction['code-smells'][0];
 
-    const result = await DevtoolsAPI.fnsToRefactor(doc, { 'code-smells': [codeSmell] });
+    const result = fnToRefactorForCodeSmell(doc, codeSmell, review);
 
-    const expected = [{
-      'file-type': 'cpp',
-      'nippy-b64': 'TlBZAHAFagRuYW1laQFmagRib2R5EACUaW50IGYoaW50IGEpIHsKICBpZiAoYSA+IDApIHsKICAgIGlmIChhID4gMSkgewogICAgICBpZiAoYSA+IDIpIHsKICAgICAgICBpZiAoYSA+IDMpIHsKICAgICAgICAgIHJldHVybiBhOwogICAgICAgIH0KICAgICAgfQogICAgfQogIH0KICByZXR1cm4gMDsKfWoJZmlsZS10eXBlaQNjcHBqBXJhbmdlcARqCnN0YXJ0LWxpbmUqAAAAAWoIZW5kLWxpbmUqAAAADGoMc3RhcnQtY29sdW1uZAFqCmVuZC1jb2x1bW5kAmoTcmVmYWN0b3JpbmctdGFyZ2V0c24BcAJqCGNhdGVnb3J5aRdEZWVwLCBOZXN0ZWQgQ29tcGxleGl0eWoEbGluZSoAAAAB',
-      'refactoring-targets': [
-        {
-          category: 'Deep, Nested Complexity',
-          line: 1
-        }
-      ],
-      body: 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}',
+    const expected = {
       name: 'f',
+      body: 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}',
+      'file-type': 'cpp',
       range: {
         'start-line': 1,
         'start-column': 1,
         'end-line': 12,
         'end-column': 2
       },
+      'refactoring-targets': [
+        {
+          category: 'Deep, Nested Complexity',
+          line: 1
+        }
+      ],
       vscodeRange: new vscode.Range(0, 0, 11, 1)
-    }];
+    };
 
     assert.deepStrictEqual(result, expected, 'Result should match expected structure');
   });

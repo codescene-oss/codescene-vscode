@@ -1,10 +1,17 @@
+import { PositionStub } from './position-stub';
+
 export class RangeStub {
   start: any;
   end: any;
 
-  constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number) {
-    this.start = { line: startLine, character: startCharacter };
-    this.end = { line: endLine, character: endCharacter };
+  constructor(startLine: number | PositionStub, startCharacter: number | PositionStub, endLine?: number, endCharacter?: number) {
+    if (typeof startLine === 'number' && typeof startCharacter === 'number') {
+      this.start = new PositionStub(startLine, startCharacter);
+      this.end = new PositionStub(endLine!, endCharacter!);
+    } else {
+      this.start = startLine;
+      this.end = startCharacter;
+    }
   }
 
   intersection(range: RangeStub): RangeStub | undefined {
