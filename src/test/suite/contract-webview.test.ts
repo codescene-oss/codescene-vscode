@@ -23,6 +23,7 @@ import { setCwfAuth, withCwfAuth } from '../../auth/cwf-auth';
 import { BackgroundServiceView } from '../../code-health-monitor/background-view';
 import { handleCWFMessage, registerObjectivesMessages } from '../../code-health-monitor/home/cwf-message-handlers';
 import { HomeView } from '../../code-health-monitor/home/home-view';
+import { getHomeData } from '../../code-health-monitor/home/home-props-utils';
 import { setCwfObjectives } from '../../objectives/cwf-objectives';
 import { updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
 import type { HomeContextViewProps } from '../../centralized-webview-framework/types';
@@ -298,6 +299,14 @@ suite('Contract webview payloads Test Suite', () => {
       );
       assertPayloadClosed(payload, (copy) => copy.data.jobs[0]);
       assertPayloadClosed(payload, (copy) => copy.data.autoRefactor);
+    });
+
+    test('a fixGoal job validates and is closed', () => {
+      const payload = getHomeData({
+        ...homePayload().data,
+        jobs: [{ type: 'fixGoal', goalId: 3, state: 'running', file: { fileName: FILE } }],
+      });
+      assertPayloadClosed(payload, (copy) => copy.data.jobs[0]);
     });
 
     test('the signed-in auth payload rides along and validates', () => {

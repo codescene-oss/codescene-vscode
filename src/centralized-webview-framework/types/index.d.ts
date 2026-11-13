@@ -33,8 +33,10 @@ export type FileDeltaData = {
 
 export type Job = {
   file: FileMetaType;
-  type: 'deltaAnalysis' | 'autoRefactor';
+  type: 'deltaAnalysis' | 'autoRefactor' | 'fixGoal';
   state: 'running' | 'queued';
+  /** The Goal being fixed, for type "fixGoal". */
+  goalId?: number;
 };
 
 export type AnalysisState = 'idle' | 'running' | 'stopped';
