@@ -86,6 +86,6 @@ export interface FunctionInfo {
   range?: Range;
 }
 export interface FunctionInfoExternal {
-  name: string;
+  name?: string;
   range?: RangeCamel;
 }

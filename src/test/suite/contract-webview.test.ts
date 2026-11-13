@@ -699,7 +699,10 @@ suite('Contract webview messages Test Suite', () => {
     const message = { messageType: 'goto-function-location', payload: { fileName: `${REPO}/src/unknown.js`, fn } } as const;
     validateWebviewMessage(message);
     await handleCWFMessage(homeView, message);
-    assert.deepStrictEqual(shown, []);
+    assert.deepStrictEqual(
+      shown.map((entry) => entry.document.fileName),
+      [`${REPO}/src/unknown.js`]
+    );
   });
 
   test('the docs samples are handled by the docs panel', async () => {
