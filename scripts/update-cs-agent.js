@@ -11,8 +11,13 @@ const pinPath = path.join(projectRoot, 'cs-agent.version');
 const stampFileName = '.cs-agent-version';
 
 const versionPattern = /^v?[0-9]+\.[0-9]+\.[0-9]+$/;
-const osNames = { darwin: 'macos', linux: 'linux', win32: 'windows' };
-const archNames = { x64: 'amd64', arm64: 'aarch64' };
+const artifactTargets = {
+  'darwin-arm64': 'macos-aarch64',
+  'darwin-x64': 'macos-amd64',
+  'linux-arm64': 'linux-aarch64',
+  'linux-x64': 'linux-amd64',
+  'win32-x64': 'windows-amd64',
+};
 const binaryNames = ['cs-agent', 'cs-agent.exe'];
 
 function cleanVersionText(text) {
@@ -41,12 +46,11 @@ function resolveVersion(env, pinPath) {
 }
 
 function artifactBaseName(platform, arch) {
-  const osName = osNames[platform];
-  const archName = archNames[arch];
-  if (!osName || !archName || (platform === 'win32' && arch !== 'x64')) {
+  const target = artifactTargets[`${platform}-${arch}`];
+  if (!target) {
     throw new Error(`Unsupported platform/arch for cs-agent: ${platform}/${arch}`);
   }
-  return `refactoring-agent-${osName}-${archName}`;
+  return `refactoring-agent-${target}`;
 }
 
 function assetName(platform, arch) {
