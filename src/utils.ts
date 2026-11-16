@@ -7,10 +7,6 @@ import { AbortError } from './devtools-api/abort-error';
 import { DevtoolsError } from './devtools-api/devtools-error';
 import { getWorkspacePath } from './git-utils';
 
-export function toUppercase(word: String) {
-  return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
 export function getFileExtension(filename: string) {
   return filename.slice(((filename.lastIndexOf('.') - 1) >>> 0) + 2);
 }

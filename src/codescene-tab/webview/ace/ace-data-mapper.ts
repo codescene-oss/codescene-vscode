@@ -30,7 +30,6 @@ export function getAceData(data: CwfAceData): AceContextViewProps {
             metadata: { 'cached?': result?.metadata['cached?'] },
             'trace-id': result?.['trace-id'],
             confidence: getConfidence(result.confidence),
-            'credits-info': getCreditsInfo(result),
             reasons: getReasons(result.reasons),
             'refactoring-properties': {
               'added-code-smells': result['refactoring-properties']['added-code-smells'],
@@ -55,14 +54,6 @@ function getConfidence(confidence: Confidence) {
       details: confidence['recommended-action'].details,
       description: confidence['recommended-action'].description,
     },
-  };
-}
-
-function getCreditsInfo(result: RefactorResponse) {
-  return {
-    used: result['credits-info']?.used ?? 0,
-    limit: result['credits-info']?.limit ?? 0,
-    reset: result['credits-info']?.reset,
   };
 }
 

@@ -1,9 +1,6 @@
 import vscode, { Disposable } from 'vscode';
-import { ACE_ENABLED } from './build-flags';
-import { AnalysisFeature, CsExtensionState, CsFeature } from './cs-extension-state';
-import { aceUsable } from './devtools-api';
-import { CreditsInfoError } from './devtools-api/credits-info-error';
-import { isDefined, toUppercase } from './utils';
+import { AnalysisFeature, CsExtensionState } from './cs-extension-state';
+import { isDefined } from './utils';
 import { automaticAnalysisEnabled, onDidChangeConfiguration } from './configuration';
 
 interface StatusBarOptions {
@@ -23,14 +20,9 @@ export function analysisProgressTooltip(queueCount?: number): string {
 export class CsStatusBar implements Disposable {
   private disposables: Disposable[] = [];
 
-  private readonly aceStatus?: vscode.StatusBarItem;
   private readonly analysisStatus: vscode.StatusBarItem;
 
   constructor() {
-    if (ACE_ENABLED) {
-      this.disposables.push(onDidChangeConfiguration('authToken', () => this.update()));
-      this.aceStatus = this.createStatusBarItem('codescene.aceStatusBarItem', vscode.StatusBarAlignment.Left, -1);
-    }
     this.disposables.push(onDidChangeConfiguration('enableAutomaticAnalysis', () => this.update()));
     this.analysisStatus = this.createStatusBarItem(
       'codescene.analysisStatusBarItem',
@@ -40,24 +32,7 @@ export class CsStatusBar implements Disposable {
   }
 
   update() {
-    const { analysis, ace } = CsExtensionState.stateProperties.features;
-
-    this.updateAceStatus(ace);
-    this.updateAnalysisStatus(analysis);
-  }
-
-  private updateAceStatus(ace: CsFeature) {
-    if (!this.aceStatus || !ace) {
-      return;
-    }
-    const item = this.aceStatus;
-    if (!aceUsable()) {
-      item.hide();
-      return;
-    }
-    item.show();
-    const handler = this.aceStateHandlers[ace.state] || (() => {});
-    handler(ace, item);
+    this.updateAnalysisStatus(CsExtensionState.stateProperties.features.analysis);
   }
 
   private updateAnalysisStatus(analysis: AnalysisFeature) {
@@ -128,46 +103,6 @@ export class CsStatusBar implements Disposable {
     item.command = options.command;
     item.backgroundColor = options.background ? new vscode.ThemeColor(options.background) : undefined;
   }
-
-  /**
-   * Don't show errors related to credit outages
-   */
-  private reportableAceError(error?: Error) {
-    return isDefined(error) && !(error instanceof CreditsInfoError);
-  }
-
-  private aceStateHandlers: Record<string, (ace: CsFeature, item: vscode.StatusBarItem) => void> = {
-    error: (ace, item) => {
-      if (this.reportableAceError(ace.error)) {
-        this.setStatus(item, {
-          text: `$(error) ACE ${toUppercase(ace.state)}`,
-          tooltip: 'Retry ACE activation',
-          command: 'codescene.ace.setEnabled',
-          background: 'statusBarItem.errorBackground',
-        });
-      }
-    },
-    offline: (ace, item) => {
-      this.setStatus(item, {
-        text: `$(error) ACE ${toUppercase(ace.state)}`,
-        tooltip: 'Retry ACE activation',
-        command: 'codescene.ace.setEnabled',
-        background: 'statusBarItem.warningBackground',
-      });
-    },
-    loading: (ace, item) => {
-      this.setStatus(item, {
-        text: '$(loading~spin) ACE',
-        tooltip: 'Retrying ACE activation...',
-      });
-    },
-    enabled: (ace, item) => {
-      this.setStatus(item, {
-        text: '$(cs-logo) ACE',
-        tooltip: 'CodeScene Agent is active',
-      });
-    },
-  };
 
   dispose() {
     this.disposables.forEach((d) => d.dispose());

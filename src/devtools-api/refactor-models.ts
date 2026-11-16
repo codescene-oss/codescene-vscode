@@ -3,30 +3,6 @@ import { Range as VscodeRange } from 'vscode';
 import { Range } from '../devtools-api/review-model';
 import { FixGoalOutcome } from '../refactoring/agent-types';
 
-export interface CreditsInfoError {
-  'credits-info': CreditsInfo;
-  /**
-   * Error message.
-   */
-  message: string;
-  /**
-   * Trace id for the request, use for debugging requests
-   */
-  'trace-id': string;
-}
-
-/**
- * ACE Credit info
- */
-export interface CreditsInfo {
-  limit: number;
-  /**
-   * Credit reset date in ISO-8601 format
-   */
-  reset?: string;
-  used: number;
-}
-
 /**
  * A structure for use in subsequent calls to the refactor endpoint.
  */
@@ -38,11 +14,6 @@ export interface FnToRefactor {
    * Function name (for presentation)
    */
   name: string;
-  /**
-   * Nippy-encoded base64 representation of the function to refactor.
-   * When present, should be used instead of JSON encoding for the post call.
-   */
-  'nippy-b64'?: string;
   /**
    * Range of the function. Use to keep track of what code to replace in the original file.
    */
@@ -69,10 +40,6 @@ export interface RefactorResponse {
    */
   code: string;
   confidence: Confidence;
-  /**
-   * ACE Credit info
-   */
-  'credits-info'?: CreditsInfo;
   /**
    * Optional declarations to be added above the refactored code
    */

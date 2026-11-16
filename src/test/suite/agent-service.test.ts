@@ -399,7 +399,6 @@ aceSuite('AgentRefactoringService Test Suite', () => {
   const agentResponse = (code: string): RefactorResponse => ({
     code,
     confidence: { level: 3, title: 'Fixed', 'recommended-action': { description: 'd', details: 'reasoning' } },
-    'credits-info': undefined,
     declarations: undefined,
     metadata: { 'cached?': false },
     reasons: [],

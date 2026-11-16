@@ -5,7 +5,6 @@ export interface RefactorResponse {
   reasons: Reason[];
   confidence: Confidence;
   'trace-id': string;
-  'credits-info': CreditsInfo;
   'refactoring-properties': RefactoringProperties;
 }
 
@@ -42,12 +41,6 @@ export interface Confidence {
 export interface RecommendedAction {
   details: string;
   description: string;
-}
-
-export interface CreditsInfo {
-  used: number;
-  limit: number;
-  reset?: string; //Credit reset date in ISO-8601 format
 }
 
 export interface RefactoringProperties {

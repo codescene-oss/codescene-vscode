@@ -97,7 +97,6 @@ export function mapFixGoalResponse(
         details,
       },
     },
-    'credits-info': undefined,
     declarations: undefined,
     metadata: { 'cached?': false },
     reasons,

@@ -254,7 +254,6 @@ export class AgentRefactoringService {
     return {
       code,
       confidence,
-      'credits-info': undefined,
       declarations: undefined,
       metadata: { 'cached?': false },
       reasons,

@@ -68,12 +68,6 @@ function webviewConfig(watch = false) {
     './src/codescene-tab/webview/script.ts',
     './src/codescene-tab/webview/documentation-script.ts',
   ];
-  if (!buildNoAce) {
-    entryPoints.push(
-      './src/codescene-tab/webview/ace-acknowledgement-script.ts',
-      './src/codescene-tab/webview/refactoring-script.ts'
-    );
-  }
 
   return {
     ...baseConfig,
