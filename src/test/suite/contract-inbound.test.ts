@@ -157,7 +157,7 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     local: declared<LocalResult>({
       result: true,
       reason: true,
-      files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true }),
+      files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true, line: true }),
     }),
     'work-sessions': declared<GoalWorkSessions>({
       state: true,

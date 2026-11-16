@@ -29,4 +29,5 @@ export const authResponseSummaries: Record<string, Summary> = {
   'cs-ide/auth-cancel-login': statusResponse,
   'cs-ide/auth-logout': statusResponse,
   'cs-ide/auth-select-account': statusResponse,
+  'cs-ide/auth-token': (value) => formatLogFields({ source: value['credential-source'] }),
 };

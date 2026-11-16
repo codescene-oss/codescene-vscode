@@ -21,6 +21,7 @@ import type { AuthSurface } from '../../auth/auth-flow';
 import type { AuthFlow } from '../../centralized-webview-framework/types/auth';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { authPayloadFixture } from '../fixtures/auth/auth-fixtures';
+import { fixGoalJobs } from '../../objectives/fix-goal-jobs';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -226,40 +227,14 @@ suite('HomeView', () => {
       assert.strictEqual(badgeCount, 0);
     });
 
-    const enrichmentCases = [
-      {
-        name: 'adds a file on its first delta',
-        initialFiles: [] as string[],
-        enrichment: false,
-        expectedFiles: ['/workspace/fileA.ts'],
-      },
-      {
-        name: 'does not resurrect a file removed while its delta was being enriched',
-        initialFiles: [] as string[],
-        enrichment: true,
-        expectedFiles: [] as string[],
-      },
-      {
-        name: 'updates a file that is still monitored when its enriched delta arrives',
-        initialFiles: ['/workspace/fileA.ts'],
-        enrichment: true,
-        expectedFiles: ['/workspace/fileA.ts'],
-      },
-    ];
-
-    enrichmentCases.forEach(({ name, initialFiles, enrichment, expectedFiles }) => {
-      test(name, () => {
-        initialFiles.forEach(addFileToHomeView);
-
-        (homeView as any).updateFileDeltaData({
-          document: mockDocument('/workspace/fileA.ts'),
-          result: mockDeltaResult,
-          updateMonitor: true,
-          enrichment,
-        });
-
-        assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], expectedFiles);
+    test('adds a file on its first delta', () => {
+      (homeView as any).updateFileDeltaData({
+        document: mockDocument('/workspace/fileA.ts'),
+        result: mockDeltaResult,
+        updateMonitor: true,
       });
+
+      assert.deepStrictEqual([...homeView.getFileIssueMap().keys()], ['/workspace/fileA.ts']);
     });
   });
 
@@ -336,6 +311,71 @@ suite('HomeView', () => {
         );
       });
     }
+  });
+
+  suite('fix-goal jobs', () => {
+    let homeView: HomeView;
+    const root = path.join('/repo');
+    const goalFile = path.join(root, 'goal.ts');
+
+    setup(() => {
+      const mockContext = createMockExtensionContext(root);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext);
+      }
+      setMockGitRepositories([{ rootUri: { fsPath: root } }]);
+      homeView = new HomeView(mockContext, { updateBadge: () => {}, dispose: () => {} } as any);
+    });
+
+    teardown(() => {
+      fixGoalJobs.clear();
+      homeView.dispose();
+      clearMockGitRepositories();
+    });
+
+    const payloadJobs = () =>
+      (homeView as any).homePayload().data.jobs.map((job: { type: string; file: { fileName: string } }) => [job.type, job.file.fileName]);
+
+    const analysisEvent = {
+      state: 'running',
+      jobs: new Set([path.join(root, 'dirty.ts')]),
+      queued: [],
+      queueCount: 0,
+      queueDone: 0,
+    };
+
+    const cases = [
+      { name: 'after an analysis event', apply: () => (homeView as any).applyAnalysisEvent(analysisEvent), analysisJobs: [path.join(root, 'dirty.ts')] },
+      { name: 'after analysis is stopped', apply: () => (homeView as any).setStoppedAnalysis(), analysisJobs: [] },
+    ];
+
+    for (const { name, apply, analysisJobs } of cases) {
+      test(`the payload lists fix-goal jobs after the analysis jobs ${name}`, () => {
+        fixGoalJobs.add(3, goalFile);
+        apply();
+        assert.deepStrictEqual(payloadJobs(), [
+          ...analysisJobs.map((fileName) => ['deltaAnalysis', fileName]),
+          ['fixGoal', goalFile],
+        ]);
+      });
+    }
+
+    test('fix-goal jobs are not counted as analysis work', () => {
+      fixGoalJobs.add(3, goalFile);
+      (homeView as any).applyAnalysisEvent({ ...analysisEvent, jobs: new Set() });
+      const data = (homeView as any).homePayload().data;
+      assert.strictEqual(data.analysisState, 'idle');
+      assert.strictEqual(data.remainingCount, 0);
+      assert.strictEqual(data.totalCount, undefined);
+    });
+
+    test('a change to the fix-goal jobs updates the view', () => {
+      let updates = 0;
+      homeView.update = Object.assign(() => updates++, { cancel: () => {}, flush: () => {} });
+      fixGoalJobs.add(3, goalFile);
+      fixGoalJobs.remove(3, goalFile);
+      assert.strictEqual(updates, 2);
+    });
   });
 });
 

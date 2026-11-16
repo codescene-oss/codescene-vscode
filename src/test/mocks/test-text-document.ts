@@ -7,6 +7,7 @@ export class TestTextDocument implements vscode.TextDocument {
   private _languageId: string;
   private _version: number;
   private _isDirty = false;
+  private _onSave?: () => void;
 
   constructor(filePath: string, content: string, languageId: string, version: number = 1) {
     this._fileName = filePath;
@@ -76,5 +77,15 @@ export class TestTextDocument implements vscode.TextDocument {
   getWordRangeAtPosition(): vscode.Range | undefined { return undefined; }
   validateRange(range: vscode.Range): vscode.Range { return range; }
   validatePosition(position: vscode.Position): vscode.Position { return position; }
-  save(): Thenable<boolean> { return Promise.resolve(true); }
+  save(): Thenable<boolean> {
+    this._onSave?.();
+    this._isDirty = false;
+    return Promise.resolve(true);
+  }
+  setText(newContent: string): void {
+    this._content = newContent;
+  }
+  setOnSave(callback: () => void): void {
+    this._onSave = callback;
+  }
 }

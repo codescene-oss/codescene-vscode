@@ -11,8 +11,10 @@ import vscode, {
 import { FnToRefactor, RefactorResponse } from '../devtools-api/refactor-models';
 import { isDefined } from '../utils';
 import { RefactoringRequest } from './request';
-import { fnsToRefactorCache } from '../devtools-api/fns-to-refactor-cache';
 import { CodeSmell } from '../devtools-api/review-model';
+import { DevtoolsAPI } from '../devtools-api';
+import Reviewer from '../review/reviewer';
+import { fnToRefactorForCodeSmell } from './fn-to-refactor';
 
 function singleLineCommentSeparator(languageId: string) {
   switch (languageId) {
@@ -158,9 +160,16 @@ export function isFunctionUnchangedInDocument(
   return { shouldUpdateRange: false, isStale: true };
 }
 
-export async function findFnToRefactor(document: vscode.TextDocument | undefined, codeSmell: CodeSmell | undefined) {
-  if (document && codeSmell) {
-    const fn = await fnsToRefactorCache.fnsToRefactor(document, codeSmell);
-    return fn;
+export function refactoringStaleness(request: RefactoringRequest): { shouldUpdateRange: boolean; isStale: boolean } {
+  if (request.goal) {
+    return { shouldUpdateRange: false, isStale: request.document.getText() !== request.fnToRefactor.body };
   }
+  return isFunctionUnchangedInDocument(request.document, request.fnToRefactor);
+}
+
+export async function findFnToRefactor(document: vscode.TextDocument | undefined, codeSmell: CodeSmell | undefined) {
+  if (!DevtoolsAPI.aceEnabled()) return;
+  if (!document || !codeSmell) return;
+  const reviewResult = await Reviewer.instance?.reviewCache.get(document, 'any')?.review.reviewResult;
+  return fnToRefactorForCodeSmell(document, codeSmell, reviewResult || undefined);
 }

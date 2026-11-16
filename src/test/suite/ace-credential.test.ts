@@ -18,7 +18,9 @@ suite('isAceAvailable', () => {
       expected: false,
     },
     { name: 'no token, signed in with an ACE credential', token: undefined, auth: SIGNED_IN_CLOUD, expected: true },
-    { name: 'no token, signed in without an ACE credential', token: undefined, auth: SIGNED_IN_ONPREM_PAT, expected: false },
+    { name: 'no token, signed in without an ACE credential', token: undefined, auth: SIGNED_IN_ONPREM_PAT, expected: true },
+    { name: 'no token, signing in', token: undefined, auth: { active: true, status: authStatusFixture('signing-in') }, expected: false },
+    { name: 'no token, signed out', token: undefined, auth: { active: true, status: authStatusFixture('signed-out') }, expected: false },
     { name: 'a token while signed out', token: 'cloud-ace-1', auth: { active: true, status: authStatusFixture('signed-out') }, expected: true },
   ];
 
@@ -39,7 +41,7 @@ suite('refactorToken', () => {
   });
 
   test('throws when ACE is unavailable', () => {
-    assert.throws(() => refactorToken(undefined, SIGNED_IN_ONPREM_PAT), MissingAuthTokenError);
+    assert.throws(() => refactorToken(undefined, INACTIVE), MissingAuthTokenError);
   });
 });
 

@@ -19,57 +19,6 @@ connection.onRequest('cs-ide/delta', () => ({
   oldGitBlobSha: 'old-sha',
   newGitBlobSha: 'new-sha',
 }));
-connection.onRequest('cs-ide/preflight', () => ({
-  version: 2,
-  fileTypes: ['ts'],
-  languageCommon: { maxInputLoc: 100, codeSmells: ['Complex Method'] },
-}));
-connection.onRequest('cs-ide/fns-to-refactor', (params: { 'file-name'?: string; fileName?: string }) => {
-  const fileName = params && typeof params === 'object' && !Array.isArray(params)
-    ? params['file-name'] ?? params.fileName
-    : undefined;
-  if (!fileName) {
-    throw new Error('Missing file-name');
-  }
-  return [{
-    body: 'function f() {}',
-    name: 'f',
-    fileType: 'TypeScript',
-    functionType: 'Function',
-    nippyB64: 'encoded',
-    range: { startLine: 1, startColumn: 1, endLine: 1, endColumn: 16 },
-    refactoringTargets: [{ category: 'Complex Method', line: 1 }],
-  }];
-});
-connection.onRequest('cs-ide/refactor', (params, token) => {
-  if (params?.token === 'unauthorized') {
-    throw new ResponseError(-32603, 'Request failed [401]');
-  }
-  if (params?.token === 'hang') {
-    return new Promise((resolve, reject) => {
-      const cancel = () => reject(new ResponseError(-32800, 'Request cancelled'));
-      if (token.isCancellationRequested) {
-        cancel();
-        return;
-      }
-      token.onCancellationRequested(cancel);
-    });
-  }
-  return {
-    code: 'function f() {}',
-    confidence: {
-      level: 1,
-      title: 'High confidence',
-      recommendedAction: { description: 'Apply', details: 'Safe change' },
-      reviewHeader: 'Review',
-    },
-    metadata: { 'cached?': false },
-    reasons: [],
-    refactoringProperties: { addedCodeSmells: [], removedCodeSmells: ['Complex Method'] },
-    traceId: 'trace-1',
-    creditsInfo: { limit: 10, used: 1 },
-  };
-});
 connection.onRequest('cs-ide/telemetry', (params) => ({ status: 202, params }));
 connection.onRequest('cs-ide/device-id', () => ({ deviceId: 'device-42' }));
 connection.onRequest('cs-ide/code-health-rules-template', () => ({ template: '{"rule_sets":[]}' }));
@@ -205,6 +154,7 @@ const signedOutStatus = {
   error: null,
 };
 connection.onRequest('cs-ide/auth-status', () => signedOutStatus);
+connection.onRequest('cs-ide/auth-token', () => ({ 'credential-source': 'oauth', 'access-token': 'fixture-access-token' }));
 connection.onRequest('cs-ide/auth-configure', () => signedOutStatus);
 connection.onRequest('cs-ide/auth-login', () => {
   throw new ResponseError(-32803, 'This CodeScene server does not support browser sign-in.', { code: 'auth/oauth-unsupported' });

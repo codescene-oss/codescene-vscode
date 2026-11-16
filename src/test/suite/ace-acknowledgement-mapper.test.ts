@@ -1,4 +1,3 @@
-import { aceSuite } from '../ace-test-suite';
 import * as assert from 'assert';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
@@ -6,9 +5,10 @@ import type { AuthStatus } from '../../centralized-webview-framework/types/auth'
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 
-aceSuite('AceAcknowledgementMapper Test Suite', () => {
+suite('AceAcknowledgementMapper Test Suite', () => {
   let originalGetAuthToken: typeof configModule.getAuthToken;
   let originalStateProperties: PropertyDescriptor | undefined;
+  let originalAcknowledged: PropertyDescriptor | undefined;
 
   function mockToken(token: string) {
     (configModule as any).getAuthToken = () => token;
@@ -24,6 +24,7 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
   setup(() => {
     originalGetAuthToken = configModule.getAuthToken;
     originalStateProperties = Object.getOwnPropertyDescriptor(csExtensionState.CsExtensionState, 'stateProperties');
+    originalAcknowledged = Object.getOwnPropertyDescriptor(csExtensionState.CsExtensionState, 'acknowledgedAceUsage');
     Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', {
       get: () => ({
         auth: { active: false, status: null },
@@ -37,6 +38,9 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
     (configModule as any).getAuthToken = originalGetAuthToken;
     if (originalStateProperties) {
       Object.defineProperty(csExtensionState.CsExtensionState, 'stateProperties', originalStateProperties);
+    }
+    if (originalAcknowledged) {
+      Object.defineProperty(csExtensionState.CsExtensionState, 'acknowledgedAceUsage', originalAcknowledged);
     }
   });
 
@@ -118,7 +122,16 @@ aceSuite('AceAcknowledgementMapper Test Suite', () => {
         cloud: disabledWith(authStatusFixture('signed-in-oauth')),
         onpremPat: disabledWith(authStatusFixture('signed-in-setting-token-onprem')),
       },
-      { cloud: false, onpremPat: true }
+      { cloud: false, onpremPat: false }
     );
+  });
+
+  test('visible requires an authenticated user', () => {
+    mockAcknowledged(true);
+    const visibleWith = (token: string) => {
+      mockToken(token);
+      return getAutoRefactorConfig().visible;
+    };
+    assert.deepStrictEqual({ authenticated: visibleWith('secret'), unauthenticated: visibleWith('') }, { authenticated: true, unauthenticated: false });
   });
 });

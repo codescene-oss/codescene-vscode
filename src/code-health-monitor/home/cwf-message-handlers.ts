@@ -11,6 +11,8 @@ import { MessageToIDEType, OpenDocsMessage } from '../../centralized-webview-fra
 import { FileMetaType } from '../../centralized-webview-framework/types';
 import { CodeSmell } from '../../devtools-api/review-model';
 import { setAutomaticAnalysisEnabled } from '../../configuration';
+import { logOutputChannel } from '../../log';
+import { findFunctionPosition } from './function-symbols';
 
 /**
  * Finds position data fora. function and opens the function in editor
@@ -18,9 +20,21 @@ import { setAutomaticAnalysisEnabled } from '../../configuration';
  * @param payload
  */
 async function handleGoToFunction(homeView: HomeView, payload: FileMetaType) {
-  const foundFileFunction = getFileAndFunctionFromState(homeView.getFileIssueMap(), payload.fileName);
-  foundFileFunction?.file &&
-    (await showDocAtPosition(foundFileFunction.file.document, getFunctionPosition(payload.fn)));
+  const document = await documentToShow(homeView, payload.fileName);
+  if (!document) return;
+  const position = getFunctionPosition(payload.fn) ?? (await findFunctionPosition(document, payload.fn?.name));
+  await showDocAtPosition(document, position);
+}
+
+async function documentToShow(homeView: HomeView, fileName: string): Promise<vscode.TextDocument | undefined> {
+  const tracked = getFileAndFunctionFromState(homeView.getFileIssueMap(), fileName)?.file.document;
+  if (tracked) return tracked;
+  try {
+    return await findOrOpenDocument(vscode.Uri.file(fileName));
+  } catch (e) {
+    logOutputChannel.warn(`Could not open ${fileName}: ${e}`);
+    return undefined;
+  }
 }
 
 /**
@@ -54,7 +68,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
   const foundFileFunction = getFileAndFunctionFromState(
     homeView.getFileIssueMap(),
     payload.fileName,
-    payload.fn
+    payload.fn?.name
       ? {
           name: payload.fn.name,
           startLine: payload.fn.range?.startLine || 0,
@@ -84,7 +98,7 @@ function handleOpenDocs(homeView: HomeView, payload: OpenDocsMessage['payload'])
 /**
  * Open settings in editor
  */
-function handleOpenSettings() {
+export function handleOpenSettings() {
   Telemetry.logUsage('control-center/open-settings');
   vscode.commands.executeCommand('workbench.action.openWorkspaceSettings', getExtensionSettingsFilter()).then(
     () => {},
@@ -155,6 +169,7 @@ function handleAnalysisMessage(message: MessageToIDEType) {
 
 type ObjectivesActions = {
   startWorkSession(goalId: number): Promise<void>;
+  fixGoal(goalId: number, path: string): Promise<void>;
 };
 
 let objectivesActions: ObjectivesActions | undefined;
@@ -176,6 +191,9 @@ async function handleObjectivesMessage(message: MessageToIDEType) {
   switch (message.messageType) {
     case 'goal-work-session-start':
       await objectivesActions.startWorkSession(message.payload.goalId);
+      return;
+    case 'fix-goal':
+      await objectivesActions.fixGoal(message.payload.goalId, message.payload.path);
       return;
   }
 }

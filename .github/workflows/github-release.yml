@@ -249,21 +249,6 @@ jobs:
           fi
           echo "VSIX version $ACTUAL_VERSION verified."
 
-      - name: Verify no-ACE settings absent from VSIX
-        if: matrix.variant == 'noace'
-        run: |
-          VSIX_FILE=$(ls ${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
-          unzip -p "$VSIX_FILE" extension/package.json > vsix-package.json
-          if jq -e '.contributes.configuration.properties | has("codescene.enableAutoRefactor")' vsix-package.json > /dev/null; then
-            echo "ACE setting codescene.enableAutoRefactor found in no-ACE VSIX package.json"
-            exit 1
-          fi
-          if jq -e '.contributes.configuration.properties | has("codescene.authToken")' vsix-package.json > /dev/null; then
-            echo "ACE setting codescene.authToken found in no-ACE VSIX package.json"
-            exit 1
-          fi
-          echo "No ACE settings in no-ACE VSIX package.json"
-
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7
         with:

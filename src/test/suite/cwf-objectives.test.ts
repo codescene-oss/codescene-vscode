@@ -57,4 +57,17 @@ suite('Home payload objectives', () => {
       { objectivesFlag: true, workSessionsFlag: false }
     );
   });
+
+  test('adds ide-goal-fix after ide-objectives', () => {
+    setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'));
+    const flags = homePayload().featureFlags ?? [];
+    assert.deepStrictEqual(
+      flags.filter((f) => f === 'ide-objectives' || f === 'ide-goal-fix'),
+      ['ide-objectives', 'ide-goal-fix']
+    );
+  });
+
+  test('has no ide-goal-fix flag while there is no snapshot', () => {
+    assert.strictEqual(homePayload().featureFlags?.includes('ide-goal-fix'), false);
+  });
 });

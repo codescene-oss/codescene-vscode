@@ -4,20 +4,15 @@ import { logOutputChannel } from './log';
 function getFirstNonBlankString(config: vscode.WorkspaceConfiguration, section: string, defaultValue: string): string {
   // This fallback logic prevents a bad behavior where a blank (perhaps even unset) Workspace value
   // can take priority over a non-blank User value.
+  const inspected = config.inspect<string>(section);
   const sources = [
-    config.get<string>(section, defaultValue) || '',       // First priority: default VS Code logic
-    config.inspect<string>(section)?.workspaceValue || '', // Second priority: Workspace
-    config.inspect<string>(section)?.globalValue || '',    // Last priority: User
+    config.get<string>(section, defaultValue), // First priority: default VS Code logic
+    inspected?.workspaceValue,                 // Second priority: Workspace
+    inspected?.globalValue,                    // Last priority: User
   ];
 
-  for (const value of sources) {
-    const trimmed = value?.trim();
-    if (trimmed) {
-      return trimmed;
-    }
-  }
-
-  return defaultValue;
+  const trimmed = sources.map((value) => (typeof value === 'string' ? value.trim() : ''));
+  return trimmed.find(Boolean) ?? defaultValue;
 }
 
 export function getConfiguration<T>(section: string, defaultValue?: T): T | undefined {
@@ -66,6 +61,46 @@ export function toggleReviewCodeLenses() {
 
 export function getAuthToken() {
   return getConfiguration<string>('authToken', '');
+}
+
+const DEFAULT_AGENT_MODEL = 'anthropic/claude-sonnet-5-5';
+
+const MODEL_BY_PROVIDER_OPTIONS: Array<{ options: string[]; model: string }> = [
+  { options: ['anthropic:api-key'], model: DEFAULT_AGENT_MODEL },
+  { options: ['openai:api-key'], model: 'openai/gpt-6.1-sol' },
+  { options: ['google:api-key'], model: 'google/gemini-4-carbon' },
+  {
+    options: ['amazon-bedrock:profile', 'amazon-bedrock:region'],
+    model: 'amazon-bedrock/eu.anthropic.claude-sonnet-5-5',
+  },
+];
+
+function inferModelFromProviderOptions(opts: Record<string, string>): string | undefined {
+  return MODEL_BY_PROVIDER_OPTIONS.find(({ options }) => options.some((option) => opts[option]))?.model;
+}
+
+export function getAgentModel(providerOptions: Record<string, string> = getProviderOptions()): string {
+  const override = getConfiguration<string>('agentModelOverride', '')?.trim();
+  if (override) {
+    return override;
+  }
+
+  const configured = getConfiguration<string>('agentModel', '');
+  const inferred = inferModelFromProviderOptions(providerOptions);
+
+  if (configured && configured !== DEFAULT_AGENT_MODEL) {
+    return configured;
+  }
+
+  if (inferred) {
+    return inferred;
+  }
+
+  return configured || DEFAULT_AGENT_MODEL;
+}
+
+export function getProviderOptions(): Record<string, string> {
+  return getConfiguration<Record<string, string>>('providerOptions') ?? {};
 }
 
 export function automaticAnalysisEnabled() {

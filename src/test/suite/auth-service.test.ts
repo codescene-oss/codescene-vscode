@@ -3,7 +3,7 @@ import { INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload, type AuthSnapshot } from 
 import { createHarness, type Harness } from '../fakes/auth-service-harness';
 import type { AuthStatus } from '../../centralized-webview-framework/types/auth';
 import { authRpcError, flushPromises } from '../fakes/fake-auth-transport';
-import { authPayloadFixture, authStatusFixture } from '../fixtures/auth/auth-fixtures';
+import { authPayloadFixture, authStatusFixture, webviewAuthStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { assertLogOmits } from '../setup';
 
 const NULL_CONFIGURATION = { 'server-url': null, 'access-token': null };
@@ -47,7 +47,7 @@ suite('AuthService', () => {
     await harness.service.start();
     assert.deepStrictEqual(harness.transport.requests, [{ method: 'cs-ide/auth-configure', params: NULL_CONFIGURATION }]);
     assert.deepStrictEqual(toAuthPayload(harness.service.current), {
-      status: authStatusFixture('signed-out'),
+      status: webviewAuthStatusFixture('signed-out'),
       accounts: null,
       projects: null,
       repo: null,
@@ -271,7 +271,7 @@ suite('AuthService account data', () => {
     assert.deepStrictEqual(
       { payload: toAuthPayload(harness.service.current), events: harness.events },
       {
-        payload: { status: authStatusFixture('signed-out'), accounts: null, projects: null, repo, 'linked-project': null },
+        payload: { status: webviewAuthStatusFixture('signed-out'), accounts: null, projects: null, repo, 'linked-project': null },
         events: [{ name: 'auth/sign-out' }],
       }
     );

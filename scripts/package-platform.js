@@ -68,12 +68,16 @@ function restorePackagingFiles(projectRoot, vscodeIgnorePath, originalVscodeIgno
   restoreVariantFiles(projectRoot, originalPackageJson, originalReadme);
 }
 
-function refreshAssets(tokenEnv) {
+function refreshAssets(tokenEnv, platform, arch) {
   if (process.env.CS_IDE_USE_LOCAL_DISTRIBUTION === 'true') {
     console.log('Skipping remote asset refresh for local distribution packaging.');
     return;
   }
   execSync(`node "${path.join(__dirname, 'update-cwf.js')}"`, { stdio: 'inherit', env: tokenEnv });
+  execSync(`node "${path.join(__dirname, 'update-cs-agent.js')}" ${platform} ${arch} --force`, {
+    stdio: 'inherit',
+    env: tokenEnv,
+  });
 }
 
 function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscodeIgnore) {
@@ -93,15 +97,12 @@ function packageExtension(platform, arch, projectRoot, buildNoAce, originalVscod
   console.log('\nStep 3: Updating .vscodeignore...');
   updateVscodeIgnore(platform, arch, originalVscodeIgnore);
 
-  console.log('\nStep 4: Updating webview...');
+  console.log('\nStep 4: Updating webview and agent...');
   const tokenEnv = { ...process.env, GITHUB_TOKEN: process.env.GITHUB_TOKEN || '' };
-  refreshAssets(tokenEnv);
+  refreshAssets(tokenEnv, platform, arch);
 
   console.log('\nStep 5: Building extension...');
-  execSync('npm run build', {
-    stdio: 'inherit',
-    env: { ...process.env, BUILD_NO_ACE: buildNoAce ? 'true' : 'false' },
-  });
+  execSync('npm run build', { stdio: 'inherit' });
 
   console.log('\nStep 6: Packaging VSIX...');
   const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));

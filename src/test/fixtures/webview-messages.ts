@@ -50,3 +50,8 @@ export const authMessageSamples: AuthMessage[] = [
   { messageType: 'auth-open-pat-page' },
 ];
 
+export const objectivesMessageSamples: MessageToIDEType[] = [
+  { messageType: 'goal-work-session-start', payload: { goalId: 2 } },
+  { messageType: 'fix-goal', payload: { goalId: 2, path: 'src/orders.js' } },
+];
+

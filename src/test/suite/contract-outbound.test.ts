@@ -43,7 +43,6 @@ type Variants = Record<string, () => unknown>;
 /** Messages in the manifest that VS Code does not send; the coverage test names why. */
 const notSentByVsCode: Record<string, string> = {
   'cs-ide/auth': 'license check: VS Code resolves its license through auth-status',
-  'cs-ide/auth-token': 'the access token stays inside cs-ide; VS Code never asks for it',
   'cs-ide/features': 'VS Code does not probe feature availability; the objectives snapshot carries its own off state',
 };
 
@@ -133,6 +132,9 @@ suite('Contract outbound params Test Suite', () => {
     'call site: refactoring request': telemetryEnvironment(noTelemetryInput, () =>
       Telemetry.logUsage('refactor/requested', { source: 'codelens', traceId: 'trace-1', skipCache: true })
     ),
+    'call site: goal fix applied': telemetryEnvironment(noTelemetryInput, () =>
+      Telemetry.logUsage('refactor/applied', { traceId: 'trace-1', goalId: 2, outcome: 'improved' })
+    ),
     'call site: sign-in failure': telemetryEnvironment(noTelemetryInput, () =>
       Telemetry.logUsage('auth/sign-in-failed', { 'error-code': 'auth/timeout' })
     ),
@@ -170,7 +172,8 @@ suite('Contract outbound params Test Suite', () => {
     {
       method: 'cs-ide/review',
       variants: {
-        'all inputs': () => client.review({ path: 'src/file.ts', 'file-content': 'const a = 1;', 'cache-path': '/cache' }),
+        'all inputs': () => client.review({ path: 'src/file.ts', 'file-content': 'const a = 1;', 'repo-path': REPO, 'cache-path': '/cache' }),
+        'call site: scoring a goal fix proposal': () => DevtoolsAPI.scoreContent(REPO, 'src/file.ts', 'const a = 1;'),
         'optional inputs missing': () => client.review({ path: 'src/file.ts' }),
       },
     },
@@ -215,6 +218,7 @@ suite('Contract outbound params Test Suite', () => {
         'optional inputs missing': () => client.stopWatchFiles(REPO),
       },
     },
+    { method: 'cs-ide/auth-token', variants: { 'no inputs': () => DevtoolsAPI.authToken() } },
 
     // ---- src/auth/auth-rpc.ts ---------------------------------------------------------------------------------
     {
@@ -307,6 +311,17 @@ suite('Contract outbound params Test Suite', () => {
       }
     });
   }
+
+  test('scoreContent sends one cs-ide/review with repo-path and no reviewFiles', async () => {
+    await client.request('test/captured', {});
+    await DevtoolsAPI.scoreContent(REPO, 'src/file.ts', 'const a = 1;');
+    const received = await client.request<Captured[]>('test/captured', {});
+    assert.deepStrictEqual(
+      received.map((m) => m.method),
+      ['cs-ide/review']
+    );
+    assert.deepStrictEqual(received[0].params, { path: 'src/file.ts', 'file-content': 'const a = 1;', 'repo-path': REPO });
+  });
 
   suite('coverage', () => {
     test('every schematized request and inbound notification of the manifest is either tested or named as not sent by VS Code', () => {

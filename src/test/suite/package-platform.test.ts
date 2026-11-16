@@ -111,6 +111,11 @@ suite('Package Platform Script Test Suite', () => {
     assert.strictEqual(twice, once);
   });
 
+  test('applyVscodeIgnoreExceptions keeps the agent binary', () => {
+    const lines = lineList(packagePlatform.applyVscodeIgnoreExceptions(committedVscodeIgnore, 'cs-linux-x64'));
+    assert.deepStrictEqual(lines.filter(l => l === 'bin/' || l === '!bin/'), ['!bin/']);
+  });
+
   test('preserves CRLF line endings without introducing bare LF lines', () => {
     const output: string = packagePlatform.applyVscodeIgnoreExceptions('cs-*\r\n*.zip\r\nMakefile\r\n', 'cs-win32-x64');
     assert.ok(!/(^|[^\r])\n/.test(output));

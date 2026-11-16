@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AuthPayload, AuthStatus } from '../../../centralized-webview-framework/types/auth';
+import type { AuthPayload, AuthStatus, WebviewAuthStatus } from '../../../centralized-webview-framework/types/auth';
 
 export type AuthStatusFixture =
   | 'env-token-override'
@@ -39,6 +39,12 @@ function readFixture<T>(name: string): T {
 
 export function authStatusFixture(name: AuthStatusFixture): AuthStatus {
   return readFixture<AuthStatus>(name);
+}
+
+export function webviewAuthStatusFixture(name: AuthStatusFixture): WebviewAuthStatus {
+  const { 'ace-credential': aceCredential, ...status } = authStatusFixture(name);
+  void aceCredential;
+  return status;
 }
 
 export function authPayloadFixture(name: AuthPayloadFixture): AuthPayload {

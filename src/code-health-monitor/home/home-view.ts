@@ -20,6 +20,7 @@ import {
 import { initBaseContent, updateRendererMessage } from '../../centralized-webview-framework/cwf-html-utils';
 import { cwfAuthSurface, onDidChangeCwfAuth } from '../../auth/cwf-auth';
 import { onDidChangeCwfObjectives } from '../../objectives/cwf-objectives';
+import { fixGoalJobs } from '../../objectives/fix-goal-jobs';
 import { authViewProps } from '../../auth/auth-view-props';
 import type { AuthSurface } from '../../auth/auth-flow';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
@@ -81,6 +82,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
       CsExtensionState.onAuthChanged(() => this.refreshAceState()),
       onDidChangeCwfAuth(() => this.update()),
       onDidChangeCwfObjectives(() => this.update()),
+      fixGoalJobs.onDidChange(() => this.update()),
       onDidChangeConfiguration('authToken', () => this.refreshAceState()), // Detect change to ACE auth token in settings
       onDidChangeConfiguration('enableAutomaticAnalysis', () => this.handleAutomaticAnalysisSetting())
     );
@@ -124,9 +126,8 @@ export class HomeView implements WebviewViewProvider, Disposable {
 
   // Detect changes to the delta result, updates the list and lastly converts the data to CWF webview format
   private updateFileDeltaData(event: DeltaAnalysisEvent) {
-    const { document, result, updateMonitor, enrichment } = event;
+    const { document, result, updateMonitor } = event;
     if (!updateMonitor) return;
-    if (enrichment && !this.fileIssueMap.has(document.uri.fsPath)) return;
 
     const evtData = (fileWithIssues: FileWithIssues) => {
       const { nIssues, scoreChange } = fileWithIssues;
@@ -215,7 +216,7 @@ export class HomeView implements WebviewViewProvider, Disposable {
   private homePayload() {
     return getHomeData({
       fileDeltaData: this.ideContextData.fileDeltaData,
-      jobs: this.ideContextData.jobs,
+      jobs: [...this.ideContextData.jobs, ...fixGoalJobs.jobs],
       autoRefactor: this.ideContextData.autoRefactor,
       showOnboarding: false,
       analysisState: this.ideContextData.analysisState,

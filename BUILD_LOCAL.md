@@ -62,6 +62,12 @@ CS_IDE_CONTRACT_BUNDLE=/path/to/cs-ide-contract npm run fetch-contract
 
 The webview boundary tests (`contract-webview.test.ts`) validate what the extension sends to the webview and what it receives from it against `webview-schema.json` and `message-schema.json` in `cs-cwf/`. `npm run updatecwf` puts them there: it builds `../cs-webview` when that checkout exists (and `CI` is not set), otherwise it downloads the release pinned in `cwf.version` and needs `GITHUB_TOKEN`. The tests fail, not skip, when the schema files are missing.
 
+### Refactoring Agent (`bin/cs-agent`)
+
+The Refactoring Agent runs `bin/cs-agent` (`bin/cs-agent.exe` on Windows). `make updateagent` downloads the `empear-analytics/cs-agent` release pinned in `cs-agent.version` for your platform and needs `GITHUB_TOKEN`. `make build` runs it for you. Set `CS_AGENT_VERSION` to try another release without changing the pin.
+
+To use a cs-agent you built yourself, copy it to `bin/cs-agent` (or `bin/cs-agent.exe`). The script keeps a binary it did not download and says so. Run `make updateagent FORCE=1` to replace it with the pinned release. Packaging (`npm run package-platform`) always installs the pinned release for the target platform, and the no-ACE variant ships without the agent.
+
 ### Using a Local CLI Distribution (`CS_IDE_USE_LOCAL_DISTRIBUTION`)
 
 Use this when you have built `cs-ide` yourself (for example from the `cli-server` branch) and do not want `bundle-cli` to download a published zip.

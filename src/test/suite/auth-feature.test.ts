@@ -96,6 +96,7 @@ suite('Auth feature activation', () => {
       disposables: [],
       update: (snapshot: Pick<AuthSnapshot, 'active' | 'status'>) => updates.push(snapshot),
       startWorkSession: () => Promise.resolve(),
+      fixGoal: () => Promise.resolve(),
     };
     disposables = activateAuth(context, transport, objectives);
     await flushPromises();

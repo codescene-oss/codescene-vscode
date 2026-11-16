@@ -69,11 +69,18 @@ Location: `Code Health Monitor` > `Extension Settings`
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | **Enable Review Code Lenses** | Boolean | true | Enables/Disables showing Code Health Score and Code Smells in the active documents |
-| **Enable Auto Refactor** | Boolean | false | Enables/Disables ACE, CodeScenes automatic refactoring tool |
+| **Enable Auto Refactor** | Boolean | true | Enables/Disables the CodeScene Refactoring Agent |
+| **Agent Model** | String | `anthropic/claude-sonnet-5-5` | Model the Refactoring Agent uses. Left at the default, it follows the credentials you set: Anthropic, then OpenAI, then Google, then Amazon Bedrock. |
+| **Agent Model Override** | String | - | Any `provider/model` identifier. Overrides **Agent Model** when set. |
+| **Provider Options** | Object | - | Amazon Bedrock `amazon-bedrock:profile` and `amazon-bedrock:region` for the Refactoring Agent. |
 | **Server URL** | String | - | CodeScene server for browser sign-in. Empty uses `CS_ONPREM_URL`, then CodeScene Cloud. Used when Experimental: Sign In is on. |
-| **Auth Token** | String | - | Personal access token — fallback for WSL, remote and headless environments. Browser sign-in is recommended. Also used for Automatic Refactoring in ACE. |
+| **Auth Token** | String | - | Personal access token — an alternative to signing in, for WSL, remote and headless environments. Also used for refactoring. Browser sign-in is recommended. |
 | **Experimental: Sign In** | Boolean | false | Sign in to CodeScene in the browser (experimental). Requires a CodeScene IDE server with sign-in support. |
 | **Enable Telemetry** | Boolean | true | Enable/Disable collecting anonymized telemetry for tracking usage and feature engagement. |
+
+### Refactoring Agent ###
+
+The Refactoring Agent runs with your own model provider account. Run **CodeScene: Set Refactoring Agent API key** to add an Anthropic, OpenAI or Google API key; keys are kept in VS Code secure storage, not in `settings.json`. For Amazon Bedrock, set **Provider Options** to an AWS profile and region instead. Run **CodeScene: test provider connectivity** to check the setup.
 
 ### Debug logging ###
 

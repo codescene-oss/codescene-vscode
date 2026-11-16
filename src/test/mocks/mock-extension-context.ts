@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { MockSecretStorage } from './mock-secret-storage';
 
 export function createMockExtensionContext(testDir: string): vscode.ExtensionContext {
   const extensionPath = path.join(__dirname, '../../..');
@@ -15,7 +16,7 @@ export function createMockExtensionContext(testDir: string): vscode.ExtensionCon
       keys: () => Array.from(storage.keys())
     } as any,
     workspaceState: {} as any,
-    secrets: {} as any,
+    secrets: new MockSecretStorage(),
     storagePath: testDir,
     globalStoragePath: testDir,
     logPath: testDir,
