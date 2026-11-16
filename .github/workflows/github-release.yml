@@ -254,15 +254,19 @@ jobs:
         run: |
           VSIX_FILE=$(ls ${{ matrix.vsix_prefix }}-*-${{ matrix.platform }}-${{ matrix.arch }}.vsix)
           unzip -p "$VSIX_FILE" extension/package.json > vsix-package.json
-          if jq -e '.contributes.configuration.properties | has("codescene.enableAutoRefactor")' vsix-package.json > /dev/null; then
-            echo "ACE setting codescene.enableAutoRefactor found in no-ACE VSIX package.json"
-            exit 1
-          fi
-          if jq -e '.contributes.configuration.properties | has("codescene.authToken")' vsix-package.json > /dev/null; then
-            echo "ACE setting codescene.authToken found in no-ACE VSIX package.json"
-            exit 1
-          fi
-          echo "No ACE settings in no-ACE VSIX package.json"
+          for setting in codescene.enableAutoRefactor codescene.authToken codescene.agentModel codescene.agentModelOverride codescene.providerOptions; do
+            if jq -e --arg key "$setting" '.contributes.configuration.properties | has($key)' vsix-package.json > /dev/null; then
+              echo "ACE setting $setting found in no-ACE VSIX package.json"
+              exit 1
+            fi
+          done
+          for command in codescene.testConnectivity codescene.setProviderApiKey; do
+            if jq -e --arg cmd "$command" '[.contributes.commands[].command] | index($cmd)' vsix-package.json > /dev/null; then
+              echo "ACE command $command found in no-ACE VSIX package.json"
+              exit 1
+            fi
+          done
+          echo "No ACE settings or commands in no-ACE VSIX package.json"
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v7

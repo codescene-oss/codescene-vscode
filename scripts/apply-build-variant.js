@@ -17,7 +17,25 @@ const ACE_KEYWORDS = new Set([
   'ai code review',
 ]);
 
-const ACE_SETTINGS = ['codescene.enableAutoRefactor', 'codescene.authToken'];
+const ACE_SETTINGS = [
+  'codescene.enableAutoRefactor',
+  'codescene.authToken',
+  'codescene.agentModel',
+  'codescene.agentModelOverride',
+  'codescene.providerOptions',
+];
+
+const ACE_COMMANDS = new Set(['codescene.testConnectivity', 'codescene.setProviderApiKey']);
+
+function removeAceCommands(contributes) {
+  const isAceCommand = (entry) => ACE_COMMANDS.has(entry.command);
+  if (contributes.commands) {
+    contributes.commands = contributes.commands.filter((entry) => !isAceCommand(entry));
+  }
+  for (const [menu, entries] of Object.entries(contributes.menus || {})) {
+    contributes.menus[menu] = entries.filter((entry) => !isAceCommand(entry));
+  }
+}
 
 function applyNoAceVariant(projectRoot) {
   const packageJsonPath = path.join(projectRoot, 'package.json');
@@ -36,6 +54,9 @@ function applyNoAceVariant(projectRoot) {
     for (const key of ACE_SETTINGS) {
       delete properties[key];
     }
+  }
+  if (pkg.contributes) {
+    removeAceCommands(pkg.contributes);
   }
 
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
