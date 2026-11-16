@@ -167,6 +167,7 @@ suite('Objectives feature fix goal', () => {
         ...snapshot.objectives[0],
         kind: 'goal' as const,
         id: GOAL_ID,
+        subject: { type: 'files' as const, files: [{ path }] },
         local: {
           result: 'violated' as const,
           reason: 'threshold-not-met',
