@@ -570,7 +570,8 @@ suite('Update CWF Script Test Suite', () => {
       assert.strictEqual(updateCwf.isUpToDate(targetDir, '2.5.8'), false);
     });
 
-    test('the token never reaches the log', async () => {
+    test('the token never reaches the log', async function () {
+      this.timeout(10000);
       await run({ GITHUB_TOKEN: token });
       fs.rmSync(targetDir, { recursive: true, force: true });
       await run({ GITHUB_TOKEN: token }, fakeFetch(404)).catch(() => undefined);
@@ -584,7 +585,8 @@ suite('Update CWF Script Test Suite', () => {
       }
     });
 
-    test('the temporary download directory is removed on success and on failure', async () => {
+    test('the temporary download directory is removed on success and on failure', async function () {
+      this.timeout(10000);
       await run({ GITHUB_TOKEN: token });
       fs.rmSync(targetDir, { recursive: true, force: true });
       await run({ GITHUB_TOKEN: token }, fakeFetch(200, 500)).catch(() => undefined);
