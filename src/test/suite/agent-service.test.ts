@@ -3,8 +3,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AgentRefactoringService, agentArgs } from '../../refactoring/agent-service';
-import { AgentOutput, ConfidenceLevel, FixGoalTarget, FixGoalOutput } from '../../refactoring/agent-types';
-import { FnToRefactor } from '../../devtools-api/refactor-models';
+import { AgentOutput, ConfidenceLevel, ScoreGoalTarget, FixGoalOutput, FindingGoalTarget, GoalFinding } from '../../refactoring/agent-types';
+import { FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
+import { Review } from '../../devtools-api/review-model';
+import { findingTargets } from '../../refactoring/fn-to-refactor';
 import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
 import { RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from '../../refactoring/agent-config';
@@ -50,7 +52,7 @@ aceSuite('AgentRefactoringService Test Suite', () => {
   }
 
   test('buildFixGoalInput writes the goal of the file, relative to the repository', () => {
-    const goal: FixGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 9, baseline: 6, repoRoot: 'C:\\work\\fake-repo', path: 'src/orders.js' };
+    const goal: ScoreGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 9, baseline: 6, repoRoot: 'C:\\work\\fake-repo', path: 'src/orders.js' };
     assert.deepStrictEqual(AgentRefactoringService.buildFixGoalInput(goal, 'fix-goal-1'), {
       '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
       task_id: 'fix-goal-1',
@@ -357,7 +359,7 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     assert.strictEqual(response.reasons.length, 1);
   });
 
-  const goal: FixGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 8, baseline: 6.2, repoRoot: '/repo', path: 'src/a.ts' };
+  const goal: ScoreGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 8, baseline: 6.2, repoRoot: '/repo', path: 'src/a.ts' };
   const fixGoalOutput = (content: string | undefined): FixGoalOutput => ({ schema_version: '1.0', task_id: 't', fix_result: 'target_reached', confidence: 'high', explanation: 'x', whole_file_content: content, generated_at: '2026-11-11T00:00:00Z' });
 
   for (const c of [
@@ -375,6 +377,81 @@ aceSuite('AgentRefactoringService Test Suite', () => {
 
   test('resolveFixGoal fails rather than guess when cs-ide gives no score', async () => {
     await assert.rejects(AgentRefactoringService.resolveFixGoal(fixGoalOutput('b\n'), createMockFnToRefactor('a\n'), goal, async () => undefined), /Could not score the proposed change/);
+  });
+
+  const findingGoal = (finding: Partial<GoalFinding> = {}): FindingGoalTarget => ({
+    goalId: 13,
+    repoRoot: '/repo',
+    path: 'src/a.ts',
+    finding: { function: 'FindExtras', issues: ['Complex Method'], line: 4, ...finding },
+  });
+  const smell = (category: string) => ({ category, details: '', 'highlight-range': { 'start-line': 1, 'start-column': 1, 'end-line': 1, 'end-column': 1 } });
+  const reviewWith = (fns: Record<string, string[]>, fileSmells: string[] = []): Review => ({
+    'file-level-code-smells': fileSmells.map(smell),
+    'function-level-code-smells': Object.entries(fns).map(([name, smells]) => ({
+      function: name,
+      range: { 'start-line': 1, 'start-column': 1, 'end-line': 1, 'end-column': 1 },
+      'code-smells': smells.map(smell),
+    })),
+    'raw-score': '',
+    score: 8,
+  } as Review);
+  const agentResponse = (code: string): RefactorResponse => ({
+    code,
+    confidence: { level: 3, title: 'Fixed', 'recommended-action': { description: 'd', details: 'reasoning' } },
+    'credits-info': undefined,
+    declarations: undefined,
+    metadata: { 'cached?': false },
+    reasons: [],
+    'refactoring-properties': { 'added-code-smells': [], 'removed-code-smells': ['Complex Method'] },
+    'trace-id': 't',
+  } as RefactorResponse);
+
+  for (const c of [
+    { name: 'reaches the goal when the finding is gone from its function', goal: findingGoal(), review: reviewWith({ FindExtras: ['Bumpy Road Ahead'], Other: ['Complex Method'] }), outcome: 'reached' },
+    { name: 'matches a reviewed function name that carries its line', goal: findingGoal(), review: reviewWith({ 'FindExtras:4': ['Complex Method'] }), outcome: 'unable' },
+    { name: 'is unable when the finding remains in its function', goal: findingGoal(), review: reviewWith({ FindExtras: ['Complex Method'] }), outcome: 'unable' },
+    { name: 'improves when the fixed issue is gone but another tracked issue remains', goal: findingGoal({ issues: ['Complex Method', 'Bumpy Road Ahead'] }), review: reviewWith({ FindExtras: ['Bumpy Road Ahead'] }), outcome: 'improved' },
+    { name: 'looks at the whole file for a file-scope finding', goal: findingGoal({ function: undefined, issues: ['Code Duplication'] }), review: reviewWith({ Other: ['Code Duplication'] }), outcome: 'unable' },
+    { name: 'reaches a file-scope goal when the file-level finding is gone', goal: findingGoal({ function: undefined, issues: ['Low Cohesion'] }), review: reviewWith({ Other: ['Complex Method'] }, ['Lines of Code in a Single File']), outcome: 'reached' },
+  ]) {
+    test(`resolveFindingFix ${c.name}`, async () => {
+      const response = await AgentRefactoringService.resolveFindingFix(agentResponse('b\n'), createMockFnToRefactor('a\n'), c.goal, async () => c.review);
+      assert.strictEqual(response['goal-outcome'], c.outcome);
+    });
+  }
+
+  test('resolveFindingFix tells what it resolved where', async () => {
+    const response = await AgentRefactoringService.resolveFindingFix(agentResponse('b\n'), createMockFnToRefactor('a\n'), findingGoal(), async () => reviewWith({}));
+    assert.deepStrictEqual(
+      { code: response.code, title: response.confidence.title, details: response.confidence['recommended-action'].details },
+      { code: 'b\n', title: 'Goal reached', details: 'Resolved Complex Method in FindExtras' }
+    );
+  });
+
+  test('resolveFindingFix does not review a proposal that changes nothing', async () => {
+    const reviewed: string[] = [];
+    const response = await AgentRefactoringService.resolveFindingFix(agentResponse('a\n'), createMockFnToRefactor('a\n'), findingGoal(), async (content) => {
+      reviewed.push(content);
+      return reviewWith({});
+    });
+    assert.deepStrictEqual({ reviewed, outcome: response['goal-outcome'] }, { reviewed: [], outcome: 'unable' });
+  });
+
+  test('resolveFindingFix fails rather than guess when cs-ide gives no review', async () => {
+    await assert.rejects(AgentRefactoringService.resolveFindingFix(agentResponse('b\n'), createMockFnToRefactor('a\n'), findingGoal(), async () => undefined), /Could not review the proposed change/);
+  });
+
+  test('buildInput for a finding goal asks the agent to fix its first issue at its line', () => {
+    const document = createMockDocument('/repo/src/a.ts', 'a\n');
+    const fnToRefactor = { ...createMockFnToRefactor('a\n'), 'refactoring-targets': findingTargets(findingGoal()) };
+    assert.deepStrictEqual(AgentRefactoringService.buildInput(document, fnToRefactor, 'refactor-1'), {
+      '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+      task_id: 'refactor-1',
+      file: '/repo/src/a.ts',
+      line: 4,
+      smell: 'Complex Method',
+    });
   });
 
   test('runFixGoal rejects a document with unsaved changes', async () => {

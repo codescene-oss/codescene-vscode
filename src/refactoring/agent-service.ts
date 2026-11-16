@@ -7,12 +7,13 @@ import { TextDocument } from 'vscode';
 import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-api/refactor-models';
 import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
-import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, FixGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT } from './agent-types';
+import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, ScoreGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT, FindingGoalTarget } from './agent-types';
 import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
-import { fixGoalCode, mapFixGoalResponse } from './fix-goal-response';
+import { findingOutcome, fixGoalCode, mapFindingFixResponse, mapFixGoalResponse } from './fix-goal-response';
+import { Review } from '../devtools-api/review-model';
 import { AbortError } from '../devtools-api/abort-error';
 
 function stripAnsi(str: string): string {
@@ -26,6 +27,7 @@ function toLf(str: string): string {
 
 export type ProgressCallback = (message: string) => void;
 export type ContentScorer = (content: string) => Promise<number | undefined>;
+export type ContentReviewer = (content: string) => Promise<Review | undefined>;
 
 export function agentArgs(skill: AgentSkill, model: string): string[] {
   return ['run', `skill:${skill.name}`, '--model', model];
@@ -116,7 +118,7 @@ export class AgentRefactoringService {
     return new Error(detail ? `Agent did not produce output file: ${detail}` : 'Agent did not produce output file');
   }
 
-  private static buildInput(document: TextDocument, fnToRefactor: FnToRefactor, taskId: string): AgentInput {
+  static buildInput(document: TextDocument, fnToRefactor: FnToRefactor, taskId: string): AgentInput {
     const target = fnToRefactor['refactoring-targets'][0];
     if (!target) {
       throw new Error('No refactoring target found');
@@ -131,7 +133,7 @@ export class AgentRefactoringService {
     };
   }
 
-  static buildFixGoalInput(goal: FixGoalTarget, taskId: string): FixGoalInput {
+  static buildFixGoalInput(goal: ScoreGoalTarget, taskId: string): FixGoalInput {
     return {
       '@context': AGENT_INPUT_CONTEXT,
       task_id: taskId,
@@ -351,7 +353,7 @@ export class AgentRefactoringService {
   static async resolveFixGoal(
     output: FixGoalOutput,
     fnToRefactor: FnToRefactor,
-    goal: FixGoalTarget,
+    goal: ScoreGoalTarget,
     score: ContentScorer
   ): Promise<RefactorResponse> {
     const code = fixGoalCode(output, fnToRefactor.body);
@@ -378,7 +380,7 @@ export class AgentRefactoringService {
   static async runFixGoal(
     document: TextDocument,
     fnToRefactor: FnToRefactor,
-    goal: FixGoalTarget,
+    goal: ScoreGoalTarget,
     score: ContentScorer,
     signal?: AbortSignal,
     onProgress?: ProgressCallback
@@ -401,6 +403,33 @@ export class AgentRefactoringService {
     logOutputChannel.info(`Agent fix-goal completed for task ${taskId}: ${output.fix_result}`);
 
     return AgentRefactoringService.resolveFixGoal(output, fnToRefactor, goal, score);
+  }
+
+  static async resolveFindingFix(
+    response: RefactorResponse,
+    fnToRefactor: FnToRefactor,
+    goal: FindingGoalTarget,
+    review: ContentReviewer
+  ): Promise<RefactorResponse> {
+    if (response.code === fnToRefactor.body) return mapFindingFixResponse(response, goal, 'unable');
+
+    const reviewed = await review(response.code);
+    if (!reviewed) {
+      throw new Error('Could not review the proposed change with CodeScene');
+    }
+    return mapFindingFixResponse(response, goal, findingOutcome(reviewed, goal.finding));
+  }
+
+  static async runFindingFix(
+    document: TextDocument,
+    fnToRefactor: FnToRefactor,
+    goal: FindingGoalTarget,
+    review: ContentReviewer,
+    signal?: AbortSignal,
+    onProgress?: ProgressCallback
+  ): Promise<RefactorResponse> {
+    const response = await AgentRefactoringService.runRefactoring(document, fnToRefactor, signal, undefined, onProgress);
+    return AgentRefactoringService.resolveFindingFix(response, fnToRefactor, goal, review);
   }
 
   private static cleanup(ioDir: string): void {

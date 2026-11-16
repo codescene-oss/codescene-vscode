@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as nodePath from 'path';
-import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
-import type { FixGoalTarget } from '../refactoring/agent-types';
+import type { LocalFileResult, ObjectiveRecommendation, ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
+import type { FixGoalTarget, GoalFinding } from '../refactoring/agent-types';
 
 type Objective = ObjectivesSnapshot['objectives'][number];
 
@@ -14,6 +14,19 @@ function findGoalObjective(
   return objective ?? 'goal-not-found';
 }
 
+function findingOf(recommendation: ObjectiveRecommendation | undefined, line: number | undefined): GoalFinding | undefined {
+  const issues = recommendation?.evidence['code-health-issues'] ?? [];
+  if (issues.length === 0 || line === undefined) return undefined;
+  const fn = recommendation?.scope === 'function' ? { function: recommendation.target.replace(/:\d+$/, '') } : {};
+  return { ...fn, issues, line };
+}
+
+function findingTarget(objective: Objective, file: LocalFileResult, repoRoot: string, goalId: number): FixGoalTarget | string {
+  const finding = findingOf(objective.subject.recommendation, file.line);
+  if (!finding) return 'no-finding';
+  return { goalId, repoRoot, path: file.path, finding };
+}
+
 function validateFileEntry(
   objective: Objective,
   path: string,
@@ -23,6 +36,7 @@ function validateFileEntry(
   const file = objective.local?.files?.find((f) => f.path === path);
   if (!file) return 'file-not-in-goal';
   if (file.result !== 'violated') return 'not-violated';
+  if (objective.subject.type === 'recommendation') return findingTarget(objective, file, repoRoot, goalId);
   if (file.value === undefined || file['comparison-value'] === undefined) return 'no-scores';
 
   return {

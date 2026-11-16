@@ -14,6 +14,7 @@ import { Delta } from './delta-model';
 import { fnToRefactorForFinding } from '../refactoring/fn-to-refactor';
 import { TelemetryEvent, TelemetryResponse } from './telemetry-model';
 import { AbortError } from './abort-error';
+import { isFindingGoal } from '../refactoring/agent-types';
 import { acquireGitApi, fireFileDeletedFromGit, getRepoRootPath } from '../git-utils';
 import Reviewer, { ReviewOpts } from '../review/reviewer';
 import { CsIdeServerClient, ReviewQueue, ServerStartEvent, WatchInventory } from './ide-server-client';
@@ -90,9 +91,12 @@ export class DevtoolsAPI {
     return { rulesMsg: result } as CodeHealthRulesResult;
   }
 
+  static reviewContent(repoRoot: string, relPath: string, content: string): Promise<Review> {
+    return DevtoolsAPI.ideServer.review({ path: relPath, 'file-content': content, 'repo-path': repoRoot });
+  }
+
   static async scoreContent(repoRoot: string, relPath: string, content: string): Promise<number | undefined> {
-    const result = await DevtoolsAPI.ideServer.review({ path: relPath, 'file-content': content, 'repo-path': repoRoot });
-    return result.score;
+    return (await DevtoolsAPI.reviewContent(repoRoot, relPath, content)).score;
   }
 
   private static readonly analysisStateEmitter = new vscode.EventEmitter<AnalysisEvent>();
@@ -285,6 +289,16 @@ export class DevtoolsAPI {
     onProgress?: ProgressCallback
   ): Promise<RefactorResponse> {
     const { document, fnToRefactor, signal, goal } = request;
+    if (goal && isFindingGoal(goal)) {
+      return AgentRefactoringService.runFindingFix(
+        document,
+        fnToRefactor,
+        goal,
+        (content) => DevtoolsAPI.reviewContent(goal.repoRoot, goal.path, content),
+        signal,
+        onProgress
+      );
+    }
     if (goal) {
       return AgentRefactoringService.runFixGoal(
         document,

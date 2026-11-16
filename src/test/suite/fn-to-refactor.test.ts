@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { ChangeType, FunctionFinding } from '../../devtools-api/delta-model';
 import { CodeSmell, Review } from '../../devtools-api/review-model';
-import { fnToRefactorForCodeSmell, fnToRefactorForFinding, fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
+import { findingTargets, fnToRefactorForCodeSmell, fnToRefactorForFinding, fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
 import { TestTextDocument } from '../mocks/test-text-document';
 
 const content = 'const a = 1;\nfunction f(x) {\n  return x;\n}\n';
@@ -148,4 +148,17 @@ suite('fnToRefactorForWholeFile', () => {
       assert.deepStrictEqual({ body: fn.body, name: fn.name, targets: fn['refactoring-targets'] }, { body: content, name: 'a.ts', targets: [] });
     });
   }
+
+  test('carries the refactoring targets it is given', () => {
+    const document = new TestTextDocument('/repo/src/a.ts', 'a\n', 'typescript');
+    const targets = [{ category: 'Complex Method', line: 4 }];
+    assert.deepStrictEqual(fnToRefactorForWholeFile(document, targets)['refactoring-targets'], targets);
+  });
+});
+
+suite('findingTargets', () => {
+  test('targets the first tracked issue of a finding at its line', () => {
+    const goal = { goalId: 13, repoRoot: '/repo', path: 'src/a.ts', finding: { function: 'f', issues: ['Complex Method', 'Bumpy Road Ahead'], line: 4 } };
+    assert.deepStrictEqual(findingTargets(goal), [{ category: 'Complex Method', line: 4 }]);
+  });
 });

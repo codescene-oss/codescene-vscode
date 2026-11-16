@@ -1,5 +1,6 @@
 import { RefactorResponse } from '../devtools-api/refactor-models';
-import { FixGoalTarget, FixGoalOutput, FixGoalOutcome } from './agent-types';
+import { ScoreGoalTarget, FixGoalOutput, FixGoalOutcome, FindingGoalTarget, GoalFinding } from './agent-types';
+import { Review } from '../devtools-api/review-model';
 
 export function meetsTarget(score: number, operator: string, target: number): boolean {
   if (operator === 'greater-than-or-equal') {
@@ -32,7 +33,7 @@ export function fixGoalCode(output: FixGoalOutput, originalBody: string): string
   return normalized;
 }
 
-export function fixGoalOutcome(goal: FixGoalTarget, reached: number | undefined): FixGoalOutcome {
+export function fixGoalOutcome(goal: ScoreGoalTarget, reached: number | undefined): FixGoalOutcome {
   if (reached === undefined) {
     return 'unable';
   }
@@ -47,7 +48,7 @@ export function fixGoalOutcome(goal: FixGoalTarget, reached: number | undefined)
 
 export function mapFixGoalResponse(
   output: FixGoalOutput,
-  goal: FixGoalTarget,
+  goal: ScoreGoalTarget,
   code: string,
   reached: number | undefined
 ): RefactorResponse {
@@ -105,6 +106,52 @@ export function mapFixGoalResponse(
       'removed-code-smells': [],
     },
     'trace-id': output.task_id,
+    'goal-outcome': outcome,
+  };
+}
+
+const withoutLine = (name: string) => name.replace(/:\d+$/, '');
+
+function smellsAt(review: Review, finding: GoalFinding): string[] {
+  const functions = review['function-level-code-smells'].filter(
+    (fn) => finding.function === undefined || withoutLine(fn.function) === finding.function
+  );
+  const fileSmells = finding.function === undefined ? review['file-level-code-smells'] : [];
+  return [...fileSmells, ...functions.flatMap((fn) => fn['code-smells'])].map((smell) => smell.category);
+}
+
+export function findingOutcome(review: Review, finding: GoalFinding): FixGoalOutcome {
+  const present = smellsAt(review, finding);
+  const remaining = finding.issues.filter((issue) => present.includes(issue));
+  if (remaining.length === 0) return 'reached';
+  if (!remaining.includes(finding.issues[0])) return 'improved';
+  return 'unable';
+}
+
+function findingDetails(finding: GoalFinding, outcome: FixGoalOutcome): string {
+  const where = finding.function ? ` in ${finding.function}` : '';
+  if (outcome === 'reached') return `Resolved ${finding.issues.join(', ')}${where}`;
+  if (outcome === 'improved') return `Resolved ${finding.issues[0]}${where}`;
+  return `${finding.issues[0]}${where} remains`;
+}
+
+const findingTitles: Record<FixGoalOutcome, string> = {
+  reached: 'Goal reached',
+  improved: 'Improved towards the goal',
+  unable: 'Unable to resolve the finding of the goal',
+};
+
+const findingLevels: Record<FixGoalOutcome, number> = { reached: 3, improved: 2, unable: 1 };
+
+export function mapFindingFixResponse(response: RefactorResponse, goal: FindingGoalTarget, outcome: FixGoalOutcome): RefactorResponse {
+  return {
+    ...response,
+    confidence: {
+      ...response.confidence,
+      level: findingLevels[outcome],
+      title: findingTitles[outcome],
+      'recommended-action': { ...response.confidence['recommended-action'], details: findingDetails(goal.finding, outcome) },
+    },
     'goal-outcome': outcome,
   };
 }

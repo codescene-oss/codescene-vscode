@@ -80,14 +80,33 @@ export interface AgentConfig {
   tracking?: TrackingConfig;
 }
 
-export interface FixGoalTarget {
+interface GoalFile {
   goalId: number;
+  repoRoot: string;
+  path: string;
+}
+
+export interface ScoreGoalTarget extends GoalFile {
   metricId: string;
   operator: string;
   target: number;
   baseline: number;
-  repoRoot: string;
-  path: string;
+}
+
+export interface GoalFinding {
+  function?: string;
+  issues: string[];
+  line: number;
+}
+
+export interface FindingGoalTarget extends GoalFile {
+  finding: GoalFinding;
+}
+
+export type FixGoalTarget = ScoreGoalTarget | FindingGoalTarget;
+
+export function isFindingGoal(goal: FixGoalTarget): goal is FindingGoalTarget {
+  return 'finding' in goal;
 }
 
 export interface FixGoalInput {

@@ -184,4 +184,23 @@ aceSuite('Fix goal commands Test Suite', () => {
       [{ body: 'formatted\n', goal }]
     );
   });
+
+  test('a finding goal request targets the finding over the whole file', async () => {
+    const findingGoal: FixGoalTarget = { goalId: 13, repoRoot: '/repo', path: 'src/file.ts', finding: { function: 'f', issues: ['Complex Method'], line: 2 } };
+    const sent: RefactoringRequest[] = [];
+    const originalPostRefactoring = DevtoolsAPI.postRefactoring;
+    (DevtoolsAPI as any).postRefactoring = async (request: RefactoringRequest) => {
+      sent.push(request);
+      return responseWith('a\r\nb\r\n');
+    };
+    try {
+      await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, findingGoal);
+    } finally {
+      (DevtoolsAPI as any).postRefactoring = originalPostRefactoring;
+    }
+    assert.deepStrictEqual(
+      sent.map((request) => ({ body: request.fnToRefactor.body, targets: request.fnToRefactor['refactoring-targets'] })),
+      [{ body: 'a\r\nb\r\n', targets: [{ category: 'Complex Method', line: 2 }] }]
+    );
+  });
 });

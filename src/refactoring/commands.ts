@@ -12,7 +12,7 @@ import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview
 import { logOutputChannel } from '../log';
 import { CodeSmell } from '../devtools-api/review-model';
 import { FixGoalTarget } from './agent-types';
-import { fnToRefactorForWholeFile } from './fn-to-refactor';
+import { fnToRefactorForGoal } from './fn-to-refactor';
 import { replaceDocument, runGoalFix } from './goal-fix';
 import { fixGoalJobs } from '../objectives/fix-goal-jobs';
 
@@ -87,7 +87,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     try {
       if (!(await ensureSavedForRefactoring(document))) return;
 
-      const request = new RefactoringRequest(fnToRefactorForWholeFile(document), document, skipCache, goal);
+      const request = new RefactoringRequest(fnToRefactorForGoal(document, goal), document, skipCache, goal);
       if (this.presentAcknowledgement(request, source)) return;
 
       Telemetry.logUsage('refactor/requested', { source, ...request.eventData });

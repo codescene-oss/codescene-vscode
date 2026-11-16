@@ -1,9 +1,9 @@
 import * as assert from 'assert';
-import { FixGoalTarget, FixGoalOutput } from '../../refactoring/agent-types';
+import { ScoreGoalTarget, FixGoalOutput } from '../../refactoring/agent-types';
 import { meetsTarget, formatScore, fixGoalCode, mapFixGoalResponse } from '../../refactoring/fix-goal-response';
 
 suite('Fix goal response Test Suite', () => {
-  const goal: FixGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 8, baseline: 6.2, repoRoot: '/repo', path: 'src/a.ts' };
+  const goal: ScoreGoalTarget = { goalId: 2, metricId: 'average-code-health', operator: 'greater-than-or-equal', target: 8, baseline: 6.2, repoRoot: '/repo', path: 'src/a.ts' };
   const output = (over: Partial<FixGoalOutput> = {}): FixGoalOutput => ({ schema_version: '1.0', task_id: 't-1', fix_result: 'improved', confidence: 'medium', explanation: 'Complex Method in parse() needs a parser split.', whole_file_content: 'b\n', generated_at: '2026-11-11T00:00:00Z', ...over });
 
   for (const c of [
