@@ -3,6 +3,7 @@ import vscode, { Range, WorkspaceEdit } from 'vscode';
 import { AbortError } from '../devtools-api/abort-error';
 import { RefactorResponse } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
+import { AgentTimeoutError } from './agent-process';
 import { RefactoringRequest } from './request';
 
 export const OPEN_GOAL_FIX = 'Open';
@@ -15,13 +16,28 @@ export async function replaceDocument(document: vscode.TextDocument, code: strin
   await vscode.workspace.applyEdit(workSpaceEdit);
 }
 
+function awaitWithProgress(request: RefactoringRequest): Thenable<RefactorResponse> {
+  return vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Refactoring Agent: fixing ${basename(request.document.fileName)}`,
+      cancellable: true,
+    },
+    (progress, token) => {
+      void progress;
+      token.onCancellationRequested(() => request.abort());
+      return request.promise;
+    }
+  );
+}
+
 async function awaitResponse(request: RefactoringRequest): Promise<RefactorResponse | undefined> {
   try {
-    return await request.promise;
+    return await awaitWithProgress(request);
   } catch (e) {
-    if (!(e instanceof AbortError)) {
-      void vscode.window.showErrorMessage(`The Refactoring Agent could not fix ${basename(request.document.fileName)}. See the CodeScene output for details.`);
-    }
+    if (e instanceof AbortError) return undefined;
+    const reason = e instanceof AgentTimeoutError ? ` ${e.message}` : ' See the CodeScene output for details.';
+    void vscode.window.showErrorMessage(`The Refactoring Agent could not fix ${basename(request.document.fileName)}.${reason}`);
     return undefined;
   }
 }

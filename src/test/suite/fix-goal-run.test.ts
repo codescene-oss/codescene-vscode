@@ -7,6 +7,7 @@ import { FixGoalTarget } from '../../refactoring/agent-types';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
 import { DevtoolsAPI } from '../../devtools-api';
 import { AbortError } from '../../devtools-api/abort-error';
+import { AgentTimeoutError } from '../../refactoring/agent-process';
 import { CsExtensionState } from '../../cs-extension-state';
 import { CodeSceneCWFAceTabPanel } from '../../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
@@ -17,7 +18,7 @@ import { aceSuite } from '../ace-test-suite';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
-import { getAppliedEdits, resetAppliedEdits } from '../setup';
+import { getAppliedEdits, getMockProgress, resetAppliedEdits, resetMockProgress } from '../setup';
 
 const original = 'a\nb\n';
 const fixed = 'c\n';
@@ -45,7 +46,7 @@ function responseWith(code: string, outcome: 'reached' | 'improved' | 'unable' =
   };
 }
 
-type Deferred = { resolve: (response: RefactorResponse) => void; reject: (error: Error) => void };
+type Deferred = { resolve: (response: RefactorResponse) => void; reject: (error: Error) => void; request: RefactoringRequest };
 
 aceSuite('Fix goal run Test Suite', () => {
   let commands: CsRefactoringCommands;
@@ -94,8 +95,8 @@ aceSuite('Fix goal run Test Suite', () => {
     CsExtensionState.init(createMockExtensionContext('/test/fix-goal-run'));
     await CsExtensionState.setAcknowledgedAceUsage(true);
 
-    (DevtoolsAPI as any).postRefactoring = () =>
-      new Promise<RefactorResponse>((resolve, reject) => pending.push({ resolve, reject }));
+    (DevtoolsAPI as any).postRefactoring = (request: RefactoringRequest) =>
+      new Promise<RefactorResponse>((resolve, reject) => pending.push({ resolve, reject, request }));
     window.showInformationMessage = (message: string, ...items: string[]) => {
       infos.push({ message, items });
       return infoAnswer;
@@ -133,6 +134,7 @@ aceSuite('Fix goal run Test Suite', () => {
     CodeSceneCWFAceTabPanel.show = originals.panelShow;
     CodeSceneCWFAceAcknowledgementTabPanel.show = originals.acknowledgementShow;
     resetAppliedEdits();
+    resetMockProgress();
   });
 
   const fixGoal = (target: FixGoalTarget = goal, doc: vscode.TextDocument = document): Promise<void> =>
@@ -238,6 +240,28 @@ aceSuite('Fix goal run Test Suite', () => {
       );
     });
   }
+
+  test('cancelling the progress notification aborts the run and removes the job', async () => {
+    const run = fixGoal();
+    await started();
+    const [progress] = getMockProgress();
+    progress.cancel();
+    assert.deepStrictEqual(
+      { cancellable: progress.cancellable, title: progress.title, aborted: pending[0].request.signal.aborted },
+      { cancellable: true, title: 'Refactoring Agent: fixing file.ts', aborted: true }
+    );
+    pending[0].reject(new AbortError('aborted'));
+    await run;
+    assert.deepStrictEqual({ jobs: jobGoals(), errors }, { jobs: [], errors: [] });
+  });
+
+  test('a timed-out run says that it timed out', async () => {
+    const run = fixGoal();
+    await started();
+    pending[0].reject(new AgentTimeoutError(20 * 60 * 1000));
+    await run;
+    assert.deepStrictEqual(errors, ['The Refactoring Agent could not fix file.ts. The Refactoring Agent did not finish within 20 minutes.']);
+  });
 
   test('an aborted run is removed without an error', async () => {
     const run = fixGoal();

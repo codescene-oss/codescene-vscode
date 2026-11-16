@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -8,13 +8,15 @@ import { FnToRefactor, RefactorResponse, Confidence, Reason } from '../devtools-
 import { logOutputChannel } from '../log';
 import { buildAgentConfigWithToken, AgentSkill, RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from './agent-config';
 import { AgentInput, AgentOutput, ConfidenceLevel, AgentChange, ScoreGoalTarget, FixGoalInput, FixGoalOutput, AGENT_INPUT_CONTEXT, FindingGoalTarget } from './agent-types';
-import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
+import { CsExtensionState } from '../cs-extension-state';
 import { resolveAgentToken } from './agent-token';
 import { getAgentModel } from '../configuration';
+import { getAgentProviderOptions } from './provider-secrets';
 import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { findingOutcome, fixGoalCode, mapFindingFixResponse, mapFixGoalResponse } from './fix-goal-response';
 import { Review } from '../devtools-api/review-model';
 import { AbortError } from '../devtools-api/abort-error';
+import { spawnAgent, waitForExit } from './agent-process';
 
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
@@ -29,20 +31,13 @@ export type ProgressCallback = (message: string) => void;
 export type ContentScorer = (content: string) => Promise<number | undefined>;
 export type ContentReviewer = (content: string) => Promise<Review | undefined>;
 
+const AGENT_TIMEOUT_MS = 20 * 60 * 1000;
+
 export function agentArgs(skill: AgentSkill, model: string): string[] {
   return ['run', `skill:${skill.name}`, '--model', model];
 }
 
 export class AgentRefactoringService {
-  private static getAgentBinaryPath(): string {
-    const extensionPath = getExtensionPath();
-    if (!extensionPath) {
-      throw new Error('Extension path not available');
-    }
-    const binaryName = process.platform === 'win32' ? 'cs-agent.exe' : 'cs-agent';
-    return path.join(extensionPath, 'bin', binaryName);
-  }
-
   static readOutput<T>(outputPath: string, stderr: string): T {
     if (!fs.existsSync(outputPath)) {
       throw AgentRefactoringService.missingOutputError(stderr);
@@ -66,6 +61,9 @@ export class AgentRefactoringService {
       fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
 
       const token = await AgentRefactoringService.requireToken();
+      if (signal?.aborted) {
+        throw new AbortError('Agent invocation aborted');
+      }
       const stderr = await AgentRefactoringService.invokeAgent(skill, workDir, ioDir, token, signal, onProgress);
 
       const outputPath = path.join(ioDir, skill.outputFile);
@@ -157,22 +155,16 @@ export class AgentRefactoringService {
     skill: AgentSkill,
     workDir: string,
     ioDir: string,
-    token: string
-  ): { proc: ChildProcess; binaryPath: string } {
-    const binaryPath = AgentRefactoringService.getAgentBinaryPath();
-    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir, CsExtensionState.stateProperties.auth.status?.server);
-    const configJson = JSON.stringify(config);
+    token: string,
+    providerOptions: Record<string, string>
+  ): ChildProcess {
+    const server = CsExtensionState.stateProperties.auth.status?.server;
+    const config = buildAgentConfigWithToken(token, skill.plugin, ioDir, server, providerOptions);
+    const args = agentArgs(skill, getAgentModel(providerOptions));
 
-    const args = agentArgs(skill, getAgentModel());
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      CS_AGENT_CONFIG: configJson,
-    };
+    logOutputChannel.debug(`Spawning agent: cs-agent ${args.join(' ')}`);
 
-    logOutputChannel.debug(`Spawning agent: ${binaryPath} ${args.join(' ')}`);
-
-    const proc = spawn(binaryPath, args, { cwd: workDir, env });
-    return { proc, binaryPath };
+    return spawnAgent(args, JSON.stringify(config), { cwd: workDir });
   }
 
   private static setupStderrHandler(proc: ChildProcess): { getStderr: () => string } {
@@ -198,7 +190,7 @@ export class AgentRefactoringService {
     });
   }
 
-  private static invokeAgent(
+  private static async invokeAgent(
     skill: AgentSkill,
     workDir: string,
     ioDir: string,
@@ -206,34 +198,17 @@ export class AgentRefactoringService {
     signal?: AbortSignal,
     onProgress?: ProgressCallback
   ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const { proc } = AgentRefactoringService.spawnAgentProcess(skill, workDir, ioDir, token);
-      const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
-      AgentRefactoringService.setupStdoutHandler(proc, onProgress);
+    const proc = AgentRefactoringService.spawnAgentProcess(skill, workDir, ioDir, token, await getAgentProviderOptions());
+    const { getStderr } = AgentRefactoringService.setupStderrHandler(proc);
+    AgentRefactoringService.setupStdoutHandler(proc, onProgress);
 
-      const abortHandler = () => {
-        proc.kill('SIGTERM');
-        reject(new AbortError('Agent invocation aborted'));
-      };
-
-      signal?.addEventListener('abort', abortHandler);
-
-      proc.on('close', (code: number | null) => {
-        signal?.removeEventListener('abort', abortHandler);
-        const stderr = getStderr();
-        if (code === 0) {
-          resolve(stderr);
-        } else {
-          logOutputChannel.error(`Agent exited with code ${code}: ${stderr}`);
-          reject(new Error(`Agent exited with code ${code}: ${stderr}`));
-        }
-      });
-
-      proc.on('error', (err: Error) => {
-        signal?.removeEventListener('abort', abortHandler);
-        reject(err);
-      });
-    });
+    const code = await waitForExit(proc, { signal, timeoutMs: AGENT_TIMEOUT_MS });
+    const stderr = getStderr();
+    if (code !== 0) {
+      logOutputChannel.error(`Agent exited with code ${code}: ${stderr}`);
+      throw new Error(`Agent exited with code ${code}: ${stderr}`);
+    }
+    return stderr;
   }
 
   static mapOutputToResponse(

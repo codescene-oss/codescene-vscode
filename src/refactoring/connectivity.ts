@@ -1,11 +1,13 @@
-import { spawn } from 'child_process';
-import * as path from 'path';
+import { ChildProcess } from 'child_process';
 import vscode from 'vscode';
-import { CsExtensionState, getExtensionPath } from '../cs-extension-state';
-import { aceToken } from '../devtools-api';
+import { CsExtensionState } from '../cs-extension-state';
+import { AbortError } from '../devtools-api/abort-error';
 import { buildAgentConfigWithToken, RENDER_CODE_FIX_SKILL } from './agent-config';
 import { getAgentModel } from '../configuration';
 import { logOutputChannel } from '../log';
+import { AgentTimeoutError, spawnAgent, waitForExit } from './agent-process';
+import { resolveAgentToken } from './agent-token';
+import { getAgentProviderOptions } from './provider-secrets';
 
 export interface ConnectivityResult {
   success: boolean;
@@ -17,88 +19,52 @@ export interface ConnectivityOptions {
   timeoutMs?: number;
 }
 
-function getAgentBinaryPath(): string {
-  const extensionPath = getExtensionPath();
-  if (!extensionPath) {
-    throw new Error('Extension path not available');
-  }
-  const binaryName = process.platform === 'win32' ? 'cs-agent.exe' : 'cs-agent';
-  return path.join(extensionPath, 'bin', binaryName);
-}
-
 const DEFAULT_TIMEOUT_MS = 60000;
 
-export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
-  const binaryPath = getAgentBinaryPath();
-  const config = buildAgentConfigWithToken(
-    aceToken(),
-    RENDER_CODE_FIX_SKILL.plugin,
-    undefined,
-    CsExtensionState.stateProperties.auth.status?.server
-  );
-  const configJson = JSON.stringify(config);
-  const model = getAgentModel();
+function failureMessage(error: unknown): string {
+  if (error instanceof AbortError) return 'Connectivity test cancelled';
+  if (error instanceof AgentTimeoutError) return 'Connectivity test timed out';
+  return error instanceof Error ? error.message : String(error);
+}
 
-  const args = ['run', 'skill:check-connectivity', '--model', model];
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    CS_AGENT_CONFIG: configJson,
-  };
+async function connectivityArgs(): Promise<{ args: string[]; configJson: string }> {
+  const providerOptions = await getAgentProviderOptions();
+  const server = CsExtensionState.stateProperties.auth.status?.server;
+  const config = buildAgentConfigWithToken(await resolveAgentToken(), RENDER_CODE_FIX_SKILL.plugin, undefined, server, providerOptions);
+  return { args: ['run', 'skill:check-connectivity', '--model', getAgentModel(providerOptions)], configJson: JSON.stringify(config) };
+}
 
-  logOutputChannel.debug(`Testing connectivity: ${binaryPath} ${args.join(' ')}`);
+function collectStderr(proc: ChildProcess): () => string {
+  let stderr = '';
+  proc.stdout?.on('data', (data: Buffer) => logOutputChannel.debug(`Connectivity stdout: ${data.toString().trim()}`));
+  proc.stderr?.on('data', (data: Buffer) => (stderr += data.toString()));
+  return () => stderr.trim();
+}
 
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+async function runConnectivityCheck(options?: ConnectivityOptions): Promise<void> {
+  const { args, configJson } = await connectivityArgs();
+  logOutputChannel.debug(`Testing connectivity: cs-agent ${args.join(' ')}`);
 
-  return new Promise((resolve) => {
-    const proc = spawn(binaryPath, args, { cwd: workspaceFolder, env, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    let resolved = false;
-
-    const resolveOnce = (result: ConnectivityResult) => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timeoutId);
-      options?.signal?.removeEventListener('abort', abortHandler);
-      resolve(result);
-    };
-
-    const timeoutId = setTimeout(() => {
-      proc.kill('SIGTERM');
-      logOutputChannel.warn('Connectivity test timed out');
-      resolveOnce({ success: false, error: 'Connectivity test timed out' });
-    }, timeoutMs);
-
-    const abortHandler = () => {
-      proc.kill('SIGTERM');
-      logOutputChannel.info('Connectivity test cancelled');
-      resolveOnce({ success: false, error: 'Connectivity test cancelled' });
-    };
-
-    options?.signal?.addEventListener('abort', abortHandler);
-
-    proc.stdout?.on('data', (data: Buffer) => {
-      logOutputChannel.debug(`Connectivity stdout: ${data.toString().trim()}`);
-    });
-
-    proc.stderr?.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    proc.on('error', (err) => {
-      logOutputChannel.error(`Connectivity test spawn error: ${err.message}`);
-      resolveOnce({ success: false, error: err.message });
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        logOutputChannel.info('Connectivity test successful');
-        resolveOnce({ success: true });
-      } else {
-        const errorMsg = stderr.trim() || `Process exited with code ${code}`;
-        logOutputChannel.error(`Connectivity test failed: ${errorMsg}`);
-        resolveOnce({ success: false, error: errorMsg });
-      }
-    });
+  const proc = spawnAgent(args, configJson, {
+    cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  const stderr = collectStderr(proc);
+
+  const code = await waitForExit(proc, { signal: options?.signal, timeoutMs: options?.timeoutMs ?? DEFAULT_TIMEOUT_MS });
+  if (code !== 0) {
+    throw new Error(stderr() || `Process exited with code ${code}`);
+  }
+}
+
+export async function testConnectivity(options?: ConnectivityOptions): Promise<ConnectivityResult> {
+  try {
+    await runConnectivityCheck(options);
+    logOutputChannel.info('Connectivity test successful');
+    return { success: true };
+  } catch (error) {
+    const message = failureMessage(error);
+    logOutputChannel.error(`Connectivity test failed: ${message}`);
+    return { success: false, error: message };
+  }
 }

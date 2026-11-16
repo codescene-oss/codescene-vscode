@@ -29,6 +29,7 @@ import { createWorkspaceWatchDependencies, WorkspaceWatch } from './git/workspac
 import { onGitDetectedAsUnavailable } from './git/git-detection';
 import { ACE_ENABLED } from './build-flags';
 import { testConnectivity } from './refactoring/connectivity';
+import { killAllAgentProcesses } from './refactoring/agent-process';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
 
@@ -368,6 +369,7 @@ function loadLegacySession(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export function deactivate() {
+  killAllAgentProcesses();
   deactivateAddon();
   deactivateGitUtils();
   deactivateLog();
