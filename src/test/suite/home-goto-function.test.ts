@@ -81,6 +81,11 @@ suite('Home view go to function Test Suite', () => {
     assert.deepStrictEqual({ shown, opened }, { shown: [{ fileName: monitored, position: new vscode.Position(2, 4) }], opened: [] });
   });
 
+  test('a file the Monitor does not track opens at the line its range carries, before any symbol lookup', async () => {
+    await goTo(goalFile, { name: 'top', range: { startLine: 7, startColumn: 1, endLine: 7, endColumn: 1 } });
+    assert.deepStrictEqual({ shown, opened }, { shown: [{ fileName: goalFile, position: new vscode.Position(6, 0) }], opened: [goalFile] });
+  });
+
   const cases = [
     { name: 'a file the Monitor does not track is opened at the top', fn: undefined, position: undefined },
     { name: 'a function found by name is opened at its name', fn: { name: 'top' }, position: new vscode.Position(10, 2) },

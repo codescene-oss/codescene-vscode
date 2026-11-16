@@ -69,6 +69,8 @@ export interface LocalFileResult {
   value?: number;
   /** The value it is compared with. */
   "comparison-value"?: number;
+  /** 1-based line of the finding a function-scope Goal is about, while the finding is present. */
+  line?: number;
 }
 
 /** The result measured in the working tree. */
