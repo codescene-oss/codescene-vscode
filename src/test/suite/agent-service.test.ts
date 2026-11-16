@@ -11,6 +11,7 @@ import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
 import { RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from '../../refactoring/agent-config';
 import { AbortError } from '../../devtools-api/abort-error';
+import { TestTextDocument } from '../mocks/test-text-document';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'src', 'test', 'fixtures', 'agent-output');
 
@@ -183,6 +184,54 @@ aceSuite('AgentRefactoringService Test Suite', () => {
     const response = AgentRefactoringService.mapOutputToResponse(output, document, fnToRefactor);
 
     assert.strictEqual(response.code, 'function test() { newCode; }');
+  });
+
+  const wholeFileOutput = (content: string): AgentOutput => ({
+    '@context': { '@vocab': 'https://codescene.io/schemas/code-health-fix#' },
+    schema_version: '1.0',
+    task_id: 'test-whole-file',
+    fix_result: 'fix_proposed',
+    confidence: 'high',
+    summary: 'Rewrote the file',
+    reasoning: 'Test',
+    changes: [{ file: 'test.ts', change_type: 'whole_file', description: 'Whole file', whole_file_content: content }],
+    generated_at: '2026-08-31T12:00:00Z',
+  });
+
+  function wholeFileFixture(eol: string) {
+    const fnLines = ['function test() {', '  oldCode;', '}'];
+    const content = ['const before = 1;', ...fnLines, 'const after = 2;'].join('\n');
+    const fnToRefactor = createMockFnToRefactor(fnLines.join(eol));
+    fnToRefactor.vscodeRange = new Range(new Position(1, 0), new Position(3, 1)) as any;
+    const document = new TestTextDocument('/test/test.ts', content, 'typescript');
+    return { document, fnToRefactor };
+  }
+
+  const wholeFileCases = [
+    { name: 'LF', eol: '\n' },
+    { name: 'CRLF', eol: '\r\n' },
+  ];
+
+  for (const { name, eol } of wholeFileCases) {
+    test(`mapOutputToResponse takes the function out of a whole-file change (${name})`, () => {
+      const { document, fnToRefactor } = wholeFileFixture(eol);
+      const newFile = ['const before = 1;', 'function test() {', '  newCode;', '}', 'const after = 2;'].join(eol);
+
+      const response = AgentRefactoringService.mapOutputToResponse(wholeFileOutput(newFile), document, fnToRefactor);
+
+      assert.strictEqual(response.code, ['function test() {', '  newCode;', '}'].join(eol));
+      assert.strictEqual(response.confidence.title, 'Rewrote the file');
+    });
+  }
+
+  test('mapOutputToResponse rejects a whole-file change that edits code outside the function', () => {
+    const { document, fnToRefactor } = wholeFileFixture('\n');
+    const newFile = ['const before = 42;', 'function test() {', '  newCode;', '}', 'const after = 2;'].join('\n');
+
+    const response = AgentRefactoringService.mapOutputToResponse(wholeFileOutput(newFile), document, fnToRefactor);
+
+    assert.strictEqual(response.code, fnToRefactor.body);
+    assert.strictEqual(response.confidence.title, 'Unable to refactor');
   });
 
   test('mapOutputToResponse ignores changes for different files', () => {

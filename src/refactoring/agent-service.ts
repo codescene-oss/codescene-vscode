@@ -16,6 +16,7 @@ import { acquireGitApi, getRepoRootPath } from '../git-utils';
 import { findingOutcome, fixGoalCode, mapFindingFixResponse, mapFixGoalResponse } from './fix-goal-response';
 import { Review } from '../devtools-api/review-model';
 import { AbortError } from '../devtools-api/abort-error';
+import { functionFromWholeFile } from './whole-file-change';
 import { spawnAgent, waitForExit } from './agent-process';
 
 function stripAnsi(str: string): string {
@@ -240,9 +241,18 @@ export class AgentRefactoringService {
     };
   }
 
-  private static applyChange(code: string, change: AgentChange): string {
+  private static applyWholeFileChange(code: string, change: AgentChange, document: TextDocument, fnToRefactor: FnToRefactor): string {
+    const fn = functionFromWholeFile(document, fnToRefactor, change.whole_file_content ?? '');
+    if (fn === undefined) {
+      logOutputChannel.warn(`Agent rewrote ${path.basename(document.fileName)} outside ${fnToRefactor.name}; ignoring the change.`);
+      return code;
+    }
+    return fn;
+  }
+
+  private static applyChange(code: string, change: AgentChange, document: TextDocument, fnToRefactor: FnToRefactor): string {
     if (change.change_type === 'whole_file' && change.whole_file_content) {
-      return toLf(change.whole_file_content);
+      return AgentRefactoringService.applyWholeFileChange(code, change, document, fnToRefactor);
     }
     if (!change.replacements) return code;
     return change.replacements.reduce((c, r) => {
@@ -269,7 +279,7 @@ export class AgentRefactoringService {
     );
     const usesCrlf = fnToRefactor.body.includes('\r\n');
     const patched = relevantChanges.reduce(
-      (code, change) => AgentRefactoringService.applyChange(code, change),
+      (code, change) => AgentRefactoringService.applyChange(code, change, document, fnToRefactor),
       toLf(fnToRefactor.body)
     );
     return usesCrlf ? patched.replace(/\n/g, '\r\n') : patched;
