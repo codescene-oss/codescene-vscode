@@ -37,9 +37,29 @@ export interface ObjectiveSubjectFile {
   path: string;
 }
 
+/** What a recommendation Goal's finding is based on. */
+export interface RecommendationEvidence {
+  "code-health-issues": string[];
+  revisions?: number;
+  loc?: number;
+  "cyclomatic-complexity"?: number;
+  defects?: number;
+}
+
+/** The hotspot recommendation a recommendation Goal tracks one finding of. */
+export interface ObjectiveRecommendation {
+  scope: "function" | "file";
+  /** The function, possibly suffixed with its line, or the file. */
+  target: string;
+  "recommendation-type": string;
+  text: string;
+  evidence: RecommendationEvidence;
+}
+
 /** What the objective is measured on. */
 export interface ObjectiveSubject {
-  type: "area" | "files";
+  type: "area" | "files" | "recommendation";
+  recommendation?: ObjectiveRecommendation;
   /** The files of a Goal that live in this repository. */
   files?: ObjectiveSubjectFile[];
 }
@@ -69,6 +89,8 @@ export interface LocalFileResult {
   value?: number;
   /** The value it is compared with. */
   "comparison-value"?: number;
+  /** 1-based line of the finding a function-scope Goal is about, while the finding is present. */
+  line?: number;
 }
 
 /** The result measured in the working tree. */

@@ -9,6 +9,7 @@ import { aceSuite } from '../ace-test-suite';
 import { getAppliedEdits, getWebviewMessageHandler, resetAppliedEdits, resetWebviewPanelMocks } from '../setup';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
 import { CsExtensionState } from '../../cs-extension-state';
+import { DevtoolsAPI } from '../../devtools-api';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { CodeSceneCWFAceTabPanel } from '../../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
@@ -167,14 +168,39 @@ aceSuite('Fix goal commands Test Suite', () => {
     document.setDirty(true);
     document.setOnSave(() => document.setText('formatted\n'));
     warningAnswer = SAVE_AND_REFACTOR;
-    const shown: RefactoringRequest[] = [];
-    CodeSceneCWFAceTabPanel.show = (request: RefactoringRequest) => {
-      shown.push(request);
+    const sent: RefactoringRequest[] = [];
+    const originalPostRefactoring = DevtoolsAPI.postRefactoring;
+    (DevtoolsAPI as any).postRefactoring = async (request: RefactoringRequest) => {
+      sent.push(request);
+      return responseWith('formatted\n');
     };
-    await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, goal);
+    try {
+      await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, goal);
+    } finally {
+      (DevtoolsAPI as any).postRefactoring = originalPostRefactoring;
+    }
     assert.deepStrictEqual(
-      shown.map((request) => ({ body: request.fnToRefactor.body, goal: request.goal })),
+      sent.map((request) => ({ body: request.fnToRefactor.body, goal: request.goal })),
       [{ body: 'formatted\n', goal }]
+    );
+  });
+
+  test('a finding goal request targets the finding over the whole file', async () => {
+    const findingGoal: FixGoalTarget = { goalId: 13, repoRoot: '/repo', path: 'src/file.ts', finding: { function: 'f', issues: ['Complex Method'], line: 2 } };
+    const sent: RefactoringRequest[] = [];
+    const originalPostRefactoring = DevtoolsAPI.postRefactoring;
+    (DevtoolsAPI as any).postRefactoring = async (request: RefactoringRequest) => {
+      sent.push(request);
+      return responseWith('a\r\nb\r\n');
+    };
+    try {
+      await (commands as any).requestAndPresentRefactoringCmd(document, 'objectives', undefined, false, undefined, findingGoal);
+    } finally {
+      (DevtoolsAPI as any).postRefactoring = originalPostRefactoring;
+    }
+    assert.deepStrictEqual(
+      sent.map((request) => ({ body: request.fnToRefactor.body, targets: request.fnToRefactor['refactoring-targets'] })),
+      [{ body: 'a\r\nb\r\n', targets: [{ category: 'Complex Method', line: 2 }] }]
     );
   });
 });

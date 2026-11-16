@@ -1,10 +1,22 @@
 import * as assert from 'assert';
 import * as path from 'path';
-import type { ObjectivesSnapshot, LocalFileResult } from '../../centralized-webview-framework/types/objectives';
+import type { ObjectivesSnapshot, LocalFileResult, ObjectiveRecommendation } from '../../centralized-webview-framework/types/objectives';
 import { resolveFixGoalTarget, handleFixGoal, type FixGoalDeps } from '../../objectives/fix-goal-messages';
 import { fixture } from '../contract/contract';
 
-const full = () => fixture('objectives-snapshot', 'full', 'entity') as ObjectivesSnapshot;
+const full = () => {
+  const s = fixture('objectives-snapshot', 'full', 'entity') as ObjectivesSnapshot;
+  s.objectives[0].subject = { type: 'files', files: s.objectives[0].subject.files };
+  return s;
+};
+const recommendation = (over: Partial<ObjectiveRecommendation> = {}, file: Partial<LocalFileResult> = {}) => {
+  const s = fixture('objectives-snapshot', 'full', 'entity') as ObjectivesSnapshot;
+  const goal = s.objectives[0];
+  goal.subject.recommendation = { ...goal.subject.recommendation!, ...over };
+  goal.local.files = [{ path: 'src/orders.js', result: 'violated', reason: 'finding-present', line: 12, ...file }];
+  return s;
+};
+const evidence = (issues: string[]) => ({ 'code-health-issues': issues });
 const withFile = (over: Partial<LocalFileResult>) => {
   const s = full();
   s.objectives[0].local.files = [{ ...s.objectives[0].local.files![0], ...over }];
@@ -98,6 +110,37 @@ suite('Fix goal messages Test Suite', () => {
   ]) {
     test(`resolveFixGoalTarget rejects: ${c.name}`, () =>
       assert.strictEqual(resolveFixGoalTarget(c.snapshot, c.goalId, c.path), c.reason));
+  }
+
+  test('resolveFixGoalTarget takes the finding of a recommendation Goal: its function, issues and line', () => {
+    assert.deepStrictEqual(resolveFixGoalTarget(recommendation({ target: 'orders:18' }), 2, 'src/orders.js'), {
+      goalId: 2,
+      repoRoot: '/work/fake-repo',
+      path: 'src/orders.js',
+      finding: { function: 'orders', issues: ['Complex Method'], line: 12 },
+    });
+  });
+
+  test('resolveFixGoalTarget leaves out the function of a file-scope recommendation Goal', () => {
+    const target = resolveFixGoalTarget(recommendation({ scope: 'file', target: 'src/orders.js' }, { line: 1 }), 2, 'src/orders.js');
+    assert.deepStrictEqual(target, {
+      goalId: 2,
+      repoRoot: '/work/fake-repo',
+      path: 'src/orders.js',
+      finding: { issues: ['Complex Method'], line: 1 },
+    });
+  });
+
+  for (const c of [
+    { name: 'resolved finding', snapshot: recommendation({}, { result: 'satisfied', line: undefined }), reason: 'not-violated' },
+    { name: 'no finding line', snapshot: recommendation({}, { line: undefined }), reason: 'no-finding' },
+    { name: 'no recommendation', snapshot: recommendation({}, {}), reason: 'no-finding', strip: true },
+    { name: 'no issues', snapshot: recommendation({ evidence: evidence([]) }), reason: 'no-finding' },
+  ]) {
+    test(`resolveFixGoalTarget rejects a recommendation Goal: ${c.name}`, () => {
+      if (c.strip) delete c.snapshot.objectives[0].subject.recommendation;
+      assert.strictEqual(resolveFixGoalTarget(c.snapshot, 2, 'src/orders.js'), c.reason);
+    });
   }
 
   test('handleFixGoal opens the file under the repository root and runs the goal', async () => {

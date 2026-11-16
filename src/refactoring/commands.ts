@@ -1,4 +1,5 @@
-import vscode, { ViewColumn, WorkspaceEdit, Range } from 'vscode';
+import path from 'path';
+import vscode, { ViewColumn, WorkspaceEdit } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
@@ -11,7 +12,9 @@ import { CodeSceneCWFAceAcknowledgementTabPanel } from '../codescene-tab/webview
 import { logOutputChannel } from '../log';
 import { CodeSmell } from '../devtools-api/review-model';
 import { FixGoalTarget } from './agent-types';
-import { fnToRefactorForWholeFile } from './fn-to-refactor';
+import { fnToRefactorForGoal } from './fn-to-refactor';
+import { replaceDocument, runGoalFix } from './goal-fix';
+import { fixGoalJobs } from '../objectives/fix-goal-jobs';
 
 /**
  * Locate the view column of an existing tab for the given document, even when the document
@@ -52,31 +55,53 @@ export class CsRefactoringCommands implements vscode.Disposable {
     codeSmell?: CodeSmell,
     goal?: FixGoalTarget
   ) {
-    const toRefactor = await this.prepareFnToRefactor(document, fnToRefactor, codeSmell, goal);
-    if (!toRefactor) return;
-
-    if (!CsExtensionState.acknowledgedAceUsage) {
-      Telemetry.logUsage('ace-info/presented', { source });
-      CodeSceneCWFAceAcknowledgementTabPanel.show(new RefactoringRequest(toRefactor, document, skipCache, goal));
+    if (goal) {
+      await this.fixGoal(document, source, skipCache, goal);
       return;
     }
 
-    const request = new RefactoringRequest(toRefactor, document, skipCache, goal);
+    const toRefactor = await this.prepareFnToRefactor(document, fnToRefactor, codeSmell);
+    if (!toRefactor) return;
+
+    const request = new RefactoringRequest(toRefactor, document, skipCache);
+    if (this.presentAcknowledgement(request, source)) return;
+
     Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
     CodeSceneCWFAceTabPanel.show(request);
+  }
+
+  private presentAcknowledgement(request: RefactoringRequest, source: string): boolean {
+    if (CsExtensionState.acknowledgedAceUsage) return false;
+    Telemetry.logUsage('ace-info/presented', { source });
+    CodeSceneCWFAceAcknowledgementTabPanel.show(request);
+    return true;
+  }
+
+  private async fixGoal(document: vscode.TextDocument, source: string, skipCache: boolean | undefined, goal: FixGoalTarget) {
+    const fileName = path.join(goal.repoRoot, goal.path);
+    if (!fixGoalJobs.add(goal.goalId, fileName)) {
+      logOutputChannel.info(`[fix-goal] Ignoring goal ${goal.goalId} ${goal.path}: it is already being fixed`);
+      return;
+    }
+
+    try {
+      if (!(await ensureSavedForRefactoring(document))) return;
+
+      const request = new RefactoringRequest(fnToRefactorForGoal(document, goal), document, skipCache, goal);
+      if (this.presentAcknowledgement(request, source)) return;
+
+      Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
+      await runGoalFix(request);
+    } finally {
+      fixGoalJobs.remove(goal.goalId, fileName);
+    }
   }
 
   private async prepareFnToRefactor(
     document: vscode.TextDocument,
     fnToRefactor: FnToRefactor | undefined,
-    codeSmell: CodeSmell | undefined,
-    goal: FixGoalTarget | undefined
+    codeSmell: CodeSmell | undefined
   ): Promise<FnToRefactor | undefined> {
-    if (goal) {
-      if (!(await ensureSavedForRefactoring(document))) return undefined;
-      return fnToRefactorForWholeFile(document);
-    }
-
     const toRefactor = fnToRefactor ?? (await findFnToRefactor(document, codeSmell));
     if (!toRefactor) {
       logOutputChannel.error('Could not refactor. Function to refactor is undefined.');
@@ -108,10 +133,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
           void vscode.window.showWarningMessage('The file changed after the CodeScene Refactoring Agent read it. Run the goal fix again on the current file.');
           return;
         }
-        const fullDocumentRange = new Range(document.positionAt(0), document.positionAt(document.getText().length));
-        const workSpaceEdit = new WorkspaceEdit();
-        workSpaceEdit.replace(document.uri, fullDocumentRange, response.code);
-        await vscode.workspace.applyEdit(workSpaceEdit);
+        await replaceDocument(document, response.code);
       } else {
         const workSpaceEdit = new WorkspaceEdit();
         workSpaceEdit.replace(document.uri, vscodeRange, response.code);

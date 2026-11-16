@@ -5,6 +5,7 @@ import { FnToRefactor, RefactoringTarget } from '../devtools-api/refactor-models
 import { CodeSmell, Range, Review } from '../devtools-api/review-model';
 import { findFunctionForCodeSmell, vscodeRange } from '../review/utils';
 import { isDefined } from '../utils';
+import { FindingGoalTarget, FixGoalTarget, isFindingGoal } from './agent-types';
 
 function wholeLinesRange(document: vscode.TextDocument, startLine: number, endLine: number): Range {
   const lastLine = Math.max(startLine, Math.min(endLine, document.lineCount));
@@ -56,6 +57,14 @@ export function fnToRefactorForFinding(document: vscode.TextDocument, finding: F
   return buildFnToRefactor(document, name, wholeLinesRange(document, range['start-line'], range['end-line']), targets);
 }
 
-export function fnToRefactorForWholeFile(document: vscode.TextDocument): FnToRefactor {
-  return buildFnToRefactor(document, basename(document.fileName), wholeLinesRange(document, 1, document.lineCount), []);
+export function fnToRefactorForWholeFile(document: vscode.TextDocument, targets: RefactoringTarget[] = []): FnToRefactor {
+  return buildFnToRefactor(document, basename(document.fileName), wholeLinesRange(document, 1, document.lineCount), targets);
+}
+
+export function findingTargets(goal: FindingGoalTarget): RefactoringTarget[] {
+  return [{ category: goal.finding.issues[0], line: goal.finding.line }];
+}
+
+export function fnToRefactorForGoal(document: vscode.TextDocument, goal: FixGoalTarget): FnToRefactor {
+  return fnToRefactorForWholeFile(document, isFindingGoal(goal) ? findingTargets(goal) : []);
 }

@@ -26,7 +26,9 @@ import type {
   ObjectivesSnapshot,
   ObjectiveSubject,
   ObjectiveSubjectFile,
+  ObjectiveRecommendation,
   ObjectiveThreshold,
+  RecommendationEvidence,
   SharedResult,
   WorkSessionParticipant,
 } from '../../centralized-webview-framework/types/objectives';
@@ -134,12 +136,28 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     threshold: declared<ObjectiveThreshold>({ operator: true, mode: true, value: true, 'comparison-value': true }),
     'created-by-display-name': true,
     parent: declared<ObjectiveParent>({ kind: true, id: true, 'created-by-display-name': true }),
-    subject: declared<ObjectiveSubject>({ type: true, files: declared<ObjectiveSubjectFile>({ path: true }) }),
+    subject: declared<ObjectiveSubject>({
+      type: true,
+      recommendation: declared<ObjectiveRecommendation>({
+        scope: true,
+        target: true,
+        'recommendation-type': true,
+        text: true,
+        evidence: declared<RecommendationEvidence>({
+          'code-health-issues': true,
+          revisions: true,
+          loc: true,
+          'cyclomatic-complexity': true,
+          defects: true,
+        }),
+      }),
+      files: declared<ObjectiveSubjectFile>({ path: true }),
+    }),
     shared: declared<SharedResult>({ applicability: true, result: true, value: true, 'evaluated-at': true, 'as-of': true }),
     local: declared<LocalResult>({
       result: true,
       reason: true,
-      files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true }),
+      files: declared<LocalFileResult>({ path: true, result: true, reason: true, value: true, 'comparison-value': true, line: true }),
     }),
     'work-sessions': declared<GoalWorkSessions>({
       state: true,
