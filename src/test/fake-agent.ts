@@ -87,6 +87,6 @@ export class FakeAgent {
 
   dispose(): void {
     this.deactivate();
-    fs.rmSync(this.extensionPath, { recursive: true, force: true });
+    fs.rmSync(this.extensionPath, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   }
 }

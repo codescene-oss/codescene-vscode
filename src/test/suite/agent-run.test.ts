@@ -77,7 +77,7 @@ suite('Agent run Test Suite', () => {
     (configModule as any).getAuthToken = originalGetAuthToken;
     DevtoolsAPI.authToken = originalAuthToken;
     DevtoolsAPI.disableAce();
-    fs.rmSync(workDir, { recursive: true, force: true });
+    fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   suite('agent binary', () => {
