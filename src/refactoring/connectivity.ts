@@ -1,6 +1,7 @@
 import { ChildProcess } from 'child_process';
 import vscode from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
+import { aceUsable } from '../devtools-api';
 import { AbortError } from '../devtools-api/abort-error';
 import { buildAgentConfigWithToken, RENDER_CODE_FIX_SKILL } from './agent-config';
 import { getAgentModel } from '../configuration';
@@ -67,4 +68,35 @@ export async function testConnectivity(options?: ConnectivityOptions): Promise<C
     logOutputChannel.error(`Connectivity test failed: ${message}`);
     return { success: false, error: message };
   }
+}
+
+function reportConnectivity(result: ConnectivityResult): void {
+  if (result.success) {
+    void vscode.window.showInformationMessage('Provider connectivity test successful.');
+  } else if (!result.error?.includes('cancelled')) {
+    void vscode.window.showErrorMessage(`Provider connectivity test failed: ${result.error}`);
+  }
+}
+
+export async function runConnectivityTestCommand(): Promise<void> {
+  if (!aceUsable()) {
+    void vscode.window.showInformationMessage(
+      'Enable "Enable Auto Refactor" and sign in to CodeScene to test provider connectivity.'
+    );
+    return;
+  }
+
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: 'Testing provider connectivity...',
+      cancellable: true,
+    },
+    async (progress, cancelToken) => {
+      void progress;
+      const abortController = new AbortController();
+      cancelToken.onCancellationRequested(() => abortController.abort());
+      reportConnectivity(await testConnectivity({ signal: abortController.signal }));
+    }
+  );
 }

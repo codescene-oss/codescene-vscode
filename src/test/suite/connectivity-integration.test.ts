@@ -25,7 +25,7 @@ suite('Connectivity Integration Test Suite', () => {
   }
 
   const projectRoot = path.join(__dirname, '..', '..', '..');
-  const agentBinaryPath = path.join(projectRoot, 'bin', 'cs-agent');
+  const agentBinaryPath = path.join(projectRoot, 'bin', process.platform === 'win32' ? 'cs-agent.exe' : 'cs-agent');
   if (!fs.existsSync(agentBinaryPath)) {
     console.log('Skipping Connectivity Integration tests: cs-agent binary not found at ' + agentBinaryPath);
     return;

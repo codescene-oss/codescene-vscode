@@ -6,7 +6,7 @@ import { activate as activateCHMonitor, deactivate as deactivateAddon } from './
 import { register as registerCHRulesCommands } from './code-health-rules';
 import { automaticAnalysisEnabled, onDidChangeConfiguration, setAutomaticAnalysisEnabled, toggleReviewCodeLenses } from './configuration';
 import { CsExtensionState } from './cs-extension-state';
-import { aceUsable, DevtoolsAPI } from './devtools-api';
+import { DevtoolsAPI } from './devtools-api';
 import type { CsIdeServerClient } from './devtools-api/ide-server-client';
 import CsDiagnostics from './diagnostics/cs-diagnostics';
 import { register as registerDocumentationCommands } from './documentation/commands';
@@ -27,7 +27,7 @@ import { acquireGitApi, deactivate as deactivateGitUtils, getRepoRootPath } from
 import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
 import { createWorkspaceWatchDependencies, WorkspaceWatch } from './git/workspace-watch';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
-import { testConnectivity } from './refactoring/connectivity';
+import { runConnectivityTestCommand } from './refactoring/connectivity';
 import { killAllAgentProcesses } from './refactoring/agent-process';
 import { initExtensionId } from './extension-id';
 import { guardWindowLifecycleDuringTests, reloadWindowForUpdate } from './extension-reload';
@@ -231,36 +231,7 @@ function registerCommands(context: vscode.ExtensionContext) {
 }
 
 function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
-  const cmd = vscode.commands.registerCommand('codescene.testConnectivity', async () => {
-    if (!aceUsable()) {
-      void vscode.window.showInformationMessage(
-        'Enable "Enable Auto Refactor" and sign in to CodeScene to test provider connectivity.'
-      );
-      return;
-    }
-    const abortController = new AbortController();
-
-    await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: 'Testing provider connectivity...',
-        cancellable: true,
-      },
-      async (progress, cancelToken) => {
-        void progress;
-        cancelToken.onCancellationRequested(() => {
-          abortController.abort();
-        });
-
-        const result = await testConnectivity({ signal: abortController.signal });
-        if (result.success) {
-          void vscode.window.showInformationMessage('Provider connectivity test successful.');
-        } else if (!result.error?.includes('cancelled')) {
-          void vscode.window.showErrorMessage(`Provider connectivity test failed: ${result.error}`);
-        }
-      }
-    );
-  });
+  const cmd = vscode.commands.registerCommand('codescene.testConnectivity', runConnectivityTestCommand);
   DISPOSABLES.push(cmd);
   context.subscriptions.push(cmd);
 }
