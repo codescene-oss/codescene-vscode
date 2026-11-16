@@ -8,6 +8,7 @@ import type {
   ProjectCandidate,
   ProjectReason,
   ProjectSource,
+  WebviewAuthStatus,
 } from '../centralized-webview-framework/types/auth';
 import type { AuthSurface } from './auth-flow';
 
@@ -50,10 +51,15 @@ export const INACTIVE_SNAPSHOT: AuthSnapshot = {
   signInBannerHidden: false,
 };
 
+function toWebviewAuthStatus({ 'ace-credential': aceCredential, ...status }: AuthStatus): WebviewAuthStatus {
+  void aceCredential;
+  return status;
+}
+
 export function toAuthPayload(snapshot: AuthSnapshot): AuthPayload | undefined {
   if (!snapshot.active || !snapshot.status) return undefined;
   return {
-    status: snapshot.status,
+    status: toWebviewAuthStatus(snapshot.status),
     accounts: snapshot.accounts,
     projects: snapshot.projects,
     repo: snapshot.repo,

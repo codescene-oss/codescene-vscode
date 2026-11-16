@@ -45,8 +45,10 @@ export type Account = {
 
 export type Project = { id: string; name: string };
 
+export type WebviewAuthStatus = Omit<AuthStatus, 'ace-credential'>;
+
 export type AuthPayload = {
-  status: AuthStatus;
+  status: WebviewAuthStatus;
   accounts: Account[] | null;
   projects: Project[] | null;
   repo: { path: string; name: string } | null;
