@@ -85,6 +85,10 @@
         "title": "CodeScene: copy Device ID"
       },
       {
+        "command": "codescene.setProviderApiKey",
+        "title": "CodeScene: Set Refactoring Agent API key"
+      },
+      {
         "command": "codescene.testConnectivity",
         "title": "CodeScene: test provider connectivity"
       },
@@ -147,6 +151,10 @@
         {
           "command": "codescene.startAutomaticAnalysis",
           "when": "!config.codescene.enableAutomaticAnalysis"
+        },
+        {
+          "command": "codescene.setProviderApiKey",
+          "when": "config.codescene.enableAutoRefactor"
         },
         {
           "command": "codescene.testConnectivity",
@@ -255,23 +263,11 @@
             "amazon-bedrock:region": {
               "type": "string",
               "description": "AWS region for Amazon Bedrock"
-            },
-            "anthropic:api-key": {
-              "type": "string",
-              "description": "API key for Anthropic"
-            },
-            "openai:api-key": {
-              "type": "string",
-              "description": "API key for OpenAI"
-            },
-            "google:api-key": {
-              "type": "string",
-              "description": "API key for Google (Gemini)"
             }
           },
           "additionalProperties": false,
           "default": {},
-          "markdownDescription": "Provider-specific options for the Refactoring Agent. Use this to authenticate into your preferred model.\n\n**[Test connectivity](command:codescene.testConnectivity)**",
+          "markdownDescription": "Amazon Bedrock options for the Refactoring Agent. API keys for Anthropic, OpenAI and Google are kept in VS Code secure storage: **[Set API key](command:codescene.setProviderApiKey)**\n\n**[Test connectivity](command:codescene.testConnectivity)**",
           "order": 18
         },
         "codescene.serverUrl": {

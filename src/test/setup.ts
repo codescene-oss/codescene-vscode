@@ -107,6 +107,37 @@ export function resetMockWindow() {
   vscodeStub.window.visibleTextEditors = [];
   vscodeStub.window.tabGroups.all = [];
   resetMockEvents();
+  resetMockProgress();
+}
+
+function filterMatchesFile(filter: { pattern?: string }, fileName: string): boolean {
+  const extension = filter.pattern?.match(/\*\*\/\*\.(\w+)$/)?.[1];
+  return extension !== undefined && fileName.endsWith(`.${extension}`);
+}
+
+type MockProgress ={ title?: string; cancellable?: boolean; cancel: () => void };
+const mockProgress: MockProgress[] = [];
+
+export function getMockProgress(): MockProgress[] {
+  return mockProgress;
+}
+
+export function resetMockProgress() {
+  mockProgress.length = 0;
+}
+
+function withMockProgress(options: { title?: string; cancellable?: boolean }, task: (progress: any, token: any) => any) {
+  const cancelled = createMockEvent<void>();
+  const token = { isCancellationRequested: false, onCancellationRequested: cancelled.event };
+  mockProgress.push({
+    title: options.title,
+    cancellable: options.cancellable,
+    cancel: () => {
+      token.isCancellationRequested = true;
+      cancelled.fire();
+    },
+  });
+  return Promise.resolve(task({ report: () => {} }, token));
 }
 
 function createMockEvent<T = any>() {
@@ -348,9 +379,12 @@ const vscodeStub = {
       trace: (text: string, ...args: unknown[]) => captureLog(name, 'trace', text, args),
     }),
     setStatusBarMessage: (text: string, timeout?: number) => ({ dispose: () => {} }),
+    withProgress: withMockProgress,
     showErrorMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
     showInformationMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
     showWarningMessage: (message: string, ...items: any[]) => Promise.resolve(undefined),
+    showQuickPick: (items: any, options?: any) => Promise.resolve(undefined),
+    showInputBox: (options?: any) => Promise.resolve(undefined),
     registerWebviewViewProvider: (id: string, provider: any) => {
       void id;
       void provider;
@@ -392,6 +426,7 @@ const vscodeStub = {
   },
   ViewColumn: { Beside: 2, Active: 1, One: 1, Two: 2, Three: 3 },
   StatusBarAlignment: { Left: 1, Right: 2 },
+  ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },
   ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),
@@ -518,24 +553,10 @@ const vscodeStub = {
   },
   languages: {
     match: (selector: any, document: any) => {
-      if (!document || !document.fileName) {
+      if (!document?.fileName || !Array.isArray(selector)) {
         return 0;
       }
-      if (Array.isArray(selector)) {
-        for (const filter of selector) {
-          if (filter.pattern) {
-            const globPattern = filter.pattern as string;
-            const match = globPattern.match(/\*\*\/\*\.(\w+)$/);
-            if (match) {
-              const extension = match[1];
-              if (document.fileName.endsWith(`.${extension}`)) {
-                return 1;
-              }
-            }
-          }
-        }
-      }
-      return 0;
+      return selector.some((filter) => filterMatchesFile(filter, document.fileName)) ? 1 : 0;
     },
     createDiagnosticCollection: (name?: string) => ({
       name: name || 'default',

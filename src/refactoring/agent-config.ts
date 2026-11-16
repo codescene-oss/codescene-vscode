@@ -77,9 +77,9 @@ export function buildAgentConfigWithToken(
   token: string | undefined,
   plugin: string | undefined,
   ioDir?: string,
-  server?: AuthServer | null
+  server?: AuthServer | null,
+  providerOpts: Record<string, string> = getProviderOptions()
 ): AgentConfig {
-  const providerOpts = getProviderOptions();
   const providerCredentials = buildProviderCredentials(providerOpts);
   const opencodeConfig = buildOpencodeConfig(providerOpts);
 
