@@ -85,8 +85,8 @@ export class FakeAgent {
     return fs.existsSync(this.recordPath) ? JSON.parse(fs.readFileSync(this.recordPath, 'utf8')) : undefined;
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     this.deactivate();
-    fs.rmSync(this.extensionPath, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await fs.promises.rm(this.extensionPath, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   }
 }

@@ -70,14 +70,14 @@ suite('Agent run Test Suite', () => {
     mockWorkspaceFolders([createMockWorkspaceFolder(workDir)]);
   });
 
-  teardown(() => {
+  teardown(async () => {
     killAllAgentProcesses();
     fakeAgent.deactivate();
     restoreDefaultWorkspaceFolders();
     (configModule as any).getAuthToken = originalGetAuthToken;
     DevtoolsAPI.authToken = originalAuthToken;
     DevtoolsAPI.disableAce();
-    fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await fs.promises.rm(workDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   suite('agent binary', () => {
