@@ -308,37 +308,68 @@ aceSuite('AgentConfig Test Suite', () => {
   });
 
   test('getAgentModel returns configured agentModel when set', () => {
-    mockConfiguration('codescene', { agentModel: 'anthropic/claude-opus-4' });
-    assert.strictEqual(getAgentModel(), 'anthropic/claude-opus-4');
-  });
-
-  test('getAgentModel infers OpenAI model from providerOptions', () => {
-    mockConfiguration('codescene', {
-      providerOptions: { 'openai:api-key': 'sk-test-key' },
-    });
-    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+    mockConfiguration('codescene', { agentModel: 'anthropic/claude-opus-5-5' });
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-opus-5-5');
   });
 
   test('getAgentModel infers Anthropic model from providerOptions', () => {
     mockConfiguration('codescene', {
       providerOptions: { 'anthropic:api-key': 'sk-ant-test' },
     });
-    assert.strictEqual(getAgentModel(), 'anthropic/claude-sonnet-4-0');
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-sonnet-5-5');
   });
 
-  test('getAgentModel prefers OpenAI over Anthropic when both set', () => {
+  test('getAgentModel infers OpenAI model from providerOptions', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'openai:api-key': 'sk-test-key' },
+    });
+    assert.strictEqual(getAgentModel(), 'openai/gpt-6.1-sol');
+  });
+
+  test('getAgentModel infers Google model from providerOptions', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'google:api-key': 'google-key' },
+    });
+    assert.strictEqual(getAgentModel(), 'google/gemini-4-carbon');
+  });
+
+  test('getAgentModel infers Bedrock model from a Bedrock profile', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'amazon-bedrock:profile': 'my-profile' },
+    });
+    assert.strictEqual(getAgentModel(), 'amazon-bedrock/eu.anthropic.claude-sonnet-5-5');
+  });
+
+  test('getAgentModel infers Bedrock model from a Bedrock region', () => {
+    mockConfiguration('codescene', {
+      providerOptions: { 'amazon-bedrock:region': 'eu-west-1' },
+    });
+    assert.strictEqual(getAgentModel(), 'amazon-bedrock/eu.anthropic.claude-sonnet-5-5');
+  });
+
+  test('getAgentModel prefers Anthropic over OpenAI when both set', () => {
     mockConfiguration('codescene', {
       providerOptions: {
         'openai:api-key': 'sk-openai',
         'anthropic:api-key': 'sk-ant',
       },
     });
-    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-sonnet-5-5');
   });
 
-  test('getAgentModel returns Bedrock default when no provider keys', () => {
+  test('getAgentModel prefers an API key over Bedrock options', () => {
+    mockConfiguration('codescene', {
+      providerOptions: {
+        'amazon-bedrock:profile': 'my-profile',
+        'google:api-key': 'google-key',
+      },
+    });
+    assert.strictEqual(getAgentModel(), 'google/gemini-4-carbon');
+  });
+
+  test('getAgentModel returns Anthropic default when no provider options', () => {
     mockConfiguration('codescene', { providerOptions: {} });
-    assert.strictEqual(getAgentModel(), 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6');
+    assert.strictEqual(getAgentModel(), 'anthropic/claude-sonnet-5-5');
   });
 
   test('getAgentModel override takes precedence over inferred model', () => {
@@ -349,19 +380,19 @@ aceSuite('AgentConfig Test Suite', () => {
     assert.strictEqual(getAgentModel(), 'custom/override');
   });
 
-  test('getAgentModel infers OpenAI even when agentModel has Bedrock default', () => {
+  test('getAgentModel infers OpenAI even when agentModel has the default', () => {
     mockConfiguration('codescene', {
-      agentModel: 'amazon-bedrock/eu.anthropic.claude-sonnet-4-6',
+      agentModel: 'anthropic/claude-sonnet-5-5',
       providerOptions: { 'openai:api-key': 'sk-test-key' },
     });
-    assert.strictEqual(getAgentModel(), 'openai/gpt-4o');
+    assert.strictEqual(getAgentModel(), 'openai/gpt-6.1-sol');
   });
 
   test('getAgentModel respects explicit non-default agentModel over inferred', () => {
     mockConfiguration('codescene', {
-      agentModel: 'openai/gpt-4-turbo',
+      agentModel: 'openai/gpt-6-astra',
       providerOptions: { 'anthropic:api-key': 'sk-ant-key' },
     });
-    assert.strictEqual(getAgentModel(), 'openai/gpt-4-turbo');
+    assert.strictEqual(getAgentModel(), 'openai/gpt-6-astra');
   });
 });
