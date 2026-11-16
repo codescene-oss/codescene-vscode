@@ -19,7 +19,14 @@ import { FakeAgent } from '../fake-agent';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { Position, Range } from '../mocks/vscode';
-import { assertLogContains, getMockProgress, resetMockProgress } from '../setup';
+import {
+  assertLogContains,
+  createMockWorkspaceFolder,
+  getMockProgress,
+  mockWorkspaceFolders,
+  resetMockProgress,
+  restoreDefaultWorkspaceFolders,
+} from '../setup';
 
 const fixturesDir = path.join(__dirname, '..', '..', '..', 'src', 'test', 'fixtures', 'agent-output');
 const fixProposed = JSON.parse(fs.readFileSync(path.join(fixturesDir, 'fix-proposed.json'), 'utf-8'));
@@ -60,11 +67,13 @@ suite('Agent run Test Suite', () => {
     (configModule as any).getAuthToken = () => authToken;
     DevtoolsAPI.authToken = () => Promise.reject(new Error('not signed in'));
     resetMockProgress();
+    mockWorkspaceFolders([createMockWorkspaceFolder(workDir)]);
   });
 
   teardown(() => {
     killAllAgentProcesses();
     fakeAgent.deactivate();
+    restoreDefaultWorkspaceFolders();
     (configModule as any).getAuthToken = originalGetAuthToken;
     DevtoolsAPI.authToken = originalAuthToken;
     DevtoolsAPI.disableAce();
