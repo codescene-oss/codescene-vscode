@@ -236,7 +236,9 @@ function registerCommands(context: vscode.ExtensionContext) {
   context.subscriptions.push(stopAutomaticAnalysisCmd, startAutomaticAnalysisCmd);
 
   registerCHRulesCommands(context);
-  registerTestConnectivityCommand(context);
+  if (ACE_ENABLED) {
+    registerTestConnectivityCommand(context);
+  }
 }
 
 function registerTestConnectivityCommand(context: vscode.ExtensionContext) {
