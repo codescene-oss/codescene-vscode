@@ -23,12 +23,12 @@ import type {
   Objective,
   ObjectiveParent,
   ObjectiveProject,
+  ObjectiveRecommendation,
+  ObjectiveRecommendationEvidence,
   ObjectivesSnapshot,
   ObjectiveSubject,
   ObjectiveSubjectFile,
-  ObjectiveRecommendation,
   ObjectiveThreshold,
-  RecommendationEvidence,
   SharedResult,
   WorkSessionParticipant,
 } from '../../centralized-webview-framework/types/objectives';
@@ -138,12 +138,13 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
     parent: declared<ObjectiveParent>({ kind: true, id: true, 'created-by-display-name': true }),
     subject: declared<ObjectiveSubject>({
       type: true,
+      files: declared<ObjectiveSubjectFile>({ path: true }),
       recommendation: declared<ObjectiveRecommendation>({
         scope: true,
         target: true,
         'recommendation-type': true,
         text: true,
-        evidence: declared<RecommendationEvidence>({
+        evidence: declared<ObjectiveRecommendationEvidence>({
           'code-health-issues': true,
           revisions: true,
           loc: true,
@@ -151,7 +152,6 @@ const objectivesSnapshotFields = declared<ObjectivesSnapshot>({
           defects: true,
         }),
       }),
-      files: declared<ObjectiveSubjectFile>({ path: true }),
     }),
     shared: declared<SharedResult>({ applicability: true, result: true, value: true, 'evaluated-at': true, 'as-of': true }),
     local: declared<LocalResult>({
