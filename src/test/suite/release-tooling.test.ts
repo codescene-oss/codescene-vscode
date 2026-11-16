@@ -52,26 +52,17 @@ suite('Release Tooling Test Suite', function () {
     assert.strictEqual(entries.includes('.versionrc.json'), false);
   });
 
-  test('both READMEs link to the GitHub Releases page', () => {
-    const cases = ['README.md', 'README-noace.md'];
-
-    for (const file of cases) {
-      const text = readRepoFile(file);
-      assert.ok(text.includes(releasesUrl), `${file} should link to ${releasesUrl}`);
-    }
+  test('the README links to the GitHub Releases page', () => {
+    assert.ok(readRepoFile('README.md').includes(releasesUrl), `README.md should link to ${releasesUrl}`);
   });
 
   test('release notes section sits immediately before the configuration section', () => {
-    const cases = ['README.md', 'README-noace.md'];
+    const headings = readRepoFile('README.md')
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('## '));
+    const releaseNotes = headings.indexOf('## Release notes ##');
 
-    for (const file of cases) {
-      const headings = readRepoFile(file)
-        .split(/\r?\n/)
-        .filter((line) => line.startsWith('## '));
-      const releaseNotes = headings.indexOf('## Release notes ##');
-
-      assert.notStrictEqual(releaseNotes, -1, `${file} should have a Release notes section`);
-      assert.strictEqual(headings[releaseNotes + 1], '## Configuration ##', `${file} section order`);
-    }
+    assert.notStrictEqual(releaseNotes, -1, 'README.md should have a Release notes section');
+    assert.strictEqual(headings[releaseNotes + 1], '## Configuration ##', 'README.md section order');
   });
 });

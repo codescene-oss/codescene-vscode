@@ -27,7 +27,6 @@ import { acquireGitApi, deactivate as deactivateGitUtils, getRepoRootPath } from
 import { discoverCodeHealthRulesFileUris } from './git/codescene-file-discovery';
 import { createWorkspaceWatchDependencies, WorkspaceWatch } from './git/workspace-watch';
 import { onGitDetectedAsUnavailable } from './git/git-detection';
-import { ACE_ENABLED } from './build-flags';
 import { testConnectivity } from './refactoring/connectivity';
 import { killAllAgentProcesses } from './refactoring/agent-process';
 import { initExtensionId } from './extension-id';
@@ -161,11 +160,7 @@ function registerAuth(context: vscode.ExtensionContext, ideServer: CsIdeServerCl
 
 function registerExtensionUi(context: vscode.ExtensionContext) {
   CsExtensionState.addListeners(context);
-  if (ACE_ENABLED) {
-    initAce(context);
-  } else {
-    CsExtensionState.setACEState({ state: 'disabled' });
-  }
+  initAce(context);
 
   const gitUnavailableDisposable = onGitDetectedAsUnavailable(() => {
     void vscode.window.showWarningMessage("'Git' binary not found by the CodeScene extension, or Git not initialized in this project.");
@@ -179,9 +174,7 @@ function registerExtensionUi(context: vscode.ExtensionContext) {
   registerCsDocProvider(context);
   activateCHMonitor(context);
 
-  if (ACE_ENABLED) {
-    setupAceConfiguration(context);
-  }
+  setupAceConfiguration(context);
 }
 
 async function completeActivation(context: vscode.ExtensionContext, ideServer: CsIdeServerClient) {
@@ -216,9 +209,7 @@ function finalizeActivation(context: vscode.ExtensionContext) {
 function registerCommands(context: vscode.ExtensionContext) {
   registerShowLogCommand(context);
   registerDocumentationCommands(context);
-  if (ACE_ENABLED) {
-    registerOpenCsSettingsCommand(context);
-  }
+  registerOpenCsSettingsCommand(context);
 
   const toggleReviewCodeLensesCmd = vscode.commands.registerCommand('codescene.toggleReviewCodeLenses', () => {
     toggleReviewCodeLenses();
@@ -236,9 +227,7 @@ function registerCommands(context: vscode.ExtensionContext) {
   context.subscriptions.push(stopAutomaticAnalysisCmd, startAutomaticAnalysisCmd);
 
   registerCHRulesCommands(context);
-  if (ACE_ENABLED) {
-    registerTestConnectivityCommand(context);
-  }
+  registerTestConnectivityCommand(context);
 }
 
 function registerTestConnectivityCommand(context: vscode.ExtensionContext) {

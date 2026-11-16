@@ -61,7 +61,7 @@ jobs:
 
     - name: Run tests with coverage
       if: matrix.os == 'ubuntu-latest' && github.event_name == 'pull_request'
-      run: npm run test:coverage:dual
+      run: npm run test:coverage
       env:
         CI: true
 
@@ -73,30 +73,3 @@ jobs:
         project-url: https://api.codescene.io/v2/projects/36131
         coverage-files: coverage/lcov.info
 
-  test-no-ace:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-
-    - uses: './.github/actions/setup'
-
-    - name: Configure Git
-      run: git config --global advice.defaultBranchName false
-
-    # The contract tests validate against webview-schema.json and message-schema.json from the bundled CWF zip
-    - name: Fetch the bundled webview (CWF)
-      run: npm run updatecwf
-      env:
-        CI: true
-        GITHUB_TOKEN: ${{ secrets.CODESCENE_IDE_DOCS_AND_WEBVIEW_TOKEN }}
-
-    - run: npm run pretest
-      env:
-        CI: true
-        BUILD_NO_ACE: true
-
-    - run: npm test
-      env:
-        CI: true
-        BUILD_NO_ACE: true

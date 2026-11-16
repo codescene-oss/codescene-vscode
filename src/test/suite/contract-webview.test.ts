@@ -15,7 +15,6 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { aceTest } from '../ace-test-suite';
 import { registerAuthMessages, routeAuthMessage, type AuthActions, type AuthMessageTarget } from '../../auth/auth-message-handler';
 import { AuthSnapshot, INACTIVE_SNAPSHOT, toAuthFlow, toAuthPayload } from '../../auth/auth-payload';
 import { authViewProps } from '../../auth/auth-view-props';
@@ -125,10 +124,10 @@ suite('Contract webview harness Test Suite', () => {
     }
   });
 
-  test('both test jobs of the test workflow fetch the CWF with the webview token before pretest', () => {
+  test('the test job of the test workflow fetches the CWF with the webview token before pretest', () => {
     const workflow = fs.readFileSync(path.join(__dirname, '..', '..', '..', '.github', 'workflows', 'test.yml'), 'utf8');
-    const jobs = workflow.split(/^  (?=build:|test-no-ace:)/m).slice(1);
-    assert.strictEqual(jobs.length, 2);
+    const jobs = workflow.split(/^  (?=build:)/m).slice(1);
+    assert.strictEqual(jobs.length, 1);
     for (const job of jobs) {
       const lines = job.split(/\r?\n/).map((line) => line.trim());
       const fetchAt = lines.indexOf('run: npm run updatecwf');
@@ -280,7 +279,7 @@ suite('Contract webview payloads Test Suite', () => {
       assertPayloadClosed(homePayload(), (copy) => copy.data);
     });
 
-    aceTest('a running and queued analysis with the ACE feature on validates', () => {
+    test('a running and queued analysis with the ACE feature on validates', () => {
       enableAce();
       assert.strictEqual(homePayload().data.autoRefactor.visible, true);
       addDelta(fixture('delta', 'full', 'entity'));
@@ -317,7 +316,7 @@ suite('Contract webview payloads Test Suite', () => {
       assertPayloadClosed(message.payload, (copy) => copy.auth.status);
     });
 
-    aceTest('the objectives payload with the goal fix flag validates and is closed', () => {
+    test('the objectives payload with the goal fix flag validates and is closed', () => {
       enableAce();
       setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'));
       const message = updateRendererMessage(homePayload());
@@ -347,7 +346,7 @@ suite('Contract webview payloads Test Suite', () => {
     const fileData = (copy: any) => copy.data.fileData;
 
     for (const variant of fixtureVariants('review')) {
-      aceTest(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
+      test(`the ${variant} review fixture, function-level smell, refactorable, validates and is closed`, async () => {
         enableAce();
         const payload = await getDocsData(docsParams(variant, 'function', newDocument()));
         assert.strictEqual(payload.data.fileData?.fn?.name, 'fakeFunction');

@@ -111,19 +111,10 @@ suite('Package Platform Script Test Suite', () => {
     assert.strictEqual(twice, once);
   });
 
-  const agentCases = [
-    { name: 'keeps the agent binary for the full variant', includeAgent: true, expected: ['!bin/'] },
-    { name: 'leaves the agent binary out of the no-ACE variant', includeAgent: false, expected: ['bin/'] },
-  ];
-
-  for (const { name, includeAgent, expected } of agentCases) {
-    test(`applyVscodeIgnoreExceptions ${name}`, () => {
-      const lines = lineList(
-        packagePlatform.applyVscodeIgnoreExceptions(committedVscodeIgnore, 'cs-linux-x64', includeAgent),
-      );
-      assert.deepStrictEqual(lines.filter(l => l === 'bin/' || l === '!bin/'), expected);
-    });
-  }
+  test('applyVscodeIgnoreExceptions keeps the agent binary', () => {
+    const lines = lineList(packagePlatform.applyVscodeIgnoreExceptions(committedVscodeIgnore, 'cs-linux-x64'));
+    assert.deepStrictEqual(lines.filter(l => l === 'bin/' || l === '!bin/'), ['!bin/']);
+  });
 
   test('preserves CRLF line endings without introducing bare LF lines', () => {
     const output: string = packagePlatform.applyVscodeIgnoreExceptions('cs-*\r\n*.zip\r\nMakefile\r\n', 'cs-win32-x64');

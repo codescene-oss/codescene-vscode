@@ -13,7 +13,6 @@ import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { DevtoolsAPI } from '../../devtools-api';
-import { aceTest } from '../ace-test-suite';
 
 const REPO = '/work/repo-a';
 const GOAL_ID = 42;
@@ -215,7 +214,7 @@ suite('Objectives feature fix goal', () => {
     await flushPromises();
   }
 
-  aceTest('routes a fix-goal webview message to the requestAndPresentRefactoring command', async () => {
+  test('routes a fix-goal webview message to the requestAndPresentRefactoring command', async () => {
     DevtoolsAPI.enableAce();
     await activate();
     await handleCWFMessage({} as any, { messageType: 'fix-goal', payload: { goalId: GOAL_ID, path } });

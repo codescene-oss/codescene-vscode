@@ -8,7 +8,6 @@ import {
 } from '../../refactoring/agent-config';
 import { getAgentModel } from '../../configuration';
 import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
-import { aceSuite } from '../ace-test-suite';
 
 const testCases = [
   {
@@ -189,7 +188,7 @@ const testCases = [
   },
 ];
 
-aceSuite('AgentConfig Test Suite', () => {
+suite('AgentConfig Test Suite', () => {
   teardown(() => {
     restoreDefaultConfiguration();
   });

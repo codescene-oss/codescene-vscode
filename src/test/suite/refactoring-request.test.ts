@@ -4,14 +4,13 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { Range, Position } from '../mocks/vscode';
-import { aceSuite } from '../ace-test-suite';
 import { CsExtensionState } from '../../cs-extension-state';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { CsRefactoringCommands } from '../../refactoring/commands';
 import * as unsavedChanges from '../../refactoring/unsaved-changes';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 
-aceSuite('RefactoringRequest Test Suite', () => {
+suite('RefactoringRequest Test Suite', () => {
   let postRefactoringCallCount: number;
   let originalPostRefactoring: any;
   let originalEnsureSaved: any;

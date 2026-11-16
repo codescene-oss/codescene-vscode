@@ -5,7 +5,6 @@ import { RefactoringRequest } from '../../refactoring/request';
 import { fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { FixGoalTarget } from '../../refactoring/agent-types';
-import { aceSuite } from '../ace-test-suite';
 import { getAppliedEdits, getWebviewMessageHandler, resetAppliedEdits, resetWebviewPanelMocks } from '../setup';
 import { RefactorResponse } from '../../devtools-api/refactor-models';
 import { CsExtensionState } from '../../cs-extension-state';
@@ -70,7 +69,7 @@ function lastCommand() {
   return executed[executed.length - 1];
 }
 
-aceSuite('Fix goal commands Test Suite', () => {
+suite('Fix goal commands Test Suite', () => {
   let commands: CsRefactoringCommands;
   const originalShowWarningMessage = vscode.window.showWarningMessage;
   const originalExecuteCommand = vscode.commands.executeCommand;

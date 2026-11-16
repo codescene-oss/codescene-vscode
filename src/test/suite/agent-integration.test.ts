@@ -11,9 +11,8 @@ import * as csExtensionState from '../../cs-extension-state';
 import { AgentRefactoringService } from '../../refactoring/agent-service';
 import { FnToRefactor } from '../../devtools-api/refactor-models';
 
-import { aceSuite } from '../ace-test-suite';
 
-aceSuite('Agent Integration Test Suite', () => {
+suite('Agent Integration Test Suite', () => {
   const testDir = createTestDir('test-agent-integration');
   const testToken = process.env.CODESCENE_TEST_TOKEN;
   let originalGetAuthToken: any;

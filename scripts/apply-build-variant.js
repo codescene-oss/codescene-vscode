@@ -7,62 +7,30 @@
 const fs = require('fs');
 const path = require('path');
 
-const ACE_KEYWORDS = new Set([
-  'refactoring',
-  'ai',
-  'anthropic',
-  'openai',
-  'gemini',
-  'gpt',
-  'ai code review',
-]);
+const NO_ACE_NAME = 'codescene-vscode-noace';
+const SIDE_BY_SIDE_NOTICE =
+  '> Do not install this extension alongside CodeScene (`codescene.codescene-vscode`). Uninstall one before installing the other.';
 
-const ACE_SETTINGS = [
-  'codescene.enableAutoRefactor',
-  'codescene.authToken',
-  'codescene.agentModel',
-  'codescene.agentModelOverride',
-  'codescene.providerOptions',
-];
-
-const ACE_COMMANDS = new Set(['codescene.testConnectivity', 'codescene.setProviderApiKey']);
-
-function removeAceCommands(contributes) {
-  const isAceCommand = (entry) => ACE_COMMANDS.has(entry.command);
-  if (contributes.commands) {
-    contributes.commands = contributes.commands.filter((entry) => !isAceCommand(entry));
-  }
-  for (const [menu, entries] of Object.entries(contributes.menus || {})) {
-    contributes.menus[menu] = entries.filter((entry) => !isAceCommand(entry));
-  }
+function withSideBySideNotice(readme) {
+  const eol = readme.includes('\r\n') ? '\r\n' : '\n';
+  const lines = readme.split(eol);
+  const badgeAt = lines.findIndex((line) => line.startsWith('[![CodeScene Code Health]'));
+  lines.splice(badgeAt + 1, 0, '', SIDE_BY_SIDE_NOTICE);
+  return lines.join(eol);
 }
 
 function applyNoAceVariant(projectRoot) {
   const packageJsonPath = path.join(projectRoot, 'package.json');
   const readmePath = path.join(projectRoot, 'README.md');
-  const noAceReadmePath = path.join(projectRoot, 'README-noace.md');
 
   const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  pkg.name = 'codescene-vscode-noace';
+  pkg.name = NO_ACE_NAME;
   pkg.displayName = 'CodeScene w/o ACE';
-  pkg.description =
-    'CodeScene code analysis without ACE. Do not install alongside CodeScene (codescene.codescene-vscode).';
-  pkg.keywords = (pkg.keywords || []).filter((keyword) => !ACE_KEYWORDS.has(keyword));
-
-  const properties = pkg.contributes?.configuration?.properties;
-  if (properties) {
-    for (const key of ACE_SETTINGS) {
-      delete properties[key];
-    }
-  }
-  if (pkg.contributes) {
-    removeAceCommands(pkg.contributes);
-  }
-
+  pkg.description = `${pkg.description} Do not install alongside CodeScene (codescene.codescene-vscode).`;
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-  if (fs.existsSync(noAceReadmePath)) {
-    fs.copyFileSync(noAceReadmePath, readmePath);
+  if (fs.existsSync(readmePath)) {
+    fs.writeFileSync(readmePath, withSideBySideNotice(fs.readFileSync(readmePath, 'utf8')));
   }
 
   return pkg;

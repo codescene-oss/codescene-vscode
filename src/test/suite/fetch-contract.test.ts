@@ -132,10 +132,10 @@ suite('Contract bundle fetch script Test Suite', () => {
     assert.match(packageJson.scripts.pretest, /npm run fetch-contract/);
   });
 
-  test('both test jobs of the test workflow run pretest', () => {
+  test('the test job of the test workflow runs pretest', () => {
     const workflow = fs.readFileSync(path.join(__dirname, '..', '..', '..', '.github', 'workflows', 'test.yml'), 'utf8');
-    const jobs = workflow.split(/^  (?=build:|test-no-ace:)/m).slice(1);
-    assert.strictEqual(jobs.length, 2);
+    const jobs = workflow.split(/^  (?=build:)/m).slice(1);
+    assert.strictEqual(jobs.length, 1);
     for (const job of jobs) {
       assert.match(job, /run: npm run pretest/);
     }

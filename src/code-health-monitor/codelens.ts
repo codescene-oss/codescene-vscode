@@ -1,5 +1,4 @@
 import vscode, { Uri } from 'vscode';
-import { ACE_ENABLED } from '../build-flags';
 import { onDidChangeConfiguration, reviewCodeLensesEnabled } from '../configuration';
 import { aceUsable } from '../devtools-api';
 import { issueToDocsParams } from '../documentation/commands';
@@ -20,7 +19,7 @@ export function register(context: vscode.ExtensionContext) {
 }
 
 function canOfferRefactoring(functionInfo: DeltaFunctionInfo): boolean {
-  return ACE_ENABLED && aceUsable() && functionInfo.isRefactoringSupported;
+  return aceUsable() && functionInfo.isRefactoringSupported;
 }
 
 export class CodeHealthMonitorCodeLens implements vscode.CodeLensProvider<vscode.CodeLens> {

@@ -4,7 +4,6 @@ import { AceRequestEvent, CodeHealthRulesResult } from './model';
 import { FnToRefactor, RefactorResponse } from './refactor-models';
 import vscode, { ExtensionContext, TextDocument } from 'vscode';
 import { isAceAvailable, refactorToken, resolveAceToken } from '../auth/ace-credential';
-import { ACE_ENABLED } from '../build-flags';
 import { getAuthToken, automaticAnalysisEnabled } from '../configuration';
 import { CsExtensionState, CsFeature } from '../cs-extension-state';
 import { logOutputChannel } from '../log';
@@ -229,17 +228,15 @@ export class DevtoolsAPI {
   private static aceActive = false;
 
   static enableAce() {
-    if (!ACE_ENABLED) return;
     DevtoolsAPI.aceActive = true;
     DevtoolsAPI.aceStateEmitter.fire({ state: 'enabled' });
   }
 
   static aceEnabled() {
-    return ACE_ENABLED && DevtoolsAPI.aceActive;
+    return DevtoolsAPI.aceActive;
   }
 
   static disableAce() {
-    if (!ACE_ENABLED) return;
     DevtoolsAPI.aceActive = false;
     DevtoolsAPI.aceStateEmitter.fire({ state: 'disabled' });
   }
@@ -254,7 +251,6 @@ export class DevtoolsAPI {
   }
 
   static async postRefactoring(request: RefactoringRequest, onProgress?: ProgressCallback): Promise<RefactorResponse> {
-    this.checkAceEnabled();
     const { document, fnToRefactor, skipCache } = request;
     this.getRefactoringAuthToken();
     DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'start' });
@@ -270,10 +266,6 @@ export class DevtoolsAPI {
     } finally {
       DevtoolsAPI.refactoringRequestEmitter.fire({ document, request, type: 'end' });
     }
-  }
-
-  private static checkAceEnabled(): void {
-    if (!ACE_ENABLED) throw new Error('ACE is not available in this build');
   }
 
   private static getRefactoringAuthToken(): string | undefined {
@@ -337,7 +329,6 @@ export class DevtoolsAPI {
   }
 
   private static handleOfflineBehavior() {
-    if (!ACE_ENABLED) return;
     DevtoolsAPI.lastNetworkError = true;
     if (CsExtensionState.stateProperties.features.ace.state !== 'offline') {
       void vscode.window.showInformationMessage('CodeScene extension is running in offline mode. Some features may be unavailable.');
@@ -348,7 +339,7 @@ export class DevtoolsAPI {
 
   private static handleBackOnline() {
     DevtoolsAPI.lastNetworkError = false;
-    if (ACE_ENABLED && CsExtensionState.stateProperties.features.ace.state === 'offline') {
+    if (CsExtensionState.stateProperties.features.ace.state === 'offline') {
       DevtoolsAPI.aceStateEmitter.fire({ state: 'enabled' });
       void vscode.window.showInformationMessage('CodeScene extension is back online.');
     }

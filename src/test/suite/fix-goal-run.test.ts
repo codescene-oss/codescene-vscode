@@ -14,7 +14,6 @@ import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webv
 import { fixGoalJobs } from '../../objectives/fix-goal-jobs';
 import { OPEN_GOAL_FIX, UNDO_GOAL_FIX } from '../../refactoring/goal-fix';
 import { SAVE_AND_REFACTOR } from '../../refactoring/unsaved-changes';
-import { aceSuite } from '../ace-test-suite';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
@@ -48,7 +47,7 @@ function responseWith(code: string, outcome: 'reached' | 'improved' | 'unable' =
 
 type Deferred = { resolve: (response: RefactorResponse) => void; reject: (error: Error) => void; request: RefactoringRequest };
 
-aceSuite('Fix goal run Test Suite', () => {
+suite('Fix goal run Test Suite', () => {
   let commands: CsRefactoringCommands;
   let document: TestTextDocument;
   let pending: Deferred[];

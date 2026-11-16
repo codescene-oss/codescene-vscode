@@ -10,7 +10,6 @@ import {
   getWebviewPostMessageCalls,
   resetWebviewPanelMocks,
 } from '../setup';
-import { aceSuite } from '../ace-test-suite';
 import { initExtensionId } from '../../extension-id';
 
 function resetDocsPanel() {
@@ -61,7 +60,7 @@ suite('CodeSceneCWFDocsTabPanel Test Suite', () => {
     panel.state = createDocsParams();
   }
 
-  aceSuite('ACE state listeners', () => {
+  suite('ACE state listeners', () => {
     test('refreshAceState posts update when ACE state changes', async () => {
       primeDocsPanel();
       getWebviewPostMessageCalls().length = 0;

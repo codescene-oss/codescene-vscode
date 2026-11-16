@@ -5,16 +5,11 @@ import * as path from 'path';
 
 const { applyNoAceVariant } = require('../../../scripts/apply-build-variant');
 
-const projectPackageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../..', 'package.json'), 'utf8'));
-
-const AGENT_SETTINGS = [
-  'codescene.enableAutoRefactor',
-  'codescene.authToken',
-  'codescene.agentModel',
-  'codescene.agentModelOverride',
-  'codescene.providerOptions',
-];
-const AGENT_COMMANDS = ['codescene.testConnectivity', 'codescene.setProviderApiKey'];
+const repoRoot = path.resolve(__dirname, '../../..');
+const projectPackageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+const projectReadme = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8');
+const sideBySideNotice =
+  '> Do not install this extension alongside CodeScene (`codescene.codescene-vscode`). Uninstall one before installing the other.';
 
 suite('Apply build variant Test Suite', () => {
   let projectRoot: string;
@@ -22,35 +17,39 @@ suite('Apply build variant Test Suite', () => {
   setup(() => {
     projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-build-variant-'));
     fs.writeFileSync(path.join(projectRoot, 'package.json'), JSON.stringify(projectPackageJson));
+    fs.writeFileSync(path.join(projectRoot, 'README.md'), projectReadme);
   });
 
   teardown(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
 
-  test('the no-ACE variant keeps its own package name', () => {
+  test('the no-ACE variant keeps its own package name and display name', () => {
     const pkg = applyNoAceVariant(projectRoot);
-    assert.deepStrictEqual({ name: pkg.name, version: pkg.version }, { name: 'codescene-vscode-noace', version: projectPackageJson.version });
+    assert.deepStrictEqual(
+      { name: pkg.name, displayName: pkg.displayName, version: pkg.version },
+      { name: 'codescene-vscode-noace', displayName: 'CodeScene w/o ACE', version: projectPackageJson.version }
+    );
   });
 
-  test('the no-ACE variant has no agent settings', () => {
+  test('the no-ACE variant contributes the same settings, commands and menus', () => {
     const pkg = applyNoAceVariant(projectRoot);
-    const properties = Object.keys(pkg.contributes.configuration.properties);
-    assert.deepStrictEqual(AGENT_SETTINGS.filter((key) => properties.includes(key)), []);
+    assert.deepStrictEqual(pkg.contributes, projectPackageJson.contributes);
   });
 
-  test('the no-ACE variant has no agent commands or menu entries', () => {
+  test('the no-ACE variant keeps the keywords and activation', () => {
     const pkg = applyNoAceVariant(projectRoot);
-    const contributed = [
-      ...pkg.contributes.commands.map((c: { command: string }) => c.command),
-      ...pkg.contributes.menus.commandPalette.map((c: { command: string }) => c.command),
-    ];
-    assert.deepStrictEqual(AGENT_COMMANDS.filter((command) => contributed.includes(command)), []);
+    assert.deepStrictEqual(
+      { keywords: pkg.keywords, main: pkg.main, activationEvents: pkg.activationEvents },
+      { keywords: projectPackageJson.keywords, main: projectPackageJson.main, activationEvents: projectPackageJson.activationEvents }
+    );
   });
 
-  test('the no-ACE variant keeps the other commands', () => {
-    const pkg = applyNoAceVariant(projectRoot);
-    assert.strictEqual(
-      pkg.contributes.commands.length,
-      projectPackageJson.contributes.commands.length - AGENT_COMMANDS.length
+  test('the no-ACE variant README is the shared README with a side-by-side notice', () => {
+    applyNoAceVariant(projectRoot);
+    const readme = fs.readFileSync(path.join(projectRoot, 'README.md'), 'utf8');
+    const eol = projectReadme.includes('\r\n') ? '\r\n' : '\n';
+    assert.deepStrictEqual(
+      { notice: readme.includes(sideBySideNotice), rest: readme.replace(`${eol}${sideBySideNotice}${eol}`, '') },
+      { notice: true, rest: projectReadme }
     );
   });
 });

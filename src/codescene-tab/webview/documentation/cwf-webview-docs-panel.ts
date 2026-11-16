@@ -9,7 +9,6 @@ import { routeAuthMessage } from '../../../auth/auth-message-handler';
 import { getDocsData } from './docs-data-mapper';
 import Telemetry from '../../../telemetry';
 import { CsExtensionState } from '../../../cs-extension-state';
-import { ACE_ENABLED } from '../../../build-flags';
 import { getExtensionSettingsFilter } from '../../../extension-id';
 import { onDidChangeConfiguration } from '../../../configuration';
 
@@ -50,13 +49,11 @@ export class CodeSceneCWFDocsTabPanel implements Disposable {
     this.webViewPanel.webview.onDidReceiveMessage(this.handleMessages, this, this.disposables);
 
     this.disposables.push(onDidChangeCwfAuth(() => this.refreshAceState()));
-    if (ACE_ENABLED) {
-      this.disposables.push(
-        CsExtensionState.onAceStateChanged(() => this.refreshAceState()),
-        CsExtensionState.onAuthChanged(() => this.refreshAceState()),
-        onDidChangeConfiguration('authToken', () => this.refreshAceState())
-      );
-    }
+    this.disposables.push(
+      CsExtensionState.onAceStateChanged(() => this.refreshAceState()),
+      CsExtensionState.onAuthChanged(() => this.refreshAceState()),
+      onDidChangeConfiguration('authToken', () => this.refreshAceState())
+    );
     vscode.workspace.onDidCloseTextDocument(
       (e) => {
         const closedThisDoc = this.state?.document === e;

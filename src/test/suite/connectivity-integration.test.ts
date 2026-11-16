@@ -7,9 +7,8 @@ import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
 import { testConnectivity } from '../../refactoring/connectivity';
 
-import { aceSuite } from '../ace-test-suite';
 
-aceSuite('Connectivity Integration Test Suite', () => {
+suite('Connectivity Integration Test Suite', () => {
   const testDir = createTestDir('test-connectivity-integration');
   const awsProfile = process.env.CS_AGENT_AWS_PROFILE;
   const awsRegion = process.env.CS_AGENT_AWS_REGION;

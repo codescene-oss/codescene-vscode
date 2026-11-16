@@ -7,7 +7,6 @@ import { AgentOutput, ConfidenceLevel, ScoreGoalTarget, FixGoalOutput, FindingGo
 import { FnToRefactor, RefactorResponse } from '../../devtools-api/refactor-models';
 import { Review } from '../../devtools-api/review-model';
 import { findingTargets } from '../../refactoring/fn-to-refactor';
-import { aceSuite } from '../ace-test-suite';
 import { Range, Position } from '../mocks/vscode';
 import { RENDER_CODE_FIX_SKILL, FIX_GOAL_SKILL } from '../../refactoring/agent-config';
 import { AbortError } from '../../devtools-api/abort-error';
@@ -44,7 +43,7 @@ function createMockDocument(fileName: string, content: string) {
   } as any;
 }
 
-aceSuite('AgentRefactoringService Test Suite', () => {
+suite('AgentRefactoringService Test Suite', () => {
   for (const { skill, expected } of [
     { skill: RENDER_CODE_FIX_SKILL, expected: ['run', 'skill:render-code-fix', '--model', 'm'] },
     { skill: FIX_GOAL_SKILL, expected: ['run', 'skill:fix-goal', '--model', 'm'] },

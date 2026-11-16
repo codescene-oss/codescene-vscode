@@ -2,7 +2,6 @@ import vscode from 'vscode';
 import type { ObjectivesField } from '../centralized-webview-framework/types';
 import type { FeatureFlags } from '../centralized-webview-framework/types/cwf-feature';
 import type { ObjectivesSnapshot } from '../centralized-webview-framework/types/objectives';
-import { ACE_ENABLED } from '../build-flags';
 
 export const IDE_OBJECTIVES_FLAG: FeatureFlags = 'ide-objectives';
 export const IDE_GOAL_FIX_FLAG: FeatureFlags = 'ide-goal-fix';
@@ -22,10 +21,7 @@ export function setCwfObjectives(snapshot: ObjectivesSnapshot | undefined, opts?
 
 export function withCwfObjectives<T extends ObjectivesField & { featureFlags?: FeatureFlags[] }>(props: T): T {
   if (!currentSnapshot) return props;
-  const flags = [IDE_OBJECTIVES_FLAG];
-  if (ACE_ENABLED) {
-    flags.push(IDE_GOAL_FIX_FLAG);
-  }
+  const flags = [IDE_OBJECTIVES_FLAG, IDE_GOAL_FIX_FLAG];
   if (workSessionsEnabled) {
     flags.push(GOAL_WORK_SESSIONS_FLAG);
   }

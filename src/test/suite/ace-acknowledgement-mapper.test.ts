@@ -1,4 +1,3 @@
-import { aceSuite } from '../ace-test-suite';
 import * as assert from 'assert';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
@@ -6,7 +5,7 @@ import type { AuthStatus } from '../../centralized-webview-framework/types/auth'
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { getAutoRefactorConfig } from '../../codescene-tab/webview/ace/acknowledgement/ace-acknowledgement-mapper';
 
-aceSuite('AceAcknowledgementMapper Test Suite', () => {
+suite('AceAcknowledgementMapper Test Suite', () => {
   let originalGetAuthToken: typeof configModule.getAuthToken;
   let originalStateProperties: PropertyDescriptor | undefined;
   let originalAcknowledged: PropertyDescriptor | undefined;

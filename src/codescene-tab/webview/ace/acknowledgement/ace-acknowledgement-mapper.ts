@@ -1,4 +1,3 @@
-import { ACE_ENABLED } from '../../../../build-flags';
 import { AceAcknowledgeContextViewProps, AutoRefactorConfig } from '../../../../centralized-webview-framework/types';
 import { CsExtensionState } from '../../../../cs-extension-state';
 import { RefactoringRequest } from '../../../../refactoring/request';
@@ -19,10 +18,6 @@ export function getAceAcknowledgeData(request: RefactoringRequest): AceAcknowled
 }
 
 export function getAutoRefactorConfig(): AutoRefactorConfig {
-  if (!ACE_ENABLED) {
-    return { disabled: true, activated: false, visible: false };
-  }
-
   const authenticated = aceAvailable();
   const acknowledged = CsExtensionState.acknowledgedAceUsage === true;
   const activated = !(!acknowledged && authenticated);

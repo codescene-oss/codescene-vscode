@@ -9,7 +9,6 @@ import { TestTextDocument } from '../mocks/test-text-document';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { createTestDir, ensureBinary } from '../integration_helper';
 
-import { aceTest } from '../ace-test-suite';
 
 suite('Delta Integration Test Suite', () => {
   const testDir = createTestDir('test-delta');
@@ -60,7 +59,7 @@ suite('Delta Integration Test Suite', () => {
   });
 
 
-  aceTest('fnToRefactorForCodeSmell resolves the enclosing function from the review', async function() {
+  test('fnToRefactorForCodeSmell resolves the enclosing function from the review', async function() {
     this.timeout(60000);
 
     const complexContent = 'int f(int a) {\n  if (a > 0) {\n    if (a > 1) {\n      if (a > 2) {\n        if (a > 3) {\n          return a;\n        }\n      }\n    }\n  }\n  return 0;\n}\n';

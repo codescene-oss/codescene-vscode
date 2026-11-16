@@ -5,7 +5,6 @@ import { fnToRefactorForWholeFile } from '../../refactoring/fn-to-refactor';
 import { TestTextDocument } from '../mocks/test-text-document';
 import { AgentRefactoringService } from '../../refactoring/agent-service';
 import { FixGoalTarget } from '../../refactoring/agent-types';
-import { aceSuite } from '../ace-test-suite';
 import * as csExtensionState from '../../cs-extension-state';
 import * as configModule from '../../configuration';
 
@@ -20,7 +19,7 @@ const goal: FixGoalTarget = {
   path: 'src/file.ts',
 };
 
-aceSuite('Fix goal request Test Suite', () => {
+suite('Fix goal request Test Suite', () => {
   const calls = { fixGoal: 0, refactor: 0 };
   let originalRunFixGoal: any;
   let originalRunRefactoring: any;
