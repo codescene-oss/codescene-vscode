@@ -11,7 +11,7 @@ import { CsExtensionState } from '../../cs-extension-state';
 import { CodeSceneCWFAceTabPanel } from '../../codescene-tab/webview/ace/cwf-webview-ace-panel';
 import { CodeSceneCWFAceAcknowledgementTabPanel } from '../../codescene-tab/webview/ace/acknowledgement/cwf-webview-ace-acknowledgement-panel';
 import { fixGoalJobs } from '../../objectives/fix-goal-jobs';
-import { UNDO_GOAL_FIX } from '../../refactoring/goal-fix';
+import { OPEN_GOAL_FIX, UNDO_GOAL_FIX } from '../../refactoring/goal-fix';
 import { SAVE_AND_REFACTOR } from '../../refactoring/unsaved-changes';
 import { aceSuite } from '../ace-test-suite';
 import { flushPromises } from '../fakes/fake-auth-transport';
@@ -58,6 +58,8 @@ aceSuite('Fix goal run Test Suite', () => {
   let warningAnswer: string | undefined;
   let panelsShown: number;
   let acknowledgementsShown: RefactoringRequest[];
+  let saved: string[];
+  let shown: vscode.TextDocument[];
 
   const window = vscode.window as any;
   const originals = {
@@ -65,6 +67,7 @@ aceSuite('Fix goal run Test Suite', () => {
     showInformationMessage: window.showInformationMessage,
     showWarningMessage: window.showWarningMessage,
     showErrorMessage: window.showErrorMessage,
+    showTextDocument: window.showTextDocument,
     panelShow: CodeSceneCWFAceTabPanel.show,
     acknowledgementShow: CodeSceneCWFAceAcknowledgementTabPanel.show,
   };
@@ -79,7 +82,14 @@ aceSuite('Fix goal run Test Suite', () => {
     warningAnswer = undefined;
     panelsShown = 0;
     acknowledgementsShown = [];
+    saved = [];
+    shown = [];
     resetAppliedEdits();
+    document.setOnSave(() => {
+      const applied = editTexts().at(-1) ?? document.getText();
+      document.setText(applied);
+      saved.push(applied);
+    });
 
     CsExtensionState.init(createMockExtensionContext('/test/fix-goal-run'));
     await CsExtensionState.setAcknowledgedAceUsage(true);
@@ -96,6 +106,10 @@ aceSuite('Fix goal run Test Suite', () => {
     };
     window.showErrorMessage = async (message: string) => {
       errors.push(message);
+      return undefined;
+    };
+    window.showTextDocument = async (doc: vscode.TextDocument) => {
+      shown.push(doc);
       return undefined;
     };
     CodeSceneCWFAceTabPanel.show = () => {
@@ -115,6 +129,7 @@ aceSuite('Fix goal run Test Suite', () => {
     window.showInformationMessage = originals.showInformationMessage;
     window.showWarningMessage = originals.showWarningMessage;
     window.showErrorMessage = originals.showErrorMessage;
+    window.showTextDocument = originals.showTextDocument;
     CodeSceneCWFAceTabPanel.show = originals.panelShow;
     CodeSceneCWFAceAcknowledgementTabPanel.show = originals.acknowledgementShow;
     resetAppliedEdits();
@@ -144,40 +159,59 @@ aceSuite('Fix goal run Test Suite', () => {
     );
   });
 
-  test('the applied fix is announced with an Undo action', async () => {
+  test('the applied fix is saved so the goal is evaluated on the fixed file', async () => {
+    const run = fixGoal();
+    await started();
+    pending[0].resolve(responseWith(fixed));
+    await run;
+    assert.deepStrictEqual({ saved, dirty: document.isDirty }, { saved: [fixed], dirty: false });
+  });
+
+  test('the applied fix is announced with Open and Undo actions', async () => {
     const run = fixGoal();
     await started();
     pending[0].resolve(responseWith(fixed));
     await run;
     assert.deepStrictEqual(infos, [
-      { message: 'The Refactoring Agent changed file.ts. Goal reached: 6.2 → 8.0 (target 8.0).', items: [UNDO_GOAL_FIX] },
+      { message: 'The Refactoring Agent changed file.ts. Goal reached: 6.2 → 8.0 (target 8.0).', items: [OPEN_GOAL_FIX, UNDO_GOAL_FIX] },
     ]);
   });
 
-  test('Undo puts the original file back', async () => {
+  async function answered(choice: string, afterFix?: () => void): Promise<void> {
     let answer!: (choice: string | undefined) => void;
     infoAnswer = new Promise((resolve) => (answer = resolve));
     const run = fixGoal();
     await started();
     pending[0].resolve(responseWith(fixed));
     await run;
-    document.setText(fixed);
-    answer(UNDO_GOAL_FIX);
+    afterFix?.();
+    answer(choice);
     await flushPromises();
-    assert.deepStrictEqual(editTexts(), [fixed, original]);
+  }
+
+  test('Open shows the fixed file', async () => {
+    await answered(OPEN_GOAL_FIX);
+    assert.deepStrictEqual({ shown, edits: editTexts() }, { shown: [document], edits: [fixed] });
+  });
+
+  test('Undo puts the original file back and saves it', async () => {
+    await answered(UNDO_GOAL_FIX);
+    assert.deepStrictEqual({ edits: editTexts(), saved }, { edits: [fixed, original], saved: [fixed, original] });
+  });
+
+  test('Undo still applies when saving reformatted the fix', async () => {
+    document.setOnSave(() => {
+      const applied = editTexts().length === 1 ? 'c formatted\n' : original;
+      document.setText(applied);
+      saved.push(applied);
+    });
+    await answered(UNDO_GOAL_FIX);
+    assert.deepStrictEqual({ edits: editTexts(), warnings }, { edits: [fixed, original], warnings: [] });
   });
 
   test('Undo refuses to touch a file that changed after the fix', async () => {
-    let answer!: (choice: string | undefined) => void;
-    infoAnswer = new Promise((resolve) => (answer = resolve));
-    const run = fixGoal();
-    await started();
-    pending[0].resolve(responseWith(fixed));
-    await run;
-    document.setText('mine\n');
-    answer(UNDO_GOAL_FIX);
-    await flushPromises();
-    assert.deepStrictEqual({ edits: editTexts(), warnings: warnings.length }, { edits: [fixed], warnings: 1 });
+    await answered(UNDO_GOAL_FIX, () => document.setText('mine\n'));
+    assert.deepStrictEqual({ edits: editTexts(), saved, warnings: warnings.length }, { edits: [fixed], saved: [fixed], warnings: 1 });
   });
 
   const failures: Array<{ name: string; finish: (deferred: Deferred) => void; before?: () => void; expect: { edits: number; infos: number; warnings: number; errors: number } }> = [

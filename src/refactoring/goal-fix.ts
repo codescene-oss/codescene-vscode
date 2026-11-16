@@ -5,6 +5,7 @@ import { RefactorResponse } from '../devtools-api/refactor-models';
 import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 
+export const OPEN_GOAL_FIX = 'Open';
 export const UNDO_GOAL_FIX = 'Undo';
 
 export async function replaceDocument(document: vscode.TextDocument, code: string): Promise<void> {
@@ -25,20 +26,31 @@ async function awaitResponse(request: RefactoringRequest): Promise<RefactorRespo
   }
 }
 
-async function offerUndo(request: RefactoringRequest, response: RefactorResponse): Promise<void> {
+async function applyAndSave(document: vscode.TextDocument, code: string): Promise<string> {
+  await replaceDocument(document, code);
+  await document.save();
+  return document.getText();
+}
+
+async function offerOpenAndUndo(request: RefactoringRequest, response: RefactorResponse, applied: string): Promise<void> {
   const { document, fnToRefactor } = request;
   const details = response.confidence['recommended-action'].details;
   const choice = await vscode.window.showInformationMessage(
     `The Refactoring Agent changed ${basename(document.fileName)}. ${details}.`,
+    OPEN_GOAL_FIX,
     UNDO_GOAL_FIX
   );
+  if (choice === OPEN_GOAL_FIX) {
+    await vscode.window.showTextDocument(document);
+    return;
+  }
   if (choice !== UNDO_GOAL_FIX) return;
 
-  if (document.getText() !== response.code) {
+  if (document.getText() !== applied) {
     void vscode.window.showWarningMessage(`${basename(document.fileName)} changed after the goal fix was applied, so it was not undone.`);
     return;
   }
-  await replaceDocument(document, fnToRefactor.body);
+  await applyAndSave(document, fnToRefactor.body);
 }
 
 export async function runGoalFix(request: RefactoringRequest): Promise<void> {
@@ -58,7 +70,7 @@ export async function runGoalFix(request: RefactoringRequest): Promise<void> {
     return;
   }
 
-  await replaceDocument(document, response.code);
+  const applied = await applyAndSave(document, response.code);
   Telemetry.logUsage('refactor/applied', request.eventData);
-  void offerUndo(request, response);
+  void offerOpenAndUndo(request, response, applied);
 }
