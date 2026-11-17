@@ -105,13 +105,13 @@ export const ideStylesVars = `
 
       --cs-theme-success: var(--vscode-charts-green);
       --cs-theme-warning: var(--vscode-editorWarning-foreground);
-      --cs-theme-issue: var(--vscode-charts-orange);
+      --cs-theme-issue: #EE9D28;
     }
 
-    /* The default charts orange is the same in light and dark themes, which is too faint on a light background. Darken it there. */
+    /* Not --vscode-charts-orange: it defaults to the translucent find-match highlight (#EA5C0055), which reads as brown. */
     body.vscode-light,
     body.vscode-high-contrast-light {
-      --cs-theme-issue: color-mix(in srgb, var(--vscode-charts-orange) 70%, black);
+      --cs-theme-issue: #A15C00;
     }
   </style>
 `;
