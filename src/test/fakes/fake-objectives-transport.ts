@@ -15,6 +15,7 @@ export class FakeObjectivesTransport implements ObjectivesTransport {
   private readonly objectivesEmitter = new EventEmitter<ObjectivesSnapshot>();
   private failure: Error | undefined;
   private workSessionStartResult: GoalWorkSessionStartResult | undefined;
+  private held: Array<() => void> | undefined;
   readonly onDidServerStart = this.startEmitter.event;
   readonly onDidObjectivesChange = this.objectivesEmitter.event;
 
@@ -31,12 +32,26 @@ export class FakeObjectivesTransport implements ObjectivesTransport {
     this.failure = error;
   }
 
+  holdRequests(): void {
+    this.held = [];
+  }
+
+  releaseRequests(): void {
+    const held = this.held ?? [];
+    this.held = undefined;
+    held.forEach((release) => release());
+  }
+
   setWorkSessionStartResult(result: GoalWorkSessionStartResult): void {
     this.workSessionStartResult = result;
   }
 
   async request<T>(method: string, params: unknown): Promise<T> {
     this.requests.push({ method, params });
+    if (this.held) {
+      const held = this.held;
+      await new Promise<void>((resolve) => held.push(resolve));
+    }
     if (this.failure) throw this.failure;
 
     if (method === 'cs-ide/goalWorkSessionStart') {

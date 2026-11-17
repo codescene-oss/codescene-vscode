@@ -48,9 +48,11 @@ export function activateObjectives(transport: ObjectivesTransport): ObjectivesFe
     });
   };
 
+  const publish = () => setCwfObjectives(service.current, { workSessions: service.workSessionsCapable, loading: service.loading });
   const disposables: vscode.Disposable[] = [
     service,
-    service.onDidChange(() => setCwfObjectives(service.current, { workSessions: service.workSessionsCapable })),
+    service.onDidChange(publish),
+    service.onDidChangeLoading(publish),
     registerObjectivesMessages({ startWorkSession, fixGoal }),
   ];
   void service.start().catch((error: unknown) => logOutputChannel.warn(`[objectives] start failed: ${String(error)}`));

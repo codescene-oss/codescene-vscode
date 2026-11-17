@@ -12,6 +12,7 @@ export interface AuthField {
 
 export interface ObjectivesField {
   objectives?: ObjectivesSnapshot;
+  objectivesLoading?: boolean;
 }
 
 export type IdeTypes = 'VSCode';
