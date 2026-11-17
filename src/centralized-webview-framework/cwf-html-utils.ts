@@ -102,6 +102,16 @@ export const ideStylesVars = `
             `--cs-theme-button-secondaryBackground-${opacity}: color-mix(in srgb, var(--vscode-button-secondaryBackground) ${opacity}%, transparent);`,
         )
         .join('\n      ')}
+
+      --cs-theme-success: var(--vscode-charts-green);
+      --cs-theme-warning: var(--vscode-editorWarning-foreground);
+      --cs-theme-issue: var(--vscode-charts-orange);
+    }
+
+    /* The default charts orange is the same in light and dark themes, which is too faint on a light background. Darken it there. */
+    body.vscode-light,
+    body.vscode-high-contrast-light {
+      --cs-theme-issue: color-mix(in srgb, var(--vscode-charts-orange) 70%, black);
     }
   </style>
 `;
