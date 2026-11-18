@@ -70,4 +70,26 @@ suite('Home payload objectives', () => {
   test('has no ide-goal-fix flag while there is no snapshot', () => {
     assert.strictEqual(homePayload().featureFlags?.includes('ide-goal-fix'), false);
   });
+
+  const loadingCases: Array<{ name: string; withSnapshot: boolean }> = [
+    { name: 'before the first snapshot', withSnapshot: false },
+    { name: 'while refreshing a snapshot', withSnapshot: true },
+  ];
+
+  for (const { name, withSnapshot } of loadingCases) {
+    test(`flags the tab and marks it loading ${name}`, () => {
+      const snapshot = withSnapshot ? fixture('objectives-snapshot', 'full', 'entity') : undefined;
+      setCwfObjectives(snapshot, { workSessions: false, loading: true });
+      const payload = homePayload();
+      assert.deepStrictEqual(
+        { objectives: payload.objectives, loading: payload.objectivesLoading, flagged: payload.featureFlags?.includes('ide-objectives') },
+        { objectives: snapshot, loading: true, flagged: true }
+      );
+    });
+  }
+
+  test('has no loading field once the snapshot has arrived', () => {
+    setCwfObjectives(fixture('objectives-snapshot', 'full', 'entity'), { workSessions: false, loading: false });
+    assert.strictEqual('objectivesLoading' in homePayload(), false);
+  });
 });

@@ -137,6 +137,37 @@ suite('ObjectivesService', () => {
     assert.deepStrictEqual({ current: service.current, changes }, { current: undefined, changes: 0 });
   });
 
+  const loadingCases: Array<{ name: string; fail: boolean }> = [
+    { name: 'the snapshot arrives', fail: false },
+    { name: 'the request fails', fail: true },
+  ];
+
+  for (const { name, fail } of loadingCases) {
+    test(`reports loading while the snapshot request is pending and stops when ${name}`, async () => {
+      await startService();
+      const transitions: boolean[] = [];
+      service.onDidChangeLoading(() => transitions.push(service.loading));
+      transport.holdRequests();
+      if (fail) transport.failRequests(new Error('boom'));
+      service.setContext({ active: true, settled: true, repoPath: REPO_A });
+      await flushPromises();
+      const whilePending = service.loading;
+      transport.releaseRequests();
+      await flushPromises();
+      assert.deepStrictEqual(
+        { whilePending, after: service.loading, transitions, published: service.current !== undefined },
+        { whilePending: true, after: false, transitions: [true, false], published: !fail }
+      );
+    });
+  }
+
+  test('is not loading when it asks for nothing', async () => {
+    await startService([]);
+    service.setContext({ active: true, settled: true, repoPath: REPO_A });
+    await flushPromises();
+    assert.strictEqual(service.loading, false);
+  });
+
   test('sets workSessionsCapable to true when server advertises goal-work-sessions-v1', async () => {
     await startService([OBJECTIVES_CAPABILITY, GOAL_WORK_SESSIONS_CAPABILITY]);
     assert.strictEqual(service.workSessionsCapable, true);

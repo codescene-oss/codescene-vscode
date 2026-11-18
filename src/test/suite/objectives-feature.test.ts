@@ -13,10 +13,13 @@ import { flushPromises } from '../fakes/fake-auth-transport';
 import { FakeObjectivesTransport } from '../fakes/fake-objectives-transport';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { DevtoolsAPI } from '../../devtools-api';
+import type { ObjectivesField } from '../../centralized-webview-framework/types';
+import { getHomeData } from '../../code-health-monitor/home/home-props-utils';
 
 const REPO = '/work/repo-a';
 const GOAL_ID = 42;
 const START_METHOD = 'cs-ide/goalWorkSessionStart';
+const homeData = { fileDeltaData: [], jobs: [], analysisState: 'idle' as const };
 
 function snapshotWithGoal(repoRoot: string): ObjectivesSnapshot {
   const snapshot = { ...fixture('objectives-snapshot', 'full', 'entity'), 'repo-root': repoRoot };
@@ -223,5 +226,21 @@ suite('Objectives feature fix goal', () => {
     assert.strictEqual(executed[0].args[1], 'objectives');
     const target = executed[0].args[5] as any;
     assert.strictEqual(target.repoRoot, REPO);
+  });
+
+  test('publishes the loading state to the home payload until the snapshot arrives', async () => {
+    transport = new FakeObjectivesTransport({ sha: 'sha', version: 'version', capabilities: [OBJECTIVES_CAPABILITY] }, snapshotWithGoalAndFile);
+    transport.holdRequests();
+    feature = activateObjectives(transport);
+    feature.update(signedIn(false));
+    await flushPromises();
+    const pending = getHomeData(homeData) as ObjectivesField;
+    transport.releaseRequests();
+    await flushPromises();
+    const loaded = getHomeData(homeData) as ObjectivesField;
+    assert.deepStrictEqual(
+      { pendingLoading: pending.objectivesLoading, pendingRepo: pending.objectives, loadedLoading: loaded.objectivesLoading, loadedRepo: loaded.objectives?.['repo-root'] },
+      { pendingLoading: true, pendingRepo: undefined, loadedLoading: undefined, loadedRepo: REPO }
+    );
   });
 });
