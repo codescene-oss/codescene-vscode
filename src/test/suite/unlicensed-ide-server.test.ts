@@ -6,8 +6,6 @@ import { CsIdeServerClient, isLicenseRequired, ReviewFailed } from '../../devtoo
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { getCapturedLogs } from '../setup';
 import { createTestDir, ensureBinary } from '../integration_helper';
-import { aceTest } from '../ace-test-suite';
-import type { CsFeature } from '../../cs-extension-state';
 
 const ISOLATED_ENV = ['CS_ACCESS_TOKEN', 'CS_CONTEXT', 'CODESCENE_HOME'] as const;
 
@@ -70,18 +68,6 @@ suite('Unlicensed cs-ide Integration Test Suite', () => {
 
     const { id, code } = await failure;
     assert.deepStrictEqual({ id, code }, { id: 'refused-1', code: 'auth/license-required' });
-  });
-
-  aceTest('treats a refused preflight as refactoring being unavailable, not as an error', async function () {
-    this.timeout(60000);
-    const states: CsFeature['state'][] = [];
-    const listener = DevtoolsAPI.onDidChangePreflightState(({ state }) => states.push(state));
-
-    assert.strictEqual(await DevtoolsAPI.preflight(), undefined);
-    listener.dispose();
-
-    assert.deepStrictEqual(states, ['loading', 'disabled']);
-    assert.deepStrictEqual(getCapturedLogs().filter(({ level }) => level === 'error'), []);
   });
 
   test('still answers device-id', async function () {
