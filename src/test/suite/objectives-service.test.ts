@@ -161,6 +161,28 @@ suite('ObjectivesService', () => {
     });
   }
 
+  const abandonedCases: Array<{ name: string; abandon: () => void }> = [
+    { name: 'sign-in is no longer active', abandon: () => service.setContext({ active: false, settled: true, repoPath: REPO_A }) },
+    { name: 'the restarted server lacks the capability', abandon: () => transport.emitRestart({ sha: 'sha', version: 'version', capabilities: [] }) },
+  ];
+
+  for (const { name, abandon } of abandonedCases) {
+    test(`stops reporting loading for a pending request as soon as ${name}`, async () => {
+      await startService();
+      const transitions: boolean[] = [];
+      service.onDidChangeLoading(() => transitions.push(service.loading));
+      transport.holdRequests();
+      service.setContext({ active: true, settled: true, repoPath: REPO_A });
+      await flushPromises();
+      abandon();
+      await flushPromises();
+      const whilePending = service.loading;
+      transport.releaseRequests();
+      await flushPromises();
+      assert.deepStrictEqual({ whilePending, after: service.loading, transitions }, { whilePending: false, after: false, transitions: [true, false] });
+    });
+  }
+
   test('is not loading when it asks for nothing', async () => {
     await startService([]);
     service.setContext({ active: true, settled: true, repoPath: REPO_A });
