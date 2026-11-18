@@ -23,7 +23,8 @@ function containsGoal(snapshot: ObjectivesSnapshot, goalId: number): boolean {
 export class ObjectivesService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly loadingEmitter = new vscode.EventEmitter<void>();
-  private pending = 0;
+  private readonly pending = new Map<string, number>();
+  private reportedLoading = false;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly snapshots = new Map<string, ObjectivesSnapshot>();
   private capable = false;
@@ -46,7 +47,8 @@ export class ObjectivesService implements vscode.Disposable {
   }
 
   get loading(): boolean {
-    return this.pending > 0;
+    const repoPath = this.servableRepo(this.hasSettled);
+    return repoPath !== undefined && this.pending.has(normalizeFsPath(repoPath));
   }
 
   get workSessionsCapable(): boolean {
@@ -83,6 +85,7 @@ export class ObjectivesService implements vscode.Disposable {
     this.hasSettled ||= context.settled;
     if (reload) void this.load();
     this.fireIfChanged(before);
+    this.fireIfLoadingChanged();
   }
 
   dispose(): void {
@@ -111,6 +114,7 @@ export class ObjectivesService implements vscode.Disposable {
     this.snapshots.clear();
     void this.load();
     this.fireIfChanged(before);
+    this.fireIfLoadingChanged();
   }
 
   private store(snapshot: ObjectivesSnapshot): void {
@@ -127,7 +131,8 @@ export class ObjectivesService implements vscode.Disposable {
     const repoPath = this.servableRepo(this.context.settled);
     if (!repoPath) return;
     const epoch = this.serverEpoch;
-    this.trackPending(1);
+    const key = normalizeFsPath(repoPath);
+    this.trackPending(key, 1);
     try {
       const snapshot = await this.rpc.snapshot(repoPath);
       logOutputChannel.info(`[objectives] requested snapshot repo=${snapshot['repo-root']} state=${snapshot.state} count=${snapshot.objectives.length}`);
@@ -135,13 +140,20 @@ export class ObjectivesService implements vscode.Disposable {
     } catch (error) {
       logOutputChannel.warn(`[objectives] request failed: ${String(error)}`);
     } finally {
-      this.trackPending(-1);
+      this.trackPending(key, -1);
     }
   }
 
-  private trackPending(delta: number): void {
-    const before = this.loading;
-    this.pending += delta;
-    if (before !== this.loading) this.loadingEmitter.fire();
+  private trackPending(key: string, delta: number): void {
+    const count = (this.pending.get(key) ?? 0) + delta;
+    if (count > 0) this.pending.set(key, count);
+    else this.pending.delete(key);
+    this.fireIfLoadingChanged();
+  }
+
+  private fireIfLoadingChanged(): void {
+    if (this.reportedLoading === this.loading) return;
+    this.reportedLoading = this.loading;
+    this.loadingEmitter.fire();
   }
 }
