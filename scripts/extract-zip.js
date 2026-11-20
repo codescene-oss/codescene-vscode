@@ -29,10 +29,16 @@ async function runExtractor(zipPath, destinationDir) {
   // Windows CI publishes zips via Compress-Archive; Expand-Archive reads those reliably.
   if (process.platform === 'win32') {
     const quote = (value) => value.replace(/'/g, "''");
+    const { PSModulePath, ...env } = process.env;
     await execFileAsync(
       'powershell.exe',
-      ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${quote(zipPath)}' -DestinationPath '${quote(destinationDir)}' -Force`],
-      execOptions
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath '${quote(zipPath)}' -DestinationPath '${quote(destinationDir)}' -Force`,
+      ],
+      { ...execOptions, env }
     );
     return;
   }

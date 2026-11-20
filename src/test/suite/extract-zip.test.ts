@@ -85,10 +85,23 @@ suite('Extract Zip Script Test Suite', () => {
     assert.strictEqual(fs.readFileSync(path.join(destination, 'assets', 'index.js'), 'utf8'), 'console.log(1);');
   });
 
-  test('rejects an archive that has not been created', async () => {
-    const destination = tempDir();
-    await assert.rejects(extractZipArchive(path.join(destination, 'missing.zip'), destination));
-  });
+  const unreadableArchiveCases = [
+    { description: 'an archive that has not been created', contents: undefined },
+    { description: 'a file that is not a zip archive', contents: 'not a zip' },
+    { description: 'a truncated zip archive', contents: buildZip([{ name: 'index.html', data: '<html></html>' }]).subarray(0, 40) },
+  ];
+
+  for (const { description, contents } of unreadableArchiveCases) {
+    test(`rejects ${description}`, async () => {
+      const directory = tempDir();
+      const zipPath = path.join(directory, 'archive.zip');
+      if (contents !== undefined) {
+        fs.writeFileSync(zipPath, contents);
+      }
+
+      await assert.rejects(extractZipArchive(zipPath, path.join(directory, 'out')));
+    });
+  }
 
   const symlinkCases = [
     { description: 'a symlink pointing outside the destination', target: '../outside', accepted: false },
