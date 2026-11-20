@@ -11,7 +11,8 @@ import { ChangeType } from '../../devtools-api/delta-model';
 import { fnToRefactorForFinding } from '../../refactoring/fn-to-refactor';
 import * as configModule from '../../configuration';
 import * as csExtensionState from '../../cs-extension-state';
-import { createTestDir, ensureBinary } from '../integration_helper';
+import { createTestDir, ensureBinary, skipWithoutCodeSceneCredential } from '../integration_helper';
+import { licensedGate } from '../fixtures/auth/auth-fixtures';
 
 
 suite('PostRefactoring Integration Test Suite', () => {
@@ -55,6 +56,7 @@ suite('PostRefactoring Integration Test Suite', () => {
   }
 
   setup(async function() {
+    skipWithoutCodeSceneCredential(this);
     this.timeout(60000);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -89,6 +91,7 @@ suite('PostRefactoring Integration Test Suite', () => {
     });
 
     DevtoolsAPI.init(binaryPath, mockContext);
+    DevtoolsAPI.useLicenseGate(licensedGate());
 
     analysisError = undefined;
     refactoringError = undefined;

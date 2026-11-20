@@ -1,6 +1,7 @@
 import vscode from 'vscode';
 import { canReauthorize } from '../auth/auth-commands';
 import type { AuthSnapshot } from '../auth/auth-payload';
+import { isLicensed } from '../auth/license-gate';
 import { logOutputChannel } from '../log';
 import { setCwfObjectives } from './cwf-objectives';
 import { ObjectivesService } from './objectives-service';
@@ -60,7 +61,7 @@ export function activateObjectives(transport: ObjectivesTransport): ObjectivesFe
     disposables,
     update: ({ active, status, syncing, repo }) => {
       reauthorizable = canReauthorize({ active, status });
-      service.setContext({ active, settled: status?.state === 'signed-in' && !syncing, repoPath: repo?.path });
+      service.setContext({ active, settled: isLicensed({ active, status }) && !syncing, repoPath: repo?.path });
     },
     startWorkSession,
     fixGoal,

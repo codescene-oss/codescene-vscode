@@ -188,6 +188,37 @@ suite('ReviewPipeline Test Suite', () => {
     assert.deepStrictEqual(events.failures.map(({ message }) => message), ['Review failed']);
   });
 
+  test('settles a review refused for a missing license without reporting a failure', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    const reviewPromise = pipeline.submit(repoRoot, submission(document));
+
+    client.failureEmitter.fire({
+      id: 'review-1',
+      repoRoot,
+      path: 'src/file.ts',
+      message: 'Sign in to CodeScene to use Code Health analysis.',
+      code: 'auth/license-required',
+    });
+
+    assert.strictEqual(await reviewPromise, undefined);
+    assert.deepStrictEqual(events.failures, []);
+    assertLogContains('debug', 'reason=auth/license-required');
+    void pipeline.submit(repoRoot, submission(document));
+    assert.strictEqual(client.batches.length, 2, 'a refused review is not reused by a later submission');
+  });
+
+  test('clear settles pending reviews and drops their late results', async () => {
+    const document = new TestTextDocument('/repo/src/file.ts', 'const value = 1;', 'typescript');
+    const reviewPromise = pipeline.submit(repoRoot, submission(document));
+
+    pipeline.clear();
+    completeReview(client, 'review-1', repoRoot);
+
+    assert.strictEqual(await reviewPromise, undefined);
+    assert.deepStrictEqual(events.reviews, []);
+    assert.deepStrictEqual(events.deltas, []);
+  });
+
   test('accepts notifications when path separators or drive letter case differ', async () => {
     const windowsRoot = 'c:\\Git\\codescene';
     const document = new TestTextDocument('c:\\Git\\codescene\\CSharp\\Example.cs', 'class Example {}', 'csharp');

@@ -68,7 +68,7 @@ suite('Auth feature activation', () => {
       return Promise.resolve(undefined);
     }) as typeof vscode.commands.executeCommand;
     (vscode.workspace as any).getConfiguration = () => ({
-      get: (key: string, defaultValue?: unknown) => (key === 'experimental.signIn' ? true : defaultValue),
+      get: (key: string, defaultValue?: unknown) => defaultValue,
       has: () => true,
       inspect: () => ({}),
       update: () => Promise.resolve(),
@@ -98,7 +98,8 @@ suite('Auth feature activation', () => {
       startWorkSession: () => Promise.resolve(),
       fixGoal: () => Promise.resolve(),
     };
-    disposables = activateAuth(context, transport, objectives);
+    const license = { onLicensed: () => {}, onUnlicensed: () => {}, onServerRelicensed: () => {} };
+    disposables = activateAuth(context, transport, license, objectives);
     await flushPromises();
     transport.notify({ ...authStatusFixture('signed-in-oauth'), 'reauthorize-needed': true });
     await flushPromises();

@@ -1,49 +1,42 @@
-import type { Memento } from 'vscode';
-import type { AuthError, AuthStatus } from '../centralized-webview-framework/types/auth';
 import type { AuthSnapshot } from './auth-payload';
+import { isLicensed, isLicenseResolving } from './license-gate';
+import { GATE_SHOWN } from './auth-telemetry';
 
-export const SIGN_IN_ACTION = 'Sign in';
-export const DONT_SHOW_AGAIN = "Don't show again";
-export const SIGN_IN_NUDGE = 'Sign in to CodeScene in your browser to connect the extension to your account.';
-export const SIGN_IN_NUDGE_DISMISSED_KEY = 'codescene.auth.signInNudgeDismissed';
+const ACTIVATION_MESSAGE = 'CodeScene requires a CodeScene account. Sign in to get Code Health analysis in your editor.';
+const SIGN_IN_ACTION = 'Sign in';
+const USE_ACCESS_TOKEN_ACTION = 'Use access token';
 
-export interface NoticeActions {
+export interface NoticeDeps {
   show(message: string, ...items: string[]): Thenable<string | undefined>;
   signIn(): Thenable<unknown>;
+  focusHomeView(): Thenable<unknown>;
+  logUsage(name: string, data?: Record<string, unknown>): void;
 }
 
-function nudgeAllowedAfter(error: AuthError | null): boolean {
-  return error === null || error.code === 'auth/invalid-token';
-}
-
-function nudgeableStatus(status: AuthStatus | null): boolean {
-  if (status?.state !== 'signed-out') return false;
-  if (status['env-token-present']) return false;
-  return status['oauth-supported'] !== false && nudgeAllowedAfter(status.error);
-}
-
-export function shouldNudge(snapshot: AuthSnapshot): boolean {
-  return snapshot.active && nudgeableStatus(snapshot.status);
+function shouldShowGate(snapshot: AuthSnapshot): boolean {
+  if (!snapshot.active) return false;
+  if (isLicensed(snapshot)) return false;
+  if (snapshot.status?.state === 'signing-in') return false;
+  if (isLicenseResolving(snapshot.status)) return false;
+  return true;
 }
 
 export class AuthNotices {
   private shown = false;
+  private gateLogged = false;
 
-  constructor(
-    private readonly state: Pick<Memento, 'get' | 'update'>,
-    private readonly actions: NoticeActions
-  ) {}
+  constructor(private readonly deps: NoticeDeps) {}
 
   async update(snapshot: AuthSnapshot): Promise<void> {
-    if (!this.canShow(snapshot)) return;
+    if (!shouldShowGate(snapshot)) return;
+    if (!this.gateLogged) {
+      this.gateLogged = true;
+      this.deps.logUsage(GATE_SHOWN);
+    }
+    if (this.shown) return;
     this.shown = true;
-    const choice = await this.actions.show(SIGN_IN_NUDGE, SIGN_IN_ACTION, DONT_SHOW_AGAIN);
-    if (choice === DONT_SHOW_AGAIN) await this.state.update(SIGN_IN_NUDGE_DISMISSED_KEY, true);
-    else if (choice === SIGN_IN_ACTION) await this.actions.signIn();
-  }
-
-  private canShow(snapshot: AuthSnapshot): boolean {
-    if (this.shown || this.state.get<boolean>(SIGN_IN_NUDGE_DISMISSED_KEY)) return false;
-    return shouldNudge(snapshot);
+    const choice = await this.deps.show(ACTIVATION_MESSAGE, SIGN_IN_ACTION, USE_ACCESS_TOKEN_ACTION);
+    if (choice === SIGN_IN_ACTION) await this.deps.signIn();
+    else if (choice === USE_ACCESS_TOKEN_ACTION) await this.deps.focusHomeView();
   }
 }

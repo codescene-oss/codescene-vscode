@@ -7,12 +7,12 @@ suite('authConfiguration', () => {
   const cases = [
     {
       name: 'blank values become null',
-      settings: { signInEnabled: true, serverUrl: '  ', accessToken: '' },
+      settings: { serverUrl: '  ', accessToken: '' },
       expected: { 'server-url': null, 'access-token': null },
     },
     {
       name: 'values are trimmed',
-      settings: { signInEnabled: true, serverUrl: ' https://cs.example ', accessToken: ' pat-1 ' },
+      settings: { serverUrl: ' https://cs.example ', accessToken: ' pat-1 ' },
       expected: { 'server-url': 'https://cs.example', 'access-token': 'pat-1' },
     },
   ];
@@ -27,14 +27,14 @@ suite('authConfiguration', () => {
 suite('readAuthSettings', () => {
   teardown(() => restoreDefaultConfiguration());
 
-  test('reads the toggle, server URL and token', () => {
-    mockConfiguration('codescene', { 'experimental.signIn': true, serverUrl: 'https://cs.example', authToken: 'pat-1' });
-    assert.deepStrictEqual(readAuthSettings(), { signInEnabled: true, serverUrl: 'https://cs.example', accessToken: 'pat-1' });
+  test('reads the server URL and token', () => {
+    mockConfiguration('codescene', { serverUrl: 'https://cs.example', authToken: 'pat-1' });
+    assert.deepStrictEqual(readAuthSettings(), { serverUrl: 'https://cs.example', accessToken: 'pat-1' });
   });
 
-  test('defaults to sign-in off and empty strings', () => {
+  test('defaults to empty strings', () => {
     mockConfiguration('codescene', {});
-    assert.deepStrictEqual(readAuthSettings(), { signInEnabled: false, serverUrl: '', accessToken: '' });
+    assert.deepStrictEqual(readAuthSettings(), { serverUrl: '', accessToken: '' });
   });
 });
 

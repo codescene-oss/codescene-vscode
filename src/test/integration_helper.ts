@@ -44,3 +44,31 @@ export async function ensureBinary(): Promise<string> {
 
   return binaryPath;
 }
+
+export async function removeTestDir(dir: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EBUSY' || attempt >= 50) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
+export const CREDENTIAL_SKIP_REASON =
+  'needs a CodeScene credential: set CS_ACCESS_TOKEN (CLI access) to run real cs-ide analysis tests';
+
+export function hasCodeSceneCredential(): boolean {
+  return Boolean(process.env.CS_ACCESS_TOKEN?.trim());
+}
+
+export function skipWithoutCodeSceneCredential(context: Mocha.Context): void {
+  if (hasCodeSceneCredential()) return;
+  const test = context.currentTest ?? context.test;
+  if (test && !test.title.endsWith(`(${CREDENTIAL_SKIP_REASON})`)) {
+    test.title = `${test.title} (${CREDENTIAL_SKIP_REASON})`;
+  }
+  context.skip();
+}

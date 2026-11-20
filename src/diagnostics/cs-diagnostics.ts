@@ -24,6 +24,10 @@ export default class CsDiagnostics {
     CsDiagnostics.collection.set(uri, diagnostics);
   }
 
+  static clear(): void {
+    CsDiagnostics.collection?.clear();
+  }
+
   static cancel(fileName: string): void {
     CsDiagnostics.reviewQueue.cancel(fileName);
   }

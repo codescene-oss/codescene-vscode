@@ -9,6 +9,7 @@ import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
 import CsDiagnostics from '../../diagnostics/cs-diagnostics';
 import { setMockGitRepositories, clearMockGitRepositories } from '../setup';
+import { licensedGate } from '../fixtures/auth/auth-fixtures';
 
 class FakeIdeServer {
   readonly reviewEmitter = new vscode.EventEmitter<ReviewResult>();
@@ -64,6 +65,7 @@ suite('Delta presentation Test Suite', () => {
     const context = createMockExtensionContext(__dirname);
     server = new FakeIdeServer();
     DevtoolsAPI.init(process.execPath, context, server as any);
+    DevtoolsAPI.useLicenseGate(licensedGate());
     Reviewer.init(context, () => new Map());
     CsDiagnostics.init(context);
     events = [];

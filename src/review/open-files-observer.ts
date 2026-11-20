@@ -139,15 +139,24 @@ export class OpenFilesObserver {
     return false;
   }
 
-  private reviewVisibleEditors(reason: string): void {
+  private forEachVisibleDocument(action: (document: vscode.TextDocument) => void): void {
     const allVisibleFileNames = this.getAllVisibleFileNames();
     if (allVisibleFileNames.size === 0) return;
     this.hasInitialized = true;
     allVisibleFileNames.forEach((filePath) => {
-      const fileUri = vscode.Uri.file(filePath);
-      void vscode.workspace.openTextDocument(fileUri).then((document) => {
-        this.trackAndReviewDocument(document, reason);
-      });
+      void vscode.workspace.openTextDocument(vscode.Uri.file(filePath)).then(action);
+    });
+  }
+
+  private reviewVisibleEditors(reason: string): void {
+    this.forEachVisibleDocument((document) => this.trackAndReviewDocument(document, reason));
+  }
+
+  reviewOpenDocuments(reason: string): void {
+    this.forEachVisibleDocument((document) => {
+      if (!isFileDocument(document)) return;
+      this.visibleDocuments.set(document.fileName, document);
+      this.reviewDocument(document, reason, !(document.isDirty && automaticAnalysisEnabled()));
     });
   }
 
