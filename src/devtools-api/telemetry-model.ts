@@ -24,6 +24,15 @@ export interface TelemetryEvent {
    * Unique identifier of user. Could be CodeScene user id.
    */
   'user-id'?: string;
+  /**
+   * Per-activation UUID identifying this IDE session.
+   */
+  'session-id'?: string;
+  /**
+   * Absolute local paths whose git repositories the event concerns.
+   * Used for enrichment and never forwarded.
+   */
+  'repository-paths'?: string[];
   [property: string]: any;
 }
 
