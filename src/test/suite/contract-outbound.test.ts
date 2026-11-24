@@ -118,7 +118,7 @@ suite('Contract outbound params Test Suite', () => {
   const everyTelemetryInput = { userId: '4711', internal: true };
   const noTelemetryInput = { internal: false };
 
-  // Event properties as the extension's call sites hand them to Telemetry.logUsage / logError.
+  // Event properties as the extension's call sites hand them to Telemetry.logUsage.
   const telemetryCallSites: Variants = {
     'all inputs: user id, internal and call-site data': telemetryEnvironment(everyTelemetryInput, () =>
       Telemetry.logUsage('code-health-monitor/file-updated', { visible: true, scoreChange: -1.5, nIssues: 3 })
@@ -138,11 +138,6 @@ suite('Contract outbound params Test Suite', () => {
     'call site: sign-in failure': telemetryEnvironment(noTelemetryInput, () =>
       Telemetry.logUsage('auth/sign-in-failed', { 'error-code': 'auth/timeout' })
     ),
-    'call site: unhandled error with nested extra data': telemetryEnvironment(noTelemetryInput, () => {
-      const error = new Error('boom') as Error & { code: string };
-      error.code = 'ECONNREFUSED';
-      Telemetry.logError(error, true, { repoRoot: REPO, context: { fileName: 'a.ts', retryCount: [1, 2] } });
-    }),
   };
 
   // ---- Review requests and notifications ----------------------------------------------------------------------
@@ -354,5 +349,18 @@ suite('Contract outbound params Test Suite', () => {
         /Keys not in kebab-case: \$\.event\.scoreChange/
       );
     });
+  });
+
+  test('reportError sends no telemetry', async () => {
+    const { reportError } = await import('../../utils');
+
+    await client.request('test/captured', {});
+    reportError({ context: 'Test error context', e: new Error('Test error'), extraData: { foo: 'bar' } });
+
+    await sleep(100);
+    const received = await client.request<Captured[]>('test/captured', {});
+    const telemetryMessages = received.filter((m) => m.method === 'cs-ide/telemetry');
+
+    assert.strictEqual(telemetryMessages.length, 0, 'reportError should not send any telemetry');
   });
 });
