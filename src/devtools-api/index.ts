@@ -324,8 +324,12 @@ export class DevtoolsAPI {
     return (await DevtoolsAPI.ideServer.deviceId())['device-id'];
   }
 
+  static isOfflineError(e: unknown): boolean {
+    return (e as Error | undefined)?.message === networkErrors.javaConnectException;
+  }
+
   private static shouldHandleOfflineBehavior(e: unknown): boolean {
-    return (e as Error).message === networkErrors.javaConnectException;
+    return DevtoolsAPI.isOfflineError(e);
   }
 
   private static handleOfflineBehavior() {

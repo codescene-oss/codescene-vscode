@@ -743,6 +743,46 @@ suite('AuthService actions', () => {
     await harness.service.closeAuth();
     assert.ok(!harness.transport.methods().includes('cs-ide/auth-cancel-login'));
   });
+
+  test('holds and releases routing on start', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    assert.deepStrictEqual(harness.routing.holds, [1]);
+    assert.deepStrictEqual(harness.routing.readies, [1]);
+  });
+
+  test('holds routing on server stop', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    harness.routing.holds = [];
+    harness.routing.readies = [];
+    harness.transport.crash();
+    await flushPromises();
+    assert.deepStrictEqual(harness.routing.holds, [2]);
+    assert.deepStrictEqual(harness.routing.readies, []);
+  });
+
+  test('holds and releases routing on restart', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    harness.routing.holds = [];
+    harness.routing.readies = [];
+    await harness.transport.restart();
+    await flushPromises();
+    assert.deepStrictEqual(harness.routing.holds, [2, 3]);
+    assert.deepStrictEqual(harness.routing.readies, [3]);
+  });
+
+  test('does not hold or release routing on settings change', async () => {
+    harness = createHarness();
+    await harness.service.start();
+    harness.routing.holds = [];
+    harness.routing.readies = [];
+    harness.settings.update({ serverUrl: 'https://cs.example' });
+    await flushPromises();
+    assert.deepStrictEqual(harness.routing.holds, []);
+    assert.deepStrictEqual(harness.routing.readies, []);
+  });
 });
 
 suite('AuthService flow payload', () => {

@@ -22,6 +22,7 @@ import type { AuthFlow } from '../../centralized-webview-framework/types/auth';
 import { flushPromises } from '../fakes/fake-auth-transport';
 import { authPayloadFixture } from '../fixtures/auth/auth-fixtures';
 import { fixGoalJobs } from '../../objectives/fix-goal-jobs';
+import Telemetry from '../../telemetry';
 
 suite('HomeView', () => {
   suite('removeStaleFiles', () => {
@@ -375,6 +376,71 @@ suite('HomeView', () => {
       fixGoalJobs.add(3, goalFile);
       fixGoalJobs.remove(3, goalFile);
       assert.strictEqual(updates, 2);
+    });
+  });
+
+  suite('telemetry', () => {
+    let homeView: HomeView;
+    let mockContext: ReturnType<typeof createMockExtensionContext>;
+    let telemetryCallCount = 0;
+
+    const mockDocument = (filePath: string) => ({
+      uri: Uri.file(filePath),
+      fileName: filePath,
+    } as any);
+
+    const mockDeltaResult = {
+      'old-score': 9.0,
+      'new-score': 8.0,
+      'score-change': -1.0,
+      'file-level-findings': [],
+      'function-level-findings': [],
+    };
+
+    suiteSetup(() => {
+      const testRepoPath = path.join(__dirname, '../../../test-home-view-repo');
+      mockContext = createMockExtensionContext(testRepoPath);
+      if (!CsExtensionState.hasInstance) {
+        CsExtensionState.init(mockContext);
+      }
+    });
+
+    setup(() => {
+      telemetryCallCount = 0;
+      const originalLogUsage = Telemetry.logUsage.bind(Telemetry);
+      Telemetry.logUsage = function (name: string, data?: Record<string, unknown>) {
+        telemetryCallCount++;
+        return originalLogUsage(name, data);
+      };
+
+      const mockBackgroundServiceView = {
+        updateBadge: () => {},
+        dispose: () => {},
+      } as any;
+      homeView = new HomeView(mockContext, mockBackgroundServiceView);
+    });
+
+    teardown(() => {
+      homeView.dispose();
+    });
+
+    test('updating the monitor sends no telemetry', () => {
+      const filePath = '/workspace/file.ts';
+      (homeView as any).updateFileDeltaData({
+        document: mockDocument(filePath),
+        result: mockDeltaResult,
+        updateMonitor: true,
+      });
+
+      (homeView as any).updateFileDeltaData({
+        document: mockDocument(filePath),
+        result: { ...mockDeltaResult, 'new-score': 7.5, 'score-change': -1.5 },
+        updateMonitor: true,
+      });
+
+      (homeView as any).removeTreeEntry(filePath);
+
+      assert.strictEqual(telemetryCallCount, 0, 'Monitor updates should not send telemetry');
     });
   });
 });

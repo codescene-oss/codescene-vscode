@@ -13,14 +13,14 @@ export function register(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       'codescene.openInteractiveDocsPanel',
       (params: InteractiveDocsParams, source: string) => {
-        Telemetry.logUsage('openInteractiveDocsPanel', { source, category: params?.issueInfo?.category });
+        Telemetry.logUsage('docs/open-interactive-panel', { source, category: params?.issueInfo?.category });
         CodeSceneCWFDocsTabPanel.show(params);
       }
     ),
     // A query param friendly version of openInteractiveDocsPanel
     vscode.commands.registerCommand('codescene.openInteractiveDocsFromDiagnosticTarget', async (queryParams) => {
       const { category, lineNo, charNo, documentUri, codeSmell } = queryParams;
-      Telemetry.logUsage('openInteractiveDocsPanel', { source: 'diagnostic-item', category });
+      Telemetry.logUsage('docs/open-interactive-panel', { source: 'diagnostic-item', category });
       const document = await findOrOpenDocument(documentUri);
       
       // Try to get review result to extract function range info
@@ -53,7 +53,7 @@ export function register(context: vscode.ExtensionContext) {
       CodeSceneCWFDocsTabPanel.show(params);
     }),
     vscode.commands.registerCommand('codescene.openCodeHealthDocs', (args) => {
-      Telemetry.logUsage('openCodeHealthDocs');
+      Telemetry.logUsage('docs/open-code-health');
 
       const params: InteractiveDocsParams = {
         issueInfo: { category: 'docs_general_code_health', position: new vscode.Position(0, 0) },

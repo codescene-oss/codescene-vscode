@@ -134,6 +134,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   private readonly queueEmitter = new vscode.EventEmitter<ReviewQueue>();
   private readonly authStatusEmitter = new vscode.EventEmitter<AuthStatus>();
   private readonly objectivesEmitter = new vscode.EventEmitter<ObjectivesSnapshot>();
+  private readonly serverStopEmitter = new vscode.EventEmitter<void>();
 
   readonly onDidReview = this.reviewEmitter.event;
   readonly onDidDelta = this.deltaEmitter.event;
@@ -144,6 +145,7 @@ export class CsIdeServerClient implements vscode.Disposable {
   readonly onDidQueue = this.queueEmitter.event;
   readonly onDidAuthStatusChange = this.authStatusEmitter.event;
   readonly onDidObjectivesChange = this.objectivesEmitter.event;
+  readonly onDidServerStop = this.serverStopEmitter.event;
 
   constructor(
     readonly binaryPath: string,
@@ -316,6 +318,7 @@ export class CsIdeServerClient implements vscode.Disposable {
     this.queueEmitter.dispose();
     this.authStatusEmitter.dispose();
     this.objectivesEmitter.dispose();
+    this.serverStopEmitter.dispose();
   }
 
   private async sendRequest<T>(method: string, params: unknown): Promise<T> {
@@ -506,8 +509,10 @@ export class CsIdeServerClient implements vscode.Disposable {
     if (process && process !== this.process) return;
     if (this.hasNoProcessState()) return;
     const failedProcess = this.process;
+    const wasRunning = this.process !== undefined;
     this.clearProcessState(error);
     this.killProcess(failedProcess);
+    if (wasRunning) this.serverStopEmitter.fire();
     this.handleError(error);
   }
 
@@ -516,8 +521,10 @@ export class CsIdeServerClient implements vscode.Disposable {
       `[cs-ide] stopping ${formatLogFields({ pid: this.process?.pid, reason: error.message })}`
     );
     const process = this.process;
+    const wasRunning = this.process !== undefined;
     this.clearProcessState(error);
     this.killProcess(process);
+    if (wasRunning) this.serverStopEmitter.fire();
   }
 
   private killProcess(process: ChildProcess | undefined): void {

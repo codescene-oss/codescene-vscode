@@ -2,9 +2,9 @@ import { basename } from 'path';
 import vscode, { Range, WorkspaceEdit } from 'vscode';
 import { AbortError } from '../devtools-api/abort-error';
 import { RefactorResponse } from '../devtools-api/refactor-models';
-import Telemetry from '../telemetry';
 import { AgentTimeoutError } from './agent-process';
 import { RefactoringRequest } from './request';
+import { logAiStage } from './ai-telemetry';
 
 export const OPEN_GOAL_FIX = 'Open';
 export const UNDO_GOAL_FIX = 'Undo';
@@ -67,6 +67,7 @@ async function offerOpenAndUndo(request: RefactoringRequest, response: RefactorR
     return;
   }
   await applyAndSave(document, fnToRefactor.body);
+  logAiStage(request, 'undone');
 }
 
 export async function runGoalFix(request: RefactoringRequest): Promise<void> {
@@ -83,10 +84,11 @@ export async function runGoalFix(request: RefactoringRequest): Promise<void> {
 
   if (document.getText() !== fnToRefactor.body) {
     void vscode.window.showWarningMessage('The file changed after the CodeScene Refactoring Agent read it. Run the goal fix again on the current file.');
+    logAiStage(request, 'failed', { reason: 'file-changed' });
     return;
   }
 
   const applied = await applyAndSave(document, response.code);
-  Telemetry.logUsage('refactor/applied', request.eventData);
+  logAiStage(request, 'applied');
   void offerOpenAndUndo(request, response, applied);
 }

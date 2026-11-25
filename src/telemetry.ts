@@ -1,5 +1,6 @@
 // This module provides a global interface to the CodeScene telemetry singleton.
 import * as vscode from 'vscode';
+import { v4 as uuid } from 'uuid';
 import { getConfiguration } from './configuration';
 import { CsExtensionState, type CsStateProperties } from './cs-extension-state';
 import { getExtensionSettingsFilter } from './extension-id';
@@ -8,13 +9,30 @@ import { TelemetryEvent } from './devtools-api/telemetry-model';
 import { logOutputChannel } from './log';
 import { serializeError } from './utils';
 import { kebabKeys } from './utils/kebab-keys';
+import { RoutingGate } from './telemetry-routing-gate';
 
 function telemetryUserId({ auth, legacySession }: CsStateProperties): string | undefined {
   return auth.status?.user?.id ?? legacySession?.userId;
 }
 
+function repositoryPathsOf(value: unknown): string[] {
+  const paths = value instanceof vscode.TelemetryTrustedValue ? value.value : value;
+  if (paths === undefined) return vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath) ?? [];
+  if (typeof paths === 'string') return [paths];
+  return Array.isArray(paths) ? paths : [];
+}
+
+interface QueuedEvent {
+  name: string;
+  data: any;
+  eventTime: string;
+}
+
 export default class Telemetry {
   private static _instance?: Telemetry;
+  private static sessionId?: string;
+  private static gate?: RoutingGate<QueuedEvent>;
+  private static inFlight = new Set<Promise<any>>();
 
   private static eventPrefix = 'vscode';
   private telemetryLogger: vscode.TelemetryLogger;
@@ -24,7 +42,13 @@ export default class Telemetry {
       sendEventData: (eventName, eventData) => {
         // The telemetry-sender apparently adds the extension id to the event name - replace it manually here to keep it simple for Amplitude users
         const evtName = eventName.replace(extension.id, Telemetry.eventPrefix);
-        void this.postTelemetry(evtName, eventData);
+        const eventTime = new Date().toISOString();
+
+        if (Telemetry.gate) {
+          Telemetry.gate.submit({ name: evtName, data: eventData, eventTime });
+        } else {
+          void this.postTelemetry(evtName, eventData, eventTime);
+        }
       },
       sendErrorData: () => {},
     };
@@ -34,6 +58,11 @@ export default class Telemetry {
 
   static async init(context: vscode.ExtensionContext): Promise<void> {
     try {
+      this.sessionId = uuid();
+      this.gate?.close();
+      this.gate = Telemetry.createGate();
+      this.gate.hold();
+
       // this `void` used to be an `await`, but it turned out to needlessly block execution.
       // `checkFirstRun` doesn't immediately change the settings value anyway - it just opens a settings form.
       void this.checkFirstRun();
@@ -56,7 +85,7 @@ export default class Telemetry {
       context.subscriptions.push(disposable);
     } catch (error) {
       logOutputChannel.error('Error during telemetry initialization:', error);
-      this._instance = undefined; // Ensure instance is cleared on error
+      this._instance = undefined;
     }
   }
 
@@ -67,22 +96,81 @@ export default class Telemetry {
     Telemetry._instance.telemetryLogger.logUsage(eventName, eventData);
   }
 
-  private async postTelemetry(eventName: string, eventData: any) {
-    try {
-      await this.postTelemetryImpl(eventName, eventData);
-    } catch (e) {
-      logOutputChannel.debug(JSON.stringify(e instanceof Error ? serializeError(e) : e));
+  static get routing() {
+    return {
+      hold: () => Telemetry.gate?.hold() ?? 0,
+      ready: (generation: number) => Telemetry.gate?.ready(generation),
+      close: () => Telemetry.gate?.close(),
+    };
+  }
+
+  static async endSession(timeoutMs = 3000): Promise<void> {
+    if (!Telemetry._instance) {
+      Telemetry.routing.close();
+      return;
+    }
+
+    const willLog = getConfiguration('enableTelemetry');
+    if (!willLog && Telemetry.inFlight.size === 0) {
+      Telemetry.routing.close();
+      return;
+    }
+
+    if (willLog) {
+      Telemetry.logUsage('session/ended');
+    }
+
+    Telemetry.routing.close();
+
+    if (Telemetry.inFlight.size > 0) {
+      const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+      await Promise.race([Promise.allSettled([...Telemetry.inFlight]), delay(timeoutMs)]);
     }
   }
 
-  private async postTelemetryImpl(eventName: string, eventData: any) {
+  static resetForTests(boundMs?: number) {
+    Telemetry.gate?.close();
+    Telemetry.gate = Telemetry.createGate(boundMs);
+    Telemetry.inFlight.clear();
+  }
+
+  private static createGate(boundMs = 15000): RoutingGate<QueuedEvent> {
+    return new RoutingGate<QueuedEvent>({
+      boundMs,
+      maxHeld: 100,
+      isFirst: (item) => item.name.endsWith('/session/started'),
+      send: (item) => {
+        void Telemetry._instance?.postTelemetry(item.name, item.data, item.eventTime);
+      },
+    });
+  }
+
+  private async postTelemetry(eventName: string, eventData: any, eventTime?: string) {
+    const promise = (async () => {
+      try {
+        await this.postTelemetryImpl(eventName, eventData, eventTime);
+      } catch (e) {
+        logOutputChannel.debug(JSON.stringify(e instanceof Error ? serializeError(e) : e));
+      }
+    })();
+
+    Telemetry.inFlight.add(promise);
+    void promise.finally(() => Telemetry.inFlight.delete(promise));
+    return promise;
+  }
+
+  private async postTelemetryImpl(eventName: string, eventData: any, eventTime?: string) {
     if (!getConfiguration('enableTelemetry')){
       return;
     }
+
+    const { 'repository-paths': repositoryPathsValue, ...otherData } = eventData ?? {};
+    const repositoryPaths = repositoryPathsOf(repositoryPathsValue);
+
     const telemetryEvent: TelemetryEvent = {
       // Event properties are free-form and come from many call sites; the protocol takes kebab-case keys.
-      ...kebabKeys(eventData),
-      'event-time': new Date().toISOString(),
+      ...kebabKeys(otherData),
+      'event-time': eventTime ?? new Date().toISOString(),
       'event-name': eventName,
       'editor-type': 'vscode',
       'editor-version': vscode.version,
@@ -95,6 +183,8 @@ export default class Telemetry {
     if (process.env.X_CODESCENE_INTERNAL) {
       telemetryEvent['internal'] = true;
     }
+    if (Telemetry.sessionId) telemetryEvent['session-id'] = Telemetry.sessionId;
+    if (repositoryPaths.length > 0) telemetryEvent['repository-paths'] = repositoryPaths;
     return DevtoolsAPI.postTelemetry(telemetryEvent);
   }
 

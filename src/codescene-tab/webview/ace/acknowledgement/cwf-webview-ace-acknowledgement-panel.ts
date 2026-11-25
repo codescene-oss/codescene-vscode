@@ -7,7 +7,6 @@ import { MessageToIDEType } from '../../../../centralized-webview-framework/type
 import { logOutputChannel } from '../../../../log';
 import { RefactoringRequest } from '../../../../refactoring/request';
 import { highlightCode } from '../../../../refactoring/utils';
-import Telemetry from '../../../../telemetry';
 import { reportError, showDocAtPosition } from '../../../../utils';
 import { commonResourceRoots } from '../../../../webview-utils';
 import { handleOpenSettings } from '../../../../code-health-monitor/home/cwf-message-handlers';
@@ -92,7 +91,6 @@ export class CodeSceneCWFAceAcknowledgementTabPanel implements Disposable {
         this.webViewPanel.dispose();
 
         await CsExtensionState.setAcknowledgedAceUsage(true);
-        Telemetry.logUsage('ace-info/acknowledged');
 
         void vscode.commands.executeCommand(
           'codescene.requestAndPresentRefactoring',

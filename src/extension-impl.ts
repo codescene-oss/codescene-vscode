@@ -122,7 +122,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const error = assertError(e);
     CsExtensionState.setAnalysisState({ state: 'error', error });
     reportError({ context: 'Unable to start extension', e });
-    Telemetry.logUsage('on_activate_extension_error', { errorMessage: error.message });
   }
 }
 
@@ -201,7 +200,7 @@ async function completeActivation(context: vscode.ExtensionContext, ideServer: C
  */
 function finalizeActivation(context: vscode.ExtensionContext) {
   // send telemetry on activation (gives us basic usage stats)
-  Telemetry.logUsage('on_activate_extension');
+  Telemetry.logUsage('session/started');
   registerCopyDeviceIdCommand(context);
   void vscode.commands.executeCommand('setContext', 'codescene.asyncActivationFinished', true);
 }
@@ -330,7 +329,8 @@ function loadLegacySession(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {
+export async function deactivate() {
+  await Telemetry.endSession();
   killAllAgentProcesses();
   deactivateAddon();
   deactivateGitUtils();

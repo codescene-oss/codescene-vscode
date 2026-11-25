@@ -1,6 +1,8 @@
+/* eslint-disable max-classes-per-file */
 import Module from 'module';
 import * as assert from 'assert';
 import * as fs from 'fs';
+import * as os from 'os';
 import { DiagnosticStub } from './stubs/diagnostic-stub';
 import { EventEmitterStub } from './stubs/event-emitter-stub';
 import { RangeStub } from './stubs/range-stub';
@@ -329,11 +331,51 @@ function createMockGitApi() {
   };
 }
 
+export class TelemetryTrustedValueStub {
+  constructor(public readonly value: any) {}
+}
+
+type TelemetryLevel = 'all' | 'error' | 'crash' | 'off';
+let mockTelemetryLevel: TelemetryLevel = 'all';
+let mockExtensionForTelemetry: { id: string } | undefined;
+
+export function setMockTelemetryLevel(level: TelemetryLevel) {
+  mockTelemetryLevel = level;
+}
+
+export function resetMockTelemetryLevel() {
+  mockTelemetryLevel = 'all';
+}
+
+export function setMockExtensionForTelemetry(extension: { id: string }) {
+  mockExtensionForTelemetry = extension;
+}
+
+export function resetMockExtensionForTelemetry() {
+  mockExtensionForTelemetry = undefined;
+}
+
+function cleanTelemetryString(value: string): string {
+  const homeDir = os.homedir();
+  return homeDir && value.includes(homeDir) ? '<REDACTED: user-file-path>' : value;
+}
+
+function deepCleanTelemetryData(data: any): any {
+  if (data instanceof TelemetryTrustedValueStub) return data.value;
+  if (typeof data === 'string') return cleanTelemetryString(data);
+  if (Array.isArray(data)) return data.map(deepCleanTelemetryData);
+  if (data && typeof data === 'object') {
+    return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, deepCleanTelemetryData(value)]));
+  }
+  return data;
+}
+
 class TabInputTextStub {
   constructor(public uri: any) {}
 }
 
 const vscodeStub = {
+  TelemetryTrustedValue: TelemetryTrustedValueStub,
   // The editor version is always a string in VS Code; telemetry sends it as editor-version.
   version: '1.112.0',
   TabInputText: TabInputTextStub,
@@ -552,6 +594,7 @@ const vscodeStub = {
     },
   },
   languages: {
+    setTextDocumentLanguage: async (document: any) => document,
     match: (selector: any, document: any) => {
       if (!document?.fileName || !Array.isArray(selector)) {
         return 0;
@@ -611,11 +654,22 @@ const vscodeStub = {
   },
   env: {
     appName: 'Visual Studio Code',
-    createTelemetryLogger: () => ({
-      logUsage: () => {},
-      logError: () => {},
-      dispose: () => {},
-    }),
+    createTelemetryLogger: (sender: any, options?: any) => {
+      const capturedOptions = options;
+      const extensionId = mockExtensionForTelemetry?.id || 'unknown';
+      return {
+        logUsage: (name: string, data?: Record<string, any>) => {
+          if (mockTelemetryLevel === 'off') {
+            return;
+          }
+          const cleaned = data ? deepCleanTelemetryData(data) : undefined;
+          sender.sendEventData(`${extensionId}/${name}`, cleaned);
+        },
+        logError: () => {},
+        dispose: () => {},
+        _capturedOptions: capturedOptions,
+      };
+    },
   },
   Uri: {
     parse: (value: string) => ({
@@ -639,6 +693,17 @@ const vscodeStub = {
       with: () => ({}),
       toString: () => path,
       toJSON: () => ({ scheme: 'file', path }),
+    }),
+    from: ({ scheme, path = '', query = '' }: { scheme: string; path?: string; query?: string }) => ({
+      scheme,
+      authority: '',
+      path,
+      query,
+      fragment: '',
+      fsPath: path,
+      with: () => ({}),
+      toString: () => `${scheme}:${path}`,
+      toJSON: () => ({ scheme, path }),
     }),
     joinPath: (base: any, ...segments: string[]) => {
       const joined = [base.toString(), ...segments].join('/');

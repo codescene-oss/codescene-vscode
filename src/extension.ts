@@ -65,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
   return impl.activate(context);
 }
 
-export function deactivate() {
+export async function deactivate() {
   if (!impl) {
     return;
   }

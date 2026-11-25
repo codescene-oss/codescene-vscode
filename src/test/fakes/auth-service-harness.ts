@@ -1,4 +1,4 @@
-import { AuthService } from '../../auth/auth-service';
+import { AuthService, type AuthServiceDeps } from '../../auth/auth-service';
 import { FakeAuthSettings } from './fake-auth-settings';
 import { FakeAuthTransport } from './fake-auth-transport';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
@@ -9,12 +9,14 @@ export interface Harness {
   settings: FakeAuthSettings;
   events: Array<{ name: string; data?: Record<string, unknown> }>;
   opened: string[];
+  routing: { holds: number[]; readies: number[] };
 }
 
 export interface HarnessOptions {
   capabilities?: string[];
   signInEnabled?: boolean;
   accessToken?: string;
+  routing?: AuthServiceDeps['routing'];
 }
 
 
@@ -34,6 +36,8 @@ export function createHarness(options: HarnessOptions = {}): Harness {
   });
   const events: Harness['events'] = [];
   const opened: string[] = [];
+  const routing = { holds: [] as number[], readies: [] as number[] };
+  let generation = 0;
   const service = new AuthService({
     transport,
     settings,
@@ -41,6 +45,14 @@ export function createHarness(options: HarnessOptions = {}): Harness {
       opened.push(url);
     },
     logUsage: (name, data) => events.push(data ? { name, data } : { name }),
+    routing: options.routing ?? {
+      hold: () => {
+        const gen = ++generation;
+        routing.holds.push(gen);
+        return gen;
+      },
+      ready: (gen: number) => routing.readies.push(gen),
+    },
   });
-  return { service, transport, settings, events, opened };
+  return { service, transport, settings, events, opened, routing };
 }

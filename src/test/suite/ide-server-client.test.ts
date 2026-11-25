@@ -353,6 +353,23 @@ suite('CsIdeServerClient Test Suite', () => {
     assertLogContains('info', 'sending watchFiles repo=/repo relativePaths=packages/app');
     assertLogContains('info', 'received watchInventoryChanged repo=/repo count=1 files=watched.ts');
   });
+
+  test('fires onDidServerStop when the process exits', async () => {
+    let stopCount = 0;
+    client.onDidServerStop(() => stopCount++);
+    await client.start();
+    const connection = client as unknown as { sendRequest<T>(method: string, params: unknown): Promise<T> };
+    await assert.rejects(connection.sendRequest('test/exit', {}), /exited|connection/i);
+    assert.strictEqual(stopCount, 1);
+  });
+
+  test('fires onDidServerStop on restart', async () => {
+    let stopCount = 0;
+    client.onDidServerStop(() => stopCount++);
+    await client.start();
+    await client.restart();
+    assert.strictEqual(stopCount, 1);
+  });
 });
 
 async function waitForLog(snippet: string): Promise<void> {
