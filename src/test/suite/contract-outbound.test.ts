@@ -20,7 +20,7 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { ReviewPipeline, ReviewPipelinePresentation } from '../../review/review-pipeline';
 import Telemetry from '../../telemetry';
-import { assertCasing, fixture, loadManifest, manifestEntry, validate } from '../contract/contract';
+import { assertCasing, fixture, loadManifest, manifestEntry, schemaDefinition, validate } from '../contract/contract';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
@@ -344,6 +344,13 @@ suite('Contract outbound params Test Suite', () => {
         /Keys not in kebab-case: \$\.event\.scoreChange/
       );
     });
+  });
+
+  test('TelemetryEvent schema documents session-id and repository-paths', () => {
+    const properties = schemaDefinition('telemetry-event.json', 'TelemetryEvent').properties;
+    assert.strictEqual(properties['session-id']?.type, 'string');
+    assert.strictEqual(properties['repository-paths']?.type, 'array');
+    assert.strictEqual(properties['repository-paths']?.items?.type, 'string');
   });
 
   test('reportError sends no telemetry', async () => {

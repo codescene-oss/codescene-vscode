@@ -106,4 +106,22 @@ suite('Telemetry Integration Test Suite', () => {
     assert.ok(response, 'Response should be defined');
     assert.strictEqual(typeof response.status, 'number', 'Status should be a number');
   });
+
+  test('cs-ide accepts an event with session-id and repository-paths', async function() {
+    this.timeout(10000);
+
+    const event: TelemetryEvent = {
+      'editor-type': 'VSCode',
+      'editor-version': '1.112.0',
+      'event-name': 'session-started',
+      'extension-version': '1.0.0',
+      'session-id': 'session-123',
+      'repository-paths': [testDir]
+    };
+
+    const response = await DevtoolsAPI.postTelemetry(event);
+
+    assert.ok(response, 'Response should be defined');
+    assert.strictEqual(typeof response.status, 'number', 'Status should be a number');
+  });
 });
