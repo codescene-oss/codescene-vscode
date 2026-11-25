@@ -11,7 +11,6 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import vscode from 'vscode';
 import { AuthRpc } from '../../auth/auth-rpc';
 import { ObjectivesRpc } from '../../objectives/objectives-rpc';
 import { GoalWorkSessionRpc } from '../../objectives/goal-work-session-rpc';
@@ -21,11 +20,11 @@ import { DevtoolsAPI } from '../../devtools-api';
 import { CsIdeServerClient } from '../../devtools-api/ide-server-client';
 import { ReviewPipeline, ReviewPipelinePresentation } from '../../review/review-pipeline';
 import Telemetry from '../../telemetry';
-import { assertCasing, fixture, loadManifest, manifestEntry, validate } from '../contract/contract';
+import { assertCasing, fixture, loadManifest, manifestEntry, schemaDefinition, validate } from '../contract/contract';
 import { authStatusFixture } from '../fixtures/auth/auth-fixtures';
 import { createMockExtensionContext } from '../mocks/mock-extension-context';
 import { TestTextDocument } from '../mocks/test-text-document';
-import { mockConfiguration, restoreDefaultConfiguration } from '../setup';
+import { mockConfiguration, restoreDefaultConfiguration, setMockExtensionForTelemetry, resetMockExtensionForTelemetry } from '../setup';
 
 const replayServer = path.join(__dirname, '../fixtures/contract-replay-server.js');
 const REPO = '/fake/repo';
@@ -78,18 +77,10 @@ suite('Contract outbound params Test Suite', () => {
   // ---- Telemetry: the production Telemetry class on top of the real client -----------------------------------
 
   const extension = { id: 'codescene.codescene-vscode', packageJSON: { version: '1.2.3' } };
-  let originalCreateTelemetryLogger: unknown;
   let originalStateProperties: PropertyDescriptor | undefined;
 
   function installTelemetry(): Telemetry {
-    const env = vscode.env as any;
-    originalCreateTelemetryLogger = env.createTelemetryLogger;
-    // What VS Code's TelemetryLogger does: hand the event to the extension's sender under the extension id.
-    env.createTelemetryLogger = (sender: vscode.TelemetrySender) => ({
-      logUsage: (name: string, data?: Record<string, any>) => sender.sendEventData(`${extension.id}/${name}`, data),
-      logError: () => {},
-      dispose: () => {},
-    });
+    setMockExtensionForTelemetry(extension);
     const telemetry = new Telemetry(extension as any);
     (Telemetry as any)._instance = telemetry;
     (Telemetry as any).sentErrorsCount = 0;
@@ -118,31 +109,27 @@ suite('Contract outbound params Test Suite', () => {
   const everyTelemetryInput = { userId: '4711', internal: true };
   const noTelemetryInput = { internal: false };
 
-  // Event properties as the extension's call sites hand them to Telemetry.logUsage / logError.
+  // Event properties as the extension's call sites hand them to Telemetry.logUsage.
   const telemetryCallSites: Variants = {
     'all inputs: user id, internal and call-site data': telemetryEnvironment(everyTelemetryInput, () =>
-      Telemetry.logUsage('code-health-monitor/file-updated', { visible: true, scoreChange: -1.5, nIssues: 3 })
+      Telemetry.logUsage('docs/open-interactive-panel', { source: 'codelens', category: 'complex-method' })
     ),
     'optional inputs missing: no user id, not internal, no data': telemetryEnvironment(noTelemetryInput, () =>
-      Telemetry.logUsage('on_activate_extension')
+      Telemetry.logUsage('session/started')
     ),
-    'call site: activation error': telemetryEnvironment(noTelemetryInput, () =>
-      Telemetry.logUsage('on_activate_extension_error', { errorMessage: 'activation failed' })
-    ),
-    'call site: refactoring request': telemetryEnvironment(noTelemetryInput, () =>
-      Telemetry.logUsage('refactor/requested', { source: 'codelens', traceId: 'trace-1', skipCache: true })
-    ),
-    'call site: goal fix applied': telemetryEnvironment(noTelemetryInput, () =>
-      Telemetry.logUsage('refactor/applied', { traceId: 'trace-1', goalId: 2, outcome: 'improved' })
+    'call site: ai/refactor/requested': telemetryEnvironment(noTelemetryInput, () =>
+      Telemetry.logUsage('ai/refactor/requested', { source: 'codelens', traceId: 'trace-1', skipCache: true })
     ),
     'call site: sign-in failure': telemetryEnvironment(noTelemetryInput, () =>
       Telemetry.logUsage('auth/sign-in-failed', { 'error-code': 'auth/timeout' })
     ),
-    'call site: unhandled error with nested extra data': telemetryEnvironment(noTelemetryInput, () => {
-      const error = new Error('boom') as Error & { code: string };
-      error.code = 'ECONNREFUSED';
-      Telemetry.logError(error, true, { repoRoot: REPO, context: { fileName: 'a.ts', retryCount: [1, 2] } });
+    'call site: with session id and repository paths': telemetryEnvironment(noTelemetryInput, () => {
+      (Telemetry as any).sessionId = 'session-123';
+      return Telemetry.logUsage('test-event', { 'repository-paths': ['/repo1', '/repo2'] });
     }),
+    'call site: goal fix applied': telemetryEnvironment(noTelemetryInput, () =>
+      Telemetry.logUsage('ai/fix-task/applied', { traceId: 'trace-1', goalId: 123, outcome: 'reached' })
+    ),
   };
 
   // ---- Review requests and notifications ----------------------------------------------------------------------
@@ -282,12 +269,15 @@ suite('Contract outbound params Test Suite', () => {
 
     originalStateProperties = Object.getOwnPropertyDescriptor(CsExtensionState, 'stateProperties');
     mockConfiguration('codescene', { enableTelemetry: true });
+    (Telemetry as any).sessionId = 'test-session-123';
     installTelemetry();
   });
 
   suiteTeardown(() => {
+    Telemetry.resetForTests();
     (Telemetry as any)._instance = undefined;
-    (vscode.env as any).createTelemetryLogger = originalCreateTelemetryLogger;
+    (Telemetry as any).sessionId = undefined;
+    resetMockExtensionForTelemetry();
     delete process.env.X_CODESCENE_INTERNAL;
     if (originalStateProperties) Object.defineProperty(CsExtensionState, 'stateProperties', originalStateProperties);
     restoreDefaultConfiguration();
@@ -354,5 +344,25 @@ suite('Contract outbound params Test Suite', () => {
         /Keys not in kebab-case: \$\.event\.scoreChange/
       );
     });
+  });
+
+  test('TelemetryEvent schema documents session-id and repository-paths', () => {
+    const properties = schemaDefinition('telemetry-event.json', 'TelemetryEvent').properties;
+    assert.strictEqual(properties['session-id']?.type, 'string');
+    assert.strictEqual(properties['repository-paths']?.type, 'array');
+    assert.strictEqual(properties['repository-paths']?.items?.type, 'string');
+  });
+
+  test('reportError sends no telemetry', async () => {
+    const { reportError } = await import('../../utils');
+
+    await client.request('test/captured', {});
+    reportError({ context: 'Test error context', e: new Error('Test error'), extraData: { foo: 'bar' } });
+
+    await sleep(100);
+    const received = await client.request<Captured[]>('test/captured', {});
+    const telemetryMessages = received.filter((m) => m.method === 'cs-ide/telemetry');
+
+    assert.strictEqual(telemetryMessages.length, 0, 'reportError should not send any telemetry');
   });
 });

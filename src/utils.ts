@@ -2,7 +2,6 @@ import { readFile } from 'fs/promises';
 import { join, normalize } from 'path';
 import vscode, { Range } from 'vscode';
 import { logOutputChannel } from './log';
-import Telemetry from './telemetry';
 import { AbortError } from './devtools-api/abort-error';
 import { DevtoolsError } from './devtools-api/devtools-error';
 import { getWorkspacePath } from './git-utils';
@@ -57,7 +56,6 @@ export function reportError({ context, e, consoleOnly = false, extraData }: Repo
   // For user-facing messages, show just the Node.js error code (https://nodejs.org/api/errors.html#nodejs-error-codes ) if available
   const code = (error as any).code;
   const userMessage = code ? `${context} (${code})` : context;
-  Telemetry.logError(error, true, {...extraData, context});
 
   if (consoleOnly) {
     logOutputChannel.show();

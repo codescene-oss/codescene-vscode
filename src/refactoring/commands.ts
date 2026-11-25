@@ -2,7 +2,6 @@ import path from 'path';
 import vscode, { ViewColumn, WorkspaceEdit } from 'vscode';
 import { CsExtensionState } from '../cs-extension-state';
 import { FnToRefactor } from '../devtools-api/refactor-models';
-import Telemetry from '../telemetry';
 import { RefactoringRequest } from './request';
 import { ensureSavedForRefactoring } from './unsaved-changes';
 import { createTempDocument, decorateCode, findFnToRefactor, selectCode, targetEditor } from './utils';
@@ -15,6 +14,7 @@ import { FixGoalTarget } from './agent-types';
 import { fnToRefactorForGoal } from './fn-to-refactor';
 import { replaceDocument, runGoalFix } from './goal-fix';
 import { fixGoalJobs } from '../objectives/fix-goal-jobs';
+import { logAiStage, logPanelStage } from './ai-telemetry';
 
 /**
  * Locate the view column of an existing tab for the given document, even when the document
@@ -66,13 +66,13 @@ export class CsRefactoringCommands implements vscode.Disposable {
     const request = new RefactoringRequest(toRefactor, document, skipCache);
     if (this.presentAcknowledgement(request, source)) return;
 
-    Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
+    request.source = source;
+    logAiStage(request, 'requested');
     CodeSceneCWFAceTabPanel.show(request);
   }
 
   private presentAcknowledgement(request: RefactoringRequest, source: string): boolean {
     if (CsExtensionState.acknowledgedAceUsage) return false;
-    Telemetry.logUsage('ace-info/presented', { source });
     CodeSceneCWFAceAcknowledgementTabPanel.show(request);
     return true;
   }
@@ -90,7 +90,8 @@ export class CsRefactoringCommands implements vscode.Disposable {
       const request = new RefactoringRequest(fnToRefactorForGoal(document, goal), document, skipCache, goal);
       if (this.presentAcknowledgement(request, source)) return;
 
-      Telemetry.logUsage('refactor/requested', { source, ...request.eventData });
+      request.source = source;
+      logAiStage(request, 'requested');
       await runGoalFix(request);
     } finally {
       fixGoalJobs.remove(goal.goalId, fileName);
@@ -143,7 +144,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
         await vscode.commands.executeCommand('editor.action.formatSelection');
       }
 
-      Telemetry.logUsage('refactor/applied', refactoring.eventData);
+      logPanelStage(refactoring, 'applied');
     });
   }
 
@@ -194,7 +195,7 @@ export class CsRefactoringCommands implements vscode.Disposable {
     await vscode.window.showTextDocument(originalCodeTmpDoc, viewColumn, false);
     await vscode.commands.executeCommand('vscode.diff', originalCodeTmpDoc.uri, refactoringTmpDoc.uri);
 
-    Telemetry.logUsage('refactor/diff-shown', refactoring.eventData);
+    logPanelStage(refactoring, 'diff-shown');
   }
 
   dispose() {

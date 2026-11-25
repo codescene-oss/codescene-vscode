@@ -17,8 +17,10 @@ export class FakeAuthTransport implements AuthTransport {
   private readonly handlers = new Map<string, Handler>();
   private readonly startEmitter = new EventEmitter<ServerStartEvent>();
   private readonly statusEmitter = new EventEmitter<AuthStatus>();
+  private readonly stopEmitter = new EventEmitter<void>();
   readonly onDidServerStart = this.startEmitter.event;
   readonly onDidAuthStatusChange = this.statusEmitter.event;
+  readonly onDidServerStop = this.stopEmitter.event;
 
   constructor(private metadata: ServerMetadata = { sha: 'sha', version: 'version', capabilities: ['auth-v1'] }) {}
 
@@ -55,6 +57,7 @@ export class FakeAuthTransport implements AuthTransport {
 
   restart(): Promise<ServerMetadata> {
     this.restarts++;
+    this.stopEmitter.fire();
     this.emitRestart();
     return Promise.resolve(this.metadata);
   }
@@ -62,6 +65,10 @@ export class FakeAuthTransport implements AuthTransport {
   emitRestart(metadata: ServerMetadata = this.metadata): void {
     this.metadata = metadata;
     this.startEmitter.fire({ metadata, restart: true });
+  }
+
+  crash(): void {
+    this.stopEmitter.fire();
   }
 
   notify(status: AuthStatus): void {

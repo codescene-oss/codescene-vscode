@@ -31,6 +31,7 @@ export interface AuthServiceDeps {
   settings: AuthSettings;
   openExternal: (url: string) => Thenable<unknown>;
   logUsage: (name: string, data?: Record<string, unknown>) => void;
+  routing: { hold(): number; ready(generation: number): void };
 }
 
 export class AuthService implements vscode.Disposable {
@@ -72,13 +73,19 @@ export class AuthService implements vscode.Disposable {
   async start(): Promise<void> {
     this.disposables.push(
       this.deps.transport.onDidServerStart((event) => {
-        if (event.restart || !this.startHandled) void this.handleServerStart(event.metadata);
+        if (event.restart || !this.startHandled) void this.handleServerStartWithRouting(event.metadata);
       }),
       this.deps.transport.onDidAuthStatusChange((status) => this.applyStatus(status)),
+      this.deps.transport.onDidServerStop(() => this.deps.routing.hold()),
       this.deps.settings.onDidChange(() => void this.refresh())
     );
-    const metadata = await this.deps.transport.start();
-    if (!this.startHandled) await this.handleServerStart(metadata);
+    const generation = this.deps.routing.hold();
+    try {
+      const metadata = await this.deps.transport.start();
+      if (!this.startHandled) await this.handleServerStart(metadata);
+    } finally {
+      this.deps.routing.ready(generation);
+    }
   }
 
   async signIn(): Promise<void> {
@@ -235,6 +242,15 @@ export class AuthService implements vscode.Disposable {
   private stopRepoSyncing(): void {
     this.repoSyncing = false;
     this.publish(this.snapshot);
+  }
+
+  private async handleServerStartWithRouting(metadata: ServerMetadata): Promise<void> {
+    const generation = this.deps.routing.hold();
+    try {
+      await this.handleServerStart(metadata);
+    } finally {
+      this.deps.routing.ready(generation);
+    }
   }
 
   private async handleServerStart(metadata: ServerMetadata): Promise<void> {

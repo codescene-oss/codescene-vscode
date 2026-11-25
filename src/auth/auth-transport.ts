@@ -8,4 +8,5 @@ export interface AuthTransport {
   request<T>(method: string, params: unknown): Promise<T>;
   readonly onDidServerStart: Event<ServerStartEvent>;
   readonly onDidAuthStatusChange: Event<AuthStatus>;
+  readonly onDidServerStop: Event<void>;
 }

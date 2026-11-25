@@ -59,6 +59,7 @@ export function activateAuth(
     settings,
     openExternal: openInBrowser,
     logUsage: (name, data) => Telemetry.logUsage(name, data),
+    routing: Telemetry.routing,
   });
   const notices = new AuthNotices(context.globalState, {
     show: (message, ...items) => vscode.window.showInformationMessage(message, ...items),

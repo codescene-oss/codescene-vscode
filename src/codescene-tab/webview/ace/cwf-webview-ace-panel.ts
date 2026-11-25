@@ -2,7 +2,6 @@ import vscode, { Disposable, ViewColumn, WebviewPanel } from 'vscode';
 import { MessageToIDEType } from '../../../centralized-webview-framework/types/messages';
 import { reportError, showDocAtPosition } from '../../../utils';
 import { commonResourceRoots } from '../../../webview-utils';
-import Telemetry from '../../../telemetry';
 import {
   copyCode,
   decorateCode,
@@ -10,6 +9,7 @@ import {
   highlightCode,
   refactoringStaleness,
 } from '../../../refactoring/utils';
+import { logPanelStage } from '../../../refactoring/ai-telemetry';
 import { logOutputChannel } from '../../../log';
 import { RefactoringRequest } from '../../../refactoring/request';
 import { initBaseContent, updateRendererMessage } from '../../../centralized-webview-framework/cwf-html-utils';
@@ -126,7 +126,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       },
       reject: () => {
         deselectRefactoring(request);
-        Telemetry.logUsage('refactor/rejected', request.eventData);
+        logPanelStage(request, 'discarded');
         this.webViewPanel.dispose();
       },
       close: () => {
@@ -154,7 +154,7 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
         const copyCodeMessage = message as Extract<MessageToIDEType, { messageType: 'copyCode' }>;
         const code = copyCodeMessage.payload?.code;
 
-        Telemetry.logUsage('refactor/copy-code', request.eventData);
+        logPanelStage(request, 'copied');
 
         if (code) {
           await copyCode(code);
@@ -260,6 +260,10 @@ export class CodeSceneCWFAceTabPanel implements Disposable {
       result.code = decorateCode(result, request.document.languageId);
 
       await this.renderAce(request, getAceData({ request, result, isStale, loading: false }));
+
+      if (request.markPresented()) {
+        logPanelStage(request, 'presented');
+      }
     } catch (error) {
       void this.handleErrorState(request, isStale, error);
     }

@@ -129,18 +129,12 @@ export class HomeView implements WebviewViewProvider, Disposable {
     const { document, result, updateMonitor } = event;
     if (!updateMonitor) return;
 
-    const evtData = (fileWithIssues: FileWithIssues) => {
-      const { nIssues, scoreChange } = fileWithIssues;
-      return { visible: this.view?.visible, scoreChange, nIssues };
-    };
-
     // Find the tree item matching the event document
     const fileWithIssues = this.fileIssueMap.get(document.uri.fsPath);
     if (fileWithIssues) {
       if (result) {
         // Update the existing entry if there are changes
         fileWithIssues.update(result, document);
-        Telemetry.logUsage('code-health-monitor/file-updated', evtData(fileWithIssues));
       } else {
         // If there are no longer any issues, remove the entry from the tree
         this.removeTreeEntry(document.uri.fsPath);
@@ -149,7 +143,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
       // No existing file entry found - add one if there are changes
       const newFileWithIssues = new FileWithIssues(result, document);
       this.fileIssueMap.set(document.uri.fsPath, newFileWithIssues);
-      Telemetry.logUsage('code-health-monitor/file-added', evtData(newFileWithIssues));
     }
 
     this.updateActivityBadge();
@@ -165,7 +158,6 @@ export class HomeView implements WebviewViewProvider, Disposable {
   // Remove delta results that no longer should be rendered
   private removeTreeEntry(filePath: string) {
     this.fileIssueMap.delete(filePath);
-    Telemetry.logUsage('code-health-monitor/file-removed', { visible: this.view?.visible });
   }
 
   private applyAnalysisEvent(event: AnalysisEvent) {
