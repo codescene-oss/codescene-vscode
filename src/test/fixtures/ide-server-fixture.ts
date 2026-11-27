@@ -148,7 +148,6 @@ const signedOutStatus = {
   user: null,
   account: null,
   license: null,
-  'ace-credential': false,
   'expires-at': null,
   login: null,
   error: null,

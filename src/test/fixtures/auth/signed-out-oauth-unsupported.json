@@ -7,7 +7,6 @@
   "user": null,
   "account": null,
   "license": null,
-  "ace-credential": false,
   "expires-at": null,
   "login": null,
   "error": { "code": "auth/oauth-unsupported", "message": "This CodeScene server does not support browser sign-in. Use an access token instead." }
