@@ -106,7 +106,6 @@ const authStatusFields = declared<AuthStatus>({
   user: declared<Declared<AuthStatus['user']>>({ id: true, name: true }),
   account: declared<Declared<AuthStatus['account']>>({ id: true, name: true }),
   license: declared<Declared<AuthStatus['license']>>({ pro: true }),
-  'ace-credential': true,
   'expires-at': true,
   login: declared<Declared<AuthStatus['login']>>({ 'login-id': true, 'authorize-url': true }),
   error: declared<Declared<AuthStatus['error']>>({ code: true, message: true }),

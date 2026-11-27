@@ -4,7 +4,6 @@ import { AUTH_STATUS_FIXTURES, authPayloadFixture, authStatusFixture } from '../
 
 const AUTH_STATUS_KEYS = [
   'account',
-  'ace-credential',
   'credential-source',
   'env-token-present',
   'error',

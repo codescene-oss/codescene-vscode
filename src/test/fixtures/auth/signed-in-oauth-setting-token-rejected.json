@@ -7,7 +7,6 @@
   "user": { "id": "17", "name": "Ada Lovelace" },
   "account": null,
   "license": { "pro": true },
-  "ace-credential": false,
   "expires-at": 1792000000,
   "login": null,
   "error": { "code": "auth/invalid-token", "message": "The access token was rejected by CodeScene." }

@@ -30,7 +30,6 @@ export type AuthStatus = {
   user: { id: string; name: string } | null;
   account: { id: string; name: string } | null;
   license: { pro: boolean } | null;
-  'ace-credential': boolean;
   'expires-at': number | null;
   login: { 'login-id': string; 'authorize-url': string } | null;
   error: AuthError | null;
@@ -45,10 +44,8 @@ export type Account = {
 
 export type Project = { id: string; name: string };
 
-export type WebviewAuthStatus = Omit<AuthStatus, 'ace-credential'>;
-
 export type AuthPayload = {
-  status: WebviewAuthStatus;
+  status: AuthStatus;
   accounts: Account[] | null;
   projects: Project[] | null;
   repo: { path: string; name: string } | null;
